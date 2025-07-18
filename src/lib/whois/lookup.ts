@@ -5,9 +5,32 @@ import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
 import { lookupRdap, convertRdapToWhoisResult } from "@/lib/whois/rdap_client";
 import whois from "whois-raw";
+import fs from "fs";
+import path from "path";
+
+// 加载自定义服务器映射
+let customServers: Record<string, string> = {};
+const customServersPath = path.resolve(process.cwd(), "src/lib/whois/custom_servers.json");
+if (fs.existsSync(customServersPath)) {
+  customServers = JSON.parse(fs.readFileSync(customServersPath, "utf-8"));
+}
+
+function getTld(domain: string) {
+  const parts = domain.toLowerCase().split(".");
+  if (parts.length < 2) return "";
+  return "." + parts[parts.length - 1];
+}
 
 function getLookupOptions(domain: string) {
   const isDomain = !!extractDomain(domain);
+  const tld = getTld(domain);
+  // 如果有自定义服务器，指定给 whois-raw
+  if (customServers[tld]) {
+    return {
+      follow: isDomain ? MAX_WHOIS_FOLLOW : 0,
+      server: customServers[tld],
+    };
+  }
   return {
     follow: isDomain ? MAX_WHOIS_FOLLOW : 0,
   };
@@ -18,14 +41,12 @@ function getLookupRawWhois(domain: string, options?: any): Promise<string> {
     try {
       whois.lookup(domain, options, (err: Error, data: string) => {
         if (err) {
-          // reject err like tld error
           reject(err);
         } else {
           resolve(data);
         }
       });
     } catch (e) {
-      // reject err like connection error
       reject(e);
     }
   });
