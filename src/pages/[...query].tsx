@@ -4076,6 +4076,12 @@ export default function LookupPage({
   const [data, setData] = React.useState<WhoisResult>(_EMPTY_WHOIS_RESULT);
   // Incrementing this forces a fresh fetch for the same target (re-query button).
   const [refreshKey, setRefreshKey] = React.useState(0);
+  // Quick DNS probe result — arrives ~100-300ms before full WHOIS, lets us
+  // show registration status early while the skeleton is still displayed.
+  const [quickProbe, setQuickProbe] = React.useState<{
+    registered: boolean | null;
+    ns: string[];
+  } | null>(null);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
@@ -4104,6 +4110,7 @@ export default function LookupPage({
   useEffect(() => {
     setData(_EMPTY_WHOIS_RESULT);
     setLoading(true);
+    setQuickProbe(null);
     let cancelled = false;
     // Use a pre-started fetch if handleSearch already fired one (hides SSR +
     // hydration latency ~400-700 ms inside the reported lookup time).
@@ -4111,18 +4118,34 @@ export default function LookupPage({
     const prefetched = refreshKey === 0 ? consumePrefetch(target) : undefined;
     const url = `/api/lookup?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
     const responsePromise = prefetched ?? fetch(url);
+
+    // Quick DNS NS probe — resolves in ~100-300 ms (no SSL check) so we can
+    // show registration status well before the full WHOIS response arrives.
+    // Only run for domain-like queries (not IPs or ASNs).
+    const looksLikeDomain = /\./.test(target) && !/^AS\d+$/i.test(target) && !/^\d{1,3}(\.\d{1,3}){3}/.test(target);
+    if (looksLikeDomain) {
+      fetch(`/api/ns-check?domain=${encodeURIComponent(target)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then((d: { registered: boolean | null; ns: string[] } | null) => {
+          if (!cancelled && d) setQuickProbe({ registered: d.registered, ns: d.ns });
+        })
+        .catch(() => {});
+    }
+
     responsePromise
       .then((r) => r.json())
       .then((d: WhoisResult) => {
         if (!cancelled) {
           setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
           setLoading(false);
+          setQuickProbe(null);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setData({ status: false, time: 0, cached: false, error: "Lookup failed", result: { ...initialWhoisAnalyzeResult } });
           setLoading(false);
+          setQuickProbe(null);
         }
       });
     return () => { cancelled = true; };
@@ -4592,6 +4615,48 @@ export default function LookupPage({
             </div>
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
+
+          <AnimatePresence initial={false}>
+            {loading && quickProbe && (
+              <motion.div
+                key="quick-probe"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                transition={{ duration: 0.18 }}
+                className="mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-background/80 text-sm"
+              >
+                <span
+                  className={
+                    quickProbe.registered === true
+                      ? "w-2 h-2 rounded-full bg-emerald-500 shrink-0"
+                      : quickProbe.registered === false
+                      ? "w-2 h-2 rounded-full bg-red-400 shrink-0"
+                      : "w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0"
+                  }
+                />
+                <span className="font-medium">
+                  {quickProbe.registered === true
+                    ? (isZh ? "域名已注册" : "Domain registered")
+                    : quickProbe.registered === false
+                    ? (isZh ? "DNS 无记录" : "No DNS records found")
+                    : (isZh ? "DNS 查询中…" : "Checking DNS…")}
+                </span>
+                {quickProbe.ns.length > 0 && (
+                  <span className="text-muted-foreground text-xs truncate hidden sm:block">
+                    NS: {quickProbe.ns.slice(0, 2).join(", ")}
+                  </span>
+                )}
+                <span className="ml-auto text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
+                  <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  </svg>
+                  {isZh ? "获取 WHOIS…" : "Fetching WHOIS…"}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence initial={false}>
             {loading && (

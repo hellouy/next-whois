@@ -646,9 +646,9 @@ const WHOIS_MERGE_WAIT_MS = 350;
 
 // After WHOIS succeeds (possibly with empty data), wait at most this long for
 // RDAP to finish before giving up on it.  RDAP often wins the race on warm
-// connections but can be slow on first query (cold TLS / DNS).  1 800 ms
-// lets a cold RDAP request complete (total cap is still RDAP_TIMEOUT = 4 s).
-const RDAP_MERGE_WAIT_MS = 1_800;
+// connections but can be slow on first query (cold TLS / DNS).  600 ms
+// is enough for most cold-start RDAP responses while keeping latency low.
+const RDAP_MERGE_WAIT_MS = 600;
 
 // Separate timeout caps for each protocol.
 // RDAP: ccTLD overrides now bypass IANA bootstrap (fast direct fetch) — 4 s
