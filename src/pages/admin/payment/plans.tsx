@@ -315,7 +315,12 @@ export default function PaymentPlansAdmin() {
             <RiStarLine className="w-3.5 h-3.5" />支付渠道配置
           </h3>
           <p className="text-xs text-muted-foreground">在「设置」页面的「支付网关」区块中配置各渠道的 API Key 和 Secret，并选择开启的渠道。</p>
-          <p className="text-xs text-muted-foreground">Webhook 地址：<code className="bg-muted px-1 rounded text-[11px]">/api/payment/webhook/stripe</code>、<code className="bg-muted px-1 rounded text-[11px]">/api/payment/webhook/xunhupay</code>、<code className="bg-muted px-1 rounded text-[11px]">/api/payment/webhook/alipay</code></p>
+          <p className="text-xs text-muted-foreground">Webhook 地址：</p>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {["/api/payment/webhook/stripe", "/api/payment/webhook/xunhupay", "/api/payment/webhook/alipay", "/api/payment/webhook/paypal"].map(url => (
+              <code key={url} className="bg-muted px-1.5 py-0.5 rounded text-[11px] break-all">{url}</code>
+            ))}
+          </div>
         </div>
       </div>
     </AdminLayout>

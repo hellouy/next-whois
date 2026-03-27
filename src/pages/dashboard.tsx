@@ -56,6 +56,17 @@ type Order = {
   created_at: string;
 };
 
+type Plan = {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  duration_days: number | null;
+  description: string | null;
+  is_recurring: boolean;
+  grants_subscription: boolean;
+};
+
 type Stamp = {
   id: string; domain: string; tag_name: string; tag_style: string;
   link: string | null; description: string | null; nickname: string;
@@ -620,6 +631,8 @@ export default function DashboardPage() {
   const [membershipPlan, setMembershipPlan] = React.useState<string | null>(null);
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = React.useState(false);
+  const [plans, setPlans] = React.useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = React.useState(false);
   const [redeemCode, setRedeemCode] = React.useState("");
   const [redeeming, setRedeeming] = React.useState(false);
   const [contactMsg, setContactMsg] = React.useState("");
@@ -691,15 +704,25 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // Load orders when membership tab opens
+  // Load orders and plans when membership tab opens
   React.useEffect(() => {
-    if (tab === "membership" && status === "authenticated" && orders.length === 0) {
-      setLoadingOrders(true);
-      fetch("/api/user/orders")
-        .then(r => r.json())
-        .then(d => { if (d.orders) setOrders(d.orders); })
-        .catch(() => {})
-        .finally(() => setLoadingOrders(false));
+    if (tab === "membership" && status === "authenticated") {
+      if (orders.length === 0) {
+        setLoadingOrders(true);
+        fetch("/api/user/orders")
+          .then(r => r.json())
+          .then(d => { if (d.orders) setOrders(d.orders); })
+          .catch(() => {})
+          .finally(() => setLoadingOrders(false));
+      }
+      if (plans.length === 0) {
+        setLoadingPlans(true);
+        fetch("/api/payment/plans")
+          .then(r => r.json())
+          .then(d => { if (Array.isArray(d.plans)) setPlans(d.plans); })
+          .catch(() => {})
+          .finally(() => setLoadingPlans(false));
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, status]);
@@ -1716,36 +1739,89 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2">
                     <RiStarLine className="w-3.5 h-3.5 text-violet-500" />
                     <p className="text-xs font-semibold">{t("dashboard.buy_membership")}</p>
-                    {!paymentEnabled && <span className="text-[10px] text-muted-foreground/60 ml-auto">{t("dashboard.contact_admin")}</span>}
+                    {plans.length > 0 && !paymentEnabled && (
+                      <span className="text-[10px] text-muted-foreground/60 ml-auto">激活码可兑换</span>
+                    )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: t("dashboard.plan_monthly"), sub: t("dashboard.plan_monthly_period"), price: "¥XX", badge: null },
-                      { label: t("dashboard.plan_yearly"), sub: t("dashboard.plan_yearly_period"), price: "¥XX", badge: t("dashboard.plan_badge_recommended") },
-                      { label: t("dashboard.plan_lifetime"), sub: t("dashboard.plan_lifetime_period"), price: "¥XX", badge: t("dashboard.plan_badge_best_value") },
-                    ].map(p => (
-                      <Link key={p.label} href={paymentEnabled ? "/payment/checkout" : "#"} className={cn(
-                        "relative flex flex-col items-center gap-1 px-2 py-3 rounded-xl border text-center transition-all group hover:border-violet-400/60 hover:bg-violet-50/50 dark:hover:bg-violet-950/10",
-                        p.badge === t("dashboard.plan_badge_recommended") ? "border-violet-300/70 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-950/10" : "border-border",
-                        !paymentEnabled && "opacity-50 pointer-events-none"
-                      )}>
-                        {p.badge && (
-                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white whitespace-nowrap">
-                            {p.badge}
-                          </span>
-                        )}
-                        <RiVipCrownLine className={cn("w-4 h-4", p.badge ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />
-                        <p className="text-[10px] font-semibold leading-tight">{p.label}</p>
-                        <p className="text-[9px] text-muted-foreground">{p.sub}</p>
-                      </Link>
-                    ))}
-                  </div>
-                  {paymentEnabled ? (
-                    <Link href="/payment/checkout" className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1">
-                      {t("dashboard.view_all_plans")} <RiArrowRightLine className="w-3 h-3" />
-                    </Link>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground/60 text-center py-0.5">{t("dashboard.payment_note")}</p>
+
+                  {loadingPlans ? (
+                    <div className="grid grid-cols-3 gap-2 animate-pulse">
+                      {[1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-xl bg-muted/50" />)}
+                    </div>
+                  ) : plans.length > 0 ? (() => {
+                    const totalPlans = plans.length;
+                    const getBadge = (idx: number) => {
+                      if (totalPlans >= 3 && idx === totalPlans - 1) return t("dashboard.plan_badge_best_value");
+                      if (totalPlans >= 3 && idx === totalPlans - 2) return t("dashboard.plan_badge_recommended");
+                      if (totalPlans === 2 && idx === 1) return t("dashboard.plan_badge_best_value");
+                      return null;
+                    };
+                    const fmtDur = (p: Plan) => {
+                      if (!p.duration_days) return t("dashboard.plan_lifetime_period");
+                      return `${p.duration_days}天`;
+                    };
+                    const fmtPrice = (p: Plan) => {
+                      const sym = p.currency?.toUpperCase() === "CNY" ? "¥" : p.currency?.toUpperCase() === "USD" ? "$" : (p.currency ?? "¥");
+                      return `${sym}${p.price.toFixed(2).replace(/\.00$/, "")}`;
+                    };
+                    const cols = totalPlans <= 2 ? "grid-cols-2" : totalPlans === 4 ? "grid-cols-2" : "grid-cols-3";
+                    return (
+                      <div className={cn("grid gap-2", cols)}>
+                        {plans.map((p, idx) => {
+                          const badge = getBadge(idx);
+                          const isHighlight = !!badge;
+                          return (
+                            <Link
+                              key={p.id}
+                              href={`/payment/checkout?plan=${p.id}`}
+                              className={cn(
+                                "relative flex flex-col items-center gap-1 px-2 py-3 rounded-xl border text-center transition-all group hover:border-violet-400/60 hover:bg-violet-50/50 dark:hover:bg-violet-950/10",
+                                isHighlight ? "border-violet-300/70 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-950/10" : "border-border"
+                              )}
+                            >
+                              {badge && (
+                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white whitespace-nowrap">
+                                  {badge}
+                                </span>
+                              )}
+                              <RiVipCrownLine className={cn("w-4 h-4", isHighlight ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />
+                              <p className="text-[10px] font-semibold leading-tight line-clamp-1">{p.name}</p>
+                              <p className="text-[9px] text-muted-foreground">{fmtDur(p)}</p>
+                              <p className="text-[10px] font-bold text-violet-600 dark:text-violet-400 mt-0.5">{fmtPrice(p)}</p>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    );
+                  })() : (
+                    <div className="grid grid-cols-3 gap-2 opacity-40 pointer-events-none">
+                      {[
+                        { label: t("dashboard.plan_monthly"), sub: t("dashboard.plan_monthly_period"), badge: null },
+                        { label: t("dashboard.plan_yearly"), sub: t("dashboard.plan_yearly_period"), badge: t("dashboard.plan_badge_recommended") },
+                        { label: t("dashboard.plan_lifetime"), sub: t("dashboard.plan_lifetime_period"), badge: t("dashboard.plan_badge_best_value") },
+                      ].map(p => (
+                        <div key={p.label} className={cn(
+                          "relative flex flex-col items-center gap-1 px-2 py-3 rounded-xl border text-center",
+                          p.badge === t("dashboard.plan_badge_recommended") ? "border-violet-300/70 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-950/10" : "border-border"
+                        )}>
+                          {p.badge && (
+                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white whitespace-nowrap">
+                              {p.badge}
+                            </span>
+                          )}
+                          <RiVipCrownLine className="w-4 h-4 text-muted-foreground" />
+                          <p className="text-[10px] font-semibold leading-tight">{p.label}</p>
+                          <p className="text-[9px] text-muted-foreground">{p.sub}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Link href="/payment/checkout" className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1">
+                    {t("dashboard.view_all_plans")} <RiArrowRightLine className="w-3 h-3" />
+                  </Link>
+                  {!paymentEnabled && (
+                    <p className="text-[10px] text-muted-foreground/60 text-center -mt-1">{t("dashboard.payment_note")}</p>
                   )}
                 </div>
 
