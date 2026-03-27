@@ -75,6 +75,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
+import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import {
   getEppStatusInfo,
   getEppStatusColor,
@@ -1417,11 +1418,22 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  // Lookup is deferred to the client via /api/lookup so that the page
-  // renders immediately (< 200 ms) instead of blocking for 4-9 s.
+  // Try to serve cached WHOIS data for SSR (gives search engines rich content).
+  // cacheOnly=true means we only check Redis/L1 — if there's no cache hit we
+  // return data:null immediately (no live lookup, no latency added).
+  let ssrData: WhoisResult | null = null;
+  try {
+    const cached = await lookupWhoisWithCache(target, { cacheOnly: true });
+    if (cached?.cached === true && cached.status) {
+      ssrData = cached;
+    }
+  } catch {
+    ssrData = null;
+  }
+
   return {
     props: {
-      data: null,
+      data: ssrData,
       target,
       displayTarget,
       origin,
@@ -4100,12 +4112,12 @@ export default function LookupPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.query]);
 
-  // Always start loading=true so skeleton renders before the client-side fetch
-  // completes.  This avoids a render pass where loading=false but result is
-  // still undefined (e.g. SSR returned an INVALID_DOMAIN_TLD error without a
-  // result object), which crashes useMemo hooks that access result.*
-  const [loading, setLoading] = React.useState(true);
-  const [data, setData] = React.useState<WhoisResult>(_EMPTY_WHOIS_RESULT);
+  // When SSR returns cached data (initialData != null), start with it so the
+  // server-rendered HTML has real content (better SEO / Googlebot indexing).
+  // The client-side useEffect always fires a fresh /api/lookup to get up-to-date
+  // data, so the SSR snapshot is just a warm-start hint.
+  const [loading, setLoading] = React.useState(initialData == null);
+  const [data, setData] = React.useState<WhoisResult>(initialData ?? _EMPTY_WHOIS_RESULT);
   // Incrementing this forces a fresh fetch for the same target (re-query button).
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [expandStatus, setExpandStatus] = React.useState(false);
@@ -4840,6 +4852,84 @@ export default function LookupPage({
                       </div>
                     </div>
                   </>
+                )}
+
+                {/* External search engine links — shown for all domain results */}
+                {!loading && queryType === "domain" && (
+                  <div className="glass-panel border border-border rounded-xl p-5">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                      <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                      </svg>
+                      {isChinese ? "在搜索引擎中查询" : "Search Engine Lookup"}
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Google search for the domain */}
+                      <a
+                        href={`https://www.google.com/search?q=${encodeURIComponent(displayTarget)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Google
+                      </a>
+                      {/* Bing search for the domain */}
+                      <a
+                        href={`https://www.bing.com/search?q=${encodeURIComponent(displayTarget)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 3v14.544l4.038 2.285 7.103-4.55-4.442-1.59V5.98L5 3zm4.038 10.285 3.647 1.305-3.647 2.337v-3.642z" fill="#0078D4"/>
+                        </svg>
+                        Bing
+                      </a>
+                      {/* Baidu search for the domain */}
+                      <a
+                        href={`https://www.baidu.com/s?wd=${encodeURIComponent(displayTarget)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15z" fill="#2932E1"/>
+                          <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#2932E1">百</text>
+                        </svg>
+                        {isChinese ? "百度" : "Baidu"}
+                      </a>
+                      {/* Google site: check if this page is indexed */}
+                      <a
+                        href={`https://www.google.com/search?q=site:x.rw/${encodeURIComponent(displayTarget)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
+                      >
+                        <svg className="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                        {isChinese ? "谷歌收录查询" : "Google Index Check"}
+                      </a>
+                      {/* Bing site: check */}
+                      <a
+                        href={`https://www.bing.com/search?q=site:x.rw/${encodeURIComponent(displayTarget)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
+                      >
+                        <svg className="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                        {isChinese ? "必应收录查询" : "Bing Index Check"}
+                      </a>
+                    </div>
+                  </div>
                 )}
 
                 {dnsProbe?.registrationStatus !== "registered" &&

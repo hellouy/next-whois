@@ -582,7 +582,7 @@ export function computeSmartTtl(result: WhoisResult): number {
 
 export async function lookupWhoisWithCache(
   domain: string,
-  options: { nocache?: boolean } = {},
+  options: { nocache?: boolean; cacheOnly?: boolean } = {},
 ): Promise<WhoisResult> {
   // ── CN Reserved SLD short-circuit ──────────────────────────────────────────
   const cnReserved = getCnReservedSldInfo(domain);
@@ -620,6 +620,11 @@ export async function lookupWhoisWithCache(
         return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
       }
     }
+  }
+
+  // cacheOnly mode: return a no-result marker instead of doing a live lookup
+  if (options.cacheOnly) {
+    return { time: 0, status: false, cached: false };
   }
 
   // Cache miss — perform live lookup
