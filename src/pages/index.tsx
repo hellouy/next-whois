@@ -1,4 +1,5 @@
-import { cn, toSearchURI, isSearchRoute } from "@/lib/utils";
+import { cn, toSearchURI, isSearchRoute, cleanDomain } from "@/lib/utils";
+import { prefetchLookup } from "@/lib/lookup-prefetch";
 import React, { useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
@@ -49,6 +50,8 @@ export default function HomePage({ origin }: { origin: string }) {
 
   const handleSearch = useCallback(
     (query: string) => {
+      const cleaned = cleanDomain(query.replace(/\s+/g, ""));
+      if (cleaned) prefetchLookup(cleaned);
       router.push(toSearchURI(query));
     },
     [router],

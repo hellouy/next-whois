@@ -69,6 +69,7 @@ import { computeLifecycle, fmtDate, fmtDateTime, fmtCountdown } from "@/lib/life
 import React, { useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { addHistory, detectQueryType } from "@/lib/history";
+import { prefetchLookup, consumePrefetch } from "@/lib/lookup-prefetch";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -4071,7 +4072,11 @@ export default function LookupPage({
     setData(_EMPTY_WHOIS_RESULT);
     setLoading(true);
     let cancelled = false;
-    fetch(`/api/lookup?query=${encodeURIComponent(target)}`)
+    // Use a pre-started fetch if handleSearch already fired one (hides SSR +
+    // hydration latency ~400-700 ms inside the reported lookup time).
+    const prefetched = consumePrefetch(target);
+    const responsePromise = prefetched ?? fetch(`/api/lookup?query=${encodeURIComponent(target)}`);
+    responsePromise
       .then((r) => r.json())
       .then((d: WhoisResult) => {
         if (!cancelled) {
@@ -4361,6 +4366,11 @@ export default function LookupPage({
   const handleSearch = (query: string) => {
     const url = toSearchURI(query);
     if (url === router.asPath) return;
+    // Fire the lookup fetch immediately — before Next.js navigation starts.
+    // By the time the page hydrates and useEffect runs, the response is often
+    // already in-flight or even complete, hiding the SSR + hydration latency.
+    const cleaned = cleanDomain(query.replace(/\s+/g, ""));
+    if (cleaned) prefetchLookup(cleaned);
     router.push(url);
   };
 
