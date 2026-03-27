@@ -17,7 +17,7 @@ import {
   RiCheckLine, RiLoader4Line, RiFileCopyLine, RiUser3Line,
   RiQuillPenLine, RiArrowRightLine, RiShieldLine,
   RiBankCardLine, RiPriceTag3Line, RiLockLine, RiGiftLine,
-  RiShieldCheckLine, RiAlertLine,
+  RiShieldCheckLine, RiAlertLine, RiCloseLine, RiQrCodeLine,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -120,35 +120,50 @@ function SponsorCard({ s, index }: { s: Sponsor; index: number }) {
   );
 }
 
-function QrCard({ title, url, icon, accentClass, subtitle }: {
-  title: string; url: string; icon: React.ReactNode;
-  accentClass: string; subtitle?: string;
+function QrModal({ title, url, icon, accentBg, onClose }: {
+  title: string; url: string; icon: React.ReactNode; accentBg: string; onClose: () => void;
 }) {
   const { t } = useTranslation();
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
   return (
-    <div className={cn("flex flex-col items-center gap-3 p-5 rounded-2xl border bg-card shadow-sm transition-all", accentClass)}>
-      <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-muted shadow-sm">
-        {icon}
-      </div>
-      <div className="text-center">
-        <span className="text-sm font-semibold">{title}</span>
-        {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
-      </div>
-      <div className="w-40 h-40 rounded-xl border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
-        <img
-          src={url}
-          alt={title}
-          className="w-full h-full object-contain"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.style.display = "none";
-            if (target.parentElement) {
-              target.parentElement.innerHTML = `<div class="text-center text-muted-foreground/40 text-xs px-4"><p class="mb-1">${t("sponsor.qr_missing")}</p><p>${t("sponsor.qr_upload_hint")}</p></div>`;
-            }
-          }}
-        />
-      </div>
-      <p className="text-[11px] text-muted-foreground text-center">{t("sponsor.scan_hint")}</p>
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 pb-8 sm:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, y: 40, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xs bg-background border border-border rounded-2xl shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={cn("flex items-center justify-between px-4 py-3", accentBg)}>
+          <div className="flex items-center gap-2">
+            {icon}
+            <span className="font-semibold text-sm">{title}</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+            <RiCloseLine className="w-4 h-4" />
+          </button>
+        </div>
+        {/* QR */}
+        <div className="p-5 flex flex-col items-center gap-3">
+          <div className="w-52 h-52 rounded-xl border border-border bg-white flex items-center justify-center overflow-hidden shadow-sm">
+            <img src={url} alt={title} className="w-full h-full object-contain p-2"
+              onError={(e) => {
+                const el = e.target as HTMLImageElement;
+                el.style.display = "none";
+                if (el.parentElement) el.parentElement.innerHTML = `<p class="text-xs text-center text-gray-400 px-4">${t("sponsor.qr_missing")}</p>`;
+              }}
+            />
+          </div>
+          <p className="text-[12px] text-muted-foreground text-center">{t("sponsor.scan_hint")}</p>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -417,6 +432,7 @@ export default function SponsorPage() {
   const [showPostPayment, setShowPostPayment] = React.useState(false);
   const [postPaymentPlatform, setPostPaymentPlatform] = React.useState<string>("");
   const [floatingHearts, setFloatingHearts] = React.useState<{ id: number; x: number }[]>([]);
+  const [activeQr, setActiveQr] = React.useState<"alipay" | "wechat" | null>(null);
 
   React.useEffect(() => {
     fetch("/api/admin/sponsors?visible_only=1")
@@ -590,32 +606,45 @@ export default function SponsorPage() {
                 <div className="h-px flex-1 bg-border/60" />
               </div>
 
-              {/* QR codes */}
-              {hasQrPayment && (
-                <div className="flex flex-wrap justify-center gap-5">
+              {/* All donation buttons in a unified grid */}
+              {(hasQrPayment || hasLinkPayment) && (
+                <div className={cn(
+                  "grid gap-3",
+                  [alipayQr, wechatQr, paypalUrl, githubUrl].filter(Boolean).length === 1
+                    ? "grid-cols-1"
+                    : [alipayQr, wechatQr, paypalUrl, githubUrl].filter(Boolean).length <= 3
+                    ? "grid-cols-2 sm:grid-cols-3"
+                    : "grid-cols-2"
+                )}>
                   {alipayQr && (
-                    <QrCard title={t("sponsor.alipay_title")} url={alipayQr} accentClass="hover:border-blue-200 dark:hover:border-blue-800/60 hover:shadow-md"
-                      icon={<RiAlipayLine className="w-6 h-6 text-blue-500" />} />
+                    <button
+                      onClick={() => { setActiveQr("alipay"); setPostPaymentPlatform(t("sponsor.platform_alipay")); }}
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-[#1677FF] text-white font-semibold hover:bg-[#0d6aee] active:scale-[0.98] transition-all shadow-sm touch-manipulation"
+                    >
+                      <RiAlipayLine className="w-5 h-5" />
+                      <span className="text-sm">{t("sponsor.alipay_title")}</span>
+                      <RiQrCodeLine className="w-3.5 h-3.5 opacity-70" />
+                    </button>
                   )}
                   {wechatQr && (
-                    <QrCard title={t("sponsor.wechat_title")} url={wechatQr} accentClass="hover:border-green-200 dark:hover:border-green-800/60 hover:shadow-md"
-                      icon={<RiWechatLine className="w-6 h-6 text-green-500" />} />
+                    <button
+                      onClick={() => { setActiveQr("wechat"); setPostPaymentPlatform(t("sponsor.platform_wechat")); }}
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-[#07C160] text-white font-semibold hover:bg-[#06ad56] active:scale-[0.98] transition-all shadow-sm touch-manipulation"
+                    >
+                      <RiWechatLine className="w-5 h-5" />
+                      <span className="text-sm">{t("sponsor.wechat_title")}</span>
+                      <RiQrCodeLine className="w-3.5 h-3.5 opacity-70" />
+                    </button>
                   )}
-                </div>
-              )}
-
-              {/* Link-based payments */}
-              {hasLinkPayment && (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   {paypalUrl && (
                     <a
                       href={paypalUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#003087] text-white font-semibold hover:bg-[#002070] transition-colors shadow-sm flex-1 max-w-xs mx-auto sm:mx-0"
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-[#003087] text-white font-semibold hover:bg-[#002070] active:scale-[0.98] transition-all shadow-sm touch-manipulation"
                     >
                       <RiPaypalLine className="w-5 h-5" />
-                      {t("sponsor.paypal_btn")}
+                      <span className="text-sm">{t("sponsor.paypal_btn")}</span>
                       <RiExternalLinkLine className="w-3.5 h-3.5 opacity-70" />
                     </a>
                   )}
@@ -624,15 +653,37 @@ export default function SponsorPage() {
                       href={githubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl border border-border bg-card font-semibold hover:bg-muted/50 transition-colors shadow-sm flex-1 max-w-xs mx-auto sm:mx-0"
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border border-border bg-card font-semibold hover:bg-muted/50 active:scale-[0.98] transition-all shadow-sm touch-manipulation"
                     >
                       <RiGithubLine className="w-5 h-5" />
-                      GitHub Sponsors
+                      <span className="text-sm">GitHub Sponsors</span>
                       <RiExternalLinkLine className="w-3.5 h-3.5 opacity-70" />
                     </a>
                   )}
                 </div>
               )}
+
+              {/* QR modals */}
+              <AnimatePresence>
+                {activeQr === "alipay" && alipayQr && (
+                  <QrModal
+                    title={t("sponsor.alipay_title")}
+                    url={alipayQr}
+                    accentBg="bg-[#e8f0fe] dark:bg-[#1677FF]/20 text-[#1677FF]"
+                    icon={<RiAlipayLine className="w-5 h-5 text-[#1677FF]" />}
+                    onClose={() => setActiveQr(null)}
+                  />
+                )}
+                {activeQr === "wechat" && wechatQr && (
+                  <QrModal
+                    title={t("sponsor.wechat_title")}
+                    url={wechatQr}
+                    accentBg="bg-[#e8f8ef] dark:bg-[#07C160]/20 text-[#07C160]"
+                    icon={<RiWechatLine className="w-5 h-5 text-[#07C160]" />}
+                    onClose={() => setActiveQr(null)}
+                  />
+                )}
+              </AnimatePresence>
 
               {/* Crypto */}
               {hasCrypto && (
