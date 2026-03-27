@@ -4296,8 +4296,6 @@ export default function LookupPage({
     const decimals = ["JPY", "KRW"].includes(cur) ? 0 : 2;
     return `${sym}${amount.toFixed(decimals)}`;
   }
-  const toCNY = formatRegistrarPrice;
-  const toUSD = formatRegistrarPrice;
 
   type TianhuTranslation = { src: string; dst: string | null; parts: { part_name: string; means: string[] }[] } | null;
   const [tianhuTranslation, setTianhuTranslation] = React.useState<TianhuTranslation>(null);
@@ -4579,9 +4577,7 @@ export default function LookupPage({
                       )}
                     >
                       {t("register_price")}
-                      {isChinese
-                        ? toCNY(result.registerPrice.new as number, result.registerPrice.currency)
-                        : toUSD(result.registerPrice.new as number, result.registerPrice.currency)}
+                      {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
                     </span>
                   </Link>
                 )}
@@ -4596,9 +4592,7 @@ export default function LookupPage({
                     <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
                     <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                       {t("renew_price")}
-                      {isChinese
-                        ? toCNY(result.renewPrice.renew as number, result.renewPrice.currency)
-                        : toUSD(result.renewPrice.renew as number, result.renewPrice.currency)}
+                      {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
                     </span>
                   </Link>
                 )}
@@ -5037,9 +5031,7 @@ export default function LookupPage({
                               <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
                               <span className={cn("text-[11px] font-normal", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("register_price")}
-                                {isChinese
-                                  ? toCNY(result.registerPrice.new as number, result.registerPrice.currency)
-                                  : toUSD(result.registerPrice.new as number, result.registerPrice.currency)}
+                                {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
                               </span>
                             </Link>
                           )}
@@ -5054,9 +5046,7 @@ export default function LookupPage({
                               <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
                               <span className={cn("text-[11px] font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("renew_price")}
-                                {isChinese
-                                  ? toCNY(result.renewPrice.renew as number, result.renewPrice.currency)
-                                  : toUSD(result.renewPrice.renew as number, result.renewPrice.currency)}
+                                {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
                               </span>
                             </Link>
                           )}
@@ -5416,16 +5406,12 @@ export default function LookupPage({
                       userEmail={session?.user?.email ?? ""}
                       registerPriceFmt={
                         result.registerPrice && result.registerPrice.new !== -1 && result.registerPrice.currency !== "Unknown"
-                          ? isChinese
-                            ? toCNY(result.registerPrice.new as number, result.registerPrice.currency)
-                            : toUSD(result.registerPrice.new as number, result.registerPrice.currency)
+                          ? formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)
                           : undefined
                       }
                       renewPriceFmt={
                         result.renewPrice && result.renewPrice.renew !== -1 && result.renewPrice.currency !== "Unknown"
-                          ? isChinese
-                            ? toCNY(result.renewPrice.renew as number, result.renewPrice.currency)
-                            : toUSD(result.renewPrice.renew as number, result.renewPrice.currency)
+                          ? formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)
                           : undefined
                       }
                       isPremium={result.registerPrice?.isPremium ?? false}
