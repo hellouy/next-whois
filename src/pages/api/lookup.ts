@@ -106,8 +106,9 @@ export default async function handler(
     });
   }
 
+  const nocache = req.query.nocache === "1";
   const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl } =
-    await lookupWhoisWithCache(trimmed);
+    await lookupWhoisWithCache(trimmed, { nocache });
   if (!status) {
     return res.status(500).json({ time, status, error, dnsProbe, registryUrl });
   }

@@ -4021,10 +4021,22 @@ const _EMPTY_WHOIS_RESULT: WhoisResult = {
   result: { ...initialWhoisAnalyzeResult },
 };
 
+const LOOKUP_PAGE_LOCALES = new Set(["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"]);
+
+/** Extract the cleaned query target from Next.js router.query (client-side). */
+function targetFromRouterQuery(query: NodeJS.Dict<string | string[]>): string {
+  const segments = (query.query as string[] | undefined) ?? [];
+  const effective =
+    segments.length >= 2 && LOOKUP_PAGE_LOCALES.has(segments[0])
+      ? segments.slice(1)
+      : segments;
+  return cleanDomain(effective.join("/").replace(/\s+/g, ""));
+}
+
 export default function LookupPage({
   data: initialData,
-  target,
-  displayTarget,
+  target: propTarget,
+  displayTarget: propDisplayTarget,
   origin,
 }: {
   data: WhoisResult | null;
@@ -4036,12 +4048,34 @@ export default function LookupPage({
   const router = useRouter();
   const settings = useSiteSettings();
   const hideRawWhois = settings.hide_raw_whois === "1";
+
+  // ── Shallow-routing target sync ──────────────────────────────────────────
+  // `target` starts as the SSR-provided prop.  When the user searches again
+  // from the same page (handleSearch uses shallow routing to skip SSR), only
+  // router.query changes — props are NOT updated.  We track target in state
+  // and re-derive it from router.query so useEffect([target]) re-fires and
+  // fetches new data without a full page reload.
+  const [target, setTarget] = React.useState(propTarget);
+  const [displayTarget, setDisplayTarget] = React.useState(propDisplayTarget);
+
+  useEffect(() => {
+    const newTarget = targetFromRouterQuery(router.query);
+    if (newTarget && newTarget !== target) {
+      setTarget(newTarget);
+      setDisplayTarget(newTarget); // domainToUnicode not available client-side
+    }
+  // router.query.query is the catch-all segment array; re-run when it changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.query]);
+
   // Always start loading=true so skeleton renders before the client-side fetch
   // completes.  This avoids a render pass where loading=false but result is
   // still undefined (e.g. SSR returned an INVALID_DOMAIN_TLD error without a
   // result object), which crashes useMemo hooks that access result.*
   const [loading, setLoading] = React.useState(true);
   const [data, setData] = React.useState<WhoisResult>(_EMPTY_WHOIS_RESULT);
+  // Incrementing this forces a fresh fetch for the same target (re-query button).
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
@@ -4065,23 +4099,22 @@ export default function LookupPage({
     };
   }, [router]);
 
-  // Client-side WHOIS fetch — runs when SSR returned data:null (deferred mode)
-  // or whenever the target changes during client navigation.
+  // Client-side WHOIS fetch — runs when target changes (shallow nav) or
+  // refreshKey increments (re-query button forces a fresh lookup).
   useEffect(() => {
-    // Reset to empty state whenever target changes (handles client-side navigation)
     setData(_EMPTY_WHOIS_RESULT);
     setLoading(true);
     let cancelled = false;
     // Use a pre-started fetch if handleSearch already fired one (hides SSR +
     // hydration latency ~400-700 ms inside the reported lookup time).
-    const prefetched = consumePrefetch(target);
-    const responsePromise = prefetched ?? fetch(`/api/lookup?query=${encodeURIComponent(target)}`);
+    // refreshKey > 0 means a forced re-query, skip the prefetch cache.
+    const prefetched = refreshKey === 0 ? consumePrefetch(target) : undefined;
+    const url = `/api/lookup?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
+    const responsePromise = prefetched ?? fetch(url);
     responsePromise
       .then((r) => r.json())
       .then((d: WhoisResult) => {
         if (!cancelled) {
-          // Always ensure result is defined — some error responses omit it,
-          // which would crash useMemo hooks that access result.* unconditionally.
           setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
           setLoading(false);
         }
@@ -4093,7 +4126,8 @@ export default function LookupPage({
         }
       });
     return () => { cancelled = true; };
-  }, [target]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, refreshKey]);
 
   const [showImagePreview, setShowImagePreview] = React.useState(false);
   const [imgWidth, setImgWidth] = React.useState(1200);
@@ -4366,13 +4400,16 @@ export default function LookupPage({
   const handleSearch = (query: string) => {
     const url = toSearchURI(query);
     if (url === router.asPath) return;
-    // Fire the lookup fetch immediately — before Next.js navigation starts.
-    // By the time the page hydrates and useEffect runs, the response is often
-    // already in-flight or even complete, hiding the SSR + hydration latency.
     const cleaned = cleanDomain(query.replace(/\s+/g, ""));
     if (cleaned) prefetchLookup(cleaned);
-    router.push(url);
+    // Shallow routing: URL changes but SSR is skipped entirely (~500 ms saved).
+    // router.query updates → targetFromRouterQuery → setTarget → useEffect
+    // re-fetches the new domain without unmounting/remounting the page.
+    router.push(url, undefined, { shallow: true });
   };
+
+  /** Force a fresh lookup for the current target (bypasses cache). */
+  const handleRefresh = () => setRefreshKey((k) => k + 1);
 
   useEffect(() => {
     if (!status) return;
@@ -4702,7 +4739,7 @@ export default function LookupPage({
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                      <Button variant="outline" size="sm" onClick={() => handleSearch(target)}>
+                      <Button variant="outline" size="sm" onClick={handleRefresh}>
                         {t("re_query")}
                       </Button>
                       {registryUrl && (
@@ -4754,7 +4791,7 @@ export default function LookupPage({
                         {error || t("lookup_failed_fallback")}
                       </p>
                       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
-                        <Button onClick={() => handleSearch(target)}>
+                        <Button onClick={handleRefresh}>
                           {t("try_again")}
                         </Button>
                         {registryUrl && (

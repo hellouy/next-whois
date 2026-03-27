@@ -582,6 +582,7 @@ export function computeSmartTtl(result: WhoisResult): number {
 
 export async function lookupWhoisWithCache(
   domain: string,
+  options: { nocache?: boolean } = {},
 ): Promise<WhoisResult> {
   // ── CN Reserved SLD short-circuit ──────────────────────────────────────────
   const cnReserved = getCnReservedSldInfo(domain);
@@ -603,19 +604,21 @@ export async function lookupWhoisWithCache(
 
   const key = `whois:${domain}`;
 
-  // L1 — in-process memory cache (30 s, survives within the same lambda instance)
-  const l1Hit = l1Get(key);
-  if (l1Hit) {
-    const remainingTtl = await getRemainingTtl(key).catch(() => null);
-    return { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
-  }
+  if (!options.nocache) {
+    // L1 — in-process memory cache (30 s, survives within the same lambda instance)
+    const l1Hit = l1Get(key);
+    if (l1Hit) {
+      const remainingTtl = await getRemainingTtl(key).catch(() => null);
+      return { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+    }
 
-  // L2 — Redis (smart TTL per domain type)
-  if (isRedisAvailable()) {
-    const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
-    if (l2) {
-      l1Set(key, l2.value);
-      return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+    // L2 — Redis (smart TTL per domain type)
+    if (isRedisAvailable()) {
+      const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
+      if (l2) {
+        l1Set(key, l2.value);
+        return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+      }
     }
   }
 
