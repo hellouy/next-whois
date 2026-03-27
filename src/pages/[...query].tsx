@@ -4074,11 +4074,16 @@ export default function LookupPage({
     fetch(`/api/lookup?query=${encodeURIComponent(target)}`)
       .then((r) => r.json())
       .then((d: WhoisResult) => {
-        if (!cancelled) { setData(d); setLoading(false); }
+        if (!cancelled) {
+          // Always ensure result is defined — some error responses omit it,
+          // which would crash useMemo hooks that access result.* unconditionally.
+          setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
+          setLoading(false);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setData({ status: false, time: 0, cached: false, error: "Lookup failed" });
+          setData({ status: false, time: 0, cached: false, error: "Lookup failed", result: { ...initialWhoisAnalyzeResult } });
           setLoading(false);
         }
       });
