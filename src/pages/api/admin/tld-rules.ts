@@ -11,6 +11,7 @@ import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { callProviderWithFallback } from "@/lib/server/ai-providers";
+import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
 
 // ─── Local JSON file cache (best-effort, fails silently in read-only envs) ────
 const LOCAL_CACHE_PATH = join(process.cwd(), "data", "tld-rules.json");
@@ -587,8 +588,8 @@ async function extractWithAI(
   sourceUrl: string,
   preferredModel?: string
 ): Promise<ExtractedLifecycle> {
-  // Trim to ~6k chars to stay within small-context models (e.g. moonshot-v1-8k = ~8k tokens total)
-  const pageSnippet = pageText.slice(0, 6000);
+  // Trim to ~8k chars — balances context richness vs. small-context model limits
+  const pageSnippet = pageText.slice(0, 8000);
   const userMessage = `TLD: .${tld}\n来源页面: ${sourceUrl}\n\n页面内容：\n${pageSnippet}`;
   const messages = [
     { role: "system" as const, content: SYSTEM_PROMPT },
@@ -800,6 +801,9 @@ export default async function handler(
         extracted.redemption_period_days +
         extracted.pending_delete_days;
 
+      // ── Immediately invalidate lifecycle override cache so new data is live ──
+      invalidateLifecycleOverridesCache();
+
       // ── Also persist to local JSON file (dual storage / backup) ──────────
       updateLocalCache(cleanTld, {
         grace_period_days: extracted.grace_period_days,
@@ -909,6 +913,9 @@ export default async function handler(
       source_url: source_url ?? null,
     });
 
+    // Immediately invalidate lifecycle override cache so manual edit is live
+    invalidateLifecycleOverridesCache();
+
     return res.json({ ok: true, tld: cleanTld, manually_edited: true });
   }
 
@@ -925,6 +932,8 @@ export default async function handler(
     deleteRedisValue(SCRAPE_CACHE_KEY(
       `https://www.iana.org/domains/root/db/${cleanTld}.html`
     )).catch(() => {});
+    // Invalidate lifecycle cache so deletion takes effect immediately
+    invalidateLifecycleOverridesCache();
     return res.json({ ok: true });
   }
 

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
-import { getProvidersInfo } from "@/lib/server/ai-providers";
+import { getProvidersInfoAsync } from "@/lib/server/ai-providers";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await requireAdmin(req, res);
   if (!session) return;
 
-  const providers = getProvidersInfo();
+  const providers = await getProvidersInfoAsync();
   const configured = providers.filter(p => p.configured);
   return res.json({
     providers,
