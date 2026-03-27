@@ -200,7 +200,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 interface WhoisRawResult {
   raw: string;
   structured: Record<string, any>;
-  server: string;
+  server?: string;
   registryUrl?: string;
 }
 

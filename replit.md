@@ -9,6 +9,7 @@
 
 ### Files Created / Fixed
 - **`src/lib/whois/whois_gtld_bootstrap.ts`** — Created missing WHOIS server bootstrap (510 entries covering gTLDs + ccTLDs). Was imported in `lookup.ts` but absent from the codebase, causing a module-not-found error on WHOIS queries.
+- **`src/lib/whois/lookup.ts`** — Fixed TypeScript error: `WhoisRawResult.server` changed from `server: string` (required) to `server?: string` (optional) to match the `WhoisRaw` local type used by the shadow WHOIS promise. This resolved 9 TS errors (`tsc --noEmit --skipLibCheck` now exits 0).
 
 ### Config Changes
 - **`next.config.js`** — Added `*.worf.replit.dev` to `allowedDevOrigins` (Replit rotates dev subdomains between `kirk`, `worf`, etc.)

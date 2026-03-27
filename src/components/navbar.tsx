@@ -401,7 +401,7 @@ export function NavDrawer() {
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <p className="text-base font-semibold tracking-tight">{logoText}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5" suppressHydrationWarning>
                     {t("nav_version_menu", { version: VERSION })}
                   </p>
                 </div>
@@ -680,7 +680,7 @@ export function Navbar() {
             className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 transition-colors flex items-center touch-manipulation select-none"
           >
             {logoText}
-            <p className="text-xs text-muted-foreground ml-1.5">{VERSION}</p>
+            <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
           </Link>
         </motion.div>
 
