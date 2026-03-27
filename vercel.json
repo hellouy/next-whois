@@ -1,6 +1,7 @@
 {
   "framework": "nextjs",
   "installCommand": "pnpm install --no-frozen-lockfile",
+  "regions": ["iad1"],
   "crons": [
     {
       "path": "/api/cron/ping",
@@ -13,7 +14,7 @@
   ],
   "functions": {
     "src/pages/[...query].tsx": {
-      "maxDuration": 30
+      "maxDuration": 10
     },
     "src/pages/api/lookup.ts": {
       "maxDuration": 30

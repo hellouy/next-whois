@@ -1,4 +1,3 @@
-import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import {
   cleanDomain,
   cn,
@@ -10,9 +9,6 @@ import {
   useSaver,
 } from "@/lib/utils";
 import { GetServerSidePropsContext } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { useRouter } from "next/router";
 import { getOrigin } from "@/lib/seo";
 import { Input } from "@/components/ui/input";
@@ -1420,46 +1416,16 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  // Get user session for search record attribution
-  let userId: string | null = null;
-  let userEmail: string | null = null;
-  try {
-    const session = await getServerSession(context.req, context.res, authOptions);
-    userId    = (session?.user as any)?.id    ?? null;
-    userEmail = (session?.user as any)?.email ?? null;
-  } catch {}
-
-  try {
-    const data = await lookupWhoisWithCache(target);
-
-    // Record every query (anonymous and logged-in) in the backend
-    if (data.status && data.result) {
-      saveSearchRecord(target, data.result, data.dnsProbe, userId, userEmail).catch(() => {});
-    }
-
-    return {
-      props: {
-        data: JSON.parse(JSON.stringify(data)),
-        target,
-        displayTarget,
-        origin,
-      },
-    };
-  } catch (e: any) {
-    return {
-      props: {
-        data: {
-          time: 0,
-          status: false,
-          cached: false,
-          error: e?.message || "Lookup failed",
-        } as WhoisResult,
-        target,
-        displayTarget,
-        origin,
-      },
-    };
-  }
+  // Lookup is deferred to the client via /api/lookup so that the page
+  // renders immediately (< 200 ms) instead of blocking for 4-9 s.
+  return {
+    props: {
+      data: null,
+      target,
+      displayTarget,
+      origin,
+    },
+  };
 }
 
 // [lat, lng, zh name]
@@ -4047,13 +4013,15 @@ function ResultSkeleton() {
   );
 }
 
+const _EMPTY_WHOIS_RESULT: WhoisResult = { status: false, time: 0, cached: false };
+
 export default function LookupPage({
-  data,
+  data: initialData,
   target,
   displayTarget,
   origin,
 }: {
-  data: WhoisResult;
+  data: WhoisResult | null;
   target: string;
   displayTarget: string;
   origin: string;
@@ -4062,7 +4030,8 @@ export default function LookupPage({
   const router = useRouter();
   const settings = useSiteSettings();
   const hideRawWhois = settings.hide_raw_whois === "1";
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(initialData === null);
+  const [data, setData] = React.useState<WhoisResult>(initialData ?? _EMPTY_WHOIS_RESULT);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
@@ -4075,16 +4044,38 @@ export default function LookupPage({
       }
       if (isSearchRoute(url)) setLoading(true);
     };
-    const handleComplete = () => setLoading(false);
+    // routeChangeComplete is intentionally NOT handled here: the
+    // client-side fetch useEffect sets loading=false once data arrives.
+    const handleError = () => setLoading(false);
     router.events.on("routeChangeStart", handleStart);
-    router.events.on("routeChangeComplete", handleComplete);
-    router.events.on("routeChangeError", handleComplete);
+    router.events.on("routeChangeError", handleError);
     return () => {
       router.events.off("routeChangeStart", handleStart);
-      router.events.off("routeChangeComplete", handleComplete);
-      router.events.off("routeChangeError", handleComplete);
+      router.events.off("routeChangeError", handleError);
     };
   }, [router]);
+
+  // Client-side WHOIS fetch — runs when SSR returned data:null (deferred mode)
+  // or whenever the target changes during client navigation.
+  useEffect(() => {
+    // Reset to empty state whenever target changes (handles client-side navigation)
+    setData(_EMPTY_WHOIS_RESULT);
+    setLoading(true);
+    let cancelled = false;
+    fetch(`/api/lookup?query=${encodeURIComponent(target)}`)
+      .then((r) => r.json())
+      .then((d: WhoisResult) => {
+        if (!cancelled) { setData(d); setLoading(false); }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setData({ status: false, time: 0, cached: false, error: "Lookup failed" });
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [target]);
+
   const [showImagePreview, setShowImagePreview] = React.useState(false);
   const [imgWidth, setImgWidth] = React.useState(1200);
   const [imgHeight, setImgHeight] = React.useState(630);

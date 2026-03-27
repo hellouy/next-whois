@@ -643,22 +643,22 @@ const WHOIS_MERGE_WAIT_MS = 350;
 
 // After WHOIS succeeds (possibly with empty data), wait at most this long for
 // RDAP to finish before giving up on it.  RDAP often wins the race on warm
-// connections but can be slow on first query (cold TLS / DNS).  2 500 ms
-// lets a cold RDAP request complete (total cap is still RDAP_TIMEOUT = 5 s).
-const RDAP_MERGE_WAIT_MS = 2_500;
+// connections but can be slow on first query (cold TLS / DNS).  1 800 ms
+// lets a cold RDAP request complete (total cap is still RDAP_TIMEOUT = 4 s).
+const RDAP_MERGE_WAIT_MS = 1_800;
 
 // Separate timeout caps for each protocol.
-// RDAP: ccTLD overrides now bypass IANA bootstrap (fast direct fetch) — 5 s
-//       gives ccTLD RDAP servers (sometimes slow) enough headroom.
-// WHOIS TCP varies more; give legitimate slow servers 4 s before giving up.
-const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  5_000);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 4_000);
+// RDAP: ccTLD overrides now bypass IANA bootstrap (fast direct fetch) — 4 s
+//       gives ccTLD RDAP servers enough headroom while failing faster on dead ones.
+// WHOIS TCP varies more; give legitimate slow servers 3 s before giving up.
+const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  4_000);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 3_000);
 
 // How long to wait for native lookups before starting third-party fallbacks
 // in parallel.  Set shorter than WHOIS_TIMEOUT so that slow WHOIS servers
-// don't block the response: fallbacks start racing at t=1.2 s while WHOIS
+// don't block the response: fallbacks start racing at t=800 ms while WHOIS
 // TCP is still open, whichever responds first wins.
-const FALLBACK_START_MS = intEnv("FALLBACK_START_MS", 1_200);
+const FALLBACK_START_MS = intEnv("FALLBACK_START_MS", 800);
 
 // For rdapIsDirect ccTLDs: WHOIS is normally skipped from the race entirely
 // so a fast RDAP response costs zero extra TCP connections.  But on cold Vercel
