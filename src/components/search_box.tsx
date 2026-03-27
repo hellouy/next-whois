@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -161,12 +162,25 @@ export function SearchBox({
   const [selectedGroup, setSelectedGroup] = useState(-1);
   const [isEnterPressed, setIsEnterPressed] = useState(false);
   const [validationError, setValidationError] = useState<{ message: string; isWarning: boolean } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setMounted(true);
     setHistory(listHistory().slice(0, 8));
   }, []);
+
+  const computeDropdownPos = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -179,9 +193,19 @@ export function SearchBox({
       }
     };
 
+    const handleResizeOrScroll = () => {
+      if (showSuggestions) computeDropdownPos();
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    window.addEventListener("resize", handleResizeOrScroll);
+    window.addEventListener("scroll", handleResizeOrScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", handleResizeOrScroll);
+      window.removeEventListener("scroll", handleResizeOrScroll, true);
+    };
+  }, [showSuggestions]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -394,6 +418,7 @@ export function SearchBox({
     const value = e.target.value.slice(0, MAX_INPUT_LENGTH);
     setInputValue(value);
     if (validationError) setValidationError(null);
+    computeDropdownPos();
     const cleaned = sanitizeInput(value);
     const newSuggestions = generateSuggestions(cleaned || value);
     setShowSuggestions(newSuggestions.length > 0);
@@ -491,7 +516,7 @@ export function SearchBox({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => { setShowSuggestions(suggestions.length > 0); setValidationError(null); }}
+          onFocus={() => { computeDropdownPos(); setShowSuggestions(suggestions.length > 0); setValidationError(null); }}
           maxLength={MAX_INPUT_LENGTH}
         />
         <motion.div
@@ -517,70 +542,6 @@ export function SearchBox({
           </Button>
         </motion.div>
 
-        {/* Suggestions anchored to input row bottom — unaffected by validation banner */}
-        <AnimatePresence mode="wait">
-          {showSuggestions && suggestions.length > 0 && (
-            <motion.div
-              ref={suggestionsRef}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.1 }}
-              className="absolute z-50 w-full top-full mt-1 bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg overflow-hidden divide-y divide-border/50"
-            >
-            {suggestions.map((group, groupIndex) => (
-              <div key={group.type} className="relative">
-                <div>
-                  {group.items.map((suggestion, index) => {
-                    const isHistory = group.type === "history";
-                    const type = predictQueryType(suggestion);
-
-                    return (
-                      <motion.div
-                        key={suggestion}
-                        initial={{ opacity: 0.5 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.1 }}
-                        className={cn(
-                          "flex items-center px-3 py-2 cursor-pointer group",
-                          "hover:bg-muted/50 transition-colors duration-150",
-                          selectedGroup === groupIndex &&
-                            selectedIndex === index &&
-                            "bg-muted/50",
-                          index !== group.items.length - 1 &&
-                            "border-b border-border/10",
-                        )}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                      >
-                        {isHistory ? (
-                          <RiHistoryLine className="w-3.5 h-3.5 mr-2 text-muted-foreground/50 group-hover:text-muted-foreground/70 transition-colors duration-150" />
-                        ) : (
-                          <RiLinkM className="w-3.5 h-3.5 mr-2 text-muted-foreground/50 group-hover:text-muted-foreground/70 transition-colors duration-150" />
-                        )}
-                        <span className="flex-grow text-sm text-foreground/80 group-hover:text-foreground transition-colors duration-150">
-                          {suggestion}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "ml-2 text-[10px] px-1.5 py-0 font-normal border-dashed rounded-sm",
-                            isHistory
-                              ? "opacity-60 bg-muted/20"
-                              : "opacity-40 group-hover:opacity-60",
-                            "transition-opacity duration-150 bg-primary/20",
-                          )}
-                        >
-                          {type.toUpperCase()}
-                        </Badge>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       <AnimatePresence>
@@ -638,6 +599,84 @@ export function SearchBox({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Portal: suggestions rendered directly on document.body to escape all stacking contexts */}
+      {mounted && showSuggestions && suggestions.length > 0 && dropdownPos &&
+        ReactDOM.createPortal(
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="suggestions-portal"
+              ref={suggestionsRef}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.1 }}
+              style={{
+                position: "fixed",
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownPos.width,
+                zIndex: 9999,
+              }}
+              className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg overflow-hidden divide-y divide-border/50"
+            >
+              {suggestions.map((group, groupIndex) => (
+                <div key={group.type} className="relative">
+                  <div>
+                    {group.items.map((suggestion, index) => {
+                      const isHistory = group.type === "history";
+                      const type = predictQueryType(suggestion);
+                      return (
+                        <motion.div
+                          key={suggestion}
+                          initial={{ opacity: 0.5 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.1 }}
+                          className={cn(
+                            "flex items-center px-3 py-2 cursor-pointer group",
+                            "hover:bg-muted/50 transition-colors duration-150",
+                            selectedGroup === groupIndex &&
+                              selectedIndex === index &&
+                              "bg-muted/50",
+                            index !== group.items.length - 1 &&
+                              "border-b border-border/10",
+                          )}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSuggestionClick(suggestion);
+                          }}
+                        >
+                          {isHistory ? (
+                            <RiHistoryLine className="w-3.5 h-3.5 mr-2 text-muted-foreground/50 group-hover:text-muted-foreground/70 transition-colors duration-150" />
+                          ) : (
+                            <RiLinkM className="w-3.5 h-3.5 mr-2 text-muted-foreground/50 group-hover:text-muted-foreground/70 transition-colors duration-150" />
+                          )}
+                          <span className="flex-grow text-sm text-foreground/80 group-hover:text-foreground transition-colors duration-150">
+                            {suggestion}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "ml-2 text-[10px] px-1.5 py-0 font-normal border-dashed rounded-sm",
+                              isHistory
+                                ? "opacity-60 bg-muted/20"
+                                : "opacity-40 group-hover:opacity-60",
+                              "transition-opacity duration-150 bg-primary/20",
+                            )}
+                          >
+                            {type.toUpperCase()}
+                          </Badge>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </AnimatePresence>,
+          document.body,
+        )
+      }
     </div>
   );
 }

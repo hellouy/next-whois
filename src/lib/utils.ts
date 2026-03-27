@@ -276,6 +276,12 @@ export function validateAndSanitizeInput(raw: string): SearchValidationResult {
     return { valid: false, cleaned, errorKey: "validation.invalid_tld", errorArgs: { tld: `.${tld}` } };
   }
 
+  // TLD must not be purely numeric — no real ICANN TLD consists only of digits
+  // e.g. "555.55", "example.123" are not valid domains
+  if (/^\d+$/.test(tld)) {
+    return { valid: false, cleaned, errorKey: "validation.invalid_tld", errorArgs: { tld: `.${tld}` } };
+  }
+
   // Validate TLD against the ICANN Public Suffix List via tldts
   // tldts always returns a publicSuffix, must check isIcann for real TLD
   const parsed = parse(cleaned, { allowPrivateDomains: false });
