@@ -55,6 +55,41 @@ Three layers of local server tables avoid IANA round-trips on first query:
 - **Main lookup page** — `getServerSideProps` calls `lookupWhoisWithCache` directly (not via `/api/lookup`), bypassing all rate limits. This is intentional per design.
 - **`.co`/`.io` slow lookups** — were Replit network blocks. On Vercel both are in `CCTLD_RDAP_OVERRIDES` and use direct RDAP endpoints.
 
+## TLD Probe, Git Fix & Performance Optimization (2026-03-27)
+
+### TLD Fast-Path Optimization (STATIC_ALWAYS_FALLBACK expansion)
+Expanded `STATIC_ALWAYS_FALLBACK` in `tld-fallback-gate.ts` from 9 → 25 TLDs:
+- **Added**: `an`, `tp`, `aq`, `bv`, `sj`, `um`, `bl`, `bq`, `eh`, `fk`, `gb`, `gm`, `gu`, `mf`, `mh`, `va`
+- All are confirmed to have no public WHOIS server (cctld-whois-servers.json = null) AND no accessible RDAP endpoint
+- **Key optimization in `lookup.ts`**: Added `isStaticAlwaysFallback()` fast-path that **completely skips RDAP+WHOIS** and goes straight to yisi/tianhu for these TLDs, saving 4-9 seconds of timeout overhead per query
+- Exported new `isStaticAlwaysFallback(domain)` function from `tld-fallback-gate.ts`
+
+### Module-Level Pre-Warming (Cold Start Reduction)
+In `lookup.ts` (at module load time, runs once per Lambda instance):
+- Pre-seeds `initRdapSkipCache()` — RDAP skip list loaded from DB before first query
+- Pre-seeds `isTldFallbackEnabled()` — fallback gate DB data loaded before first query
+- Combined with existing `getWhoiser()` pre-warm, all 3 caches are ready before any user query arrives
+
+### Git Push Fix (PUSH_REJECTED)
+Updated `git-force-push.ts` to support two modes:
+- **`pull_push`** (default): `git fetch` → `git merge origin/<branch>` → `git push` — safe, preserves remote commits
+- **`force`**: `git push --force` — overwrites remote, use when there's no valid data on remote
+- Both modes: auto-remove `index.lock`, abort pending merges/rebases, show last 3 commits before push
+
+Updated `git-fix.tsx` admin page:
+- Mode selector UI (Sync Push recommended / Force Push)
+- Show/hide token button
+- Colored log output (green = success, red = error)
+- Contextual hint when push fails (suggest switching mode)
+
+### New Admin API: TLD Probe (`/api/admin/tld-probe`)
+- **GET**: Returns `static_always_fallback`, `rdap_overrides_known`, `whois_known` lists
+- **POST `{tlds: string[], timeout: number}`**: Probes up to 30 TLDs for direct connectivity
+  - Per TLD: tries RDAP (if known override URL), then TCP WHOIS (port 43)
+  - Returns `result`: `"rdap"` | `"whois"` | `"static_fallback"` | `"none"`, latency, method used
+  - Summary: count per result type
+- Useful for verifying which TLDs can be queried natively from Vercel vs which need fallback
+
 ## Multi-Model AI System for TLD Scraping (Added 2026-03-26)
 
 ### Architecture

@@ -43,6 +43,14 @@ const getWhoiser = () => {
 };
 // Warm up eagerly — by the time the first request arrives the module is loaded.
 void getWhoiser();
+// Pre-seed the in-memory DB caches (RDAP-skip list + fallback gate) at module
+// load time so the first real lookup hits warm caches instead of waiting for
+// two DB round-trips.  Both functions are idempotent no-ops after first call.
+import("@/lib/whois/tld-rdap-skip").then(m => m.initRdapSkipCache()).catch(() => {});
+import("@/lib/whois/tld-fallback-gate").then(m => {
+  // Trigger the lazy DB load by calling isTldFallbackEnabled with a dummy domain.
+  m.isTldFallbackEnabled("warmup.com").catch(() => {});
+}).catch(() => {});
 import { domainToASCII } from "url";
 import {
   getCustomServerEntry,
@@ -57,7 +65,7 @@ import { probeDomain } from "@/lib/whois/dns-check";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupYisi } from "@/lib/whois/yisi-fallback";
 import { lookupTianhu } from "@/lib/whois/tianhu-fallback";
-import { isTldFallbackEnabled, recordTldNativeFailure, recordTldNativeSuccess, forceTldFallback } from "@/lib/whois/tld-fallback-gate";
+import { isTldFallbackEnabled, recordTldNativeFailure, recordTldNativeSuccess, forceTldFallback, isStaticAlwaysFallback } from "@/lib/whois/tld-fallback-gate";
 import { isRdapSkipped, markRdapSkipped, markRdapSupported, initRdapSkipCache } from "@/lib/whois/tld-rdap-skip";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
@@ -668,6 +676,26 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const startTime = performance.now();
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
+
+  // ── Fast-path: TLDs in STATIC_ALWAYS_FALLBACK have no reachable native server ──
+  // Skip RDAP + WHOIS entirely (saves 4–9 s of timeout overhead) and go straight
+  // to yisi/tianhu.  This synchronous check costs zero DB/network calls.
+  if (isDomainQuery && isStaticAlwaysFallback(domain)) {
+    const [tianhuResult, yisiResult] = await Promise.all([
+      lookupTianhu(domain).catch(() => null),
+      lookupYisi(domain).catch(() => null),
+    ]);
+    const fallbackResult = tianhuResult ?? yisiResult;
+    if (fallbackResult) return fallbackResult;
+    // Both failed — return informative error
+    const tld = domain.split(".").pop()?.toLowerCase() ?? "";
+    return {
+      time: elapsed(),
+      status: false,
+      cached: false,
+      error: `No public WHOIS/RDAP server for .${tld} — fallback sources also unavailable`,
+    };
+  }
 
   // ── Initialise RDAP-skip cache (no-op after first call) ──────────────────
   await initRdapSkipCache();

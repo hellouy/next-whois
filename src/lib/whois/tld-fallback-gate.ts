@@ -19,7 +19,7 @@ function extractTld(domain: string): string {
 // TLDs that sometimes succeed via custom scrapers (e.g. .ba → nic-ba) are NOT
 // listed here; they get promoted via forceTldFallback after a confirmed block.
 const STATIC_ALWAYS_FALLBACK = new Set<string>([
-  // No WHOIS server + confirmed no RDAP (cross-ref with STATIC_NO_RDAP)
+  // ── Confirmed no WHOIS server + confirmed no RDAP ─────────────────────────
   "bd",  // Bangladesh — WHOIS null, no RDAP
   "cg",  // Republic of Congo — WHOIS null, no RDAP
   "er",  // Eritrea — WHOIS null, no RDAP
@@ -27,9 +27,32 @@ const STATIC_ALWAYS_FALLBACK = new Set<string>([
   "lr",  // Liberia — WHOIS null, no RDAP
   "ne",  // Niger — WHOIS null, no RDAP
   "sz",  // Eswatini — WHOIS null, no RDAP
-  // No WHOIS server + RDAP clearly unavailable for other reasons
+
+  // ── Political / infrastructure reasons ───────────────────────────────────
   "kp",  // North Korea — no public internet services
-  "cu",  // Cuba — no WHOIS, no functional RDAP
+  "cu",  // Cuba — no WHOIS; rdap.nic.cu exists but blocked from global infra
+
+  // ── Dissolved / non-functional TLDs (cctld-whois-servers.json: null) ─────
+  "an",  // Netherlands Antilles — dissolved 2010, TLD withdrawn
+  "tp",  // East Timor — retired, replaced by .tl (which has RDAP)
+
+  // ── Uninhabited / no registry services ───────────────────────────────────
+  "aq",  // Antarctica — no ccTLD registry operates public WHOIS/RDAP
+  "bv",  // Bouvet Island — Norwegian territory, no domain services
+  "sj",  // Svalbard & Jan Mayen — no separate registry, redirected to .no
+  "um",  // US Minor Outlying Islands — no active registry
+
+  // ── Overseas territories with no public WHOIS/RDAP ────────────────────────
+  "bl",  // Saint Barthélemy — France overseas collectivity, no public RDAP
+  "bq",  // Caribbean Netherlands (Bonaire etc.) — no public RDAP
+  "eh",  // Western Sahara — disputed territory, no public registry
+  "fk",  // Falkland Islands — small registry, no public RDAP
+  "gb",  // Great Britain (legacy .gb) — superseded by .uk, not actively used
+  "gm",  // Gambia — WHOIS null, no known public RDAP endpoint
+  "gu",  // Guam — US territory, no public RDAP (uses .com/.gov instead)
+  "mf",  // Saint Martin — French side, no separate public RDAP
+  "mh",  // Marshall Islands — WHOIS null, no public RDAP
+  "va",  // Vatican City — very small registry, no public RDAP
 ]);
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
@@ -53,6 +76,17 @@ async function maybeLoad(): Promise<void> {
       if (r.use_fallback) _enabled.add(r.tld);
     }
   } catch {}
+}
+
+/**
+ * Synchronous check for TLDs that should ALWAYS skip native WHOIS/RDAP and go
+ * straight to yisi/tianhu.  Used by lookup.ts to short-circuit native attempts
+ * entirely (avoiding wasted TCP connections and timeouts) for TLDs confirmed to
+ * have no accessible public WHOIS or RDAP endpoint.
+ */
+export function isStaticAlwaysFallback(domain: string): boolean {
+  const tld = extractTld(domain);
+  return STATIC_ALWAYS_FALLBACK.has(tld);
 }
 
 /**
