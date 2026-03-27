@@ -1,0 +1,65 @@
+Let me first explore the current parsing code to understand what's already being extracted:
+Let me read the full parser file to understand the exact current state:
+Now let me look at the RDAP parser and the display component to understand what's already being shown:
+Now let me read the RDAP parser and the results display page to know exactly what exists:
+Let me read the RDAP entity parser and the display page:
+Now I have a complete picture. Let me implement the comprehensive enhancement. The plan:
+
+types.ts — Add 13 new fields: city, address, postal code, fax, admin contact (name/org/email/phone/country), tech contact (name/org/email/phone), registryDomainId
+common_parser.ts — 100+ new synonym rules, comma-separated NS handling, more ccTLD-specific patterns
+rdap_client.ts — Extract admin/tech roles, city/street/postal from vCard adr, fax from tel;type=fax
+[...query].tsx — Display the new fields in the UI
+Now let me see the current contact fields display section in the results page:
+Now let me check the i18n translation keys:
+Now I have the complete picture. Let me implement everything in parallel batches.
+
+Step 1: Update types.ts with 14 new fields:
+Now update the initial value object:
+Step 2: Update common_parser.ts — massive synonym expansion. Let me do it in targeted edits:
+Now fix the remaining abuse contact section (which had a duplicate ac e-mail/ac phone number that now belong to admin contact) and add more NS synonyms and date synonyms:
+Fix the remaining old duplicate cases (ac e-mail → admin, orgtechphone → tech):
+Now check for the duplicate registrar url case that was already in the original switch:
+Remove the original duplicate registrar url case:
+Now check for the duplicate state: case (it was already in the original for status parsing):
+Fix the duplicate state case — keep it only in the original status block:
+Now add more date synonyms for ccTLD formats and improve NS comma handling. Let me first check the full current state of the key sections:
+Fix the remaining ac e-mail duplicate (remove it from the email case since it now belongs in admin email):
+Now improve the NS handling to support comma-separated values, and add more registrar/date synonyms:
+Now add more date synonyms for ccTLD-specific formats:
+Now add more expiration and updated date synonyms:
+Now add more updated-date synonyms:
+Check for remaining duplicates before moving on:
+Fix the lookup.ts type errors — need to add new fields to the object literal there:
+Now update the RDAP client to extract the new fields from entity vCards:
+Now update the convertRdapToWhoisResult to pass all new fields into the result object:
+Now check for all other places that construct WhoisAnalyzeResult to add the new fields, and run TypeScript check:
+Fix the fallback files that construct WhoisAnalyzeResult objects:
+Good — both fallback files use ...initialWhoisAnalyzeResult spread, so they inherit all new fields automatically. Now update the locale files and then the display page. Let me do the locale updates for all 8 languages in parallel:
+Now update the display page to show all new fields. First let me check the hasRegistrant check and the current registrant display area more carefully:
+Update the hasRegistrant check to include all new fields:
+Now update the registrant fields display and add the admin/tech contact sections:
+Now update hasRegistrantContact to include new fields, and add registry domain ID display in the registrar card:
+Now find and add the registry domain ID display near the WHOIS server / IANA ID fields:
+Now let me also update the fuzzy matching section in common_parser.ts to handle admin/tech email/phone:
+Expand the fuzzy matching section to also handle admin/tech email patterns:
+Now run full TypeScript check:
+Zero new errors. Let me also check the lookup.ts issues to confirm they're pre-existing and not related to my changes:
+All 9 lookup.ts errors are pre-existing type issues (WhoisRaw.server optionality) unrelated to my changes. Let me restart and verify:
+Excellent! The Registry Domain ID is already showing (2138514_DOMAIN_COM-VRSN) and the layout looks correct. Let me check the compact results list view also properly handles the new fields in multi-domain results:
+The implementation is clean. Now I need to push via the GitHub API (no direct git push). Let me find the existing push helper:
+I'll push the changed files via the GitHub API. Let me identify them and push:
+Let me use Node.js instead of Python:
+The large [...query].tsx file needs special handling due to its size. Let me push it separately:
+All 13 files pushed successfully. Here's what was completed:
+
+UI changes in [...query].tsx:
+
+Registrant grid expanded from 5 → 10 fields: added registrantName, registrantCity, registrantAddress, registrantPostalCode, registrantFax
+Admin Contact section added inline (sub-section within registrant block): name, organization, country + flag, email, phone
+Tech Contact section added inline: name, organization, email, phone
+Registry Domain ID added to the registrar panel (WHOIS Server row), with the guard condition updated to isValidField(whoisServer) || isValidField(registryDomainId)
+hasRegistrantContact (right-sidebar) updated to also count new fields + admin/tech contact presence
+common_parser.ts fuzzy matching:
+
+Added fuzzy rules for keys containing admin+email, admin+phone, tech+email, tech+phone — catches non-standard field name variations across ccTLD WHOIS servers
+The screenshot above confirms google.com already shows Registry Domain ID: 2138514_DOMAIN_COM-VRSN in the registrar panel. Domains with fuller contact data (e.g. gTLDs before GDPR redaction, or some ccTLDs) will now show all the new fields.
