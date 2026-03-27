@@ -233,7 +233,7 @@ export default function DocsPage({ origin }: { origin: string }) {
   return (
     <>
       <Head>
-        <title key="site-title">{docTitle}</title>
+        <title key="title">{docTitle}</title>
         <meta key="og:title" property="og:title" content={docTitle} />
         <meta key="og:image" property="og:image" content={`${origin}/banner.png`} />
         <meta key="twitter:title" name="twitter:title" content={docTitle} />

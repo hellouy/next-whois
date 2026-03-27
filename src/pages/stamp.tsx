@@ -244,7 +244,7 @@ function StampLandingPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${sl("page_title_main")} · ${siteName}`}</title>
+        <title key="title">{`${sl("page_title_main")} · ${siteName}`}</title>
         <meta name="description" content={sl("page_desc_main")} />
       </Head>
       <div className="max-w-lg mx-auto px-4 py-8 pb-10 space-y-6">
@@ -914,7 +914,7 @@ export default function StampPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${s("title")} · ${domain}`}</title>
+        <title key="title">{`${s("title")} · ${domain}`}</title>
       </Head>
 
       <div className="min-h-[calc(100vh-64px)] bg-background">

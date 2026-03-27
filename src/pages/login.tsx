@@ -62,7 +62,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <Head><title key="site-title">{`${t("auth.login_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
+      <Head><title key="title">{`${t("auth.login_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
       <div className="min-h-screen flex items-center justify-center px-4 py-16">
         <motion.div
           initial={{ opacity: 0, y: 16 }}

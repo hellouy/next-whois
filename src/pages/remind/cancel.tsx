@@ -47,7 +47,7 @@ export default function CancelPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${r("cancel_title")} — WHOIS`}</title>
+        <title key="title">{`${r("cancel_title")} — WHOIS`}</title>
       </Head>
 
       <div className="min-h-[calc(100vh-64px)] bg-background flex items-center justify-center px-4">

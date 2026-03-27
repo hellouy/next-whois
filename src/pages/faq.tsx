@@ -114,7 +114,7 @@ export default function FaqPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${pageTitle} — ${siteName}`}</title>
+        <title key="title">{`${pageTitle} — ${siteName}`}</title>
         <meta
           name="description"
           content={

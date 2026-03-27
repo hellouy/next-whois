@@ -4497,7 +4497,7 @@ export default function LookupPage({
 
           return (
             <>
-              <title key="page-title">{`${displayTarget} WHOIS 查询 · 注册信息 · 到期时间`}</title>
+              <title key="title">{`${displayTarget} WHOIS 查询 · 注册信息 · 到期时间`}</title>
               <meta name="description" content={description} />
               <meta name="keywords" content={keywords} />
               <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />

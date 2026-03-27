@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <>
-      <Head><title key="site-title">{`${t("auth.forgot_page_title")} · ${siteName}`}</title></Head>
+      <Head><title key="title">{`${t("auth.forgot_page_title")} · ${siteName}`}</title></Head>
       <div className="min-h-screen flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">

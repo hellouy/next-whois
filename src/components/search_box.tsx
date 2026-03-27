@@ -172,6 +172,10 @@ export function SearchBox({
     setHistory(listHistory().slice(0, 8));
   }, []);
 
+  useEffect(() => {
+    setInputValue(initialValue);
+  }, [initialValue]);
+
   const computeDropdownPos = () => {
     if (!inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();

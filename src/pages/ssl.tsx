@@ -158,7 +158,7 @@ export default function SslPage() {
 
   return (
     <>
-      <Head><title key="site-title">{`${t("ssl.title")} — ${siteLabel}`}</title></Head>
+      <Head><title key="title">{`${t("ssl.title")} — ${siteLabel}`}</title></Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
           <div className="flex items-center gap-3">

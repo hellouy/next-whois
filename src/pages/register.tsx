@@ -214,7 +214,7 @@ export default function RegisterPage() {
   if (!registrationOpen) {
     return (
       <>
-        <Head><title key="site-title">{`${t("auth.register_closed_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
+        <Head><title key="title">{`${t("auth.register_closed_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="text-center space-y-4 max-w-sm">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-700/30 mb-2">
@@ -233,7 +233,7 @@ export default function RegisterPage() {
 
   return (
     <>
-      <Head><title key="site-title">{`${t("auth.register_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
+      <Head><title key="title">{`${t("auth.register_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
       <div className="min-h-screen flex items-center justify-center px-4 py-16">
         <motion.div
           initial={{ opacity: 0, y: 16 }}

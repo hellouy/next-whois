@@ -368,7 +368,7 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
   return (
     <>
       <Head>
-        <title key="site-title">{`${t("remind.sub_success")} · ${domain}`}</title>
+        <title key="title">{`${t("remind.sub_success")} · ${domain}`}</title>
       </Head>
       <div className="min-h-[calc(100vh-64px)] bg-background">
         <div className="max-w-lg mx-auto px-4 py-5 pb-10">
@@ -809,7 +809,7 @@ export default function RemindPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${t("remind.page_title_main")} · ${siteName}`}</title>
+        <title key="title">{`${t("remind.page_title_main")} · ${siteName}`}</title>
         <meta name="description" content={t("remind.page_desc_main")} />
       </Head>
 

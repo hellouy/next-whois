@@ -185,7 +185,7 @@ export default function FeedbackPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${meta.label} — ${settings.site_logo_text || "X.RW"}`}</title>
+        <title key="title">{`${meta.label} — ${settings.site_logo_text || "X.RW"}`}</title>
       </Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-xl mx-auto px-4 sm:px-6 py-6">

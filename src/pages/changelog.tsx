@@ -470,7 +470,7 @@ export default function ChangelogPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${isChinese ? "更新记录" : "Changelog"} — ${siteName}`}</title>
+        <title key="title">{`${isChinese ? "更新记录" : "Changelog"} — ${siteName}`}</title>
       </Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-16">

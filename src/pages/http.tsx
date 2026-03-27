@@ -109,7 +109,7 @@ export default function HttpCheckPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${t("http.page_title")} — ${siteLabel}`}</title>
+        <title key="title">{`${t("http.page_title")} — ${siteLabel}`}</title>
       </Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">

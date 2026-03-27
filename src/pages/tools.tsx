@@ -88,7 +88,7 @@ export default function ToolsPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${t("nav_tools")} — ${siteLabel}`}</title>
+        <title key="title">{`${t("nav_tools")} — ${siteLabel}`}</title>
       </Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">

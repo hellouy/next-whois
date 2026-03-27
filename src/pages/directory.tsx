@@ -93,7 +93,7 @@ export default function NavPage() {
   return (
     <>
       <Head>
-        <title key="site-title">{`${t("nav_directory")} — ${siteLabel}`}</title>
+        <title key="title">{`${t("nav_directory")} — ${siteLabel}`}</title>
       </Head>
       <ScrollArea className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-6">
