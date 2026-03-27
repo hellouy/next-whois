@@ -4013,7 +4013,12 @@ function ResultSkeleton() {
   );
 }
 
-const _EMPTY_WHOIS_RESULT: WhoisResult = { status: false, time: 0, cached: false };
+const _EMPTY_WHOIS_RESULT: WhoisResult = {
+  status: false,
+  time: 0,
+  cached: false,
+  result: { ...initialWhoisAnalyzeResult },
+};
 
 export default function LookupPage({
   data: initialData,
