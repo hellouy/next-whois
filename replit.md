@@ -1,5 +1,21 @@
 # Next Whois UI — v3.23
 
+## Replit Environment Setup (2026-03-27)
+
+### Secrets Configured
+- `POSTGRES_URL` — Supabase pooled connection (aws-1-ap-southeast-2.pooler.supabase.com:5432)
+- `VERCEL_TOKEN` — Vercel personal access token for deployment
+- `GITHUB_TOKEN` — GitHub classic token for repo access
+
+### Files Created / Fixed
+- **`src/lib/whois/whois_gtld_bootstrap.ts`** — Created missing WHOIS server bootstrap (510 entries covering gTLDs + ccTLDs). Was imported in `lookup.ts` but absent from the codebase, causing a module-not-found error on WHOIS queries.
+
+### Config Changes
+- **`next.config.js`** — Added `*.worf.replit.dev` to `allowedDevOrigins` (Replit rotates dev subdomains between `kirk`, `worf`, etc.)
+
+### Dev Environment Variables
+- `NEXTAUTH_URL` / `NEXT_PUBLIC_BASE_URL` — Updated to current Replit dev domain (must be refreshed if the dev domain changes)
+
 ## Multi-Model AI System for TLD Scraping (Added 2026-03-26)
 
 ### Architecture

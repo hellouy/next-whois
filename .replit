@@ -61,8 +61,8 @@ NEXT_PUBLIC_MAX_WHOIS_FOLLOW = "0"
 NEXT_PUBLIC_HISTORY_LIMIT = "-1"
 
 [userenv.development]
-NEXTAUTH_URL = "https://47ffe339-d299-4262-a870-555637e91b46-00-219t6rtphep5t.kirk.replit.dev"
-NEXT_PUBLIC_BASE_URL = "https://47ffe339-d299-4262-a870-555637e91b46-00-219t6rtphep5t.kirk.replit.dev"
+NEXTAUTH_URL = "https://3c867b8f-a45e-4449-aa48-680bd4e403ae-00-89ewzym5zeqp.worf.replit.dev"
+NEXT_PUBLIC_BASE_URL = "https://3c867b8f-a45e-4449-aa48-680bd4e403ae-00-89ewzym5zeqp.worf.replit.dev"
 
 [postMerge]
 path = "scripts/post-merge.sh"

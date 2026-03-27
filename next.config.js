@@ -17,7 +17,7 @@ const nextConfig = {
   compress: true,
   optimizeFonts: true,
   // Allow Replit's proxied dev domain to load _next/* resources without warnings
-  allowedDevOrigins: ["*.replit.dev", "*.kirk.replit.dev", "*.repl.co"],
+  allowedDevOrigins: ["*.replit.dev", "*.kirk.replit.dev", "*.worf.replit.dev", "*.repl.co"],
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 86400,
