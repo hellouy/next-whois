@@ -103,6 +103,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // ── Mode: pull_push — fetch → merge → push ────────────────────────────────
   if (mode === "pull_push") {
+    // Auto-commit any uncommitted working-tree changes so they are included in push
+    const statusOut = runCmd("git", ["status", "--porcelain"], cwd);
+    if (statusOut.ok && statusOut.out.trim().length > 0) {
+      runCmd("git", ["add", "-A"], cwd);
+      const commitResult = runCmd("git", ["commit", "-m", "chore: sync uncommitted changes"], cwd, {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: "0",
+        GIT_AUTHOR_NAME: "Replit Agent",
+        GIT_AUTHOR_EMAIL: "agent@replit.dev",
+        GIT_COMMITTER_NAME: "Replit Agent",
+        GIT_COMMITTER_EMAIL: "agent@replit.dev",
+      });
+      if (commitResult.ok) {
+        log.push("✓ 已提交未暂存的本地变更");
+      } else {
+        log.push(`  commit 结果: ${commitResult.out || commitResult.err}`);
+      }
+    } else {
+      log.push("  工作区干净，无未提交变更");
+    }
+
     // Abort any pending operations
     runCmd("git", ["merge", "--abort"], cwd);
     runCmd("git", ["rebase", "--abort"], cwd);

@@ -4035,8 +4035,12 @@ export default function LookupPage({
   const router = useRouter();
   const settings = useSiteSettings();
   const hideRawWhois = settings.hide_raw_whois === "1";
-  const [loading, setLoading] = React.useState(initialData === null);
-  const [data, setData] = React.useState<WhoisResult>(initialData ?? _EMPTY_WHOIS_RESULT);
+  // Always start loading=true so skeleton renders before the client-side fetch
+  // completes.  This avoids a render pass where loading=false but result is
+  // still undefined (e.g. SSR returned an INVALID_DOMAIN_TLD error without a
+  // result object), which crashes useMemo hooks that access result.*
+  const [loading, setLoading] = React.useState(true);
+  const [data, setData] = React.useState<WhoisResult>(_EMPTY_WHOIS_RESULT);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
