@@ -12,6 +12,9 @@
     }
   ],
   "functions": {
+    "src/pages/[...query].tsx": {
+      "maxDuration": 30
+    },
     "src/pages/api/lookup.ts": {
       "maxDuration": 30
     },
@@ -21,8 +24,20 @@
     "src/pages/api/admin/tld-servers.ts": {
       "maxDuration": 10
     },
+    "src/pages/api/admin/git-force-push.ts": {
+      "maxDuration": 60
+    },
+    "src/pages/api/admin/changelog-sync.ts": {
+      "maxDuration": 30
+    },
+    "src/pages/api/admin/setup.ts": {
+      "maxDuration": 30
+    },
     "src/pages/api/remind/process.ts": {
       "maxDuration": 60
+    },
+    "src/pages/api/cron/ping.ts": {
+      "maxDuration": 10
     }
   },
   "headers": [

@@ -23,6 +23,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await requireAdmin(req, res);
   if (!session) return;
 
+  if (process.env.VERCEL) {
+    return res.status(400).json({
+      success: false,
+      log: [
+        "✗ 此功能仅在本地 / Replit 开发环境可用",
+        "  Vercel 部署为只读文件系统，不含 .git 目录",
+        "  如需推送代码，请在本地执行 git push 或使用 GitHub 界面",
+      ],
+    });
+  }
+
   const { token } = req.body as { token?: string };
   if (!token || token.trim().length < 10) {
     return res.status(400).json({ success: false, log: ["✗ 请提供 GitHub Personal Access Token"] });

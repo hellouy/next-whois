@@ -72,10 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
       }
-      res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=30");
+      res.setHeader("Cache-Control", "private, no-store");
       return res.json({ settings: { ...DEFAULT_SETTINGS, ...settings } });
     } catch {
-      res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=30");
+      res.setHeader("Cache-Control", "private, no-store");
       return res.json({ settings: DEFAULT_SETTINGS });
     }
   }

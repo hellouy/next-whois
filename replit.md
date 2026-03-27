@@ -36,6 +36,25 @@ Three layers of local server tables avoid IANA round-trips on first query:
 ### Dev Environment Variables
 - `NEXTAUTH_URL` / `NEXT_PUBLIC_BASE_URL` — Updated to current Replit dev domain (must be refreshed if the dev domain changes)
 
+## Vercel Compatibility Fixes (2026-03-27)
+
+### Issues Fixed
+- **`vercel.json`** — Added `maxDuration` for previously unconfigured Vercel functions:
+  - `src/pages/[...query].tsx` → 30s (main SSR lookup page, was using Vercel default 60s; explicit 30s is safe and matches `api/lookup`)
+  - `src/pages/api/admin/git-force-push.ts` → 60s
+  - `src/pages/api/admin/changelog-sync.ts` → 30s
+  - `src/pages/api/admin/setup.ts` → 30s
+  - `src/pages/api/cron/ping.ts` → 10s
+- **`src/pages/api/user/forgot-password.ts`** — Changed localhost fallback (`"http://localhost:5000"`) to `"https://x.rw"`. On Vercel, `NEXT_PUBLIC_BASE_URL` / `NEXTAUTH_URL` always takes precedence; fallback is never reached, but the correct value is now in place.
+- **`src/pages/api/admin/settings.ts`** — Changed `Cache-Control: public, max-age=15` → `private, no-store`. The settings endpoint can return sensitive server-only keys (`smtp_pass`, `captcha_secret_key`) for admin users. Using `public` caused Vercel's Edge Cache to potentially serve admin-scoped responses to subsequent non-admin requests. Now `private, no-store` prevents any CDN/proxy caching.
+- **`src/pages/api/admin/git-force-push.ts`** — Added early Vercel environment check: if `process.env.VERCEL` is set, returns a 400 with an informative Chinese-language message explaining the tool is not available on read-only Vercel deployments. Previously would silently fail with confusing git errors.
+
+### Confirmed Non-Issues (Vercel-safe)
+- **`admin/tld-rules.ts`** filesystem ops — already wrapped in try/catch with `console.warn`; silently degrades on Vercel's read-only FS, uses Redis/DB as primary storage.
+- **`api/lookup.ts` rate limiting** — in-process Map for brute-force tracking is ephemeral per Lambda instance; Redis-based rate limiter is the primary mechanism and persists correctly.
+- **Main lookup page** — `getServerSideProps` calls `lookupWhoisWithCache` directly (not via `/api/lookup`), bypassing all rate limits. This is intentional per design.
+- **`.co`/`.io` slow lookups** — were Replit network blocks. On Vercel both are in `CCTLD_RDAP_OVERRIDES` and use direct RDAP endpoints.
+
 ## Multi-Model AI System for TLD Scraping (Added 2026-03-26)
 
 ### Architecture
