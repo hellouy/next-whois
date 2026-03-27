@@ -10,6 +10,25 @@
 ### Files Created / Fixed
 - **`src/lib/whois/whois_gtld_bootstrap.ts`** — Created missing WHOIS server bootstrap (510 entries covering gTLDs + ccTLDs). Was imported in `lookup.ts` but absent from the codebase, causing a module-not-found error on WHOIS queries.
 - **`src/lib/whois/lookup.ts`** — Fixed TypeScript error: `WhoisRawResult.server` changed from `server: string` (required) to `server?: string` (optional) to match the `WhoisRaw` local type used by the shadow WHOIS promise. This resolved 9 TS errors (`tsc --noEmit --skipLibCheck` now exits 0).
+- **`src/lib/whois/rdap_gtld_bootstrap.ts`** — Created missing RDAP gTLD/ccTLD bootstrap (1198 entries from IANA dns.json, generated 2026-03-27). Imported by `rdap_client.ts` but absent, causing all gTLD RDAP lookups to fail the local fast path and fall through to `node-rdap` IANA auto-discovery (extra network round-trip). Now eliminates IANA round-trip for all 1198 known TLDs.
+
+### Local Server List Architecture (Query Speed Optimization)
+Three layers of local server tables avoid IANA round-trips on first query:
+
+| Layer | File | Entries | Coverage |
+|---|---|---|---|
+| ccTLD RDAP overrides (hand-curated) | `rdap_client.ts` → `CCTLD_RDAP_OVERRIDES` | 168 | 168 ccTLDs → direct RDAP, no IANA |
+| gTLD+ccTLD RDAP bootstrap (IANA) | `rdap_gtld_bootstrap.ts` | 1198 | All IANA-listed TLDs → direct RDAP |
+| WHOIS server bootstrap | `whois_gtld_bootstrap.ts` | 510 | Key TLDs incl. .com/.net/.org/.io → direct WHOIS |
+
+**Query flow for .com (example):**
+- Before: WHOIS → whois.iana.org (discover) → whois.verisign-grs.com + RDAP → download dns.json (download) → rdap.verisign.com (2× IANA round-trips)
+- After: WHOIS → whois.verisign-grs.com directly + RDAP → rdap.verisign.com/com/v1/ directly (0 IANA round-trips)
+
+**ccTLD RDAP direct mode** (`rdapIsDirect = true` when TLD in `RDAP_DIRECT_CCTLDS`):
+- RDAP query fires immediately to curated endpoint (e.g. `rdap.denic.de` for .de)
+- WHOIS starts as shadow at t=2s (reduced worst-case latency for RDAP-first registries)
+- RDAP wins: shadow WHOIS cancelled; RDAP slow: shadow WHOIS provides fallback data
 
 ### Config Changes
 - **`next.config.js`** — Added `*.worf.replit.dev` to `allowedDevOrigins` (Replit rotates dev subdomains between `kirk`, `worf`, etc.)
