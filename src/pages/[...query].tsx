@@ -2735,73 +2735,6 @@ function DomainStatusInfoCard({
   );
 }
 
-const CONFETTI_COLORS = [
-  "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6",
-  "#ef4444", "#ec4899", "#06b6d4", "#84cc16",
-  "#f97316", "#a855f7", "#14b8a6", "#facc15",
-];
-
-type ConfettiShape = "circle" | "rect" | "ribbon";
-
-function ConfettiPieces() {
-  const pieces = React.useMemo(
-    () =>
-      Array.from({ length: 52 }, (_, i) => {
-        const shape: ConfettiShape =
-          i % 5 === 0 ? "ribbon" : i % 3 === 0 ? "circle" : "rect";
-        const baseLeft = (i * 1.97 + (i % 7) * 5.3) % 100;
-        return {
-          id: i,
-          left: `${baseLeft}%`,
-          delay: (i * 0.06 + (i % 4) * 0.15) % 2.2,
-          duration: 1.4 + (i * 0.07) % 1.4,
-          color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-          width: shape === "ribbon" ? 3 : 5 + (i % 5) * 2,
-          height: shape === "ribbon" ? 10 + (i % 4) * 3 : 5 + (i % 5) * 2,
-          shape,
-          rotateDir: i % 2 === 0 ? 540 : -540,
-          xDrift: ((i % 9) - 4) * 12,
-          repeatDelay: 0.3 + (i % 5) * 0.2,
-        };
-      }),
-    [],
-  );
-
-  return (
-    <div className="absolute inset-x-0 top-0 h-36 overflow-hidden pointer-events-none">
-      {pieces.map((p) => (
-        <motion.div
-          key={p.id}
-          style={{
-            position: "absolute",
-            left: p.left,
-            top: -16,
-            width: p.width,
-            height: p.height,
-            backgroundColor: p.color,
-            borderRadius:
-              p.shape === "circle" ? "50%" : p.shape === "ribbon" ? 1 : 2,
-            opacity: 0.9,
-          }}
-          animate={{
-            y: [0, 140, 140],
-            x: [0, p.xDrift, p.xDrift * 1.4],
-            opacity: [0, 1, 0],
-            rotate: [0, p.rotateDir],
-            scaleX: p.shape === "ribbon" ? [1, 0.3, 1, 0.3] : 1,
-          }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            repeatDelay: p.repeatDelay,
-            ease: "easeIn",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 const ALL_REMINDER_THRESHOLDS = [60, 30, 10, 5, 1];
 const DEFAULT_REMINDER_THRESHOLDS = [60, 30, 1];
@@ -3793,167 +3726,138 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
     : (registrars.find((r) => !r.isPremium) ?? registrars[0] ?? null);
 
   return (
-    <div className={cn(
-      "glass-panel rounded-xl overflow-hidden",
-      isPremium
-        ? "border border-amber-300/50 dark:border-amber-700/40"
-        : "border border-emerald-300/40 dark:border-emerald-700/35"
-    )}>
-      {/* Hero section */}
+    <div className="glass-panel rounded-xl overflow-hidden border border-border/60">
+      {/* Accent bar at top */}
       <div className={cn(
-        "relative p-6 sm:p-8",
-        isPremium
-          ? "bg-amber-50/25 dark:bg-amber-950/12"
-          : "bg-emerald-50/20 dark:bg-emerald-950/12"
-      )}>
-        {!isPremium && <ConfettiPieces />}
-        <div className="relative z-10">
-          {/* Top row: icon + domain name + badge */}
-          <div className="flex items-start gap-4 mb-4">
-            {/* Fixed-size container so rings are always centered */}
-            <div className="relative w-12 h-12 shrink-0">
-              <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center shadow-sm",
-                isPremium
-                  ? "bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20"
-                  : "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20"
-              )}>
-                {isPremium
-                  ? <RiVipCrownLine className="w-6 h-6 text-white" />
-                  : <RiCheckLine className="w-6 h-6 text-white" />}
-              </div>
-              {/* Ring 1 — inset-0 + scale so it stays perfectly centered */}
-              <motion.span
-                className={cn("absolute inset-0 rounded-xl border-2 pointer-events-none",
-                  isPremium ? "border-amber-400/55 dark:border-amber-500/40" : "border-emerald-400/55 dark:border-emerald-500/40"
-                )}
-                animate={{ scale: [1, 1.55, 1], opacity: [0.7, 0, 0.7] }}
-                transition={{ duration: 2.3, repeat: Infinity, ease: "easeInOut" }}
-              />
-              {/* Ring 2 */}
-              <motion.span
-                className={cn("absolute inset-0 rounded-xl border pointer-events-none",
-                  isPremium ? "border-amber-300/30 dark:border-amber-600/25" : "border-emerald-300/30 dark:border-emerald-600/25"
-                )}
-                animate={{ scale: [1, 1.95, 1], opacity: [0.4, 0, 0.4] }}
-                transition={{ duration: 2.3, repeat: Infinity, ease: "easeInOut", delay: 0.45 }}
-              />
-            </div>
+        "h-0.5 w-full",
+        isPremium ? "bg-amber-500/70" : "bg-emerald-500/70"
+      )} />
 
-            <div className="flex-1 min-w-0">
-              {/* Badge */}
-              <div className="mb-1.5">
-                {isPremium ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border border-amber-300/50 dark:border-amber-700/40 rounded-full px-2.5 py-0.5">
-                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
-                    {isZh ? "溢价域名" : "Premium Domain"}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-300/50 dark:border-emerald-700/40 rounded-full px-2.5 py-0.5">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                    {isZh ? "可注册" : "Available"}
-                  </span>
-                )}
-              </div>
-              {/* Domain name */}
-              <div className="flex items-baseline flex-wrap gap-0 leading-tight">
-                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-all">
-                  {sldForDisplay}
-                </span>
-                <span className={cn(
-                  "text-2xl sm:text-3xl font-bold tracking-tight",
-                  isPremium ? "text-amber-500 dark:text-amber-400" : "text-emerald-500 dark:text-emerald-400"
-                )}>
-                  {tldForDisplay}
-                </span>
-              </div>
-            </div>
+      {/* Header */}
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start gap-3.5">
+          {/* Icon */}
+          <div className={cn(
+            "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border",
+            isPremium
+              ? "bg-amber-500/8 dark:bg-amber-500/10 border-amber-400/25 dark:border-amber-500/20"
+              : "bg-emerald-500/8 dark:bg-emerald-500/10 border-emerald-400/25 dark:border-emerald-500/20"
+          )}>
+            {isPremium
+              ? <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+              : <RiCheckLine className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />}
           </div>
 
-          {/* Description */}
-          {isPremium ? (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              {anyApiPremium && premiumRegistrars.length > 0
+          <div className="flex-1 min-w-0">
+            {/* Status badge */}
+            <div className="mb-1">
+              {isPremium ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/8 dark:bg-amber-500/12 border border-amber-400/25 dark:border-amber-500/25 rounded-full px-2 py-0.5">
+                  <span className="w-1 h-1 rounded-full bg-amber-500" />
+                  {isZh ? "溢价域名" : "Premium"}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/8 dark:bg-emerald-500/12 border border-emerald-400/25 dark:border-emerald-500/25 rounded-full px-2 py-0.5">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                  {isZh ? "可注册" : "Available"}
+                </span>
+              )}
+            </div>
+            {/* Domain name */}
+            <div className="flex items-baseline flex-wrap gap-0 leading-tight">
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-all">
+                {sldForDisplay}
+              </span>
+              <span className={cn(
+                "text-2xl sm:text-3xl font-bold tracking-tight",
+                isPremium ? "text-amber-500 dark:text-amber-400" : "text-emerald-500 dark:text-emerald-400"
+              )}>
+                {tldForDisplay}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-sm text-muted-foreground leading-relaxed mt-3 mb-4">
+          {isPremium
+            ? (anyApiPremium && premiumRegistrars.length > 0
                 ? (isZh
                     ? `该域名为溢价域名，注册商已报溢价注册费，最低约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年，实际以注册商报价为准。`
                     : `This is a premium domain. Registrars quote a premium fee — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm the exact price with the registrar before purchasing.`)
                 : (isZh
                     ? "该域名为溢价域名，注册价格高于普通域名，以下展示的为标准 TLD 参考价，实际溢价需以注册商报价为准。"
-                    : "This is a premium domain. Registration costs are above standard rates. Prices shown are standard TLD references — the actual premium price may differ.")}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              {isZh
-                ? "该域名尚未被注册，抢先注册属于你的域名！"
-                : "This domain is unregistered. Grab it before someone else does!"}
-            </p>
-          )}
+                    : "This is a premium domain. Registration costs are above standard rates. Prices shown are standard TLD references — the actual premium price may differ."))
+            : (isZh
+                ? "该域名尚未被注册，现在抢先注册属于你的域名。"
+                : "This domain is available for registration. Grab it before someone else does.")}
+        </p>
 
-          {/* CTA */}
-          {!loadingPrices && bestRegistrar && (
-            <a
-              href={bestRegistrar.registrarweb}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "inline-flex items-center gap-2 text-white font-semibold text-sm px-5 py-2.5 rounded-lg shadow-sm transition-all duration-150 hover:opacity-90 active:scale-[0.98]",
-                isPremium
-                  ? "bg-amber-500 dark:bg-amber-600 shadow-amber-500/20"
-                  : "bg-emerald-500 dark:bg-emerald-600 shadow-emerald-500/20"
-              )}
-            >
-              <RiShoppingCartLine className="w-4 h-4" />
+        {/* CTA */}
+        {loadingPrices ? (
+          <div className="h-9 w-44 rounded-lg bg-muted/40 animate-pulse" />
+        ) : bestRegistrar ? (
+          <a
+            href={bestRegistrar.registrarweb}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "inline-flex items-center gap-2 font-semibold text-sm px-4 py-2 rounded-lg border transition-all duration-150 active:scale-[0.98]",
+              isPremium
+                ? "border-amber-400/40 dark:border-amber-500/35 text-amber-700 dark:text-amber-300 bg-amber-500/8 dark:bg-amber-500/10 hover:bg-amber-500/15 dark:hover:bg-amber-500/18"
+                : "border-emerald-400/40 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300 bg-emerald-500/8 dark:bg-emerald-500/10 hover:bg-emerald-500/15 dark:hover:bg-emerald-500/18"
+            )}
+          >
+            <RiShoppingCartLine className="w-3.5 h-3.5 shrink-0" />
+            <span>
               {isZh
                 ? `${isPremium ? "查看价格" : "立即注册"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/${isZh ? "首年起" : "yr"}`
                 : `${isPremium ? "Check Price" : "Register Now"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/yr`}
-            </a>
-          )}
-          {loadingPrices && (
-            <div className="h-9 w-48 rounded-lg bg-muted/40 animate-pulse" />
-          )}
-        </div>
+            </span>
+          </a>
+        ) : null}
       </div>
 
+      {/* Divider */}
+      <div className="border-t border-border/50" />
+
       {/* Pricing section */}
-      <div className={cn(
-        "border-t",
-        isPremium ? "border-amber-200/40 dark:border-amber-800/30" : "border-emerald-200/40 dark:border-emerald-800/30"
-      )}>
-        {/* Premium warning */}
+      <div>
+        {/* Premium notice */}
         {isPremium && !loadingPrices && (
-          <div className="mx-4 sm:mx-6 mt-4 flex items-start gap-2 rounded-lg border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/15 dark:border-amber-800/40 px-3 py-2.5">
-            <RiInformationLine className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+          <div className="mx-4 sm:mx-5 mt-4 flex items-start gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+            <RiInformationLine className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <p className="text-[11px] text-muted-foreground leading-snug">
               {anyApiPremium && premiumRegistrars.length > 0
                 ? (isZh
-                    ? "溢价注册商的报价已显示在上方（标注「溢价」），未标注的注册商可能仅提供标准参考价，实际注册价格请以注册商实时报价为准。"
-                    : "Registrars showing a \"Premium\" badge have quoted the actual premium fee for this domain. Others may display only the standard TLD reference price — always confirm the final price with the registrar.")
+                    ? "溢价注册商的报价已显示（标注「溢价」），未标注的注册商可能仅提供标准参考价，实际注册价格请以注册商实时报价为准。"
+                    : "Registrars with a \"Premium\" badge have quoted the actual premium fee. Others may display only the standard TLD reference price — always confirm the final price with the registrar.")
                 : (isZh
                     ? "以下价格为该 TLD 的标准/溢价参考价，实际注册价格可能显著更高，请以注册商实时报价为准。"
-                    : "Prices below are standard/premium TLD reference rates. The actual registration cost for this specific domain may be significantly higher — confirm with the registrar before purchasing.")}
+                    : "Prices below are standard/premium TLD reference rates. The actual cost for this specific domain may be significantly higher — confirm with the registrar.")}
             </p>
           </div>
         )}
 
-        <div className="px-4 sm:px-6 pt-4 pb-1 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-semibold uppercase tracking-wide">
-            <RiShoppingCartLine className="w-3.5 h-3.5" />
-            {isZh ? "注册商价格对比" : "Registrar Price Comparison"}
+        <div className="px-4 sm:px-5 pt-4 pb-1.5 flex items-center justify-between">
+          <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1.5 font-semibold uppercase tracking-wider">
+            <RiShoppingCartLine className="w-3 h-3" />
+            {isZh ? "注册商价格对比" : "Registrar Prices"}
           </p>
           {registrars.length > 0 && (
-            <span className="text-[10px] text-muted-foreground/50">
+            <span className="text-[10px] text-muted-foreground/40">
               {isZh ? "以官网为准" : "Reference only"}
             </span>
           )}
         </div>
 
         {loadingPrices ? (
-          <div className="px-4 sm:px-6 pb-5 pt-3 space-y-2.5">
+          <div className="px-4 sm:px-5 pb-5 pt-2 space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3 py-1">
+              <div key={i} className="flex items-center gap-3 py-1.5">
                 <div className="w-8 h-8 rounded-lg bg-muted/50 animate-pulse shrink-0" />
                 <div className="flex-1 h-3.5 rounded bg-muted/40 animate-pulse" />
-                <div className="w-20 h-4 rounded bg-muted/40 animate-pulse shrink-0" />
+                <div className="w-16 h-4 rounded bg-muted/40 animate-pulse shrink-0" />
               </div>
             ))}
           </div>
@@ -3972,48 +3876,39 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    "flex items-center gap-3 px-4 sm:px-6 py-3 transition-colors duration-150 group",
-                    rowIsPremium
-                      ? "hover:bg-amber-50/60 dark:hover:bg-amber-950/20"
-                      : "hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30",
-                    isFirst && (rowIsPremium
-                      ? "bg-amber-50/40 dark:bg-amber-950/15"
-                      : "bg-emerald-50/40 dark:bg-emerald-950/20"),
+                    "flex items-center gap-3 px-4 sm:px-5 py-2.5 transition-colors duration-150 group hover:bg-muted/40",
+                    isFirst && "bg-muted/20",
                   )}
                 >
                   <RegistrarIcon faviconDomain={faviconDomain} name={r.registrarname} />
 
                   <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <span className="shrink-0 text-[11px] font-bold text-muted-foreground/30 w-4 text-right tabular-nums">
+                    <span className="shrink-0 text-[11px] font-bold text-muted-foreground/25 w-4 text-right tabular-nums">
                       {idx + 1}
                     </span>
                     <p className={cn(
                       "text-sm truncate",
-                      isFirst ? "font-semibold text-foreground" : "font-medium text-foreground/75",
+                      isFirst ? "font-semibold text-foreground" : "font-medium text-foreground/70",
                     )}>
                       {r.registrarname}
                     </p>
-                    {/* "Best price" badge — only for non-premium domains */}
                     {isFirst && !rowIsPremium && !isPremium && (
-                      <span className="shrink-0 text-[9px] font-bold text-white bg-emerald-500 dark:bg-emerald-600 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                      <span className="shrink-0 text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-400/30 dark:border-emerald-500/30 px-1.5 py-0.5 rounded uppercase tracking-wide">
                         {isZh ? "最低价" : "BEST"}
                       </span>
                     )}
-                    {/* "Cheapest premium" badge — first premium entry on a confirmed premium domain */}
                     {isFirst && rowIsPremium && anyApiPremium && (
-                      <span className="shrink-0 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 border border-amber-300/50 dark:border-amber-700/40 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                      <span className="shrink-0 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-400/30 dark:border-amber-500/30 px-1.5 py-0.5 rounded uppercase tracking-wide">
                         {isZh ? "最低溢价" : "LOWEST"}
                       </span>
                     )}
-                    {/* Premium badge — all premium entries except the first when already badged above */}
                     {rowIsPremium && !(isFirst && anyApiPremium) && (
-                      <span className="shrink-0 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 border border-amber-300/50 dark:border-amber-700/40 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                      <span className="shrink-0 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/8 border border-amber-400/25 dark:border-amber-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">
                         {isZh ? "溢价" : "PREMIUM"}
                       </span>
                     )}
-                    {/* "Standard reference" badge — non-premium entries in a confirmed-premium domain list */}
                     {!rowIsPremium && anyApiPremium && (
-                      <span className="shrink-0 text-[9px] font-bold text-muted-foreground/60 bg-muted/60 border border-border/60 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                      <span className="shrink-0 text-[9px] font-bold text-muted-foreground/50 bg-muted/50 border border-border/50 px-1.5 py-0.5 rounded uppercase tracking-wide">
                         {isZh ? "参考价" : "STD"}
                       </span>
                     )}
@@ -4024,43 +3919,42 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
                       <span className={cn(
                         "font-bold tabular-nums",
                         rowIsPremium
-                          ? (isFirst ? "text-base text-amber-600 dark:text-amber-400" : "text-sm text-amber-500/70")
-                          : (isFirst ? "text-base text-emerald-600 dark:text-emerald-400" : "text-sm text-foreground/75"),
+                          ? (isFirst ? "text-base text-amber-600 dark:text-amber-400" : "text-sm text-amber-500/60 dark:text-amber-500/50")
+                          : (isFirst ? "text-base text-emerald-600 dark:text-emerald-400" : "text-sm text-foreground/60"),
                       )}>
                         {typeof r.new === "number" ? formatPrice(r.new, r.currency) : "N/A"}
                       </span>
-                      <span className="text-xs text-muted-foreground/50">
+                      <span className="text-xs text-muted-foreground/40">
                         /{isZh ? "年" : "yr"}
                       </span>
                     </div>
-                    <svg className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3.5 h-3.5 text-muted-foreground/25 group-hover:text-muted-foreground/50 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
                 </a>
               );
             })}
-            <p className="text-[10px] text-muted-foreground/35 px-4 sm:px-6 pt-2.5 pb-2">
+            <p className="text-[10px] text-muted-foreground/30 px-4 sm:px-5 pt-2.5 pb-2">
               {isPremium
                 ? (anyApiPremium && premiumRegistrars.length > 0
                     ? (isZh
-                        ? "数据来源：nazhumi.com & miqingju.com · 溢价报价优先排列 · 「参考价」为标准 TLD 价格，不代表实际溢价"
-                        : "Source: nazhumi.com & miqingju.com · Premium quotes listed first · \"STD\" entries show standard TLD price, not domain-specific premium fee")
+                        ? "数据来源：nazhumi.com & miqingju.com · 溢价报价优先排列 · 「参考价」为标准 TLD 价格"
+                        : "Source: nazhumi.com & miqingju.com · Premium quotes first · \"STD\" = standard TLD price")
                     : (isZh
-                        ? "数据来源：nazhumi.com & miqingju.com · 溢价域名价格仅供参考，实际以注册商为准"
-                        : "Source: nazhumi.com & miqingju.com · Premium prices are indicative only — confirm with registrar"))
+                        ? "数据来源：nazhumi.com & miqingju.com · 溢价域名价格仅供参考"
+                        : "Source: nazhumi.com & miqingju.com · Premium prices are indicative"))
                 : (isZh
                     ? "数据来源：nazhumi.com & miqingju.com · 最低价优先 · 价格仅供参考"
-                    : "Source: nazhumi.com & miqingju.com · Sorted by lowest price · For reference only")}
+                    : "Source: nazhumi.com & miqingju.com · Sorted by lowest price · Reference only")}
             </p>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground/60 text-center py-6">
+          <p className="text-xs text-muted-foreground/50 text-center py-6">
             {isZh ? "暂无价格数据" : "No pricing data available for this TLD"}
           </p>
         )}
       </div>
-
     </div>
   );
 }

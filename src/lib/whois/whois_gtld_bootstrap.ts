@@ -399,7 +399,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "fishing": "whois.nic.fishing",
   "fit": "whois.nic.fit",
   "fitness": "whois.donuts.co",
-  "fj": "whois.rdap.fj",
+  "fj": "whois.domains.fj",
   "flickr": "whois.nic.flickr",
   "flights": "whois.donuts.co",
   "flir": "whois.nic.flir",
