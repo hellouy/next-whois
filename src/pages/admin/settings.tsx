@@ -511,6 +511,7 @@ const FEATURE_GROUPS: { title: string; icon: React.ElementType; color: string; i
     icon: RiSearchLine,
     color: "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400",
     items: [
+      { key: "enable_search_links", label: "搜索引擎外链", desc: "查询结果页显示「在搜索引擎中查询」卡片，含 Google/Bing/百度 跳转链接及收录查询", onColor: "bg-emerald-500" },
       { key: "enable_feedback", label: "结果反馈入口", desc: "查询结果页底部显示「反馈问题」按钮", onColor: "bg-emerald-500" },
       { key: "enable_share", label: "分享按钮", desc: "查询结果页显示分享/导出功能入口", onColor: "bg-emerald-500" },
       { key: "enable_stamps", label: "品牌认领 (Stamps)", desc: "允许用户为域名申请添加品牌标签", onColor: "bg-emerald-500" },

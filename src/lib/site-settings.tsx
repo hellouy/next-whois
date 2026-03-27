@@ -29,6 +29,7 @@ export interface SiteSettings {
   query_only_mode: string;
   hide_raw_whois: string;
   // Core feature toggles
+  enable_search_links: string;
   enable_feedback: string;
   enable_stamps: string;
   enable_sponsor: string;
@@ -133,6 +134,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   maintenance_mode: "",
   query_only_mode: "",
   hide_raw_whois: "",
+  enable_search_links: "1",
   enable_feedback: "1",
   enable_stamps: "1",
   enable_sponsor: "1",
