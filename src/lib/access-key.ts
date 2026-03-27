@@ -92,6 +92,39 @@ export function extractApiKey(req: NextApiRequest): string | null {
   return null;
 }
 
+/**
+ * Returns true when the request comes from the same site (same-origin).
+ * The browser sends an `Origin` or `Referer` header whose host matches the
+ * server's `Host` header for same-origin requests — external callers will
+ * either omit it or send a different origin.  This lets the site's own
+ * client-side pages call /api/lookup without an API key even when the admin
+ * has enabled API-key enforcement for external consumers.
+ */
+function isSameOriginRequest(req: NextApiRequest): boolean {
+  const host = req.headers["host"];
+  if (!host) return false;
+
+  // Check Origin header first (set by fetch() in modern browsers)
+  const origin = req.headers["origin"];
+  if (origin && typeof origin === "string") {
+    try {
+      const originHost = new URL(origin).host;
+      return originHost === host;
+    } catch { /* ignore malformed origin */ }
+  }
+
+  // Fallback: check Referer header
+  const referer = req.headers["referer"];
+  if (referer && typeof referer === "string") {
+    try {
+      const refHost = new URL(referer).host;
+      return refHost === host;
+    } catch { /* ignore malformed referer */ }
+  }
+
+  return false;
+}
+
 export async function enforceApiKey(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -99,6 +132,11 @@ export async function enforceApiKey(
 ): Promise<boolean> {
   const required = await isApiKeyRequired();
   if (!required) return true;
+
+  // Always allow requests that originate from the same site (e.g. the query
+  // page fetching /api/lookup client-side) even when external API key
+  // enforcement is enabled.
+  if (isSameOriginRequest(req)) return true;
 
   const key = extractApiKey(req);
   if (!key) {
