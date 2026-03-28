@@ -200,7 +200,7 @@ export async function lookupTianhu(
       time: 0,
       status: true,
       cached: false,
-      source: "whois",
+      source: "tian.hu",
       result: toAnalyzeResult(json.data, domain),
     };
   } catch {

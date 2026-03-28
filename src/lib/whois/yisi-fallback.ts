@@ -141,7 +141,7 @@ export async function lookupYisi(domain: string): Promise<WhoisResult | null> {
       time: json.time ?? 0,
       status: true,
       cached: json.cached ?? false,
-      source: "whois",
+      source: "YISI.YUN",
       result: toAnalyzeResult(json.result, domain),
     };
   } catch {

@@ -26,7 +26,7 @@ type Data = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;

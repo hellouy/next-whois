@@ -5364,7 +5364,24 @@ export default function LookupPage({
                               )}
                             </>
                           )}
-                          {data.source && ` · ${data.source}`}
+                          {data.source && (
+                            <>
+                              {" · "}
+                              {(data.source === "tian.hu" || data.source === "YISI.YUN") ? (
+                                <a
+                                  href={data.source === "tian.hu" ? "https://tian.hu" : "https://yisi.yun"}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={isChinese ? "通过第三方 API 获取" : "Via third-party API"}
+                                  className="text-amber-500/80 hover:text-amber-500 hover:underline transition-colors"
+                                >
+                                  {data.source}
+                                </a>
+                              ) : (
+                                data.source
+                              )}
+                            </>
+                          )}
                         </span>
                         <div className="ml-auto flex items-center gap-1">
                           <button
