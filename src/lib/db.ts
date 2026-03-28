@@ -316,6 +316,12 @@ const ALTER_COLUMNS = [
   `ALTER TABLE payment_plans ADD COLUMN IF NOT EXISTS balance_grant_cents INTEGER NOT NULL DEFAULT 0`,
   /* Drop overly-restrictive confidence check — scraper uses high/medium/low/ai */
   `ALTER TABLE tld_rules DROP CONSTRAINT IF EXISTS tld_rules_confidence_check`,
+  /* Change search_history FK from ON DELETE CASCADE → ON DELETE SET NULL.
+     Previously, deleting a user wiped ALL their search records — destroying admin stats.
+     With SET NULL the rows survive (user_id becomes NULL) so aggregate data is preserved. */
+  `ALTER TABLE search_history DROP CONSTRAINT IF EXISTS search_history_user_id_fkey`,
+  `ALTER TABLE search_history ADD CONSTRAINT  search_history_user_id_fkey
+     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`,
 ];
 
 const CREATE_INDEXES = [

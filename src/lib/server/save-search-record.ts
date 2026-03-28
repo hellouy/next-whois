@@ -149,12 +149,26 @@ export async function saveSearchRecord(
     // Always insert a fresh record for every search event — both logged-in and anonymous.
     // This ensures every query is counted in admin stats regardless of who performed it.
     // The user history API uses DISTINCT ON to deduplicate for the user-facing display.
-    await run(
-      `INSERT INTO search_history
+    const insertSql = `INSERT INTO search_history
          (id, user_id, query, query_type, reg_status, expiration_date, remaining_days, value_tier)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [randomBytes(8).toString("hex"), userId ?? null, cleanQuery, queryType, regStatus, expDate, remDays, valueTier],
-    );
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
+    try {
+      await run(insertSql,
+        [randomBytes(8).toString("hex"), userId ?? null, cleanQuery, queryType, regStatus, expDate, remDays, valueTier],
+      );
+    } catch (fkErr: any) {
+      // PostgreSQL error 23503 = foreign_key_violation.
+      // This fires when the session's user_id no longer exists in the users table
+      // (e.g. account deleted then recreated, or stale JWT after account change).
+      // Retry without user_id so the search is ALWAYS recorded in admin stats.
+      if (userId && fkErr?.code === "23503") {
+        await run(insertSql,
+          [randomBytes(8).toString("hex"), null, cleanQuery, queryType, regStatus, expDate, remDays, valueTier],
+        );
+      } else {
+        throw fkErr;
+      }
+    }
 
     // Opportunistically prune old anonymous records (fire-and-forget)
     if (!userId) maybePruneAnonymous().catch(() => {});
