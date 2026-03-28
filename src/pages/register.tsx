@@ -67,7 +67,13 @@ export default function RegisterPage() {
   }, [codeCooldown]);
 
   const captchaProvider = settings.captcha_provider;
-  const captchaSiteKey = settings.captcha_site_key;
+  // Use per-provider site key, fall back to legacy shared key
+  const captchaSiteKey = (
+    captchaProvider === "turnstile" ? (settings.captcha_turnstile_site_key || settings.captcha_site_key) :
+    captchaProvider === "hcaptcha"  ? (settings.captcha_hcaptcha_site_key  || settings.captcha_site_key) :
+    captchaProvider === "mtcaptcha" ? (settings.captcha_mtcaptcha_site_key || settings.captcha_site_key) :
+    settings.captcha_site_key
+  );
 
   React.useEffect(() => {
     if (!captchaProvider || !captchaSiteKey) return;

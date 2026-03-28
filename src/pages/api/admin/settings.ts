@@ -14,7 +14,13 @@ import {
 import { invalidateSettingsCache } from "@/lib/server/site-settings-server";
 
 const ALLOWED_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
-const SERVER_ONLY_KEYS = new Set(["captcha_secret_key", "smtp_pass"]);
+const SERVER_ONLY_KEYS = new Set([
+  "captcha_secret_key",
+  "captcha_turnstile_secret_key",
+  "captcha_hcaptcha_secret_key",
+  "captcha_mtcaptcha_secret_key",
+  "smtp_pass",
+]);
 
 let _rowsCache: { rows: { key: string; value: string }[]; ts: number } | null = null;
 const ROWS_CACHE_TTL = 30_000;

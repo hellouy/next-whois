@@ -89,6 +89,13 @@ export interface SiteSettings {
   captcha_provider: string;
   captcha_site_key: string;
   captcha_secret_key: string;
+  // Per-provider keys (independent, never overwrite each other)
+  captcha_turnstile_site_key: string;
+  captcha_turnstile_secret_key: string;
+  captcha_hcaptcha_site_key: string;
+  captcha_hcaptcha_secret_key: string;
+  captcha_mtcaptcha_site_key: string;
+  captcha_mtcaptcha_secret_key: string;
   // OG image styles
   og_enabled_styles: string;
   // SMTP email config
@@ -189,6 +196,12 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   captcha_provider: "",
   captcha_site_key: "",
   captcha_secret_key: "",
+  captcha_turnstile_site_key: "",
+  captcha_turnstile_secret_key: "",
+  captcha_hcaptcha_site_key: "",
+  captcha_hcaptcha_secret_key: "",
+  captcha_mtcaptcha_site_key: "",
+  captcha_mtcaptcha_secret_key: "",
   og_enabled_styles: "0,1,2,3,4,5,6,7",
   smtp_enabled: "",
   smtp_host: "",

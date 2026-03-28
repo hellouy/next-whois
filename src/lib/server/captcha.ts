@@ -2,15 +2,21 @@ import { one } from "@/lib/db-query";
 
 export async function getCaptchaConfig(): Promise<{ provider: string; siteKey: string; secretKey: string }> {
   try {
-    const rows = await Promise.all([
-      one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'captcha_provider'"),
+    const provider = (await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'captcha_provider'"))?.value ?? "";
+    if (!provider) return { provider: "", siteKey: "", secretKey: "" };
+
+    // Read per-provider keys first, fall back to legacy shared keys
+    const [perSiteKey, perSecretKey, legacySiteKey, legacySecretKey] = await Promise.all([
+      one<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'captcha_${provider}_site_key'`),
+      one<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'captcha_${provider}_secret_key'`),
       one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'captcha_site_key'"),
       one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'captcha_secret_key'"),
     ]);
+
     return {
-      provider: rows[0]?.value ?? "",
-      siteKey: rows[1]?.value ?? "",
-      secretKey: rows[2]?.value ?? "",
+      provider,
+      siteKey: perSiteKey?.value || legacySiteKey?.value || "",
+      secretKey: perSecretKey?.value || legacySecretKey?.value || "",
     };
   } catch {
     return { provider: "", siteKey: "", secretKey: "" };

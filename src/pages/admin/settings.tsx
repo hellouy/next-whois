@@ -1038,76 +1038,111 @@ export default function AdminSettingsPage() {
 
               {/* CAPTCHA section */}
               {activeSection === "captcha" && (
-                <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                  <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/30">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
-                      <RiFingerprint2Line className="w-3.5 h-3.5" />
-                    </div>
-                    <h3 className="text-sm font-bold">人机验证 (CAPTCHA)</h3>
-                  </div>
-                  <div className="p-5 space-y-5">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      配置注册页面的人机验证组件，防止机器人批量注册。选择服务商并填写密钥后保存即可生效，无需重启。
-                    </p>
-
-                    {/* Provider */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold block">验证服务商</label>
-                      <select
-                        value={form.captcha_provider}
-                        onChange={e => setForm(f => ({ ...f, captcha_provider: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
-                      >
-                        <option value="">不启用（关闭人机验证）</option>
-                        <option value="turnstile">Cloudflare Turnstile（免费、无感知，推荐）</option>
-                        <option value="hcaptcha">hCaptcha（注重隐私）</option>
-                        <option value="mtcaptcha">MTCaptcha（企业级、合规性强）</option>
-                      </select>
-                      <p className="text-[11px] text-muted-foreground">
-                        {form.captcha_provider === "mtcaptcha" ? (
-                          <>MTCaptcha 注册 → <a href="https://www.mtcaptcha.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">mtcaptcha.com</a></>
-                        ) : (
-                          <>推荐使用 Cloudflare Turnstile，免费且对用户无感知，注册 → <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cloudflare Dashboard</a></>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Site key */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold block">Site Key（公钥，前端使用）</label>
-                      <input
-                        type="text"
-                        value={form.captcha_site_key}
-                        onChange={e => setForm(f => ({ ...f, captcha_site_key: e.target.value }))}
-                        placeholder="0x4AAAAAAA..."
-                        autoComplete="off"
-                        className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
-                      />
-                    </div>
-
-                    {/* Secret key */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold block">Secret Key（私钥，仅服务端使用）</label>
-                      <input
-                        type="password"
-                        value={form.captcha_secret_key}
-                        onChange={e => setForm(f => ({ ...f, captcha_secret_key: e.target.value }))}
-                        placeholder="输入 Secret Key（保存后不可查看明文）"
-                        autoComplete="new-password"
-                        className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
-                      />
-                      <p className="text-[11px] text-muted-foreground">Secret Key 仅用于服务端验证，不会通过公开 API 返回给前端。</p>
-                    </div>
-
-                    {form.captcha_provider && (
-                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-700/30">
-                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">使用提醒</p>
-                        <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
-                          同时填写 Site Key 和 Secret Key 才会启用验证。注册页将在邮件输入框下方显示 CAPTCHA 组件，用户须先通过验证，"发送验证码"按钮才会激活。
-                        </p>
+                <div className="space-y-4">
+                  {/* Active provider selector */}
+                  <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/30">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
+                        <RiFingerprint2Line className="w-3.5 h-3.5" />
                       </div>
-                    )}
+                      <h3 className="text-sm font-bold">人机验证 (CAPTCHA)</h3>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        每个服务商的密钥独立保存，互不覆盖。填写好各服务商密钥后，选择"启用服务商"即可切换，无需重新填写。
+                      </p>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold block">启用服务商</label>
+                        <select
+                          value={form.captcha_provider}
+                          onChange={e => setForm(f => ({ ...f, captcha_provider: e.target.value }))}
+                          className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+                        >
+                          <option value="">不启用（关闭人机验证）</option>
+                          <option value="turnstile">Cloudflare Turnstile（免费、无感知，推荐）</option>
+                          <option value="hcaptcha">hCaptcha（注重隐私）</option>
+                          <option value="mtcaptcha">MTCaptcha（企业级、合规性强）</option>
+                        </select>
+                        <p className="text-[11px] text-muted-foreground">注册页在邮件输入框下方显示 CAPTCHA，用户须先通过验证，"发送验证码"按钮才会激活。</p>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Per-provider key sections */}
+                  {(
+                    [
+                      {
+                        id: "turnstile",
+                        label: "Cloudflare Turnstile",
+                        siteKeyField: "captcha_turnstile_site_key" as const,
+                        secretKeyField: "captcha_turnstile_secret_key" as const,
+                        siteKeyPlaceholder: "0x4AAAAAAA...",
+                        link: { label: "Cloudflare Dashboard", href: "https://dash.cloudflare.com/?to=/:account/turnstile" },
+                      },
+                      {
+                        id: "hcaptcha",
+                        label: "hCaptcha",
+                        siteKeyField: "captcha_hcaptcha_site_key" as const,
+                        secretKeyField: "captcha_hcaptcha_secret_key" as const,
+                        siteKeyPlaceholder: "10000000-ffff-ffff-ffff-000000000001",
+                        link: { label: "hCaptcha Dashboard", href: "https://dashboard.hcaptcha.com/" },
+                      },
+                      {
+                        id: "mtcaptcha",
+                        label: "MTCaptcha",
+                        siteKeyField: "captcha_mtcaptcha_site_key" as const,
+                        secretKeyField: "captcha_mtcaptcha_secret_key" as const,
+                        siteKeyPlaceholder: "MTPublic-xxxxx",
+                        link: { label: "mtcaptcha.com", href: "https://www.mtcaptcha.com" },
+                      },
+                    ] as const
+                  ).map(provider => {
+                    const isActive = form.captcha_provider === provider.id;
+                    return (
+                      <div
+                        key={provider.id}
+                        className={`glass-panel border rounded-2xl overflow-hidden transition-all ${isActive ? "border-primary/40 ring-1 ring-primary/20" : "border-border"}`}
+                      >
+                        <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/20">
+                          <span className="text-xs font-bold text-foreground/80">{provider.label}</span>
+                          {isActive && (
+                            <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                              <RiCheckLine className="w-3 h-3" />启用中
+                            </span>
+                          )}
+                          <a href={provider.link.href} target="_blank" rel="noopener noreferrer" className={`text-[10px] text-primary hover:underline${isActive ? "" : " ml-auto"}`}>
+                            {provider.link.label} →
+                          </a>
+                        </div>
+                        <div className="p-5 space-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold block">Site Key（公钥，前端使用）</label>
+                            <input
+                              type="text"
+                              value={form[provider.siteKeyField]}
+                              onChange={e => setForm(f => ({ ...f, [provider.siteKeyField]: e.target.value }))}
+                              placeholder={provider.siteKeyPlaceholder}
+                              autoComplete="off"
+                              className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold block">Secret Key（私钥，仅服务端）</label>
+                            <input
+                              type="password"
+                              value={form[provider.secretKeyField]}
+                              onChange={e => setForm(f => ({ ...f, [provider.secretKeyField]: e.target.value }))}
+                              placeholder="输入 Secret Key（保存后不可查看明文）"
+                              autoComplete="new-password"
+                              className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <p className="text-[11px] text-muted-foreground px-1">Secret Key 仅用于服务端验证，不会通过公开 API 返回给前端。</p>
                 </div>
               )}
 
