@@ -744,7 +744,19 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
   }
 }
 
+/**
+ * Format an email address with a display name if it doesn't already have one.
+ * "noreply@x.rw" → "X.RW <noreply@x.rw>"
+ * "X.RW <noreply@x.rw>" → unchanged (already has a name)
+ */
+function withSenderName(email: string, name: string): string {
+  if (!email || email.includes("<")) return email;
+  const safeName = name.replace(/[<>"]/g, "").trim() || "X.RW";
+  return `${safeName} <${email}>`;
+}
+
 async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: string) {
+  const siteLabel = await getSiteLabel();
   const nodemailer = await import("nodemailer");
   const transporter = nodemailer.default.createTransport({
     host: smtp.host,
@@ -754,7 +766,7 @@ async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: 
     auth: { user: smtp.user, pass: smtp.pass },
     tls: { rejectUnauthorized: false },
   });
-  await transporter.sendMail({ from: smtp.from, to, subject, html });
+  await transporter.sendMail({ from: withSenderName(smtp.from, siteLabel), to, subject, html });
 }
 
 async function sendViaResend(to: string, subject: string, html: string) {
@@ -763,9 +775,10 @@ async function sendViaResend(to: string, subject: string, html: string) {
     console.warn("[sendEmail] RESEND_API_KEY not set — email skipped");
     return;
   }
+  const siteLabel = await getSiteLabel();
   const configuredFrom = process.env.RESEND_FROM_EMAIL || "";
   const fromAddresses = configuredFrom
-    ? [configuredFrom, RESEND_FALLBACK_FROM]
+    ? [withSenderName(configuredFrom, siteLabel), RESEND_FALLBACK_FROM]
     : [RESEND_FALLBACK_FROM];
 
   for (const from of fromAddresses) {

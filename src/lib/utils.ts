@@ -89,31 +89,7 @@ export function useSaver() {
 export function toSearchURI(query: string | undefined | null) {
   if (!query) return "/";
   const q = query.trim();
-  let locale = "en";
-
-  const VALID = ["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"];
-  if (typeof window !== "undefined") {
-    const path = window.location.pathname;
-    const match = path.match(/^\/([a-z]{2}(?:-[a-z]{2})?)(\/|$)/);
-    if (match && VALID.includes(match[1])) {
-      locale = match[1];
-    } else {
-      locale =
-        document.cookie
-          .split("; ")
-          .find((row) => row.startsWith("NEXT_LOCALE="))
-          ?.split("=")[1] ||
-        navigator.language.split("-")[0] ||
-        "en";
-      if (!VALID.includes(locale)) locale = "en";
-    }
-  }
-
-  if (!VALID.includes(locale)) {
-    locale = "en";
-  }
-
-  return q ? `/${locale}/${encodeURIComponent(q)}` : "/";
+  return q ? `/${encodeURIComponent(q)}` : "/";
 }
 
 export function includeArgs(from: string, ...args: string[]): boolean {

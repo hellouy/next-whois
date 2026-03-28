@@ -1331,14 +1331,16 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   const origin = getOrigin(context.req);
 
   // ── Strip locale prefix from catch-all segments ───────────────────────────
-  // toSearchURI() generates /{locale}/{query} (e.g. /en/x.rw, /zh/x.rw).
-  // Next.js has no i18n routing configured, so the catch-all receives all
-  // segments: ["en", "x.rw"].  Strip the locale so only the real query
-  // reaches cleanDomain/looksLikeQuery.
+  // URLs no longer include a locale prefix.  Old bookmarked URLs like
+  // /zh/x.rw or /en/x.rw are 301-redirected to /x.rw for canonicality.
   const VALID_LOCALES = new Set(["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"]);
   const hasLocalePrefix =
     querySegments.length >= 2 && VALID_LOCALES.has(querySegments[0]);
-  const effectiveSegments = hasLocalePrefix ? querySegments.slice(1) : querySegments;
+  if (hasLocalePrefix) {
+    const cleanPath = "/" + querySegments.slice(1).join("/");
+    return { redirect: { destination: cleanPath, permanent: true } };
+  }
+  const effectiveSegments = querySegments;
 
   // ── Smart URL cleaning + canonical redirect ──────────────────────────────
   // Strip spaces first (handles URL-encoded spaces like %20 decoded to " ")
@@ -1358,14 +1360,8 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 
   // If cleaning changed the URL (spaces removed, protocol stripped, path trimmed…),
   // redirect to the canonical clean URL to avoid duplicate/broken results.
-  // Preserve the locale prefix so the URL stays consistent (e.g. /zh/www.x.rw → /zh/x.rw).
   if (looksLikeQuery(target) && `/${target}` !== `/${rawPath}`) {
-    const redirectLocale = hasLocalePrefix
-      ? querySegments[0]
-      : (context.req.cookies["NEXT_LOCALE"] && VALID_LOCALES.has(context.req.cookies["NEXT_LOCALE"])
-          ? context.req.cookies["NEXT_LOCALE"]
-          : "en");
-    return { redirect: { destination: `/${redirectLocale}/${target}`, permanent: false } };
+    return { redirect: { destination: `/${target}`, permanent: false } };
   }
 
   // If it still doesn't look like any known query type, redirect to home
@@ -1381,8 +1377,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   if (requireLogin === "1") {
     const session = await getServerSession(context.req, context.res, authOptions);
     if (!session?.user?.email) {
-      const locale = context.req.cookies["NEXT_LOCALE"] ?? "en";
-      const callbackUrl = `/${locale}/${target}`;
+      const callbackUrl = `/${target}`;
       return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}&msg=require_login`, permanent: false } };
     }
   }
@@ -4080,16 +4075,10 @@ const _EMPTY_WHOIS_RESULT: WhoisResult = {
   result: { ...initialWhoisAnalyzeResult },
 };
 
-const LOOKUP_PAGE_LOCALES = new Set(["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"]);
-
 /** Extract the cleaned query target from Next.js router.query (client-side). */
 function targetFromRouterQuery(query: NodeJS.Dict<string | string[]>): string {
   const segments = (query.query as string[] | undefined) ?? [];
-  const effective =
-    segments.length >= 2 && LOOKUP_PAGE_LOCALES.has(segments[0])
-      ? segments.slice(1)
-      : segments;
-  return cleanDomain(effective.join("/").replace(/\s+/g, ""));
+  return cleanDomain(segments.join("/").replace(/\s+/g, ""));
 }
 
 export default function LookupPage({
