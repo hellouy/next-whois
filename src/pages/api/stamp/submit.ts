@@ -5,6 +5,21 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { one, run, isDbReady } from "@/lib/db-query";
 
+/** Basic domain format validation (supports IDN punycode, rejects obvious garbage) */
+function isValidDomain(d: string): boolean {
+  if (!d || d.length > 253) return false;
+  if (!d.includes(".")) return false;
+  if (d.startsWith(".") || d.endsWith(".")) return false;
+  if (d.includes("..")) return false;
+  const labels = d.split(".");
+  const tld = labels[labels.length - 1];
+  if (tld.length < 2) return false;
+  return labels.every(l =>
+    l.length > 0 && l.length <= 63 &&
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i.test(l)
+  );
+}
+
 // Free-tier limits enforced server-side (mirrors UI in stamp.tsx / dashboard.tsx)
 const FREE_TAG_NAME_MAX = 5;
 const MEMBER_TAG_NAME_MAX = 20;
@@ -75,7 +90,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  const cleanDomain   = String(domain).toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const cleanDomain   = String(domain).toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "").replace(/\/.*$/, "");
+  if (!isValidDomain(cleanDomain)) {
+    return res.status(400).json({ error: "域名格式不正确，请输入有效的域名（如 example.com）" });
+  }
   const cleanTagName  = rawTagName.slice(0, maxTagLen);
   const cleanTagStyle  = resolvedTagStyle;
   const cleanCardTheme = resolvedCardTheme;

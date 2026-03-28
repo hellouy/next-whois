@@ -1,6 +1,28 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 export const config = { maxDuration: 15 };
+
+const RL_LIMIT  = 20;
+const RL_WINDOW = 60_000;
+
+/** Returns true if the hostname resolves to a private / loopback / link-local address */
+function isPrivateHost(host: string): boolean {
+  // Reject obvious loopback / localhost
+  if (/^(localhost|127\.|0\.0\.0\.0|::1|0:0:0:0:0:0:0:1)$/i.test(host)) return true;
+  // Reject RFC-1918 private ranges
+  if (/^10\.\d+\.\d+\.\d+$/.test(host)) return true;
+  if (/^192\.168\.\d+\.\d+$/.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(host)) return true;
+  // Reject link-local
+  if (/^169\.254\.\d+\.\d+$/.test(host)) return true;
+  if (/^fe80:/i.test(host)) return true;
+  // Reject metadata / cloud-provider IPs
+  if (host === "169.254.169.254") return true;
+  // Reject .local mDNS domains
+  if (/\.local$/i.test(host)) return true;
+  return false;
+}
 
 export type HttpCheckResult = {
   ok: boolean;
@@ -37,6 +59,16 @@ export default async function handler(
     });
   }
 
+  // Rate limiting: 20 requests per minute per IP
+  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  if (!allowed) {
+    return res.status(429).json({
+      ok: false, url: "", finalUrl: "", statusCode: null, statusText: null,
+      latencyMs: null, server: null, contentType: null, redirectChain: [],
+      error: "请求过于频繁，请稍后再试",
+    });
+  }
+
   const rawUrl = ((req.query.url as string) || "").trim();
 
   if (!rawUrl || !isValidUrl(rawUrl)) {
@@ -45,6 +77,20 @@ export default async function handler(
       latencyMs: null, server: null, contentType: null, redirectChain: [],
       error: "请输入合法的 URL（http:// 或 https://）",
     });
+  }
+
+  // SSRF protection: block requests to private / internal hosts
+  try {
+    const parsed = new URL(rawUrl);
+    if (isPrivateHost(parsed.hostname)) {
+      return res.status(400).json({
+        ok: false, url: rawUrl, finalUrl: rawUrl, statusCode: null, statusText: null,
+        latencyMs: null, server: null, contentType: null, redirectChain: [],
+        error: "不允许访问私有或内网地址",
+      });
+    }
+  } catch {
+    // URL parse already validated above
   }
 
   const MAX_REDIRECTS = 8;

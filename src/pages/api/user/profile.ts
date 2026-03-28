@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -32,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "PATCH") {
-    const { name, avatar_color, email } = req.body;
+    const { name, avatar_color, email, emailChangeCode } = req.body;
     const updates: string[] = [];
     const params: (string | null)[] = [];
 
@@ -54,10 +55,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail))
         return res.status(400).json({ error: "邮箱格式不正确" });
       if (newEmail !== session.user.email) {
+        // Require verification code sent to the new email address
+        if (!emailChangeCode?.trim()) {
+          return res.status(400).json({ error: "请先发送验证码到新邮箱，并填写验证码", code: "NEED_CODE" });
+        }
+        const storeKey = `email-change:${session.user.email}:${newEmail}`;
+        const storedCode = await getRedisValue(storeKey);
+        if (!storedCode) {
+          return res.status(400).json({ error: "验证码已过期，请重新发送", code: "CODE_EXPIRED" });
+        }
+        if (String(emailChangeCode).trim() !== storedCode) {
+          return res.status(400).json({ error: "验证码不正确，请重新输入", code: "CODE_WRONG" });
+        }
         const existing = await one("SELECT id FROM users WHERE email = $1", [newEmail]);
         if (existing) return res.status(409).json({ error: "该邮箱已被使用" });
         updates.push(`email = $${params.length + 1}`);
         params.push(newEmail);
+        // Consume the code
+        await deleteRedisValue(storeKey).catch(() => {});
       }
     }
 

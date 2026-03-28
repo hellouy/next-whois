@@ -9,7 +9,8 @@ import {
   RiAddLine, RiBarChartLine, RiBankCardLine, RiCheckDoubleLine,
   RiRefreshLine, RiPlugLine, RiRobot2Line, RiKeyLine, RiGiftLine,
   RiShieldUserLine, RiRadarLine, RiFireLine, RiServerLine,
-  RiCodeBoxLine, RiWrenchLine,
+  RiCodeBoxLine, RiWrenchLine, RiMoneyDollarCircleLine,
+  RiPaletteLine, RiErrorWarningLine, RiGithubLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -26,6 +27,7 @@ type Stats = {
   subscribedUsers: number;
   totalOrders: number;
   paidOrders: number;
+  paidRevenue: number;
   recentUsers: { id: string; email: string; name: string | null; created_at: string; disabled: boolean }[];
   recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null }[];
 };
@@ -123,6 +125,9 @@ export default function AdminIndexPage() {
     { href: "/admin/hot-prefixes",      label: "热搜词",      desc: "首页热门搜索词管理",          icon: RiFireLine,       color: "text-red-500" },
     { href: "/admin/system",            label: "系统状态",    desc: "数据库连接、查询趋势",        icon: RiServerLine,     color: "text-gray-500" },
     { href: "/admin/notify",            label: "邮件通知",    desc: "向用户发送群发通知",          icon: RiBellLine,       color: "text-blue-400" },
+    { href: "/admin/stamp-styles",      label: "印章样式",    desc: "品牌印章风格配置",            icon: RiPaletteLine,    color: "text-fuchsia-500" },
+    { href: "/admin/tld-lifecycle-feedback", label: "生命周期反馈", desc: "查看 TLD 爬取异常反馈",  icon: RiErrorWarningLine, color: "text-orange-400" },
+    { href: "/admin/git-fix",           label: "Git 修复",    desc: "代码仓库问题修复工具",        icon: RiGithubLine,     color: "text-neutral-500" },
   ];
 
   return (
@@ -223,6 +228,23 @@ export default function AdminIndexPage() {
               href="/admin/payment/orders"
               color="bg-green-100 dark:bg-green-950/40 text-green-600 dark:text-green-400"
             />
+          )}
+          {(stats?.paidRevenue ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => router.push("/admin/payment/orders", undefined, { locale: false })}
+              className="glass-panel border border-border rounded-2xl p-5 flex items-start gap-4 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-lime-100 dark:bg-lime-950/40 text-lime-600 dark:text-lime-400">
+                <RiMoneyDollarCircleLine className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground font-medium">已收营收</p>
+                <p className="text-2xl font-bold tabular-nums mt-0.5">¥{(stats?.paidRevenue ?? 0).toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground/70 mt-0.5">来自 {stats?.paidOrders ?? 0} 笔已付款订单</p>
+              </div>
+              <RiArrowRightLine className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors mt-1" />
+            </button>
           )}
         </div>
 

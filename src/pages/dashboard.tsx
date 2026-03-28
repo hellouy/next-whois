@@ -639,6 +639,13 @@ export default function DashboardPage() {
   const [contactCategory, setContactCategory] = React.useState(() => t("contact.cat_payment"));
   const [contactSending, setContactSending] = React.useState(false);
   const [contactSent, setContactSent] = React.useState(false);
+  const [subSearch, setSubSearch] = React.useState("");
+  const [emailChangeCode, setEmailChangeCode] = React.useState("");
+  const [sendingChangeCode, setSendingChangeCode] = React.useState(false);
+  const [changeCodeCooldown, setChangeCodeCooldown] = React.useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = React.useState("");
+  const [deletingAccount, setDeletingAccount] = React.useState(false);
   const [inviteCodeInput, setInviteCodeInput] = React.useState("");
   const [applyingCode, setApplyingCode] = React.useState(false);
   const [editingName, setEditingName] = React.useState(false);
@@ -880,24 +887,76 @@ export default function DashboardPage() {
     }
   }
 
+  async function sendEmailChangeCode() {
+    if (!emailValue.trim()) return;
+    setSendingChangeCode(true);
+    try {
+      const res = await fetch("/api/user/send-email-change-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail: emailValue.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("验证码已发送到新邮箱");
+      let countdown = 60;
+      setChangeCodeCooldown(countdown);
+      const timer = setInterval(() => {
+        countdown--;
+        setChangeCodeCooldown(countdown);
+        if (countdown <= 0) clearInterval(timer);
+      }, 1000);
+    } catch (e: any) {
+      toast.error(e.message || "发送失败");
+    } finally {
+      setSendingChangeCode(false);
+    }
+  }
+
   async function saveEmail() {
     if (!emailValue.trim()) { toast.error(t("dashboard.enter_email")); return; }
+    if (!emailChangeCode.trim()) { toast.error("请填写发送到新邮箱的验证码"); return; }
     setSavingEmail(true);
     try {
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailValue.trim() }),
+        body: JSON.stringify({ email: emailValue.trim(), emailChangeCode: emailChangeCode.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       await updateSession({ email: emailValue.trim().toLowerCase() });
       toast.success(t("dashboard.email_updated"));
       setEditingEmail(false);
+      setEmailChangeCode("");
+      setChangeCodeCooldown(0);
     } catch (e: any) {
       toast.error(e.message || t("dashboard.update_failed"));
     } finally {
       setSavingEmail(false);
+    }
+  }
+
+  async function deleteAccount() {
+    if (deleteConfirmEmail.toLowerCase().trim() !== user?.email?.toLowerCase()) {
+      toast.error("确认邮箱不匹配");
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      const res = await fetch("/api/user/delete-account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: deleteConfirmEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("账户已注销");
+      await signOut({ callbackUrl: "/" });
+    } catch (e: any) {
+      toast.error(e.message || "注销失败，请稍后再试");
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -1206,6 +1265,25 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Subscription search */}
+              {subscriptions.length > 4 && (
+                <div className="relative">
+                  <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+                  <input
+                    type="text"
+                    value={subSearch}
+                    onChange={e => setSubSearch(e.target.value)}
+                    placeholder="搜索域名…"
+                    className="w-full h-9 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+                  />
+                  {subSearch && (
+                    <button onClick={() => setSubSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground">
+                      <RiCloseLine className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Subscription membership expiry */}
               {subscriptionExpiresAt && (
                 <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-700/30 text-[11px] text-violet-700 dark:text-violet-400">
@@ -1305,6 +1383,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : [...subscriptions]
+                .filter(s => !subSearch.trim() || s.domain.toLowerCase().includes(subSearch.trim().toLowerCase()))
                 .sort((a, b) => {
                   if (!a.active && b.active) return 1;
                   if (a.active && !b.active) return -1;
@@ -2122,18 +2201,37 @@ export default function DashboardPage() {
                       <Input
                         type="email"
                         value={emailValue}
-                        onChange={e => setEmailValue(e.target.value)}
+                        onChange={e => { setEmailValue(e.target.value); setEmailChangeCode(""); }}
                         placeholder={t("dashboard.new_email_placeholder")}
                         className="h-8 rounded-xl text-xs"
                         autoFocus
                       />
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="text"
+                          value={emailChangeCode}
+                          onChange={e => setEmailChangeCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="6 位验证码"
+                          className="h-8 rounded-xl text-xs flex-1 font-mono tracking-widest"
+                          maxLength={6}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={sendingChangeCode || changeCodeCooldown > 0 || !emailValue.trim()}
+                          onClick={sendEmailChangeCode}
+                          className="h-8 text-xs rounded-lg shrink-0 whitespace-nowrap"
+                        >
+                          {sendingChangeCode ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : "发送验证码"}
+                        </Button>
+                      </div>
                       <p className="text-[10px] text-amber-600 dark:text-amber-400">{t("dashboard.email_change_warn")}</p>
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={saveEmail} disabled={savingEmail} className="h-7 text-xs rounded-lg gap-1 flex-1">
+                        <Button size="sm" onClick={saveEmail} disabled={savingEmail || !emailChangeCode.trim()} className="h-7 text-xs rounded-lg gap-1 flex-1">
                           {savingEmail ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiCheckLine className="w-3 h-3" />}
                           {t("dashboard.confirm_change")}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingEmail(false)} className="h-7 text-xs rounded-lg">{t("dashboard.cancel")}</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setEditingEmail(false); setEmailChangeCode(""); setChangeCodeCooldown(0); }} className="h-7 text-xs rounded-lg">{t("dashboard.cancel")}</Button>
                       </div>
                     </div>
                   )}
@@ -2199,12 +2297,105 @@ export default function DashboardPage() {
                 )}
               </div>
 
+              {/* ── Contact support ── */}
+              <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                <div className="px-4 pt-3 pb-2 border-b border-border/60 flex items-center gap-2">
+                  <RiMailLine className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold">{t("contact.title")}</p>
+                </div>
+                {contactSent ? (
+                  <div className="px-4 py-5 flex flex-col items-center gap-2 text-center">
+                    <RiCheckboxCircleLine className="w-8 h-8 text-emerald-500" />
+                    <p className="text-xs font-semibold">{t("contact.sent_title")}</p>
+                    <button onClick={() => { setContactSent(false); setContactMsg(""); }} className="text-[10px] text-muted-foreground hover:text-foreground mt-1">{t("contact.resend")}</button>
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 space-y-2.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {([
+                        [t("contact.cat_payment"), "cat_payment"],
+                        [t("contact.cat_membership"), "cat_membership"],
+                        [t("contact.cat_feature"), "cat_feature"],
+                        [t("contact.cat_other"), "cat_other"],
+                      ] as [string, string][]).map(([label]) => (
+                        <button key={label} type="button" onClick={() => setContactCategory(label)}
+                          className={cn("h-8 rounded-xl text-[11px] font-medium border transition-all",
+                            contactCategory === label ? "bg-foreground text-background border-foreground" : "bg-muted/30 text-muted-foreground border-border hover:border-muted-foreground/40"
+                          )}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea value={contactMsg} onChange={e => setContactMsg(e.target.value)} placeholder={t("contact.placeholder")} rows={3} maxLength={500}
+                      className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/40" />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] text-muted-foreground/60">{t("contact.char_count", { count: contactMsg.length })}</p>
+                      <Button size="sm" className="h-8 rounded-xl text-xs gap-1.5 shrink-0" disabled={!contactMsg.trim() || contactSending}
+                        onClick={async () => {
+                          if (!contactMsg.trim()) return;
+                          setContactSending(true);
+                          try {
+                            const r = await fetch("/api/user/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: contactCategory, message: contactMsg }) });
+                            if (!r.ok) { toast.error(t("contact.send_failed")); return; }
+                            setContactSent(true);
+                          } catch { toast.error(t("contact.send_failed")); } finally { setContactSending(false); }
+                        }}>
+                        {contactSending ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiMailLine className="w-3.5 h-3.5" />}
+                        {t("contact.send")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* ── Danger zone ── */}
               <button onClick={() => signOut({ callbackUrl: "/" })}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
                 <RiLogoutBoxLine className="w-4 h-4" />
                 {t("sign_out")}
               </button>
+
+              {/* Delete account */}
+              {!showDeleteConfirm ? (
+                <button
+                  onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmEmail(""); }}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs text-muted-foreground/60 hover:text-red-500 transition-colors"
+                >
+                  <RiDeleteBinLine className="w-3.5 h-3.5" />
+                  注销账户
+                </button>
+              ) : (
+                <div className="glass-panel border border-red-200/50 dark:border-red-800/40 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <RiAlertLine className="w-4 h-4 text-red-500 shrink-0" />
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">确认注销账户</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">此操作<span className="font-semibold text-red-500">不可撤销</span>，将永久删除您的账户和所有数据（包括订阅、品牌印章等）。请输入您的邮箱地址确认：</p>
+                  <Input
+                    type="email"
+                    value={deleteConfirmEmail}
+                    onChange={e => setDeleteConfirmEmail(e.target.value)}
+                    placeholder={user?.email || "输入您的邮箱地址"}
+                    className="h-9 rounded-xl text-xs"
+                    autoComplete="off"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-8 text-xs rounded-lg border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                      disabled={deletingAccount || deleteConfirmEmail.toLowerCase().trim() !== user?.email?.toLowerCase()}
+                      onClick={deleteAccount}
+                    >
+                      {deletingAccount ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiDeleteBinLine className="w-3.5 h-3.5 mr-1" />}
+                      确认注销
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-8 text-xs rounded-lg" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(""); }}>
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              )}
             </motion.div>
             );
           })()}

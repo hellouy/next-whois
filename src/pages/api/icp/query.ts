@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 export const config = { maxDuration: 15 };
+
+const RL_LIMIT  = 30;
+const RL_WINDOW = 60_000;
 
 const VALID_TYPES = ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"] as const;
 type IcpType = typeof VALID_TYPES[number];
@@ -86,6 +90,16 @@ export default async function handler(
       ok: false, type: "web", search: "", pageNum: 1, pageSize: 10,
       total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
       error: "Method not allowed",
+    });
+  }
+
+  // Rate limiting: 30 requests per minute per IP
+  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  if (!allowed) {
+    return res.status(429).json({
+      ok: false, type: "web", search: "", pageNum: 1, pageSize: 10,
+      total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
+      error: "请求过于频繁，请稍后再试",
     });
   }
 

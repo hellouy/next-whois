@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const q = `
         SELECT
           u.id, u.email, u.name, u.created_at, u.updated_at,
-          u.disabled, u.admin_notes, u.subscription_access, u.subscription_expires_at, u.email_verified,
+          u.disabled, u.admin_notes, u.subscription_access, u.subscription_expires_at, u.email_verified, u.balance_cents,
           (SELECT COUNT(*) FROM search_history sh WHERE sh.user_id = u.id)::int AS search_count,
           (SELECT COUNT(*) FROM stamps s WHERE s.email = u.email)::int AS stamp_count,
           (SELECT COUNT(*) FROM reminders r WHERE r.email = u.email AND r.active = true)::int AS reminder_count
@@ -73,13 +73,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
 
-    const { name, email, admin_notes, disabled, subscription_access, email_verified } = req.body as {
+    const { name, email, admin_notes, disabled, subscription_access, email_verified, subscription_expires_at, balance_adjustment, balance_note } = req.body as {
       name?: string;
       email?: string;
       admin_notes?: string;
       disabled?: boolean;
       subscription_access?: boolean;
       email_verified?: boolean;
+      subscription_expires_at?: string | null;
+      balance_adjustment?: number;
+      balance_note?: string;
     };
 
     try {
@@ -102,17 +105,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           updates.push(`subscription_expires_at = NULL`);
         }
       }
+      // Allow admin to set a specific subscription expiry date (or null for lifetime)
+      if (subscription_expires_at !== undefined) {
+        if (subscription_expires_at === null || subscription_expires_at === "") {
+          updates.push(`subscription_expires_at = NULL`);
+        } else {
+          const parsedDate = new Date(subscription_expires_at);
+          if (isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ error: "到期日期格式不正确" });
+          }
+          params.push(parsedDate.toISOString());
+          updates.push(`subscription_expires_at = $${params.length}`);
+        }
+      }
       if (email_verified !== undefined) { params.push(Boolean(email_verified)); updates.push(`email_verified = $${params.length}`); }
 
-      if (updates.length === 0) return res.status(400).json({ error: "无可更新字段" });
-      updates.push(`updated_at = NOW()`);
+      if (updates.length === 0 && balance_adjustment === undefined) return res.status(400).json({ error: "无可更新字段" });
 
-      params.push(id);
-      await run(`UPDATE users SET ${updates.join(", ")} WHERE id = $${params.length}`, params);
+      if (updates.length > 0) {
+        updates.push(`updated_at = NOW()`);
+        params.push(id);
+        await run(`UPDATE users SET ${updates.join(", ")} WHERE id = $${params.length}`, params);
+      }
+
+      // Handle balance adjustment separately to also create a transaction record
+      if (balance_adjustment !== undefined && balance_adjustment !== 0) {
+        const adjCents = Math.round(Number(balance_adjustment));
+        if (!isNaN(adjCents)) {
+          await run(
+            "UPDATE users SET balance_cents = GREATEST(0, balance_cents + $1), updated_at = NOW() WHERE id = $2",
+            [adjCents, id]
+          );
+          await run(
+            `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
+             VALUES ($1, $2, $3, $4)`,
+            [id, Math.abs(adjCents), adjCents > 0 ? "recharge" : "deduct", balance_note?.trim() || (adjCents > 0 ? "管理员充值" : "管理员扣款")]
+          );
+        }
+      }
 
       const updated = await one(
         `SELECT id, email, name, created_at, updated_at, disabled, admin_notes,
-                subscription_access, subscription_expires_at, email_verified,
+                subscription_access, subscription_expires_at, email_verified, balance_cents,
                 (SELECT COUNT(*) FROM search_history sh WHERE sh.user_id = u.id)::int AS search_count,
                 (SELECT COUNT(*) FROM stamps s WHERE s.email = u.email)::int AS stamp_count,
                 (SELECT COUNT(*) FROM reminders r WHERE r.email = u.email AND r.active = true)::int AS reminder_count

@@ -15,6 +15,7 @@ import {
   RiFilterLine, RiCheckboxCircleLine, RiVipCrownLine,
   RiHistoryLine, RiStarLine, RiBellLine,
   RiDownloadLine, RiAlertLine, RiBankCardLine,
+  RiTimeLine, RiCoinLine, RiAddCircleLine, RiSubtractLine,
 } from "@remixicon/react";
 
 type User = {
@@ -26,7 +27,9 @@ type User = {
   disabled: boolean;
   admin_notes: string | null;
   subscription_access: boolean;
+  subscription_expires_at: string | null;
   email_verified: boolean;
+  balance_cents: number;
   search_count: number;
   stamp_count: number;
   reminder_count: number;
@@ -76,11 +79,18 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
   const [notes, setNotes] = React.useState(user.admin_notes || "");
   const [disabled, setDisabled] = React.useState(user.disabled);
   const [subscriptionAccess, setSubscriptionAccess] = React.useState(user.subscription_access);
+  const [subscriptionExpiresAt, setSubscriptionExpiresAt] = React.useState<string>(
+    user.subscription_expires_at ? new Date(user.subscription_expires_at).toISOString().split("T")[0] : ""
+  );
   const [emailVerified, setEmailVerified] = React.useState(user.email_verified);
+  const [balanceAdjustment, setBalanceAdjustment] = React.useState("");
+  const [balanceNote, setBalanceNote] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   async function handleSave() {
     if (!email.trim()) { toast.error("邮箱不能为空"); return; }
+    const adjCents = balanceAdjustment !== "" ? Math.round(parseFloat(balanceAdjustment) * 100) : undefined;
+    if (balanceAdjustment !== "" && isNaN(adjCents!)) { toast.error("余额调整金额格式不正确"); return; }
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/users?id=${user.id}`, {
@@ -92,7 +102,11 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
           admin_notes: notes.trim() || null,
           disabled,
           subscription_access: subscriptionAccess,
+          subscription_expires_at: subscriptionAccess
+            ? (subscriptionExpiresAt || null)
+            : undefined,
           email_verified: emailVerified,
+          ...(adjCents !== undefined && adjCents !== 0 ? { balance_adjustment: adjCents, balance_note: balanceNote.trim() || undefined } : {}),
         }),
       });
       const data = await res.json();
@@ -183,6 +197,54 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
             desc="开启后用户可享受订阅会员功能"
             color="bg-amber-500"
           />
+
+          {subscriptionAccess && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <RiTimeLine className="w-3.5 h-3.5 text-muted-foreground" />订阅到期日期
+                <span className="text-[10px] text-muted-foreground/60 ml-auto">留空 = 永久有效</span>
+              </Label>
+              <input
+                type="date"
+                value={subscriptionExpiresAt}
+                onChange={e => setSubscriptionExpiresAt(e.target.value)}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <RiCoinLine className="w-3.5 h-3.5 text-muted-foreground" />余额调整（元）
+              <span className="text-[10px] text-muted-foreground/60 ml-auto">当前：¥{((user.balance_cents ?? 0) / 100).toFixed(2)}</span>
+            </Label>
+            <div className="flex gap-2">
+              <div className="flex items-center gap-1 flex-1">
+                <button type="button" onClick={() => {
+                  const v = parseFloat(balanceAdjustment) || 0;
+                  setBalanceAdjustment(v > 0 ? `-${Math.abs(v).toFixed(2)}` : `${Math.abs(v).toFixed(2)}`);
+                }} className="p-2 rounded-lg bg-muted hover:bg-muted/80 text-xs font-semibold w-8 h-8 flex items-center justify-center shrink-0">
+                  {balanceAdjustment.startsWith("-") ? <RiSubtractLine className="w-3.5 h-3.5 text-red-500" /> : <RiAddCircleLine className="w-3.5 h-3.5 text-emerald-500" />}
+                </button>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={balanceAdjustment}
+                  onChange={e => setBalanceAdjustment(e.target.value)}
+                  placeholder="0.00（正数充值，负数扣款）"
+                  className="h-10 rounded-xl flex-1"
+                />
+              </div>
+            </div>
+            {balanceAdjustment !== "" && parseFloat(balanceAdjustment) !== 0 && (
+              <Input
+                value={balanceNote}
+                onChange={e => setBalanceNote(e.target.value)}
+                placeholder="备注（可选，如：活动奖励）"
+                className="h-9 rounded-xl text-xs"
+              />
+            )}
+          </div>
 
           <Toggle
             checked={emailVerified}
@@ -516,7 +578,9 @@ export default function AdminUsersPage() {
                     )}
                     {user.subscription_access && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-semibold shrink-0">
-                        订阅
+                        {user.subscription_expires_at
+                          ? `订阅至 ${new Date(user.subscription_expires_at).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" })}`
+                          : "永久订阅"}
                       </span>
                     )}
                     {user.email_verified && (

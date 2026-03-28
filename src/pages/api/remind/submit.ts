@@ -41,7 +41,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!(await isDbReady())) return res.status(500).json({ error: "Database unavailable" });
 
-  const cleanDomain  = String(domain).toLowerCase().trim();
+  const cleanDomain  = String(domain).toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "").replace(/\/.*$/, "");
+
+  // Basic domain format validation
+  function isValidDomain(d: string): boolean {
+    if (!d || d.length > 253) return false;
+    if (!d.includes(".")) return false;
+    if (d.startsWith(".") || d.endsWith(".")) return false;
+    if (d.includes("..")) return false;
+    const labels = d.split(".");
+    const tld = labels[labels.length - 1];
+    if (tld.length < 2) return false;
+    return labels.every(l =>
+      l.length > 0 && l.length <= 63 &&
+      /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i.test(l)
+    );
+  }
+  if (!isValidDomain(cleanDomain)) {
+    return res.status(400).json({ error: "域名格式不正确，请输入有效的域名（如 example.com）" });
+  }
 
   // ── Enforce free-tier subscription limit (re-validate from DB, not JWT) ─────
   const session = await getServerSession(req, res, authOptions);

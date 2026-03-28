@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const [
       users, disabledUsers, stamps, verifiedStamps, reminders, history, feedback,
       anonSearches, todaySearches, todayUsers, subscribedUsers,
-      totalOrders, paidOrders,
+      totalOrders, paidOrders, paidRevenue,
     ] = await Promise.all([
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE disabled = true"),
@@ -30,6 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE subscription_access = true AND (subscription_expires_at IS NULL OR subscription_expires_at > NOW())").catch(() => ({ count: "0" })),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders").catch(() => ({ count: "0" })),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders WHERE status = 'paid'").catch(() => ({ count: "0" })),
+      one<{ sum: string | null }>("SELECT SUM(amount)::text AS sum FROM payment_orders WHERE status = 'paid'").catch(() => ({ sum: null })),
     ]);
 
     const [recentUsers, recentSearches] = await Promise.all([
@@ -55,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscribedUsers: parseInt(subscribedUsers?.count ?? "0"),
       totalOrders: parseInt(totalOrders?.count ?? "0"),
       paidOrders: parseInt(paidOrders?.count ?? "0"),
+      paidRevenue: parseFloat(paidRevenue?.sum ?? "0") || 0,
       recentUsers,
       recentSearches,
     });
