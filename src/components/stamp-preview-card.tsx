@@ -163,7 +163,8 @@ export function StampPreviewCard({
         {/* Info */}
         <div className="px-4 pt-2 pb-4 text-center">
           <p className="text-[14.5px] font-black text-gray-900 leading-tight tracking-tight mt-1">{tagName}</p>
-          {desc && <p className="text-[7.5px] text-gray-400 mt-2 mb-3 leading-relaxed line-clamp-2">{desc}</p>}
+          <p className="text-[6.5px] font-mono tracking-wider mt-0.5 mb-1" style={{color:"rgba(0,0,0,0.28)"}}>{domain}</p>
+          {desc && <p className="text-[7.5px] text-gray-400 mt-1.5 mb-3 leading-relaxed line-clamp-2">{desc}</p>}
           <a href={link} className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-white text-[8.5px] font-bold"
             style={{background:"linear-gradient(135deg,#D4AF37,#B8860B)",
               boxShadow:"0 3px 12px rgba(180,140,30,0.35)"}}>
@@ -302,6 +303,8 @@ export function StampPreviewCard({
         <div className="px-4 text-center pb-2">
           <p className="font-black text-gray-900 leading-tight tracking-tight"
             style={{fontSize:16,textShadow:"0 1px 6px rgba(255,255,255,0.7)"}}>{tagName}</p>
+          <p className="text-[6.5px] font-mono tracking-wider mt-0.5"
+            style={{color:"rgba(20,20,20,0.35)",textShadow:"0 1px 2px rgba(255,255,255,0.5)"}}>{domain}</p>
           {desc && <p className="text-[7px] leading-relaxed mt-1.5 line-clamp-2"
             style={{color:"rgba(20,20,20,0.55)",textShadow:"0 1px 3px rgba(255,255,255,0.5)"}}>{desc}</p>}
         </div>
@@ -375,6 +378,7 @@ export function StampPreviewCard({
               <RiShieldCheckLine style={{width:7,height:7}} />{tagLabel}
             </span>
             <p className="font-black text-gray-900 leading-none tracking-tight" style={{fontSize:17}}>{tagName}</p>
+            <p className="text-[6px] font-mono tracking-wider mt-0.5" style={{color:"#d1d5db"}}>{domain}</p>
             {desc && <p className="text-[7px] leading-relaxed mt-1.5 line-clamp-2" style={{color:"#9ca3af"}}>{desc}</p>}
           </div>
           <a href={link} className="flex items-center justify-between mt-2 px-2.5 py-1.5 rounded-[10px] text-white text-[8px] font-bold"
@@ -425,7 +429,8 @@ export function StampPreviewCard({
             style={{background:"rgba(255,255,255,0.15)"}}>
             {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 1).toUpperCase()}
           </div>
-          <span className="text-[7px] font-bold px-1.5 py-0.5 rounded ml-auto"
+          <p className="text-[7.5px] font-mono flex-1 truncate" style={{color:"rgba(255,255,255,0.8)"}}>{domain}</p>
+          <span className="text-[7px] font-bold px-1.5 py-0.5 rounded"
             style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.75)"}}>
             {tagLabel}
           </span>

@@ -5936,14 +5936,18 @@ export default function LookupPage({
                                     style={{border:"2px solid rgba(10,10,10,0.6)",color:"rgba(10,10,10,0.78)",background:"rgba(255,255,255,0.38)",backdropFilter:"blur(8px)"}}>
                                     {isChinese ? lbl.zh : lbl.en}
                                   </span>
-                                  <h2 className="font-black text-gray-900 leading-[1.05] tracking-tight mb-5 max-w-[270px]"
+                                  <h2 className="font-black text-gray-900 leading-[1.05] tracking-tight mb-1.5 max-w-[270px]"
                                     style={{fontSize:34,textShadow:"0 1px 6px rgba(255,255,255,0.7)"}}>
                                     {stamp.tagName}
                                   </h2>
+                                  <p className="text-[11px] font-mono tracking-widest mb-4"
+                                    style={{color:"rgba(10,10,10,0.38)",textShadow:"0 1px 2px rgba(255,255,255,0.5)"}}>
+                                    {result.domain || target}
+                                  </p>
                                   <p className="text-[14px] leading-relaxed max-w-[248px]" style={{color:"rgba(20,20,20,0.72)",textShadow:"0 1px 3px rgba(255,255,255,0.5)"}}>
                                     {stamp.description || (isChinese
-                                      ? `该域名 ${result.domain || target} 已由持有人认领，点击下方访问主页了解更多。`
-                                      : `${result.domain || target} has been claimed. Visit the profile to learn more.`
+                                      ? `该域名已由持有人认领，点击下方访问主页了解更多。`
+                                      : `This domain has been claimed. Visit the profile to learn more.`
                                     )}
                                   </p>
                                 </div>
