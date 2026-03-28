@@ -1620,5 +1620,16 @@
     "redirect_chain": "跳转链路"
   },
   "nav_directory": "域名导航",
-  "nav_directory_desc": "精选域名行业工具与平台导航"
+  "nav_directory_desc": "精选域名行业工具与平台导航",
+  "nav_faq": "常见问题",
+  "nav_privacy": "隐私政策",
+  "nav_terms": "服务条款",
+  "maintenance_title": "系统维护中",
+  "maintenance_refresh": "刷新试试",
+  "maintenance_tip_0": "工程师正在努力敲代码，请稍候 ☕",
+  "maintenance_tip_1": "系统升级中，回来会更好用的 🚀",
+  "maintenance_tip_2": "正在给服务器「喂」新功能 🍕",
+  "maintenance_tip_3": "比你以为的快，比你想的更值得等待 ✨",
+  "maintenance_tip_4": "稍等片刻，我们在给它打补丁 🩹",
+  "close_announcement": "关闭公告"
 }

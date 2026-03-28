@@ -4356,3 +4356,59 @@ All persistent state lives in PostgreSQL (`src/lib/db.ts`). Tables auto-created 
 
 **Hot Prefix Table:** `hot_prefixes` (id, prefix, category, weight, source, sale_examples, notes, enabled, hit_count, created_at, updated_at)
 **Alert subject prefixes:** 🔥 热门前缀可用 / ⚡ 特殊关键词可用 / 💎 高价值域名可用
+
+## UI/UX Polish & i18n Hardening (2026-03-28)
+
+### i18n Completeness
+
+**Scope:** Eliminated all hardcoded Chinese/English strings across public-facing components.
+
+| File | Change |
+|---|---|
+| `locales/{en,zh,zh-tw,de,fr,ja,ko,ru}.json` | Added `nav_faq`, `nav_privacy`, `nav_terms`, `maintenance_title`, `maintenance_refresh`, `maintenance_tip_0..4`, `close_announcement` keys to all 8 locale files |
+| `src/pages/_app.tsx` | `AnnouncementBanner` close button uses `t("close_announcement")`; `MaintenanceGate` title/button/tips use `t()` |
+| `src/pages/faq.tsx`, `privacy.tsx`, `terms.tsx` | Page `<title>` uses `t("nav_faq")`, `t("nav_privacy")`, `t("nav_terms")` |
+| `src/lib/email.ts` | Email `lang="und"` (was "zh"), bilingual footer (中文 + English), Privacy + Terms links, cancel text bilingual |
+
+### Navbar Animation
+
+**File:** `src/components/navbar.tsx`
+- `<nav>` → `<motion.nav>` using Framer Motion `animate` prop
+- Custom cubic-bezier `[0.22, 1, 0.36, 1]` spring on y/opacity/scale
+- Replaces CSS `transition-all` class toggling
+
+### Auth Pages Visual Redesign
+
+**Files:** `src/pages/login.tsx`, `src/pages/register.tsx`
+
+Both pages share the same design language:
+- **Ambient glow:** Absolute-positioned `violet-500/5` blur circle behind content
+- **Icon:** `motion.div` with scale-in animation, `blur-xl` glow halo underneath, `w-16 h-16` rounded-2xl with gradient background
+- **Form card:** `glass-panel` + `border-border/80` + `overflow-hidden` (for accent bar); thin `h-0.5` gradient accent bar (`from-transparent via-primary/40 to-transparent`) at card top
+- **Entry animation:** `ease: [0.22, 1, 0.36, 1]` throughout (matching navbar)
+- **Password toggle:** `aria-label` added for screen reader compatibility
+
+### Maintenance Page Improvements
+
+**File:** `src/pages/_app.tsx` (`MaintenanceGate`)
+- All Chinese strings extracted to i18n keys
+- Wrench icon: `maintenance-wrench` CSS keyframe (rotation) replaces `animate-bounce`
+- Tips rendered from `MAINTENANCE_TIP_KEYS` array with `as const` for TypeScript compatibility
+
+### AvailableDomainCard Design (query results page)
+
+**File:** `src/pages/[...query].tsx`
+
+Redesigned available/premium domain card:
+- Gradient accent bar (emerald for available, amber for premium)
+- Circular icon with colored ring and appropriate check/crown icon
+- Status badge with animated dot indicator
+- Bilingual descriptions support `isZh` locale detection
+- Registrar price comparison table with "Best price" highlight
+- Registration tips section with colored bullet dots
+
+### Accessibility Improvements
+
+- `src/pages/login.tsx`: Password visibility toggle button has `aria-label={showPwd ? "Hide password" : "Show password"}`
+- `src/pages/register.tsx`: Same password visibility toggle aria-label
+- `src/components/navbar.tsx`: Key nav buttons retain `aria-label` using i18n keys

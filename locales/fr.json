@@ -1620,5 +1620,16 @@
     "redirect_chain": "Chaîne de redirections"
   },
   "nav_directory": "Nav Domaines",
-  "nav_directory_desc": "Répertoire d'outils pour les domaines"
+  "nav_directory_desc": "Répertoire d'outils pour les domaines",
+  "nav_faq": "FAQ",
+  "nav_privacy": "Confidentialité",
+  "nav_terms": "Conditions",
+  "maintenance_title": "Maintenance en cours",
+  "maintenance_refresh": "Rafraîchir",
+  "maintenance_tip_0": "Nos ingénieurs travaillent dur — patience ☕",
+  "maintenance_tip_1": "Mise à niveau du système — encore mieux après 🚀",
+  "maintenance_tip_2": "On nourrit le serveur avec de nouvelles fonctionnalités 🍕",
+  "maintenance_tip_3": "Plus rapide que prévu et ça vaut l'attente ✨",
+  "maintenance_tip_4": "Application des correctifs — bientôt de retour 🩹",
+  "close_announcement": "Fermer l'annonce"
 }

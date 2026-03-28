@@ -13,6 +13,7 @@ import { LocaleProvider } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
 import { RiMegaphoneLine, RiCloseLine, RiWrenchLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 
 
@@ -87,22 +88,24 @@ function AppHead({ origin }: { origin: string }) {
   );
 }
 
-const FOOTER_LINKS = [
-  { href: "/faq", label: "FAQ" },
-  { href: "/privacy", label: "Privacy" },
-  { href: "/terms", label: "Terms" },
-];
-
 function SiteFooter() {
   const settings = useSiteSettings();
   const router = useRouter();
+  const { t } = useTranslation();
   const footerText = settings.site_footer;
+
+  const footerLinks = [
+    { href: "/faq",     label: t("nav_faq") },
+    { href: "/privacy", label: t("nav_privacy") },
+    { href: "/terms",   label: t("nav_terms") },
+  ];
+
   if (router.pathname.startsWith("/admin")) return null;
-  if (!footerText && FOOTER_LINKS.length === 0) return null;
+  if (!footerText && footerLinks.length === 0) return null;
   return (
     <footer className="border-t border-border/40 mt-12 py-5 px-4 text-center">
       <div className="flex items-center justify-center gap-5 mb-2">
-        {FOOTER_LINKS.map((link) => (
+        {footerLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
@@ -119,6 +122,7 @@ function SiteFooter() {
 
 function AnnouncementBanner() {
   const settings = useSiteSettings();
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = React.useState(false);
   const msg = settings.site_announcement;
   const visible = !!msg && !dismissed;
@@ -137,7 +141,7 @@ function AnnouncementBanner() {
       <button
         onClick={() => setDismissed(true)}
         className="p-0.5 rounded hover:bg-white/20 transition-colors shrink-0"
-        aria-label="关闭公告"
+        aria-label={t("close_announcement")}
       >
         <RiCloseLine className="w-3.5 h-3.5" />
       </button>
@@ -145,16 +149,17 @@ function AnnouncementBanner() {
   );
 }
 
-const MAINTENANCE_TIPS = [
-  "工程师正在努力敲代码，请稍候 ☕",
-  "系统升级中，回来会更好用的 🚀",
-  "正在给服务器「喂」新功能 🍕",
-  "比你以为的快，比你想的更值得等待 ✨",
-  "稍等片刻，我们在给它打补丁 🩹",
-];
+const MAINTENANCE_TIP_KEYS = [
+  "maintenance_tip_0",
+  "maintenance_tip_1",
+  "maintenance_tip_2",
+  "maintenance_tip_3",
+  "maintenance_tip_4",
+] as const;
 
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const settings = useSiteSettings();
+  const { t } = useTranslation();
   const [sessionEmail, setSessionEmail] = React.useState<string | null | undefined>(undefined);
   const [tipIndex, setTipIndex] = React.useState(0);
   const [dots, setDots] = React.useState(".");
@@ -169,7 +174,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (settings.maintenance_mode !== "1") return;
-    const tipTimer = setInterval(() => setTipIndex(i => (i + 1) % MAINTENANCE_TIPS.length), 3500);
+    const tipTimer = setInterval(() => setTipIndex(i => (i + 1) % MAINTENANCE_TIP_KEYS.length), 3500);
     const dotTimer = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 500);
     return () => { clearInterval(tipTimer); clearInterval(dotTimer); };
   }, [settings.maintenance_mode]);
@@ -200,7 +205,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
         </div>
         {/* Center icon */}
         <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/60 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center shadow-lg">
-          <RiWrenchLine className="w-9 h-9 text-amber-600 dark:text-amber-400 animate-bounce" style={{ animationDuration: "2s" }} />
+          <RiWrenchLine className="w-9 h-9 text-amber-600 dark:text-amber-400" style={{ animation: "maintenance-wrench 2s ease-in-out infinite" }} />
         </div>
         {/* Small satellites */}
         <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-400/80 dark:bg-blue-500/60 flex items-center justify-center text-white text-[10px] animate-pulse">⚙</div>
@@ -210,7 +215,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
       {/* Title */}
       <h1 className="text-2xl font-bold mb-2 tracking-tight">
         <span className="bg-gradient-to-r from-amber-600 to-orange-500 dark:from-amber-400 dark:to-orange-400 bg-clip-text text-transparent">
-          系统维护中
+          {t("maintenance_title")}
         </span>
         <span className="text-amber-600/60 dark:text-amber-400/60 font-normal ml-0.5">{dots}</span>
       </h1>
@@ -228,7 +233,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 
       {/* Rotating tip */}
       <p className="text-sm text-muted-foreground max-w-xs min-h-[2.5rem] flex items-center justify-center px-2">
-        {MAINTENANCE_TIPS[tipIndex]}
+        {t(MAINTENANCE_TIP_KEYS[tipIndex])}
       </p>
 
       {/* Custom message */}
@@ -243,7 +248,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
         onClick={() => window.location.reload()}
         className="mt-6 px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
       >
-        刷新试试
+        {t("maintenance_refresh")}
       </button>
 
       {/* Keyframe injection */}
@@ -252,6 +257,10 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
           0%   { transform: translateX(-100%); }
           50%  { transform: translateX(150%); }
           100% { transform: translateX(-100%); }
+        }
+        @keyframes maintenance-wrench {
+          0%, 100% { transform: rotate(-12deg) scale(1); }
+          50%       { transform: rotate(12deg) scale(1.08); }
         }
       `}</style>
     </div>

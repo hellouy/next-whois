@@ -238,17 +238,28 @@ export default function RegisterPage() {
   return (
     <>
       <Head><title key="title">{`${t("auth.register_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
-      <div className="min-h-screen flex items-center justify-center px-4 py-16">
+      <div className="min-h-screen flex items-center justify-center px-4 py-16 relative overflow-hidden">
+        {/* Ambient glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full bg-violet-500/5 dark:bg-violet-500/8 blur-[80px] pointer-events-none" />
+
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="w-full max-w-sm"
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-sm relative"
         >
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-primary/10 border border-primary/20 mb-4">
-              <RiUserAddLine className="w-6 h-6 text-primary" />
-            </div>
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.08, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="relative inline-flex items-center justify-center mb-4"
+            >
+              <div className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl" />
+              <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/25 via-primary/10 to-primary/5 border border-primary/25 shadow-lg shadow-primary/10">
+                <RiUserAddLine className="w-7 h-7 text-primary" />
+              </div>
+            </motion.div>
             <h1 className="text-2xl font-bold tracking-tight">{t("auth.register_title")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {t("auth.register_subtitle").replace("{{name}}", logoText)}
@@ -256,7 +267,10 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate>
-            <div className="glass-panel border border-border rounded-2xl p-6 space-y-4">
+            <div className="glass-panel border border-border/80 rounded-2xl overflow-hidden shadow-sm">
+              {/* Accent top bar */}
+              <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+              <div className="p-6 space-y-4">
               {/* Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-xs font-semibold">
@@ -377,6 +391,7 @@ export default function RegisterPage() {
                     onClick={() => setShowPwd(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
                     tabIndex={-1}
+                    aria-label={showPwd ? "Hide password" : "Show password"}
                   >
                     {showPwd ? <RiEyeOffLine className="w-4 h-4" /> : <RiEyeLine className="w-4 h-4" />}
                   </button>
@@ -529,7 +544,8 @@ export default function RegisterPage() {
                   {t("auth.register_terms_link")}
                 </Link>
               </p>
-            </div>
+              </div>{/* end p-6 */}
+            </div>{/* end glass-panel */}
           </form>
 
           <div className="mt-5 text-center space-y-2">

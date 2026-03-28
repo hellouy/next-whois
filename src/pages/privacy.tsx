@@ -55,10 +55,10 @@ function BulletList({ items }: { items: string[] }) {
 
 export default function PrivacyPage() {
   const settings = useSiteSettings();
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || settings.site_title || "X.RW";
-  const pageTitle = isChinese ? "隐私政策" : "Privacy Policy";
+  const pageTitle = t("nav_privacy");
   const contactEmail = settings.about_contact_email || settings.admin_email || "";
 
   const sections: Section[] = [

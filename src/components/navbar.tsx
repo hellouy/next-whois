@@ -663,15 +663,23 @@ export function Navbar() {
   const { t } = useTranslation();
 
   return (
-    <div className="fixed left-0 right-0 z-50 flex justify-center" style={{ top: "var(--ann-h, 0px)", transition: "top 0.2s ease" }}>
-      <nav
+    <div className="fixed left-0 right-0 z-50 flex justify-center" style={{ top: "var(--ann-h, 0px)", transition: "top 0.22s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+      <motion.nav
+        animate={{
+          y: isVisible ? 0 : -56,
+          opacity: isVisible ? 1 : 0,
+          scale: isVisible ? 1 : 0.97,
+        }}
+        transition={{
+          y:       { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+          opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+          scale:   { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+        }}
         className={cn(
           "mt-4 px-2 h-10 rounded-full",
           "bg-background shadow-sm",
           "flex items-center gap-6",
-          "transition-all duration-300 ease-in-out",
           "border border-primary/25 border-dashed",
-          isVisible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0",
         )}
       >
         <motion.div {...TAP}>
@@ -702,7 +710,7 @@ export function Navbar() {
           <HistoryDrawer />
           <NavDrawer />
         </div>
-      </nav>
+      </motion.nav>
     </div>
   );
 }

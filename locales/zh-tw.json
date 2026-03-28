@@ -1620,5 +1620,16 @@
     "redirect_chain": "跳轉鏈路"
   },
   "nav_directory": "網域導航",
-  "nav_directory_desc": "精選網域行業工具與平台導航"
+  "nav_directory_desc": "精選網域行業工具與平台導航",
+  "nav_faq": "常見問題",
+  "nav_privacy": "隱私政策",
+  "nav_terms": "服務條款",
+  "maintenance_title": "系統維護中",
+  "maintenance_refresh": "重新整理",
+  "maintenance_tip_0": "工程師正在努力寫程式，請稍候 ☕",
+  "maintenance_tip_1": "系統升級中，回來後會更好用 🚀",
+  "maintenance_tip_2": "正在給伺服器「餵」新功能 🍕",
+  "maintenance_tip_3": "比你想的快，也比你想的更值得等待 ✨",
+  "maintenance_tip_4": "稍等片刻，我們正在修復問題 🩹",
+  "close_announcement": "關閉公告"
 }

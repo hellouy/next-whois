@@ -46,10 +46,10 @@ function BulletList({ items }: { items: string[] }) {
 
 export default function TermsPage() {
   const settings = useSiteSettings();
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || settings.site_title || "X.RW";
-  const pageTitle = isChinese ? "服务条款" : "Terms of Service";
+  const pageTitle = t("nav_terms");
   const contactEmail = settings.about_contact_email || settings.admin_email || "";
 
   type Section = {

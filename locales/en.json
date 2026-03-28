@@ -1620,5 +1620,16 @@
     "redirect_chain": "Redirect Chain"
   },
   "nav_directory": "Domain Nav",
-  "nav_directory_desc": "Curated domain tools & platforms directory"
+  "nav_directory_desc": "Curated domain tools & platforms directory",
+  "nav_faq": "FAQ",
+  "nav_privacy": "Privacy",
+  "nav_terms": "Terms",
+  "maintenance_title": "Under Maintenance",
+  "maintenance_refresh": "Try Refreshing",
+  "maintenance_tip_0": "Engineers are working hard — please hang tight ☕",
+  "maintenance_tip_1": "System upgrade in progress — it'll be even better soon 🚀",
+  "maintenance_tip_2": "Feeding the server some fresh new features 🍕",
+  "maintenance_tip_3": "Faster than you think, worth every second of the wait ✨",
+  "maintenance_tip_4": "Applying patches — we'll be back before you know it 🩹",
+  "close_announcement": "Close announcement"
 }

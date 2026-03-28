@@ -1620,5 +1620,16 @@
     "redirect_chain": "リダイレクトチェーン"
   },
   "nav_directory": "ドメインナビ",
-  "nav_directory_desc": "厳選ドメインツール・プラットフォーム一覧"
+  "nav_directory_desc": "厳選ドメインツール・プラットフォーム一覧",
+  "nav_faq": "よくある質問",
+  "nav_privacy": "プライバシー",
+  "nav_terms": "利用規約",
+  "maintenance_title": "メンテナンス中",
+  "maintenance_refresh": "更新する",
+  "maintenance_tip_0": "エンジニアが鋭意作業中です — しばらくお待ちください ☕",
+  "maintenance_tip_1": "システムアップグレード中 — 完了後さらに良くなります 🚀",
+  "maintenance_tip_2": "サーバーに新機能を追加中です 🍕",
+  "maintenance_tip_3": "思ったより早く、思ったより価値があります ✨",
+  "maintenance_tip_4": "パッチ適用中 — もうすぐ戻ります 🩹",
+  "close_announcement": "お知らせを閉じる"
 }

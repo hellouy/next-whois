@@ -42,7 +42,7 @@ function emailLayout(body: string, siteName = "X.RW"): string {
     : `<span style="color:${PRIMARY}">${tail}</span>`;
 
   return `<!DOCTYPE html>
-<html lang="zh">
+<html lang="und">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
@@ -71,10 +71,18 @@ function emailLayout(body: string, siteName = "X.RW"): string {
 
         <!-- Footer -->
         <tr>
-          <td style="padding:20px 8px 0;text-align:center">
-            <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">
-              此邮件由 <a href="${BASE_URL()}" style="color:${PRIMARY};text-decoration:none">${siteName}</a> 自动发送，请勿直接回复。<br/>
+          <td style="padding:24px 8px 0;text-align:center">
+            <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;line-height:1.9">
+              此邮件由 <a href="${BASE_URL()}" style="color:${PRIMARY};text-decoration:none">${siteName}</a> 自动发送，请勿直接回复
+              <span style="color:#cbd5e1;margin:0 6px">·</span>
+              This is an automated message from <a href="${BASE_URL()}" style="color:${PRIMARY};text-decoration:none">${siteName}</a>, please do not reply
+            </p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1">
               © ${year} ${siteName}
+              <span style="margin:0 6px">·</span>
+              <a href="${BASE_URL()}/privacy" style="color:#cbd5e1;text-decoration:none">Privacy</a>
+              <span style="margin:0 6px">·</span>
+              <a href="${BASE_URL()}/terms" style="color:#cbd5e1;text-decoration:none">Terms</a>
             </p>
           </td>
         </tr>
@@ -147,7 +155,7 @@ function ghostLink(href: string, label: string) {
 function actionRow(btnHref: string, btnLabel: string, cancelHref?: string, btnColor = PRIMARY) {
   return `<div style="padding:20px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     ${ctaBtn(btnHref, btnLabel, btnColor)}
-    ${cancelHref ? ghostLink(cancelHref, "取消订阅") : ""}
+    ${cancelHref ? ghostLink(cancelHref, "取消订阅 · Unsubscribe") : ""}
   </div>`;
 }
 

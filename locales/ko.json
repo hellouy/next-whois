@@ -1620,5 +1620,16 @@
     "redirect_chain": "리디렉션 체인"
   },
   "nav_directory": "도메인 내비",
-  "nav_directory_desc": "선별된 도메인 도구 및 플랫폼 디렉토리"
+  "nav_directory_desc": "선별된 도메인 도구 및 플랫폼 디렉토리",
+  "nav_faq": "자주 묻는 질문",
+  "nav_privacy": "개인정보처리방침",
+  "nav_terms": "이용약관",
+  "maintenance_title": "점검 중",
+  "maintenance_refresh": "새로 고침",
+  "maintenance_tip_0": "엔지니어들이 열심히 작업 중입니다 — 잠시만 기다려 주세요 ☕",
+  "maintenance_tip_1": "시스템 업그레이드 중입니다 — 돌아오면 더 좋아질 거예요 🚀",
+  "maintenance_tip_2": "서버에 새 기능을 추가하고 있습니다 🍕",
+  "maintenance_tip_3": "예상보다 빠르고, 기다릴 만한 가치가 있습니다 ✨",
+  "maintenance_tip_4": "패치 적용 중 — 곧 돌아오겠습니다 🩹",
+  "close_announcement": "공지 닫기"
 }

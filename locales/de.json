@@ -1620,5 +1620,16 @@
     "redirect_chain": "Weiterleitungskette"
   },
   "nav_directory": "Domain-Nav",
-  "nav_directory_desc": "Ausgewähltes Domain-Tools-Verzeichnis"
+  "nav_directory_desc": "Ausgewähltes Domain-Tools-Verzeichnis",
+  "nav_faq": "FAQ",
+  "nav_privacy": "Datenschutz",
+  "nav_terms": "Nutzungsbedingungen",
+  "maintenance_title": "Wartungsarbeiten",
+  "maintenance_refresh": "Neu laden",
+  "maintenance_tip_0": "Unsere Ingenieure arbeiten fleißig — bitte warten ☕",
+  "maintenance_tip_1": "System-Upgrade läuft — danach wird alles noch besser 🚀",
+  "maintenance_tip_2": "Wir füttern den Server mit neuen Features 🍕",
+  "maintenance_tip_3": "Schneller als erwartet und die Wartezeit wert ✨",
+  "maintenance_tip_4": "Patches werden eingespielt — gleich wieder online 🩹",
+  "close_announcement": "Ankündigung schließen"
 }

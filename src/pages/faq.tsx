@@ -106,10 +106,10 @@ const FAQS: FaqItem[] = [
 
 export default function FaqPage() {
   const settings = useSiteSettings();
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || settings.site_title || "X.RW";
-  const pageTitle = isChinese ? "常见问题" : "FAQ";
+  const pageTitle = t("nav_faq");
 
   return (
     <>
