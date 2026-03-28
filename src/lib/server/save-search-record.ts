@@ -57,11 +57,11 @@ export async function maybeSendHighValueAlert(
 
   const recent = await one<{ count: string }>(
     `SELECT COUNT(*) AS count FROM search_history
-     WHERE query = $1 AND reg_status = 'unregistered'
+     WHERE LOWER(query) = LOWER($1) AND reg_status = 'unregistered'
      AND created_at >= NOW() - INTERVAL '24 hours'`,
     [query],
   );
-  if (parseInt(recent?.count ?? "0") > 1) return;
+  if (parseInt(recent?.count ?? "0") > 0) return;
 
   if (!scoreResult) return;
 
@@ -115,6 +115,17 @@ export async function maybeSendHighValueAlert(
   }).catch(err => console.error("[high-value-alert]", err.message));
 }
 
+// Prune anonymous search_history records older than 30 days (1% of requests).
+// Anonymous rows have no user retention value; they are used only for aggregate stats.
+async function maybePruneAnonymous() {
+  if (Math.random() > 0.01) return;
+  try {
+    await run(
+      `DELETE FROM search_history WHERE user_id IS NULL AND created_at < NOW() - INTERVAL '30 days'`,
+    );
+  } catch {}
+}
+
 export async function saveSearchRecord(
   query: string,
   result: WhoisAnalyzeResult,
@@ -144,5 +155,10 @@ export async function saveSearchRecord(
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [randomBytes(8).toString("hex"), userId ?? null, cleanQuery, queryType, regStatus, expDate, remDays, valueTier],
     );
-  } catch {}
+
+    // Opportunistically prune old anonymous records (fire-and-forget)
+    if (!userId) maybePruneAnonymous().catch(() => {});
+  } catch (err: any) {
+    console.error("[save-search-record] DB write failed:", err?.message ?? err);
+  }
 }

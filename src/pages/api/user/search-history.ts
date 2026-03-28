@@ -2,108 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSession } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { many, one, run, isDbReady } from "@/lib/db-query";
-import { scoreDomain, shouldAlertAdmin } from "@/lib/domain-value";
-import { sendEmail, highValueAlertHtml, getSiteLabel } from "@/lib/email";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
-import { checkHotPrefix } from "@/lib/server/hot-prefix-cache";
-import { analyzeDomainWithAi } from "@/lib/server/domain-value-ai";
+import { computeValueTier, maybeSendHighValueAlert } from "@/lib/server/save-search-record";
 
 const MAX_HISTORY   = 100;
 const PAGE_SIZE     = 20;
-
-// Retention by value tier (days)
-const RETENTION: Record<string, number> = {
-  high:     50,
-  valuable: 20,
-  normal:   10,
-};
-
-function computeValueTier(
-  query: string,
-  queryType: string,
-  regStatus: string | null,
-): "high" | "valuable" | "normal" {
-  if (queryType !== "domain" || regStatus !== "unregistered") return "normal";
-  const result = scoreDomain(query, queryType);
-  if (!result) return "normal";
-  if (result.score >= 55) return "high";
-  if (result.score >= 35) return "valuable";
-  return "normal";
-}
-
-async function maybeSendHighValueAlert(
-  query: string,
-  queryType: string,
-  regStatus: string,
-  checkedByEmail?: string | null,
-) {
-  const scoreResult = scoreDomain(query, queryType);
-  const sld = query.lastIndexOf(".") > 0 ? query.substring(0, query.lastIndexOf(".")) : query;
-  const hotPrefixMatch = await checkHotPrefix(sld).catch(() => null);
-
-  const shouldAlert = shouldAlertAdmin(query, queryType, regStatus) || !!hotPrefixMatch;
-  if (!shouldAlert) return;
-
-  const recent = await one<{ count: string }>(
-    `SELECT COUNT(*) AS count FROM search_history
-     WHERE query = $1 AND reg_status = 'unregistered'
-     AND created_at >= NOW() - INTERVAL '24 hours'`,
-    [query],
-  );
-  if (parseInt(recent?.count ?? "0") > 0) return;
-
-  if (!scoreResult) return;
-
-  // Fetch AI summary for high-value / hot prefix domains
-  let aiSummary: string | null = null;
-  if (scoreResult.score >= 55 || hotPrefixMatch) {
-    try {
-      const aiResult = await Promise.race([
-        analyzeDomainWithAi(query),
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
-      ]) as Awaited<ReturnType<typeof analyzeDomainWithAi>> | null;
-      if (aiResult && typeof aiResult === "object" && "summary" in aiResult) {
-        aiSummary = (aiResult as { summary?: string }).summary ?? null;
-      }
-    } catch {
-      // AI unavailable — proceed without it
-    }
-  }
-
-  const siteName = await getSiteLabel().catch(() => "X.RW");
-  const html = highValueAlertHtml({
-    domain: query,
-    score: scoreResult.score,
-    tier: scoreResult.tier,
-    reasons: scoreResult.reasons,
-    isAlertKeyword: scoreResult.isAlertKeyword,
-    isNumericOnly: scoreResult.isNumericOnly,
-    checkedBy: checkedByEmail ?? null,
-    breakdown: scoreResult.breakdown,
-    hotPrefix: hotPrefixMatch ? {
-      prefix: hotPrefixMatch.prefix.prefix,
-      category: hotPrefixMatch.prefix.category,
-      weight: hotPrefixMatch.prefix.weight,
-      matchType: hotPrefixMatch.matchType,
-      saleExamples: hotPrefixMatch.prefix.sale_examples,
-      notes: hotPrefixMatch.prefix.notes,
-    } : null,
-    aiSummary,
-    siteName,
-  });
-
-  const subjectPrefix = hotPrefixMatch
-    ? "🔥 热门前缀可用"
-    : scoreResult.isAlertKeyword
-    ? "⚡ 特殊关键词可用"
-    : "💎 高价值域名可用";
-
-  await sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `${subjectPrefix}：${query}（评分 ${scoreResult.score}${hotPrefixMatch ? ` · 前缀:${hotPrefixMatch.prefix.prefix}` : ""}）`,
-    html,
-  }).catch(err => console.error("[high-value-alert]", err.message));
-}
 
 /** Delete records that have exceeded their tier-based retention period. */
 async function pruneExpired(userId: string) {
@@ -120,14 +22,14 @@ async function pruneExpired(userId: string) {
 
 /** Keep only the newest MAX_HISTORY records for this user. */
 async function trimToLimit(userId: string) {
-  const allRows = await many<{ id: string }>(
-    "SELECT id FROM search_history WHERE user_id = $1 ORDER BY created_at DESC",
-    [userId],
+  await run(
+    `DELETE FROM search_history WHERE user_id = $1
+     AND id NOT IN (
+       SELECT id FROM search_history WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT $2
+     )`,
+    [userId, MAX_HISTORY],
   );
-  if (allRows.length > MAX_HISTORY) {
-    const toDelete = allRows.slice(MAX_HISTORY).map((r) => r.id);
-    await run(`DELETE FROM search_history WHERE id = ANY($1::varchar[])`, [toDelete]);
-  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -203,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const clean = (rec.query || "").trim().slice(0, 255);
         if (!clean) continue;
         const tier = computeValueTier(clean, rec.queryType ?? "domain", rec.regStatus ?? null);
-        await run("DELETE FROM search_history WHERE user_id = $1 AND query = $2", [userId, clean]);
+        await run("DELETE FROM search_history WHERE user_id = $1 AND LOWER(query) = LOWER($2)", [userId, clean]);
         const id = randomBytes(8).toString("hex");
         const createdAt = rec.timestamp ? new Date(rec.timestamp).toISOString() : new Date().toISOString();
         await run(
@@ -234,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maybeSendHighValueAlert(clean, qt, rs, userEmail).catch(() => {});
     }
 
-    await run("DELETE FROM search_history WHERE user_id = $1 AND query = $2", [userId, clean]);
+    await run("DELETE FROM search_history WHERE user_id = $1 AND LOWER(query) = LOWER($2)", [userId, clean]);
 
     const id = randomBytes(8).toString("hex");
     await run(

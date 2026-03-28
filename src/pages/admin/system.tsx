@@ -13,7 +13,7 @@ import {
 
 type SystemData = {
   ok: boolean;
-  db: { ok: boolean };
+  db: { ok: boolean; latencyMs?: number | null };
   redis: { ok: boolean; configured: boolean; latencyMs: number | null };
   adminEmail?: string;
   stats: {
@@ -135,7 +135,9 @@ export default function AdminSystemPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">Supabase 数据库</p>
                   <p className={cn("text-xs mt-0.5", data.db.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600")}>
-                    {data.db.ok ? "连接正常" : "连接异常"}
+                    {data.db.ok
+                      ? `连接正常${data.db.latencyMs != null ? ` · ${data.db.latencyMs}ms` : ""}`
+                      : "连接异常"}
                   </p>
                 </div>
               </div>

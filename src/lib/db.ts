@@ -144,7 +144,13 @@ const CREATE_TABLES = [
     drop_timezone          TEXT,
     pre_expiry_days        INTEGER,
     scraped_at             TIMESTAMPTZ,
-    updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    manually_edited        BOOLEAN      NOT NULL DEFAULT false,
+    model_used             TEXT,
+    scrape_status          TEXT         NOT NULL DEFAULT 'pending',
+    failure_reason         TEXT,
+    fetch_strategy         TEXT,
+    scrape_attempts        INTEGER      NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS tld_lifecycle_overrides (
     id             VARCHAR(16)  PRIMARY KEY,
@@ -303,6 +309,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS failure_reason      TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS fetch_strategy      TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS scrape_attempts     INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS manually_edited     BOOLEAN NOT NULL DEFAULT false`,
 ];
 
 const CREATE_INDEXES = [
@@ -315,7 +322,10 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_search_history_user_id   ON search_history (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_created   ON search_history (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_query     ON search_history (query)`,
+  `CREATE INDEX IF NOT EXISTS idx_search_history_lower_q   ON search_history (LOWER(query))`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_type      ON search_history (query_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_search_history_regstatus ON search_history (reg_status)`,
+  `CREATE INDEX IF NOT EXISTS idx_search_history_uid_q     ON search_history (user_id, LOWER(query))`,
   `CREATE INDEX IF NOT EXISTS idx_payment_orders_email     ON payment_orders (user_email)`,
   `CREATE INDEX IF NOT EXISTS idx_payment_orders_status    ON payment_orders (status)`,
   `CREATE INDEX IF NOT EXISTS idx_payment_orders_created   ON payment_orders (created_at DESC)`,
@@ -378,9 +388,9 @@ function makePool(connectionString: string): Pool {
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: { rejectUnauthorized: false },
-    max: 5,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 20000,
+    max: 10,
+    connectionTimeoutMillis: 8000,
+    idleTimeoutMillis: 30000,
     allowExitOnIdle: true,
   });
   p.on("error", (err) => console.error("[db] pool error:", err.message));

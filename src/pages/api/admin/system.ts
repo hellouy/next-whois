@@ -41,7 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ total: string; disabled: string; subscribed: string }>(
         `SELECT COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE disabled = true) AS disabled,
-                COUNT(*) FILTER (WHERE subscription_access = true) AS subscribed
+                COUNT(*) FILTER (WHERE subscription_access = true
+                  AND (subscription_expires_at IS NULL OR subscription_expires_at > NOW())) AS subscribed
          FROM users`
       ),
       one<{ total: string; verified: string; pending: string }>(
@@ -85,6 +86,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const dbOk = !!users;
 
+    // DB latency check (separate lightweight query after main queries)
+    let dbLatencyMs: number | null = null;
+    try {
+      const { getDbReady } = await import("@/lib/db");
+      const db = await getDbReady();
+      if (db) {
+        const t0 = Date.now();
+        await db.query("SELECT 1");
+        dbLatencyMs = Date.now() - t0;
+      }
+    } catch { /* remain null */ }
+
     // Redis health check
     let redisOk = false;
     let redisLatencyMs: number | null = null;
@@ -99,7 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.json({
       ok: true,
-      db: { ok: dbOk },
+      db: { ok: dbOk, latencyMs: dbLatencyMs },
       redis: { ok: redisOk, configured: !!redis, latencyMs: redisLatencyMs },
       adminEmail,
       stats: {

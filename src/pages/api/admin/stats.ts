@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE user_id IS NULL"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE created_at >= NOW() - INTERVAL '1 day'"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE created_at >= NOW() - INTERVAL '1 day'"),
-      one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE subscription_access = true").catch(() => ({ count: "0" })),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE subscription_access = true AND (subscription_expires_at IS NULL OR subscription_expires_at > NOW())").catch(() => ({ count: "0" })),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders").catch(() => ({ count: "0" })),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders WHERE status = 'paid'").catch(() => ({ count: "0" })),
     ]);
