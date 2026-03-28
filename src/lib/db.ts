@@ -280,6 +280,16 @@ const CREATE_TABLES = [
     order_id        VARCHAR(32)  REFERENCES payment_orders(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
+
+  `CREATE TABLE IF NOT EXISTS changelog_entries (
+    id              TEXT         PRIMARY KEY,
+    entry_date      DATE         NOT NULL,
+    type            TEXT         NOT NULL DEFAULT 'new',
+    zh              TEXT         NOT NULL DEFAULT '',
+    en              TEXT         NOT NULL DEFAULT '',
+    version         TEXT,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 const ALTER_COLUMNS = [
@@ -352,6 +362,8 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_activation_codes_used    ON activation_codes (used)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_user_id       ON balance_transactions (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_created       ON balance_transactions (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_changelog_entry_date     ON changelog_entries (entry_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_changelog_created        ON changelog_entries (created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS tld_registry_info (
     tld              TEXT        PRIMARY KEY,
     tld_type         TEXT,
