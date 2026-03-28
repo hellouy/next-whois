@@ -5,8 +5,8 @@ import { one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const adminErr = await requireAdmin(req, res);
-  if (adminErr) return;
+  const session = await requireAdmin(req, res);
+  if (!session) return;
   const steps: { step: string; ok: boolean; detail?: string }[] = [];
 
   const connSource = getConnectionSource();

@@ -12,13 +12,15 @@ interface Window {
 const store = new Map<string, Window>();
 
 // Housekeeping: clear stale entries every 5 minutes so the Map never grows unbounded.
+// An entry is stale when its newest timestamp is older than the rate-limit window
+// used by callers (lookup.ts: 60 s). Increase MAX_WINDOW_MS if new callers use longer windows.
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1_000;
+const MAX_WINDOW_MS = 60_000;
 if (typeof setInterval !== "undefined") {
   setInterval(() => {
     const now = Date.now();
     store.forEach((win, key) => {
-      // Drop any window whose newest timestamp is older than the largest window we track (60 s).
-      if (!win.timestamps.length || now - win.timestamps[win.timestamps.length - 1] > 60_000) {
+      if (!win.timestamps.length || now - win.timestamps[win.timestamps.length - 1] > MAX_WINDOW_MS) {
         store.delete(key);
       }
     });

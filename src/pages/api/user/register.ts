@@ -86,15 +86,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used) VALUES ($1, $2, $3, $4, $5, $6)",
       [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null],
     );
-    if (codeRow) {
-      await run("UPDATE invite_codes SET use_count = use_count + 1 WHERE id = $1", [codeRow.id]);
-    }
-    if (storedCode !== null) {
-      await deleteRedisValue(`verify:register:${cleanEmail}`);
-    }
   } catch (err: any) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "该邮箱已注册" });
+    }
     console.error("[register] insert error:", err.message);
     return res.status(500).json({ error: "注册失败，请稍后重试" });
+  }
+
+  if (codeRow) {
+    const updated = await run(
+      "UPDATE invite_codes SET use_count = use_count + 1 WHERE id = $1 AND use_count < max_uses",
+      [codeRow.id],
+    );
+    if (updated === 0) {
+      await run("DELETE FROM users WHERE id = $1", [id]);
+      return res.status(400).json({ error: "邀请码已达使用上限，注册失败" });
+    }
+  }
+
+  if (storedCode !== null) {
+    await deleteRedisValue(`verify:register:${cleanEmail}`);
   }
 
   getSiteLabel().then((siteName) => {

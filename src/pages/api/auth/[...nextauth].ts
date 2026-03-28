@@ -4,47 +4,75 @@ import { compare } from "bcryptjs";
 import { one } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSetting } from "@/lib/server/site-settings-server";
+import {
+  isRedisAvailable,
+  incrRedisValue,
+  setRedisValue,
+  deleteRedisValue,
+  getRedisValue,
+} from "@/lib/server/redis";
 
-// ── Brute-force tracking: failed attempts per email (in-process, single server) ─
-const failedAttempts = new Map<string, { count: number; resetAt: number }>();
+// ── Brute-force tracking: Redis-backed (survives serverless cold starts) ────────
+// Falls back to in-process Map when Redis is unavailable.
 const MAX_FAILED_ATTEMPTS = 10;
 const FAILED_WINDOW_MS    = 15 * 60 * 1000; // 15 minutes
 const LOCKOUT_MS          = 30 * 60 * 1000; // 30-minute lockout after exceeding threshold
 
-function isLockedOut(key: string): boolean {
-  const entry = failedAttempts.get(key);
-  if (!entry) return false;
-  if (Date.now() > entry.resetAt) {
-    failedAttempts.delete(key);
-    return false;
+const _localBf = new Map<string, { count: number; resetAt: number }>();
+
+async function isLockedOut(key: string): Promise<boolean> {
+  if (isRedisAvailable()) {
+    try {
+      const locked = await getRedisValue(`bf:lock:${key}`);
+      if (locked) return true;
+    } catch {}
   }
+  const entry = _localBf.get(key);
+  if (!entry) return false;
+  if (Date.now() > entry.resetAt) { _localBf.delete(key); return false; }
   return entry.count >= MAX_FAILED_ATTEMPTS;
 }
 
-function recordFailedAttempt(key: string) {
-  const entry = failedAttempts.get(key);
+async function recordFailedAttempt(key: string) {
+  if (isRedisAvailable()) {
+    try {
+      const windowSecs  = Math.ceil(FAILED_WINDOW_MS / 1000);
+      const lockoutSecs = Math.ceil(LOCKOUT_MS / 1000);
+      const count = await incrRedisValue(`bf:count:${key}`, windowSecs);
+      if (count !== null && count >= MAX_FAILED_ATTEMPTS) {
+        await setRedisValue(`bf:lock:${key}`, "1", lockoutSecs);
+      }
+      return;
+    } catch {}
+  }
   const now = Date.now();
+  const entry = _localBf.get(key);
   if (!entry || now > entry.resetAt) {
-    failedAttempts.set(key, { count: 1, resetAt: now + FAILED_WINDOW_MS });
+    _localBf.set(key, { count: 1, resetAt: now + FAILED_WINDOW_MS });
   } else {
     entry.count += 1;
-    // Extend lockout window on each additional failure once threshold reached
-    if (entry.count >= MAX_FAILED_ATTEMPTS) {
-      entry.resetAt = now + LOCKOUT_MS;
-    }
+    if (entry.count >= MAX_FAILED_ATTEMPTS) entry.resetAt = now + LOCKOUT_MS;
   }
 }
 
-function clearFailedAttempts(key: string) {
-  failedAttempts.delete(key);
+async function clearFailedAttempts(key: string) {
+  if (isRedisAvailable()) {
+    try {
+      await Promise.all([
+        deleteRedisValue(`bf:count:${key}`),
+        deleteRedisValue(`bf:lock:${key}`),
+      ]);
+    } catch {}
+  }
+  _localBf.delete(key);
 }
 
-// Housekeeping — purge expired entries every 10 minutes
+// Housekeeping — purge expired in-process fallback entries every 10 minutes
 if (typeof setInterval !== "undefined") {
   setInterval(() => {
     const now = Date.now();
-    failedAttempts.forEach((entry, key) => {
-      if (now > entry.resetAt) failedAttempts.delete(key);
+    _localBf.forEach((entry, key) => {
+      if (now > entry.resetAt) _localBf.delete(key);
     });
   }, 10 * 60 * 1000).unref?.();
 }
@@ -81,9 +109,9 @@ export const authOptions: NextAuthOptions = {
         const ipRl = await checkRateLimit(`login:ip:${ip}`, 20, 10 * 60 * 1000);
         if (!ipRl.ok) return null; // silently reject — caller sees "CredentialsSignin"
 
-        // ── Rate-limit by email (per-account brute-force) ──────────────────
+        // ── Rate-limit by email (per-account brute-force, Redis-backed) ───────
         const emailKey = `login:email:${email}`;
-        if (isLockedOut(emailKey)) return null;
+        if (await isLockedOut(emailKey)) return null;
 
         const user = await one<{
           id: string;
@@ -99,19 +127,19 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user) {
-          recordFailedAttempt(emailKey);
+          await recordFailedAttempt(emailKey);
           return null;
         }
         if (user.disabled) return null;
 
         const valid = await compare(credentials.password, user.password_hash);
         if (!valid) {
-          recordFailedAttempt(emailKey);
+          await recordFailedAttempt(emailKey);
           return null;
         }
 
         // Successful login — clear any brute-force counters
-        clearFailedAttempts(emailKey);
+        await clearFailedAttempts(emailKey);
 
         // Respect subscription expiry at login time
         const expired = user.subscription_expires_at
