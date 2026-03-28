@@ -602,7 +602,22 @@ export default function AdminSettingsPage() {
       .then(r => r.json())
       .then(data => {
         if (data.settings) {
-          const merged = { ...DEFAULT_SETTINGS, ...data.settings };
+          const merged: SiteSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+          // Defensive fallback: if per-provider CAPTCHA keys are empty but the
+          // legacy shared keys exist, pre-fill from the legacy values so the
+          // admin always sees their actual configuration.
+          const prov = merged.captcha_provider as string;
+          const m = merged as unknown as Record<string, string>;
+          const legacySite = m.captcha_site_key || "";
+          const legacySecret = m.captcha_secret_key || "";
+          if (prov && legacySite) {
+            const sk = `captcha_${prov}_site_key`;
+            if (sk in m && !m[sk]) m[sk] = legacySite;
+          }
+          if (prov && legacySecret) {
+            const rk = `captcha_${prov}_secret_key`;
+            if (rk in m && !m[rk]) m[rk] = legacySecret;
+          }
           setForm(merged);
           setSaved(merged);
         }
