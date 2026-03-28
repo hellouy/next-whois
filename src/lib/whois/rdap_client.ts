@@ -147,11 +147,8 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   xk: "https://rdap.nic.xk/",
   // ── Africa ───────────────────────────────────────────────────────────────
   ao: "https://rdap.nic.ao/",
-  bf: "https://rdap.coccaregistry.org/",              // CoCCA (Burkina Faso)
-  bj: "https://rdap.coccaregistry.org/",              // CoCCA (Benin)
   bw: "https://rdap.nic.bw/",
   cd: "https://rdap.nic.cd/",
-  cf: "https://rdap.coccaregistry.org/",              // CoCCA (Central African Republic)
   ci: "https://rdap.nic.ci/",
   cm: "https://rdap.nic.cm/",                     // IANA: nic.cm, not netcom.cm
   dj: "https://rdap.nic.dj/",
@@ -172,7 +169,6 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   sn: "https://rdap.nic.sn/whois43/",             // IANA: /whois43/ path required
   so: "https://rdap.nic.so/",
   ss: "https://rdap.nic.ss/",
-  st: "https://rdap.coccaregistry.org/",              // CoCCA (São Tomé and Príncipe)
   td: "https://rdap.nic.td/",
   tz: "https://whois.tznic.or.tz/rdap/",          // IANA: whois.tznic.or.tz/rdap/
   ug: "https://rdap.nic.ug/",
@@ -196,7 +192,6 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // bn: rdap.bnnic.bn is NXDOMAIN (no RDAP service); WHOIS via whois.bnnic.bn works with DoH fallback
   bt: "https://rdap.nic.bt/",
   cc: "https://tld-rdap.verisign.com/cc/v1/",
-  ck: "https://rdap.coccaregistry.org/",              // CoCCA (Cook Islands)
   cx: "https://rdap.nic.cx/",
   fj: "https://www.rdap.fj/",                      // IANA: www.rdap.fj
   fm: "https://rdap.centralnic.com/fm/",
@@ -207,7 +202,6 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   io: "https://rdap.identitydigital.services/rdap/", // confirmed: IdentityDigital
   jp: "https://rdap.jprs.jp/",
   kh: "https://rdap.nic.kh/",
-  ki: "https://rdap.coccaregistry.org/",              // CoCCA (Kiribati)
   kr: "https://rdap.kr/",
   la: "https://rdap.nic.la/",
   mm: "https://rdap.nic.mm/",
@@ -219,7 +213,6 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   np: "https://rdap.nic.np/",
   nu: "https://rdap.nic.nu/",
   nz: "https://rdap.srs.net.nz/",
-  pf: "https://rdap.coccaregistry.org/",              // CoCCA (French Polynesia)
   pg: "https://rdap.nic.pg/",
   ph: "https://rdap.dot.ph/",
   pk: "https://rdap.pknic.net.pk/",

@@ -54,7 +54,10 @@ const STATIC_ALWAYS_FALLBACK = new Set<string>([
   "mh",  // Marshall Islands — WHOIS null, no public RDAP
   "va",  // Vatican City — very small registry, no public RDAP
 
-  // NOTE: .bf was here previously but now uses CoCCA RDAP (rdap.coccaregistry.org).
+  // ── Wrong/unreachable WHOIS server from cloud infrastructure ──────────────
+  // cctld-whois-servers.json maps .bf → whois.ripe.net (RIPE IP/ASN registry,
+  // NOT a domain-registration WHOIS — returns nothing useful for .bf names).
+  "bf",  // Burkina Faso — cctld server (RIPE) doesn't serve .bf domain data
   // NOTE: .bn was here previously but whois.bnnic.bn (202.152.92.245) is reachable
   //       from cloud once the hostname resolves — DNS-over-HTTPS fallback handles it.
 ]);
