@@ -13,6 +13,9 @@ import {
   RiEditLine, RiSendPlaneLine, RiCheckLine,
 } from "@remixicon/react";
 
+type TldQuality = "high" | "medium" | "low" | "ai" | null;
+type TldScrapeStatus = "ok" | "warn_defaults" | "failed" | "pending" | "no_data" | null;
+
 type Reminder = {
   id: string;
   domain: string;
@@ -26,9 +29,14 @@ type Reminder = {
   cancelled_at: string | null;
   phase_flags: string | null;
   created_at: string;
+  tld_confidence: TldQuality;
+  tld_scrape_status: TldScrapeStatus;
+  tld_needs_review: boolean | null;
+  tld_manually_edited: boolean | null;
+  tld_scrape_attempts: number | null;
 };
 
-type FilterTab = "all" | "active" | "inactive";
+type FilterTab = "all" | "active" | "inactive" | "review";
 
 const EMPTY_EDIT = { domain: "", email: "", expiration_date: "", days_before: "" };
 
@@ -37,6 +45,7 @@ export default function AdminRemindersPage() {
   const [total, setTotal] = React.useState(0);
   const [activeCount, setActiveCount] = React.useState(0);
   const [inactiveCount, setInactiveCount] = React.useState(0);
+  const [reviewCount, setReviewCount] = React.useState(0);
   const [search, setSearch] = React.useState("");
   const [activeFilter, setActiveFilter] = React.useState<FilterTab>("all");
   const [loading, setLoading] = React.useState(false);
@@ -58,6 +67,7 @@ export default function AdminRemindersPage() {
         setTotal(data.total || 0);
         setActiveCount(data.activeCount || 0);
         setInactiveCount(data.inactiveCount || 0);
+        if (data.reviewCount != null) setReviewCount(data.reviewCount);
         setOffset(off);
       })
       .catch(() => toast.error("加载失败"))
@@ -196,9 +206,10 @@ export default function AdminRemindersPage() {
   }
 
   const FILTERS: { key: FilterTab; label: string; count: number; color?: string }[] = [
-    { key: "all", label: "全部", count: activeCount + inactiveCount },
-    { key: "active", label: "活跃", count: activeCount, color: "emerald" },
-    { key: "inactive", label: "已停用", count: inactiveCount },
+    { key: "all",      label: "全部",     count: activeCount + inactiveCount },
+    { key: "active",   label: "活跃",     count: activeCount,  color: "emerald" },
+    { key: "inactive", label: "已停用",   count: inactiveCount },
+    { key: "review",   label: "需要核查", count: reviewCount,  color: "amber" },
   ];
 
   return (
@@ -292,6 +303,34 @@ export default function AdminRemindersPage() {
                           提前 {reminder.days_before} 天
                         </span>
                       )}
+                      {/* TLD data quality badge */}
+                      {(() => {
+                        const st = reminder.tld_scrape_status;
+                        const cf = reminder.tld_confidence;
+                        const me = reminder.tld_manually_edited;
+                        if (me) return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-medium" title="管理员已手动设置此TLD规则">TLD人工设置</span>
+                        );
+                        if (cf === "high") return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 font-medium" title="来自官方注册局规范数据库">TLD可靠</span>
+                        );
+                        if (st === "ok" && cf === "medium") return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 font-medium" title="AI从官方政策页面提取到具体数据">TLD AI核实</span>
+                        );
+                        if (st === "warn_defaults") return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-100 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 font-medium" title="AI未找到官方政策，使用行业默认值估算">TLD估算</span>
+                        );
+                        if (st === "no_data") return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 font-medium" title="多次抓取均无法获得数据，需人工核查">TLD待核查</span>
+                        );
+                        if (st === "failed") return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 font-medium" title="TLD抓取失败，数据不可靠">TLD失败</span>
+                        );
+                        if (!st) return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-medium" title="尚未抓取此TLD的生命周期规则">TLD未知</span>
+                        );
+                        return null;
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-3 mt-1 flex-wrap">

@@ -636,6 +636,7 @@ export default async function handler(
               scraped_at, updated_at, model_used, ai_reasoning,
               COALESCE(manually_edited, FALSE) AS manually_edited,
               COALESCE(scrape_status, 'pending') AS scrape_status,
+              COALESCE(needs_admin_review, FALSE) AS needs_admin_review,
               failure_reason, fetch_strategy,
               COALESCE(scrape_attempts, 0) AS scrape_attempts
        FROM tld_rules ORDER BY tld`
@@ -675,6 +676,7 @@ export default async function handler(
       warn_defaults: rows.filter(r => r.scrape_status === "warn_defaults" && !r.manually_edited).length,
       failed: rows.filter(r => r.scrape_status === "failed" && !r.manually_edited).length,
       pending: rows.filter(r => r.scrape_status === "pending" && !r.manually_edited).length,
+      no_data: rows.filter(r => r.scrape_status === "no_data" && !r.manually_edited).length,
       manually_edited: rows.filter(r => r.manually_edited).length,
     };
 
@@ -861,10 +863,24 @@ export default async function handler(
     }
   }
 
-  // PATCH — manual edit (admin overrides AI scrape; marks record as manually_edited)
+  // PATCH — manual edit OR admin special actions (reset-to-pending)
   if (req.method === "PATCH") {
     const session = await requireAdmin(req, res);
     if (!session) return;
+
+    // Special action: reset an exhausted no_data TLD back to pending for retry
+    if (req.body?.action === "reset-to-pending") {
+      const cleanTld = String(req.body.tld || "").toLowerCase().replace(/^\./, "");
+      if (!cleanTld) return res.status(400).json({ error: "tld is required" });
+      await run(
+        `UPDATE tld_rules
+         SET scrape_status='pending', needs_admin_review=FALSE,
+             scrape_attempts=0, failure_reason=NULL, updated_at=NOW()
+         WHERE tld=$1`,
+        [cleanTld]
+      );
+      return res.json({ ok: true, message: `已将 .${cleanTld} 重置为待抓取状态` });
+    }
 
     const {
       tld, grace_period_days, redemption_period_days, pending_delete_days,

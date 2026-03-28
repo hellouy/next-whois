@@ -55,10 +55,11 @@ type TldRule = {
   model_used: string | null;
   ai_reasoning: string | null;
   manually_edited: boolean;
-  scrape_status: "ok" | "warn_defaults" | "failed" | "pending";
+  scrape_status: "ok" | "warn_defaults" | "failed" | "pending" | "no_data";
   failure_reason: string | null;
   fetch_strategy: string | null;
   scrape_attempts: number;
+  needs_admin_review: boolean;
 };
 
 type ScrapeStats = {
@@ -67,6 +68,7 @@ type ScrapeStats = {
   warn_defaults: number;
   failed: number;
   pending: number;
+  no_data: number;
   manually_edited: number;
 };
 
@@ -802,10 +804,11 @@ export default function AdminTldRulesPage() {
 
         {/* ── Stats Overview ──────────────────────────────────────────────── */}
         {scrapeStats && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "✅ 已确认", value: scrapeStats.ok, cls: "bg-green-50 border-green-200 text-green-700 dark:bg-green-950/20 dark:border-green-900 dark:text-green-400", desc: "真实数据，可信" },
-              { label: "⚠ 仅默认值", value: scrapeStats.warn_defaults, cls: "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-950/20 dark:border-orange-900 dark:text-orange-400", desc: "AI未找到具体政策，使用30/30/5行业默认值" },
+              { label: "⚠ 仅默认值", value: scrapeStats.warn_defaults, cls: "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-950/20 dark:border-orange-900 dark:text-orange-400", desc: "AI未找到具体政策，使用30/30/5行业默认值，仍在重试" },
+              { label: "🚫 无数据", value: scrapeStats.no_data, cls: "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400", desc: "多次重试失败，需人工核查或手动录入" },
               { label: "❌ 失败", value: scrapeStats.failed, cls: "bg-red-50 border-red-200 text-red-700 dark:bg-red-950/20 dark:border-red-900 dark:text-red-400", desc: "网络/AI错误，需重试或手动填写" },
               { label: "⏳ 待抓取", value: scrapeStats.pending, cls: "bg-muted border-border text-muted-foreground", desc: "尚未抓取" },
               { label: "✏ 手动修改", value: scrapeStats.manually_edited, cls: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-400", desc: "管理员手动录入，受保护" },
@@ -818,8 +821,8 @@ export default function AdminTldRulesPage() {
           </div>
         )}
 
-        {/* ── Failed / Warn records panel ─────────────────────────────────── */}
-        {!loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults")).length > 0 && (
+        {/* ── Failed / Warn / No-data records panel ───────────────────────── */}
+        {!loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")).length > 0 && (
           <div className="border rounded-xl overflow-hidden bg-card">
             <div className="flex items-center gap-3 px-4 py-3 border-b bg-red-50/50 dark:bg-red-950/10">
               <RiErrorWarningLine className="w-4 h-4 text-red-500" />
@@ -827,17 +830,18 @@ export default function AdminTldRulesPage() {
                 需要关注的记录
               </span>
               <span className="text-xs text-muted-foreground">
-                — 失败或仅获得默认值的 TLD，建议手动重试或填写
+                — 失败、默认值或已穷尽重试的 TLD，建议手动录入或重置后再次抓取
               </span>
             </div>
             <div className="divide-y divide-border">
               {rules
-                .filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults"))
+                .filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data"))
                 .map(r => (
                   <div key={r.tld} className={cn(
                     "flex items-start gap-3 px-4 py-3",
-                    r.scrape_status === "failed" && "bg-red-50/30 dark:bg-red-950/10",
+                    r.scrape_status === "failed"        && "bg-red-50/30 dark:bg-red-950/10",
                     r.scrape_status === "warn_defaults" && "bg-orange-50/30 dark:bg-orange-950/10",
+                    r.scrape_status === "no_data"       && "bg-rose-50/40 dark:bg-rose-950/10",
                   )}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -846,10 +850,13 @@ export default function AdminTldRulesPage() {
                         {r.scrape_attempts > 0 && (
                           <span className="text-[10px] text-muted-foreground">尝试 {r.scrape_attempts} 次</span>
                         )}
-                        {r.fetch_strategy && r.scrape_status !== "failed" && (
+                        {r.scrape_status === "no_data" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-medium">已穷尽重试</span>
+                        )}
+                        {r.fetch_strategy && r.scrape_status !== "failed" && r.scrape_status !== "no_data" && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{r.fetch_strategy}</span>
                         )}
-                        {r.model_used && r.scrape_status !== "failed" && (
+                        {r.model_used && r.scrape_status !== "failed" && r.scrape_status !== "no_data" && (
                           <span className="text-[10px] text-muted-foreground">{r.model_used}</span>
                         )}
                       </div>
@@ -858,38 +865,67 @@ export default function AdminTldRulesPage() {
                           {r.failure_reason}
                         </p>
                       )}
+                      {r.scrape_status === "no_data" && r.failure_reason && (
+                        <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 italic">
+                          {r.failure_reason}
+                        </p>
+                      )}
                       {r.scrape_status === "warn_defaults" && r.ai_reasoning && (
                         <p className="text-xs text-orange-700 dark:text-orange-400 mt-1 italic">
                           {r.ai_reasoning}
                         </p>
                       )}
-                      {r.scrape_status === "warn_defaults" && (
+                      {(r.scrape_status === "warn_defaults" || r.scrape_status === "no_data") && (
                         <p className="text-xs text-muted-foreground mt-0.5">
                           当前值: {r.grace_period_days}d / {r.redemption_period_days}d / {r.pending_delete_days}d
-                          {r.source_url && (
-                            <> · <a href={r.source_url} target="_blank" rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline">{new URL(r.source_url).hostname}</a></>
-                          )}
+                          {r.source_url && (() => { try { return <> · <a href={r.source_url!} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{new URL(r.source_url!).hostname}</a></>; } catch { return null; } })()}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                      <Button
-                        variant="outline" size="sm"
-                        className={cn(
-                          "h-7 gap-1 text-xs",
-                          r.scrape_status === "failed"
-                            ? "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-                            : "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400"
-                        )}
-                        disabled={retrying === r.tld}
-                        onClick={() => handleRetry(r.tld)}
-                      >
-                        {retrying === r.tld
-                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
-                          : <RiRefreshLine className="w-3.5 h-3.5" />}
-                        重新抓取
-                      </Button>
+                      {r.scrape_status === "no_data" ? (
+                        <Button
+                          variant="outline" size="sm"
+                          className="h-7 gap-1 text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400"
+                          disabled={retrying === r.tld}
+                          onClick={async () => {
+                            setRetrying(r.tld);
+                            try {
+                              const res = await fetch("/api/admin/tld-rules", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "reset-to-pending", tld: r.tld }),
+                              });
+                              const data = await res.json();
+                              if (data.ok) { toast.success(data.message); load(); }
+                              else toast.error(data.error ?? "重置失败");
+                            } catch { toast.error("重置失败"); }
+                            finally { setRetrying(null); }
+                          }}
+                        >
+                          {retrying === r.tld
+                            ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                            : <RiRefreshLine className="w-3.5 h-3.5" />}
+                          重置重抓
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline" size="sm"
+                          className={cn(
+                            "h-7 gap-1 text-xs",
+                            r.scrape_status === "failed"
+                              ? "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                              : "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400"
+                          )}
+                          disabled={retrying === r.tld}
+                          onClick={() => handleRetry(r.tld)}
+                        >
+                          {retrying === r.tld
+                            ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                            : <RiRefreshLine className="w-3.5 h-3.5" />}
+                          重新抓取
+                        </Button>
+                      )}
                       <Button
                         variant="ghost" size="sm"
                         className="h-7 gap-1 text-xs text-blue-600 hover:bg-blue-50"

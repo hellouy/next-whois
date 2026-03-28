@@ -19,36 +19,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (search) {
         params.push(`%${search}%`);
-        conditions.push(`(domain ILIKE $${params.length} OR email ILIKE $${params.length})`);
+        conditions.push(`(r.domain ILIKE $${params.length} OR r.email ILIKE $${params.length})`);
       }
-      if (filter === "active") conditions.push("active = true");
-      if (filter === "inactive") conditions.push("active = false");
+      if (filter === "active") conditions.push("r.active = true");
+      if (filter === "inactive") conditions.push("r.active = false");
+      if (filter === "review") {
+        // Reminders whose TLD data quality is uncertain: no record, pending, failed, warn_defaults, or no_data
+        conditions.push(`(tr.tld IS NULL OR tr.needs_admin_review = true OR tr.scrape_status IN ('pending','failed','warn_defaults','no_data'))`);
+      }
 
       const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-      const q = `SELECT id, domain, email, expiration_date, whois_expiry_date, whois_synced_at,
-                        active, days_before, cancel_reason, cancelled_at, phase_flags, created_at
-                 FROM reminders${where}
-                 ORDER BY created_at DESC
+      const q = `SELECT r.id, r.domain, r.email, r.expiration_date, r.whois_expiry_date, r.whois_synced_at,
+                        r.active, r.days_before, r.cancel_reason, r.cancelled_at, r.phase_flags, r.created_at,
+                        tr.confidence             AS tld_confidence,
+                        tr.scrape_status          AS tld_scrape_status,
+                        tr.needs_admin_review     AS tld_needs_review,
+                        tr.manually_edited        AS tld_manually_edited,
+                        tr.scrape_attempts        AS tld_scrape_attempts
+                 FROM reminders r
+                 LEFT JOIN tld_rules tr ON tr.tld = LOWER(REVERSE(SPLIT_PART(REVERSE(r.domain), '.', 1)))${where}
+                 ORDER BY r.created_at DESC
                  LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
       const reminders = await many(q, params);
 
       const countParams = params.slice(0, params.length - 2);
       const countRow = await one<{ count: string }>(
-        `SELECT COUNT(*) AS count FROM reminders${where}`,
+        `SELECT COUNT(*) AS count FROM reminders r LEFT JOIN tld_rules tr ON tr.tld = LOWER(REVERSE(SPLIT_PART(REVERSE(r.domain), '.', 1)))${where}`,
         countParams.length ? countParams : undefined
       );
       const total = parseInt(countRow?.count ?? "0");
 
-      const [activeCount, inactiveCount] = await Promise.all([
+      const [activeCount, inactiveCount, reviewCount] = await Promise.all([
         one<{ count: string }>("SELECT COUNT(*) AS count FROM reminders WHERE active = true"),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM reminders WHERE active = false"),
+        one<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM reminders r
+           LEFT JOIN tld_rules tr ON tr.tld = LOWER(REVERSE(SPLIT_PART(REVERSE(r.domain), '.', 1)))
+           WHERE tr.tld IS NULL OR tr.needs_admin_review = true
+              OR tr.scrape_status IN ('pending','failed','warn_defaults','no_data')`
+        ),
       ]);
 
       return res.json({
         reminders, total,
-        activeCount: parseInt(activeCount?.count ?? "0"),
+        activeCount:   parseInt(activeCount?.count   ?? "0"),
         inactiveCount: parseInt(inactiveCount?.count ?? "0"),
+        reviewCount:   parseInt(reviewCount?.count   ?? "0"),
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });

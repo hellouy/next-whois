@@ -696,15 +696,25 @@ function applyKnownPolicy(tld, extracted) {
 
 // ── DB save ───────────────────────────────────────────────────────────────────
 async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy) {
+  // Confidence grading:
+  //   high   — curated policy database (verified by humans)
+  //   medium — AI extracted real numbers from an official policy page
+  //   low    — AI returned ICANN standard defaults (no specific data found)
+  const confidence = ex.model_used === "curated-database" ? "high"
+                   : scrapeStatus === "ok"               ? "medium"
+                   :                                       "low";
+  // needs_admin_review: flag low-confidence results for admin inspection
+  const needsReview = scrapeStatus !== "ok";
+
   await dbRun(
     `INSERT INTO tld_rules
        (tld, grace_period_days, redemption_period_days, pending_delete_days,
         source_url, confidence, raw_excerpt, ai_reasoning, model_used,
         drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
         scraped_at, updated_at,
-        scrape_status, fetch_strategy, failure_reason,
+        scrape_status, fetch_strategy, failure_reason, needs_admin_review,
         scrape_attempts)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW(),$15,$16,NULL,1)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW(),$15,$16,NULL,$17,1)
      ON CONFLICT (tld) DO UPDATE SET
        grace_period_days=$2, redemption_period_days=$3, pending_delete_days=$4,
        source_url=$5, confidence=$6, raw_excerpt=$7, ai_reasoning=$8,
@@ -712,12 +722,13 @@ async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy
        drop_timezone=$13, pre_expiry_days=$14,
        scraped_at=NOW(), updated_at=NOW(),
        scrape_status=$15, fetch_strategy=$16, failure_reason=NULL,
+       needs_admin_review=$17,
        scrape_attempts=COALESCE(tld_rules.scrape_attempts,0)+1`,
     [
       tld,
       ex.grace_period_days, ex.redemption_period_days, ex.pending_delete_days,
       finalUrl,
-      ex.model_used === "curated-database" ? "high" : "ai",
+      confidence,
       pageText.slice(0, 1000),
       ex.reasoning,
       ex.model_used ?? null,
@@ -725,6 +736,7 @@ async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy
       ex.pre_expiry_days ?? 0,
       scrapeStatus,
       fetchStrategy ?? null,
+      needsReview,
     ]
   );
 }
@@ -734,11 +746,13 @@ async function saveFailureToDb(tld, reason) {
   await dbRun(
     `INSERT INTO tld_rules
        (tld, grace_period_days, redemption_period_days, pending_delete_days,
-        scrape_status, failure_reason, scraped_at, updated_at, scrape_attempts)
-     VALUES ($1, 30, 30, 5, 'failed', $2, NOW(), NOW(), 1)
+        scrape_status, failure_reason, scraped_at, updated_at,
+        needs_admin_review, confidence, scrape_attempts)
+     VALUES ($1, 30, 30, 5, 'failed', $2, NOW(), NOW(), TRUE, 'low', 1)
      ON CONFLICT (tld) DO UPDATE SET
        scrape_status='failed', failure_reason=$2,
        scraped_at=NOW(), updated_at=NOW(),
+       needs_admin_review=TRUE, confidence='low',
        scrape_attempts=COALESCE(tld_rules.scrape_attempts,0)+1`,
     [tld, short]
   ).catch(e => console.warn(`  [DB] 写入失败记录出错: ${e.message}`));
@@ -754,6 +768,23 @@ function log(tld, status, msg = "") {
   console.log(`${pct} ${icon} .${tld.padEnd(8)} ${msg}`);
 }
 
+// Max retry thresholds before promoting to no_data (exhausted)
+const MAX_WARN_ATTEMPTS   = 3;  // warn_defaults: give up after 3 all-default results
+const MAX_FAILED_ATTEMPTS = 5;  // failed: give up after 5 network/parse failures
+
+/**
+ * Promote a TLD to 'no_data' status (permanently skipped until manually reviewed).
+ * Saves the record but stops automatic re-scraping.
+ */
+async function markNoData(tld, reason) {
+  await dbRun(
+    `UPDATE tld_rules
+     SET scrape_status='no_data', needs_admin_review=TRUE, failure_reason=$2, updated_at=NOW()
+     WHERE tld=$1`,
+    [tld, reason.slice(0, 500)]
+  ).catch(e => console.warn(`  [DB] markNoData失败: ${e.message}`));
+}
+
 // ── Single TLD scrape ─────────────────────────────────────────────────────────
 async function scrapeTld(tld) {
   const ianaUrl = `https://www.iana.org/domains/root/db/${tld}.html`;
@@ -761,7 +792,8 @@ async function scrapeTld(tld) {
   // Skip rules — based on scrape_status, NOT time
   if (!FORCE && !CLEAR_DEFS) {
     const existing = await dbOne(
-      `SELECT scraped_at, scrape_status, COALESCE(manually_edited,FALSE) as manually_edited,
+      `SELECT scraped_at, scrape_status, scrape_attempts,
+              COALESCE(manually_edited,FALSE) as manually_edited,
               grace_period_days, redemption_period_days, pending_delete_days
        FROM tld_rules WHERE tld=$1`, [tld]
     ).catch(() => null);
@@ -771,14 +803,34 @@ async function scrapeTld(tld) {
       log(tld, "skip", "手动修改，跳过");
       return;
     }
-    // Only skip records that were successfully scraped (non-default real data)
+    // 永久跳过：已成功抓取到真实数据
     if (existing?.scrape_status === "ok") {
       stats.skip++;
       const dateStr = existing.scraped_at ? new Date(existing.scraped_at).toISOString().slice(0,10) : "—";
-      log(tld, "skip", `已成功抓取 (${dateStr})，跳过`);
+      log(tld, "skip", `已成功抓取 (${dateStr})，永久保存`);
       return;
     }
-    // Records with warn_defaults, failed, pending — will be re-attempted
+    // 永久跳过：已穷尽重试（needs_admin_review），人工核查后才会重新抓取
+    if (existing?.scrape_status === "no_data") {
+      stats.skip++;
+      log(tld, "skip", `已穷尽重试，等待人工核查`);
+      return;
+    }
+    // warn_defaults 超过最大次数 → 升级为 no_data
+    if (existing?.scrape_status === "warn_defaults" && (existing.scrape_attempts ?? 0) >= MAX_WARN_ATTEMPTS) {
+      stats.skip++;
+      await markNoData(tld, `已连续 ${existing.scrape_attempts} 次仅得到默认值，无法找到官方政策页面`);
+      log(tld, "skip", `warn_defaults×${existing.scrape_attempts} → 标记为 no_data，需人工核查`);
+      return;
+    }
+    // failed 超过最大次数 → 升级为 no_data
+    if (existing?.scrape_status === "failed" && (existing.scrape_attempts ?? 0) >= MAX_FAILED_ATTEMPTS) {
+      stats.skip++;
+      await markNoData(tld, `已连续 ${existing.scrape_attempts} 次网络/解析失败`);
+      log(tld, "skip", `failed×${existing.scrape_attempts} → 标记为 no_data，需人工核查`);
+      return;
+    }
+    // warn_defaults, failed(< 上限), pending — 继续重试
   }
 
   if (CLEAR_DEFS && !FORCE) {
