@@ -48,9 +48,10 @@ void getWhoiser();
 // two DB round-trips.  Both functions are idempotent no-ops after first call.
 import("@/lib/whois/tld-rdap-skip").then(m => m.initRdapSkipCache()).catch(() => {});
 import("@/lib/whois/tld-fallback-gate").then(m => {
-  // Trigger the lazy DB load by calling isTldFallbackEnabled with a dummy domain.
   m.isTldFallbackEnabled("warmup.com").catch(() => {});
 }).catch(() => {});
+// Pre-load custom server list + no-server set into the 5-minute in-process cache.
+import("@/lib/whois/custom-servers").then(m => m.getAllCustomServers()).catch(() => {});
 // Pre-warm DNS for the most-queried WHOIS servers so the first real request
 // hits the in-process cache instead of paying a system-DNS or DoH round-trip.
 warmupDnsCache([
@@ -384,6 +385,11 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
   const rawExtracted = extractDomain(domain) || domain;
   const domainToQuery = toAsciiDomain(rawExtracted);
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
+  // All TCP/HTTP calls inside getLookupWhois are wrapped by
+  // withTimeout(getLookupWhois, WHOIS_TIMEOUT) in the caller.
+  // innerTimeout must be shorter so whoiser/TCP can clean up before the outer
+  // deadline fires.  300 ms headroom is enough for connection teardown.
+  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   const tld = domainToQuery.split(".").slice(1).join(".");
   const tldSuffix = domainToQuery.split(".").pop() || "";
   // Deduplicate DB calls when tld and tldSuffix are identical (all 2-part domains like .com/.net).
@@ -406,7 +412,7 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
     if (isScraperEntry(customEntry)) {
       const { name: scraperName, registryUrl } = customEntry;
       if (scraperName === "nic-ba") {
-        const nicBaResult = await lookupNicBa(domainToQuery, LOOKUP_TIMEOUT);
+        const nicBaResult = await lookupNicBa(domainToQuery, innerTimeout);
         if (nicBaResult.success) {
           return {
             raw: nicBaResult.raw,
@@ -432,7 +438,7 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
       const raw = await queryWhoisHttp(
         customEntry,
         domainToQuery,
-        LOOKUP_TIMEOUT,
+        innerTimeout,
       );
       if (!raw || raw.trim().length === 0) {
         if (isUserServer) {
@@ -456,8 +462,8 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
           const { whoisQuery } = await getWhoiser();
           const raw =
             port === 43
-              ? await whoisQuery(tcpHost, domainToQuery, LOOKUP_TIMEOUT)
-              : await queryWhoisTcp(tcpHost, port, domainToQuery, LOOKUP_TIMEOUT);
+              ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
+              : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
           if (raw && raw.trim().length > 0) {
             return { raw, structured: {}, server: tcpHost };
           }
@@ -482,11 +488,6 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
   // Look up WHOIS server from local bootstrap before falling back to IANA auto-discovery.
   // This avoids a live query to whois.iana.org for 1100+ known gTLDs.
   const bootstrapWhoisHost = getGtldWhoisServer(tld) ?? getGtldWhoisServer(tldSuffix);
-
-  // Inner whoiser timeout must be shorter than the outer withTimeout(getLookupWhois, WHOIS_TIMEOUT)
-  // wrapper so whoiser can clean up its own TCP connections before the outer deadline fires.
-  // Using WHOIS_TIMEOUT - 300 ms gives a 300 ms cleanup window.
-  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
 
   let primaryError: unknown = null;
 

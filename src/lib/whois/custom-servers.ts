@@ -84,7 +84,14 @@ async function readUserManagedServers(): Promise<CustomServerMap> {
 
 let _allServersCache: CustomServerMap | null = null;
 let _allServersCacheAt = 0;
-const ALL_SERVERS_TTL_MS = 30_000;
+// Custom server list changes rarely; explicit invalidation is called on every
+// admin write/delete so a long TTL is safe and reduces DB queries significantly.
+const ALL_SERVERS_TTL_MS = 300_000; // 5 minutes
+
+// Separate cache for user-managed (DB-only) servers, used by isUserManagedServer.
+// Must share the same TTL / invalidation cycle as _allServersCache.
+let _userManagedCache: CustomServerMap | null = null;
+let _userManagedCacheAt = 0;
 
 // TLDs explicitly recorded as having NO public WHOIS server in our cctld file.
 // Kept separate so lookup.ts can short-circuit without calling whoiser.
@@ -94,6 +101,8 @@ function invalidateAllServersCache() {
   _allServersCache = null;
   _allServersCacheAt = 0;
   _knownNoServerCache = null;
+  _userManagedCache = null;
+  _userManagedCacheAt = 0;
 }
 
 async function writeDbServer(tld: string, entry: CustomServerEntry): Promise<void> {
@@ -182,8 +191,14 @@ export async function deleteCustomServer(tld: string): Promise<boolean> {
 
 export async function isUserManagedServer(tld: string): Promise<boolean> {
   const normalized = tld.toLowerCase().replace(/^\./, "");
-  const userServers = await readUserManagedServers();
-  return normalized in userServers;
+  // Use the in-process cache to avoid a DB query on every lookup.
+  // Cache is invalidated explicitly when admin writes/deletes a custom server.
+  const now = Date.now();
+  if (!_userManagedCache || now - _userManagedCacheAt >= ALL_SERVERS_TTL_MS) {
+    _userManagedCache = await readUserManagedServers();
+    _userManagedCacheAt = now;
+  }
+  return normalized in _userManagedCache;
 }
 
 export function isHttpEntry(entry: CustomServerEntry): entry is HttpServerEntry {
