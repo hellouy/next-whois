@@ -58,10 +58,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { token: bodyToken, mode = "force" } = req.body as { token?: string; mode?: Mode };
-  // When called internally (internalAuth=true), fall back to GITHUB_TOKEN env var
-  const token = bodyToken || (internalAuth ? process.env.GITHUB_TOKEN : undefined);
+  // Prefer body token; always fall back to GITHUB_TOKEN env var (auth already verified above)
+  const token = (bodyToken && bodyToken.trim().length >= 10 ? bodyToken.trim() : null)
+    ?? process.env.GITHUB_TOKEN;
   if (!token || token.trim().length < 10) {
-    return res.status(400).json({ success: false, log: ["✗ 请提供 GitHub Personal Access Token（至少10位）"] });
+    return res.status(400).json({ success: false, log: [
+      "✗ 未找到可用的 GitHub Token",
+      "  · 在请求体中传入 token 字段，或",
+      "  · 在 Replit Secrets 中设置 GITHUB_TOKEN 环境变量",
+    ]});
   }
 
   const cwd = process.cwd();

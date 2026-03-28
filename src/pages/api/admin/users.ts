@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { hash } from "bcryptjs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -73,13 +74,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
 
-    const { name, email, admin_notes, disabled, subscription_access, email_verified } = req.body as {
+    const { name, email, admin_notes, disabled, subscription_access, email_verified, new_password } = req.body as {
       name?: string;
       email?: string;
       admin_notes?: string;
       disabled?: boolean;
       subscription_access?: boolean;
       email_verified?: boolean;
+      new_password?: string;
     };
 
     try {
@@ -103,6 +105,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       if (email_verified !== undefined) { params.push(Boolean(email_verified)); updates.push(`email_verified = $${params.length}`); }
+      if (new_password !== undefined) {
+        if (new_password.trim().length < 8) return res.status(400).json({ error: "新密码至少需要 8 位" });
+        const hashed = await hash(new_password.trim(), 12);
+        params.push(hashed); updates.push(`password_hash = $${params.length}`);
+      }
 
       if (updates.length === 0) return res.status(400).json({ error: "无可更新字段" });
       updates.push(`updated_at = NOW()`);
