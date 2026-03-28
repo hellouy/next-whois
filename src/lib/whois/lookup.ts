@@ -319,6 +319,27 @@ async function queryWhoisHttp(
   }
 }
 
+// ── IANA WHOIS referral cache ──────────────────────────────────────────────────
+// whois.iana.org is the definitive registry for TLD → WHOIS server mappings.
+// We query it on-demand when our local bootstrap has a wrong/outdated entry or
+// when whoiser's auto-discovery fails.  Results cached 24 h (server assignments
+// rarely change).  Uses queryWhoisTcp so DoH DNS fallback is automatic.
+const _ianaServerCache = new Map<string, { server: string | null; expires: number }>();
+
+async function getIanaWhoisServer(tld: string): Promise<string | null> {
+  const cached = _ianaServerCache.get(tld);
+  if (cached && cached.expires > Date.now()) return cached.server;
+  try {
+    const raw = await queryWhoisTcp("whois.iana.org", 43, tld, 5_000);
+    const m = raw.match(/^refer:\s*(\S+)/im);
+    const server = m ? m[1].trim().toLowerCase() : null;
+    _ianaServerCache.set(tld, { server, expires: Date.now() + 86_400_000 });
+    return server;
+  } catch {
+    return null;
+  }
+}
+
 async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
   if (isIPAddress(domain)) {
     const ip = domain.replace(/\/\d{1,3}$/, "");
@@ -445,39 +466,85 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
   const bootstrapWhoisHost = getGtldWhoisServer(tld) ?? getGtldWhoisServer(tldSuffix);
 
   const { whoisDomain } = await getWhoiser();
-  const data = await whoisDomain(domainToQuery, {
-    raw: true,
-    follow,
-    timeout: LOOKUP_TIMEOUT,
-    ...(bootstrapWhoisHost ? { host: bootstrapWhoisHost } : {}),
-  });
 
-  const servers = Object.keys(data);
-  if (servers.length === 0) throw new Error("No WHOIS server responded");
-
-  const lastServer = servers[servers.length - 1];
-  const structured = (data as any)[lastServer] || {};
-  const rawParts: string[] = [];
-  for (const s of servers) {
-    const entry = (data as any)[s];
-    if (entry?.__raw) {
-      rawParts.push(entry.__raw);
-    } else if (entry) {
-      const lines: string[] = [];
-      for (const [k, v] of Object.entries(entry)) {
-        if (k === "text" || k === "__raw" || k === "__comments") continue;
-        if (Array.isArray(v)) {
-          for (const item of v) lines.push(`${k}: ${item}`);
-        } else if (v !== undefined && v !== null && v !== "") {
-          lines.push(`${k}: ${v}`);
+  function extractRawFromData(data: any): WhoisRawResult | null {
+    const servers = Object.keys(data ?? {});
+    if (servers.length === 0) return null;
+    const lastServer = servers[servers.length - 1];
+    const structured = (data as any)[lastServer] || {};
+    const rawParts: string[] = [];
+    for (const s of servers) {
+      const entry = (data as any)[s];
+      if (entry?.__raw) {
+        rawParts.push(entry.__raw);
+      } else if (entry) {
+        const lines: string[] = [];
+        for (const [k, v] of Object.entries(entry)) {
+          if (k === "text" || k === "__raw" || k === "__comments") continue;
+          if (Array.isArray(v)) {
+            for (const item of v) lines.push(`${k}: ${item}`);
+          } else if (v !== undefined && v !== null && v !== "") {
+            lines.push(`${k}: ${v}`);
+          }
         }
+        if (lines.length > 0) rawParts.push(lines.join("\n"));
       }
-      if (lines.length > 0) rawParts.push(lines.join("\n"));
+    }
+    const raw = rawParts.join("\n\n") || "";
+    return { raw, structured, server: lastServer };
+  }
+
+  // ── Attempt 1: local bootstrap host (or whoiser auto-discovery if no bootstrap) ──
+  let primaryResult: WhoisRawResult | null = null;
+  let primaryError: unknown = null;
+  try {
+    const data = await whoisDomain(domainToQuery, {
+      raw: true,
+      follow,
+      timeout: LOOKUP_TIMEOUT,
+      ...(bootstrapWhoisHost ? { host: bootstrapWhoisHost } : {}),
+    });
+    primaryResult = extractRawFromData(data);
+  } catch (err) {
+    primaryError = err;
+  }
+  if (primaryResult && primaryResult.raw.trim().length > 0) return primaryResult;
+
+  // ── Attempt 2: whoiser auto-discovery (only when bootstrap host was used and failed) ──
+  // If our local bootstrap pointed to the wrong/outdated server, let whoiser
+  // query whois.iana.org to find the current authoritative server.
+  if (bootstrapWhoisHost) {
+    try {
+      const data = await whoisDomain(domainToQuery, {
+        raw: true,
+        follow,
+        timeout: LOOKUP_TIMEOUT,
+        // no host: whoiser auto-discovers via IANA
+      });
+      const result = extractRawFromData(data);
+      if (result && result.raw.trim().length > 0) return result;
+    } catch {
+      // keep going to IANA referral
     }
   }
-  const raw = rawParts.join("\n\n") || "";
 
-  return { raw, structured, server: lastServer };
+  // ── Attempt 3: IANA WHOIS referral (direct TCP to whois.iana.org → refer:) ──
+  // Ask IANA for the TLD's definitive WHOIS server and query it directly.
+  // Handles cases where whoiser's auto-discovery also fails (DNS, network).
+  const ianaServer = await getIanaWhoisServer(tldSuffix);
+  if (ianaServer && ianaServer !== bootstrapWhoisHost) {
+    try {
+      const raw = await queryWhoisTcp(ianaServer, 43, domainToQuery, LOOKUP_TIMEOUT);
+      if (raw && raw.trim().length > 0) {
+        return { raw, structured: {}, server: ianaServer };
+      }
+    } catch {
+      // IANA referral server also failed
+    }
+  }
+
+  // All three attempts exhausted — throw the most informative error
+  throw primaryError ?? new Error("No WHOIS server responded");
 }
 
 function pickStr(a: string, b: string): string {
@@ -768,15 +835,32 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   let _shadowTimerId: ReturnType<typeof setTimeout> | null = null;
   const shadowWhoisPromise: Promise<WhoisRaw | null> = rdapIsDirect
     ? new Promise<WhoisRaw | null>(resolve => {
-        _shadowTimerId = setTimeout(async () => {
-          if (_shadowCancelled) { resolve(null); return; }
+        let shadowStarted = false;
+
+        async function runShadowWhois() {
+          if (shadowStarted || _shadowCancelled) return;
+          shadowStarted = true;
+          if (_shadowTimerId !== null) { clearTimeout(_shadowTimerId); _shadowTimerId = null; }
           try {
             const r = await withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT);
             resolve(_shadowCancelled ? null : r);
           } catch {
             resolve(null);
           }
-        }, RDAP_DIRECT_WHOIS_SHADOW_MS);
+        }
+
+        // Scheduled path: start WHOIS after the normal shadow delay.
+        _shadowTimerId = setTimeout(runShadowWhois, RDAP_DIRECT_WHOIS_SHADOW_MS);
+
+        // Fail-fast path: if RDAP rejects with a clear non-timeout error
+        // (e.g. ECONNREFUSED, HTTP 4xx, DNS failure), there is no point waiting
+        // the full 2 s — start WHOIS immediately so total latency is
+        //   RDAP_fail_time + WHOIS_TIMEOUT  instead of  RDAP_DIRECT_WHOIS_SHADOW_MS + WHOIS_TIMEOUT.
+        rdapPromise.catch((err: unknown) => {
+          const msg = (err as Error)?.message?.toLowerCase() ?? "";
+          const isTimeout = msg.includes("timeout") || msg.includes("timed out") || msg.includes("abort");
+          if (!isTimeout) runShadowWhois();
+        });
       })
     : Promise.resolve(null);
   // Call to suppress linter warning about unused variable
