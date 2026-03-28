@@ -4671,29 +4671,29 @@ export default function LookupPage({
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
 
-          <AnimatePresence mode="popLayout" initial={false}>
-            {/* Show skeleton ONLY on the very first load when there is no
-                previous data yet (data.time === 0).  For subsequent searches
-                we keep the previous result visible (dimmed) so the layout
-                never collapses/re-expands — the visible "jump". */}
-            {loading && data.time === 0 ? (
-              <motion.div
-                key="skeleton"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12, ease: "easeOut" }}
-              >
-                <ResultSkeleton />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: loading ? 0.45 : 1 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                style={{ pointerEvents: loading ? "none" : undefined }}
-              >
+          {/* Result is always in the layout flow — skeleton overlays it as an
+              absolute layer only during the very first load so there is no
+              key-switch, no layout-height jump, no visible "跳一下". */}
+          <div className="relative" style={{ minHeight: loading && data.time === 0 ? 520 : undefined }}>
+            <AnimatePresence>
+              {loading && data.time === 0 && (
+                <motion.div
+                  key="skeleton"
+                  className="absolute inset-x-0 top-0 z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1, ease: "easeOut" }}
+                >
+                  <ResultSkeleton />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <motion.div
+              animate={{ opacity: loading && data.time === 0 ? 0 : (loading ? 0.45 : 1) }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              style={{ pointerEvents: loading ? "none" : undefined }}
+            >
 
           {result && (
             <div
@@ -6676,9 +6676,8 @@ export default function LookupPage({
             </>
           )}
 
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </motion.div>
+          </div>
         </main>
       </ScrollArea>
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
