@@ -1,5 +1,6 @@
 import React from "react";
 import Head from "next/head";
+import * as BatchRunner from "@/lib/batch-runner";
 import { AdminLayout } from "@/components/admin-layout";
 import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
@@ -241,12 +242,7 @@ const G_TLDS: { tld: string; source_url?: string }[] = [
   { tld: "talk" }, { tld: "you" },
 ];
 
-type BatchStatus = "idle" | "running" | "done";
-type BatchItem = {
-  tld: string;
-  status: "pending" | "ok" | "error" | "skipped";
-  msg?: string;
-};
+// BatchStatus + BatchItem types live in @/lib/batch-runner
 
 type Tab = "cc" | "gtld" | "compare";
 
@@ -281,12 +277,10 @@ export default function AdminTldRulesPage() {
   const [selectedModel, setSelectedModel] = React.useState<string>(""); // "" = auto (priority order)
   const [batchModel, setBatchModel] = React.useState<string>("");
 
-  // Batch state
-  const [batchStatus, setBatchStatus] = React.useState<BatchStatus>("idle");
-  const [batchItems, setBatchItems] = React.useState<BatchItem[]>([]);
-  const [batchIdx, setBatchIdx] = React.useState(0);
-  const [batchList, setBatchList] = React.useState<{ tld: string; source_url?: string }[]>([]);
-  const batchAbortRef = React.useRef(false);
+  // ── Batch: React re-renders whenever the singleton notifies ──────────────
+  const [, _batchTick] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => BatchRunner.subscribe(_batchTick), []);
+  const batch = BatchRunner.getState();
 
   // IANA gTLD list (dynamically fetched, 1000+)
   const [ianaGtlds, setIanaGtlds] = React.useState<{ tld: string }[]>([]);
@@ -359,26 +353,13 @@ export default function AdminTldRulesPage() {
       .finally(() => setIanaLoading(false));
   }, [tab]);
 
-  // ── Auto-populate batchItems from DB on load / tab change ───────────────
-  // Shows every TLD's current DB status in the grid immediately on page load —
-  // no need to click "Start" to see progress.  Re-syncs after batch completes.
+  // ── Sync DB state → batch grid on load / tab change ─────────────────────
+  // The singleton guards itself: if a batch is running, initFromDb is a no-op.
   React.useEffect(() => {
-    if (batchStatus === "running") return; // Don't overwrite an active batch
     const list = tab === "cc" ? CC_TLDS : (ianaGtlds.length > 0 ? ianaGtlds : G_TLDS);
-    if (list.length === 0 || rules.length === 0) return;
-    const items: BatchItem[] = list.map(t => {
-      const rule = rules.find(r => r.tld === t.tld);
-      if (rule?.manually_edited)          return { tld: t.tld, status: "skipped" as const, msg: "手动修改" };
-      if (rule?.scrape_status === "ok")   return { tld: t.tld, status: "ok"      as const, msg: rule.scraped_at?.slice(0, 10) ?? "" };
-      if (rule?.scrape_status === "failed"       ||
-          rule?.scrape_status === "no_data")      return { tld: t.tld, status: "error"   as const, msg: rule.failure_reason ?? rule.scrape_status };
-      if (rule?.scrape_status === "warn_defaults")return { tld: t.tld, status: "error"   as const, msg: "仅默认值" };
-      return { tld: t.tld, status: "pending" as const };
-    });
-    setBatchItems(items);
-    setBatchList(list);
+    BatchRunner.initFromDb(list, rules);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rules, tab, ianaGtlds, batchStatus]);
+  }, [rules, tab, ianaGtlds]);
 
   // Export helpers
   function exportAs(format: "json" | "csv") {
@@ -526,109 +507,7 @@ export default function AdminTldRulesPage() {
     }
   }
 
-  function startBatch(list: typeof batchList) {
-    // Build full item list: mark done ones (ok/manually-edited) immediately as "skipped"
-    const items: BatchItem[] = list.map(t => {
-      const rule = rules.find(r => r.tld === t.tld);
-      if (rule?.manually_edited) {
-        return { tld: t.tld, status: "skipped" as const, msg: "手动修改，已跳过" };
-      }
-      if (isTldDone(t.tld)) {
-        const dateStr = rule?.scraped_at ? new Date(rule.scraped_at).toISOString().slice(0, 10) : "—";
-        return { tld: t.tld, status: "skipped" as const, msg: `已成功抓取 (${dateStr})` };
-      }
-      return { tld: t.tld, status: "pending" as const };
-    });
-    const pending = items.filter(i => i.status === "pending");
-    if (pending.length === 0) {
-      toast.info(`所有 ${list.length} 个 TLD 已成功抓取，无需重新抓取`);
-      return;
-    }
-    toast.info(`跳过 ${items.length - pending.length} 个已成功 TLD，准备抓取/重试 ${pending.length} 个`);
-    batchAbortRef.current = false;
-    setBatchList(list);
-    setBatchItems(items);
-    // Start from first pending item
-    const firstPending = items.findIndex(i => i.status === "pending");
-    setBatchIdx(firstPending);
-    setBatchStatus("running");
-  }
-
-  function stopBatch() {
-    batchAbortRef.current = true;
-    setBatchStatus("done");
-    toast.info("已停止批量抓取");
-  }
-
-  React.useEffect(() => {
-    if (batchStatus !== "running") return;
-    // `cancelled` prevents React 18 strict-mode double-invocation from firing
-    // two simultaneous API calls for the same TLD.
-    let cancelled = false;
-
-    // Find next pending item starting from batchIdx
-    const nextPending = batchItems.findIndex((it, i) => i >= batchIdx && it.status === "pending");
-    if (nextPending === -1) {
-      setBatchStatus("done");
-      const doneCount = batchItems.filter(i => i.status === "ok").length;
-      const skipCount = batchItems.filter(i => i.status === "skipped").length;
-      toast.success(`批量抓取完成：成功 ${doneCount} 个，跳过 ${skipCount} 个`);
-      load();
-      return () => { cancelled = true; };
-    }
-    if (batchAbortRef.current) return;
-    if (nextPending !== batchIdx) {
-      setBatchIdx(nextPending);
-      return () => { cancelled = true; };
-    }
-
-    const item = batchItems[batchIdx];
-    const meta = batchList.find(t => t.tld === item.tld);
-
-    (async () => {
-      try {
-        const res = await fetch("/api/admin/tld-rules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tld: item.tld, source_url: meta?.source_url, model: batchModel || undefined }),
-        });
-        if (cancelled) return;
-        const data = await res.json();
-        if (!res.ok) {
-          setBatchItems(prev => prev.map((it, i) =>
-            i === batchIdx ? { ...it, status: res.status === 429 ? "skipped" : "error", msg: data.error } : it
-          ));
-        } else if (data.skipped) {
-          const skipMsg = data.reason === "manually_edited"
-            ? "手动修改，已保护"
-            : data.reason === "already_ok"
-            ? `已成功抓取 (${data.scraped_at?.slice(0,10) ?? "—"})`
-            : `已跳过`;
-          setBatchItems(prev => prev.map((it, i) =>
-            i === batchIdx ? { ...it, status: "skipped", msg: skipMsg } : it
-          ));
-        } else {
-          setBatchItems(prev => prev.map((it, i) =>
-            i === batchIdx ? { ...it, status: "ok", msg: `${data.total_release_days}d` } : it
-          ));
-        }
-      } catch (err: any) {
-        if (cancelled) return;
-        setBatchItems(prev => prev.map((it, i) =>
-          i === batchIdx ? { ...it, status: "error", msg: err.message } : it
-        ));
-      } finally {
-        if (!cancelled && !batchAbortRef.current) {
-          // Brief pause: short for skipped items, a bit longer after a real fetch
-          await new Promise(r => setTimeout(r, 800));
-          if (!cancelled) setBatchIdx(i => i + 1);
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batchStatus, batchIdx]);
+  // startBatch / stopBatch / runLoop → now in BatchRunner singleton
 
   const filtered = React.useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -649,82 +528,44 @@ export default function AdminTldRulesPage() {
     return rows;
   }, [compareData, showOnlyConflicts, showOnlyScraped, compareSearch]);
 
-  // Is this record using all-default values (likely means no real data found)?
-  function isDefaultValues(r: TldRule) {
-    return r.grace_period_days === 30 && r.redemption_period_days === 30 && r.pending_delete_days === 5;
-  }
-
-  function confidenceBadge(r: TldRule) {
-    const c = r.confidence;
-    let badge: React.ReactNode;
-    if (c === "high") badge = <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">官方</span>;
-    else if (c === "ai") badge = <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">AI</span>;
-    else badge = <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">估算</span>;
-    const parts = [
-      `置信度: ${c}`,
-      r.model_used ? `模型: ${r.model_used}` : "",
-      r.fetch_strategy ? `策略: ${r.fetch_strategy}` : "",
+  /**
+   * Unified status badge — ONE clear label per TLD row.
+   * Replaces the confusing combination of sourceBadge + confidenceBadge.
+   *
+   * Priority order (most specific → least specific):
+   *   手动录入 > 官方数据 > AI确认 > 估算值 > 仅默认值 > 抓取失败 > 无数据 > 待抓取
+   */
+  function statusBadge(r: TldRule) {
+    const tooltip = [
+      r.model_used    ? `模型: ${r.model_used}`        : "",
+      r.fetch_strategy? `策略: ${r.fetch_strategy}`    : "",
       r.scrape_attempts > 1 ? `尝试 ${r.scrape_attempts} 次` : "",
+      r.scraped_at    ? `抓取: ${r.scraped_at.slice(0, 10)}` : "",
     ].filter(Boolean).join(" · ");
-    return <span title={parts}>{badge}</span>;
-  }
 
-  function qualityBadge(r: TldRule) {
-    if (r.manually_edited) return null; // manually edited is always trustworthy
-    if (!r.scraped_at) return null;
-    if (isDefaultValues(r) && r.confidence !== "high") {
-      return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium"
-          title={r.ai_reasoning ?? "AI 未找到具体政策数据，使用行业默认值"}>
-          <RiErrorWarningLine className="w-2.5 h-2.5" />默认值
-        </span>
-      );
-    }
-    return null;
-  }
+    if (r.manually_edited)
+      return <span title="管理员手动录入，已锁定保护" className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium"><RiLockLine className="w-2.5 h-2.5" />手动录入</span>;
 
-  function sourceBadge(r: TldRule) {
-    if (r.manually_edited) {
-      return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
-          <RiUserLine className="w-2.5 h-2.5" />手动修改
-        </span>
-      );
-    }
-    if (r.scrape_status === "failed") {
-      return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium"
-          title={r.failure_reason ?? "抓取失败"}>
-          <RiErrorWarningLine className="w-2.5 h-2.5" />失败
-        </span>
-      );
-    }
-    if (r.scrape_status === "warn_defaults") {
-      return (
-        <div className="flex flex-wrap gap-0.5">
-          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium"
-            title={r.ai_reasoning ?? "仅获得行业默认值，未找到注册局具体政策"}>
-            <RiErrorWarningLine className="w-2.5 h-2.5" />仅默认值
-          </span>
-        </div>
-      );
-    }
     if (r.scrape_status === "ok") {
-      return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium"
-          title={`${r.fetch_strategy ?? "ai"} · ${r.model_used ?? ""}`}>
-          <RiCheckboxCircleLine className="w-2.5 h-2.5" />已确认
-        </span>
-      );
+      if (r.confidence === "high")
+        return <span title={`官方数据（置信度最高）· ${tooltip}`} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium"><RiCheckboxCircleLine className="w-2.5 h-2.5" />官方数据</span>;
+      if (r.confidence === "ai")
+        return <span title={`AI 解析确认· ${tooltip}`} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 font-medium"><RiRobot2Line className="w-2.5 h-2.5" />AI确认</span>;
+      // confidence === "est": AI scraped but data is estimated
+      return <span title={`AI估算值，非注册局官方政策· ${tooltip}`} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium"><RiBarChartLine className="w-2.5 h-2.5" />估算值</span>;
     }
-    if (r.scraped_at) {
-      return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
-          <RiRobot2Line className="w-2.5 h-2.5" />已爬取
-        </span>
-      );
-    }
-    return null;
+
+    if (r.scrape_status === "warn_defaults")
+      return <span title={r.ai_reasoning ?? "AI未找到注册局具体政策，使用行业默认值 30/30/5d"} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium"><RiErrorWarningLine className="w-2.5 h-2.5" />仅默认值</span>;
+
+    if (r.scrape_status === "failed")
+      return <span title={r.failure_reason ?? "抓取失败"} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium"><RiErrorWarningLine className="w-2.5 h-2.5" />抓取失败</span>;
+
+    if (r.scrape_status === "no_data")
+      return <span title={r.failure_reason ?? "已穷尽重试，无有效数据"} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 font-medium"><RiErrorWarningLine className="w-2.5 h-2.5" />无数据</span>;
+
+    // pending / unknown
+    return <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium"><RiTimeLine className="w-2.5 h-2.5" />待抓取</span>;
   }
 
   function formatDropTime(r: TldRule | CompareRow, prefix: "db_" | "" = "") {
@@ -735,17 +576,19 @@ export default function AdminTldRulesPage() {
     return `${String(h).padStart(2,"0")}:${String(m??0).padStart(2,"0")} ${tz ?? "UTC"}`;
   }
 
-  const batchDone = batchItems.filter(i => i.status === "ok").length;
-  const batchErr  = batchItems.filter(i => i.status === "error").length;
-  const batchSkip = batchItems.filter(i => i.status === "skipped").length;
-  const batchPending = batchItems.filter(i => i.status === "pending").length;
-  // Progress % counts processed items (ok + error + skipped); pending = not yet reached
-  const batchPct = batchItems.length
-    ? Math.round(((batchDone + batchErr + batchSkip) / batchItems.length) * 100) : 0;
+  // ── Batch summary helpers (derived from singleton state) ─────────────────
+  const batchDone    = batch.items.filter(i => i.status === "ok").length;
+  const batchErr     = batch.items.filter(i => i.status === "error").length;
+  const batchSkip    = batch.items.filter(i => i.status === "skipped").length;
+  const batchPending = batch.items.filter(i => i.status === "pending").length;
+  // Progress % = processed items (ok + error + skipped) out of total
+  const batchPct = batch.items.length
+    ? Math.round(((batchDone + batchErr + batchSkip) / batch.items.length) * 100)
+    : 0;
 
-  function BatchPanel({ list, label }: { list: typeof batchList; label: string }) {
-    const isActive = batchStatus === "running";
-    const isDone   = batchStatus === "done";
+  function BatchPanel({ list, label }: { list: { tld: string; source_url?: string }[]; label: string }) {
+    const isActive = batch.status === "running";
+    const isDone   = batch.status === "done";
 
     return (
       <div className="border rounded-xl p-5 space-y-4 bg-card">
@@ -772,12 +615,23 @@ export default function AdminTldRulesPage() {
               </select>
             )}
             {isActive ? (
-              <Button variant="outline" size="sm" onClick={stopBatch}
+              <Button variant="outline" size="sm"
+                onClick={() => { BatchRunner.stop(); toast.info("已停止批量抓取"); }}
                 className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/30">
                 <RiStopCircleLine className="w-4 h-4" />停止
               </Button>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => startBatch(list)} className="gap-1.5">
+              <Button variant="outline" size="sm"
+                onClick={() => {
+                  const pending = list.filter(t => {
+                    const r = rules.find(x => x.tld === t.tld);
+                    return !r?.manually_edited && r?.scrape_status !== "ok";
+                  });
+                  if (pending.length === 0) { toast.info(`所有 ${list.length} 个 TLD 已成功抓取`); return; }
+                  toast.info(`跳过 ${list.length - pending.length} 个已成功 TLD，准备抓取 ${pending.length} 个`);
+                  BatchRunner.start(list, rules, batchModel || undefined);
+                }}
+                className="gap-1.5">
                 <RiPlayCircleLine className="w-4 h-4" />
                 {isDone ? "重新批量" : "开始批量抓取"}
               </Button>
@@ -785,13 +639,13 @@ export default function AdminTldRulesPage() {
           </div>
         </div>
 
-        {/* ── Progress bar (only shown while running or after run) ── */}
-        {(isActive || isDone) && batchItems.length > 0 && (
+        {/* ── Progress bar (running or done) ── */}
+        {(isActive || isDone) && batch.items.length > 0 && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>
                 {isActive
-                  ? `正在处理 .${batchItems[batchIdx]?.tld ?? "…"} (${batchIdx + 1} / ${batchItems.length})`
+                  ? `正在处理 .${batch.items[batch.idx]?.tld ?? "…"} (${batch.idx + 1} / ${batch.items.length})`
                   : `本次完成 ${batchDone} · 失败 ${batchErr} · 跳过 ${batchSkip}`}
               </span>
               <span>{batchPct}%</span>
@@ -803,7 +657,7 @@ export default function AdminTldRulesPage() {
         )}
 
         {/* ── DB-status summary row (idle only) ── */}
-        {!isActive && !isDone && batchItems.length > 0 && (
+        {!isActive && !isDone && batch.items.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />已确认 <strong className="text-foreground">{batchDone}</strong>
@@ -822,18 +676,18 @@ export default function AdminTldRulesPage() {
           </div>
         )}
 
-        {/* ── TLD grid — always visible, auto-populated from DB on load ── */}
-        {batchItems.length > 0 ? (
+        {/* ── TLD grid — always visible, populated from DB on load ── */}
+        {batch.items.length > 0 ? (
           <div className="max-h-64 overflow-y-auto grid grid-cols-3 sm:grid-cols-6 gap-1">
-            {batchItems.map((it, i) => {
-              const isCurrent = isActive && i === batchIdx && it.status === "pending";
+            {batch.items.map((it, i) => {
+              const isCurrent = isActive && i === batch.idx && it.status === "pending";
               return (
                 <div key={it.tld} title={it.msg ?? it.tld} className={cn(
                   "text-xs px-2 py-1 rounded flex items-center gap-1 truncate",
                   it.status === "ok"      && "bg-green-100  text-green-700  dark:bg-green-900/30  dark:text-green-400",
                   it.status === "error"   && "bg-red-100    text-red-700    dark:bg-red-900/30    dark:text-red-400",
                   it.status === "skipped" && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-500",
-                  isCurrent              && "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+                  isCurrent               && "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
                   it.status === "pending" && !isCurrent && "bg-muted text-muted-foreground",
                 )}>
                   {isCurrent
@@ -959,7 +813,7 @@ export default function AdminTldRulesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-sm">.{r.tld}</span>
-                        {sourceBadge(r)}
+                        {statusBadge(r)}
                         {r.scrape_attempts > 0 && (
                           <span className="text-[10px] text-muted-foreground">尝试 {r.scrape_attempts} 次</span>
                         )}
@@ -1437,7 +1291,6 @@ export default function AdminTldRulesPage() {
                     <th className="text-left px-3 py-2.5 font-medium">掉落时间</th>
                     <th className="text-right px-3 py-2.5 font-medium">提前删</th>
                     <th className="text-left px-3 py-2.5 font-medium">来源</th>
-                    <th className="text-left px-3 py-2.5 font-medium">置信</th>
                     <th className="text-left px-3 py-2.5 font-medium">更新</th>
                     <th className="px-3 py-2.5" />
                   </tr>
@@ -1458,7 +1311,7 @@ export default function AdminTldRulesPage() {
                           <td className="px-4 py-2.5">
                             <div className="flex flex-col gap-0.5">
                               <span className="font-mono font-medium">.{r.tld}</span>
-                              {sourceBadge(r)}
+                              {statusBadge(r)}
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-right">{r.grace_period_days}d</td>
@@ -1484,7 +1337,6 @@ export default function AdminTldRulesPage() {
                               </a>
                             ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
-                          <td className="px-3 py-2.5">{confidenceBadge(r)}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">
                             {r.updated_at ? new Date(r.updated_at).toLocaleDateString("zh-CN") : "—"}
                           </td>
