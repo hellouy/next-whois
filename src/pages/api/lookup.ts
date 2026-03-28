@@ -116,14 +116,14 @@ export default async function handler(
   const nocache = req.query.nocache === "1";
   const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl } =
     await lookupWhoisWithCache(trimmed, { nocache });
+
+  // Record EVERY query attempt — successful or failed, logged-in or anonymous.
+  // Use the actual result when available; fall back to initialWhoisAnalyzeResult
+  // so even failed/errored lookups appear in admin stats.
+  saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail).catch(() => {});
+
   if (!status) {
     return res.status(500).json({ time, status, error, dnsProbe, registryUrl });
-  }
-
-  // Always save the search record — including cached results — so every query
-  // (anonymous or logged-in, first-time or repeat) is recorded in the backend.
-  if (result) {
-    saveSearchRecord(trimmed, result, dnsProbe, userId, userEmail).catch(() => {});
   }
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
