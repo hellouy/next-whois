@@ -4163,8 +4163,13 @@ export default function LookupPage({
     const silentRefresh = isFirstLoad && initialData != null && refreshKey === 0;
 
     if (!silentRefresh) {
-      setData(_EMPTY_WHOIS_RESULT);
       setLoading(true);
+      // Do NOT reset data to _EMPTY_WHOIS_RESULT here.
+      // Keeping the previous result visible prevents the layout from
+      // collapsing then re-expanding (the "jump") while the new lookup loads.
+      // On the very first load data is already _EMPTY_WHOIS_RESULT (initial
+      // useState), so the skeleton still shows correctly when there is nothing
+      // to display yet.
     }
 
     let cancelled = false;
@@ -4667,7 +4672,11 @@ export default function LookupPage({
           </div>
 
           <AnimatePresence mode="popLayout" initial={false}>
-            {loading ? (
+            {/* Show skeleton ONLY on the very first load when there is no
+                previous data yet (data.time === 0).  For subsequent searches
+                we keep the previous result visible (dimmed) so the layout
+                never collapses/re-expands — the visible "jump". */}
+            {loading && data.time === 0 ? (
               <motion.div
                 key="skeleton"
                 initial={{ opacity: 0 }}
@@ -4681,8 +4690,9 @@ export default function LookupPage({
               <motion.div
                 key="result"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: loading ? 0.45 : 1 }}
                 transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                style={{ pointerEvents: loading ? "none" : undefined }}
               >
 
           {result && (
