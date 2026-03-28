@@ -359,6 +359,27 @@ export default function AdminTldRulesPage() {
       .finally(() => setIanaLoading(false));
   }, [tab]);
 
+  // ── Auto-populate batchItems from DB on load / tab change ───────────────
+  // Shows every TLD's current DB status in the grid immediately on page load —
+  // no need to click "Start" to see progress.  Re-syncs after batch completes.
+  React.useEffect(() => {
+    if (batchStatus === "running") return; // Don't overwrite an active batch
+    const list = tab === "cc" ? CC_TLDS : (ianaGtlds.length > 0 ? ianaGtlds : G_TLDS);
+    if (list.length === 0 || rules.length === 0) return;
+    const items: BatchItem[] = list.map(t => {
+      const rule = rules.find(r => r.tld === t.tld);
+      if (rule?.manually_edited)          return { tld: t.tld, status: "skipped" as const, msg: "手动修改" };
+      if (rule?.scrape_status === "ok")   return { tld: t.tld, status: "ok"      as const, msg: rule.scraped_at?.slice(0, 10) ?? "" };
+      if (rule?.scrape_status === "failed"       ||
+          rule?.scrape_status === "no_data")      return { tld: t.tld, status: "error"   as const, msg: rule.failure_reason ?? rule.scrape_status };
+      if (rule?.scrape_status === "warn_defaults")return { tld: t.tld, status: "error"   as const, msg: "仅默认值" };
+      return { tld: t.tld, status: "pending" as const };
+    });
+    setBatchItems(items);
+    setBatchList(list);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rules, tab, ianaGtlds, batchStatus]);
+
   // Export helpers
   function exportAs(format: "json" | "csv") {
     const link = document.createElement("a");
@@ -541,6 +562,10 @@ export default function AdminTldRulesPage() {
 
   React.useEffect(() => {
     if (batchStatus !== "running") return;
+    // `cancelled` prevents React 18 strict-mode double-invocation from firing
+    // two simultaneous API calls for the same TLD.
+    let cancelled = false;
+
     // Find next pending item starting from batchIdx
     const nextPending = batchItems.findIndex((it, i) => i >= batchIdx && it.status === "pending");
     if (nextPending === -1) {
@@ -549,10 +574,13 @@ export default function AdminTldRulesPage() {
       const skipCount = batchItems.filter(i => i.status === "skipped").length;
       toast.success(`批量抓取完成：成功 ${doneCount} 个，跳过 ${skipCount} 个`);
       load();
-      return;
+      return () => { cancelled = true; };
     }
     if (batchAbortRef.current) return;
-    if (nextPending !== batchIdx) { setBatchIdx(nextPending); return; }
+    if (nextPending !== batchIdx) {
+      setBatchIdx(nextPending);
+      return () => { cancelled = true; };
+    }
 
     const item = batchItems[batchIdx];
     const meta = batchList.find(t => t.tld === item.tld);
@@ -564,6 +592,7 @@ export default function AdminTldRulesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tld: item.tld, source_url: meta?.source_url, model: batchModel || undefined }),
         });
+        if (cancelled) return;
         const data = await res.json();
         if (!res.ok) {
           setBatchItems(prev => prev.map((it, i) =>
@@ -584,16 +613,20 @@ export default function AdminTldRulesPage() {
           ));
         }
       } catch (err: any) {
+        if (cancelled) return;
         setBatchItems(prev => prev.map((it, i) =>
           i === batchIdx ? { ...it, status: "error", msg: err.message } : it
         ));
       } finally {
-        if (!batchAbortRef.current) {
-          await new Promise(r => setTimeout(r, 1200));
-          setBatchIdx(i => i + 1);
+        if (!cancelled && !batchAbortRef.current) {
+          // Brief pause: short for skipped items, a bit longer after a real fetch
+          await new Promise(r => setTimeout(r, 800));
+          if (!cancelled) setBatchIdx(i => i + 1);
         }
       }
     })();
+
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchStatus, batchIdx]);
 
@@ -703,88 +736,119 @@ export default function AdminTldRulesPage() {
   }
 
   const batchDone = batchItems.filter(i => i.status === "ok").length;
-  const batchErr = batchItems.filter(i => i.status === "error").length;
+  const batchErr  = batchItems.filter(i => i.status === "error").length;
   const batchSkip = batchItems.filter(i => i.status === "skipped").length;
+  const batchPending = batchItems.filter(i => i.status === "pending").length;
+  // Progress % counts processed items (ok + error + skipped); pending = not yet reached
   const batchPct = batchItems.length
     ? Math.round(((batchDone + batchErr + batchSkip) / batchItems.length) * 100) : 0;
 
   function BatchPanel({ list, label }: { list: typeof batchList; label: string }) {
+    const isActive = batchStatus === "running";
+    const isDone   = batchStatus === "done";
+
     return (
       <div className="border rounded-xl p-5 space-y-4 bg-card">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium flex items-center gap-2">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="font-medium flex items-center gap-2 flex-wrap">
             <RiPlayCircleLine className="w-4 h-4 text-violet-500" />
             {label}
             <span className="text-xs text-muted-foreground font-normal">
-              — {list.length} 个 · 已成功(ok)的自动跳过，失败/默认值记录自动重试，无时效限制
+              — 已成功(ok)的自动跳过，失败/默认值记录自动重试，关闭页面即停止
             </span>
           </h2>
           <div className="flex items-center gap-2 flex-wrap">
-            {aiModels.filter(m => m.configured).length > 0 && batchStatus !== "running" && (
+            {aiModels.filter(m => m.configured).length > 0 && !isActive && (
               <select
                 value={batchModel}
                 onChange={e => setBatchModel(e.target.value)}
                 className="h-7 rounded border text-xs px-2 bg-background"
               >
-                <option value="">AI 自动选择</option>
+                <option value="">AI 自动选择（按优先级）</option>
                 {aiModels.filter(m => m.configured).map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
             )}
-            {batchStatus === "running" ? (
-              <Button variant="outline" size="sm" onClick={stopBatch} className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50">
+            {isActive ? (
+              <Button variant="outline" size="sm" onClick={stopBatch}
+                className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/30">
                 <RiStopCircleLine className="w-4 h-4" />停止
               </Button>
             ) : (
               <Button variant="outline" size="sm" onClick={() => startBatch(list)} className="gap-1.5">
                 <RiPlayCircleLine className="w-4 h-4" />
-                {batchStatus === "done" ? "重新批量" : "开始批量抓取"}
+                {isDone ? "重新批量" : "开始批量抓取"}
               </Button>
             )}
           </div>
         </div>
 
-        {batchItems.length > 0 && (
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {batchStatus === "running"
-                    ? `正在处理 .${batchItems[batchIdx]?.tld ?? "…"} (${batchIdx + 1}/${batchItems.length})`
-                    : `完成 ${batchDone}  失败 ${batchErr}  跳过 ${batchSkip}`}
-                </span>
-                <span>{batchPct}%</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${batchPct}%` }} />
-              </div>
+        {/* ── Progress bar (only shown while running or after run) ── */}
+        {(isActive || isDone) && batchItems.length > 0 && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>
+                {isActive
+                  ? `正在处理 .${batchItems[batchIdx]?.tld ?? "…"} (${batchIdx + 1} / ${batchItems.length})`
+                  : `本次完成 ${batchDone} · 失败 ${batchErr} · 跳过 ${batchSkip}`}
+              </span>
+              <span>{batchPct}%</span>
             </div>
-            <div className="max-h-48 overflow-y-auto grid grid-cols-3 sm:grid-cols-6 gap-1">
-              {batchItems.map((it, i) => (
-                <div key={it.tld} title={it.msg} className={cn(
-                  "text-xs px-2 py-1 rounded flex items-center gap-1",
-                  it.status === "ok" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                  it.status === "error" && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                  it.status === "skipped" && "bg-yellow-100 text-yellow-700",
-                  it.status === "pending" && i === batchIdx && batchStatus === "running" && "bg-violet-100 text-violet-700 dark:bg-violet-900/30",
-                  it.status === "pending" && i !== batchIdx && "bg-muted text-muted-foreground",
-                )}>
-                  {it.status === "pending" && i === batchIdx && batchStatus === "running"
-                    ? <RiLoader4Line className="w-3 h-3 animate-spin shrink-0" />
-                    : it.status === "ok" ? <RiCheckboxCircleLine className="w-3 h-3 shrink-0" />
-                    : it.status === "error" ? <RiErrorWarningLine className="w-3 h-3 shrink-0" />
-                    : null}
-                  .{it.tld}
-                </div>
-              ))}
+            <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${batchPct}%` }} />
             </div>
           </div>
         )}
 
-        {batchItems.length === 0 && (
+        {/* ── DB-status summary row (idle only) ── */}
+        {!isActive && !isDone && batchItems.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />已确认 <strong className="text-foreground">{batchDone}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />失败/默认 <strong className="text-foreground">{batchErr}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />待抓取 <strong className="text-foreground">{batchPending}</strong>
+            </span>
+            {batchSkip > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />手动保护 <strong className="text-foreground">{batchSkip}</strong>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── TLD grid — always visible, auto-populated from DB on load ── */}
+        {batchItems.length > 0 ? (
+          <div className="max-h-64 overflow-y-auto grid grid-cols-3 sm:grid-cols-6 gap-1">
+            {batchItems.map((it, i) => {
+              const isCurrent = isActive && i === batchIdx && it.status === "pending";
+              return (
+                <div key={it.tld} title={it.msg ?? it.tld} className={cn(
+                  "text-xs px-2 py-1 rounded flex items-center gap-1 truncate",
+                  it.status === "ok"      && "bg-green-100  text-green-700  dark:bg-green-900/30  dark:text-green-400",
+                  it.status === "error"   && "bg-red-100    text-red-700    dark:bg-red-900/30    dark:text-red-400",
+                  it.status === "skipped" && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-500",
+                  isCurrent              && "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+                  it.status === "pending" && !isCurrent && "bg-muted text-muted-foreground",
+                )}>
+                  {isCurrent
+                    ? <RiLoader4Line className="w-3 h-3 animate-spin shrink-0" />
+                    : it.status === "ok"    ? <RiCheckboxCircleLine className="w-3 h-3 shrink-0" />
+                    : it.status === "error" ? <RiErrorWarningLine   className="w-3 h-3 shrink-0" />
+                    : null}
+                  .{it.tld}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <p className="text-xs text-muted-foreground">
-            点击"开始批量抓取"——已成功确认(scrape_status=ok)的记录直接跳过，失败/仅默认值/未抓取的记录都会重新尝试。每条间隔 1.2 秒，无时效限制。每次成功抓取同时写入数据库和本地 JSON 文件备份。
+            数据库状态加载中…已确认(ok)的 TLD 将自动跳过，失败/默认值的记录自动重试，每次成功抓取实时写入数据库。
           </p>
         )}
       </div>
