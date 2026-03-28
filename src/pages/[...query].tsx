@@ -128,7 +128,7 @@ const FeedbackDrawer = dynamic(
 );
 
 const CARD_CONTAINER_VARIANTS = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     transition: { staggerChildren: 0.06, delayChildren: 0 },
@@ -4674,24 +4674,27 @@ export default function LookupPage({
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
 
-          <AnimatePresence initial={false}>
-            {loading && (
+          <AnimatePresence mode="wait" initial={false}>
+            {loading ? (
               <motion.div
                 key="skeleton"
-                initial={{ opacity: 1 }}
+                initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <ResultSkeleton />
               </motion.div>
-            )}
-          </AnimatePresence>
+            ) : (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
 
-          {!loading && result && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
+          {result && (
+            <div
               className="flex items-center flex-wrap gap-2 mb-4 sm:mb-6"
             >
               {result.registerPrice &&
@@ -4741,16 +4744,13 @@ export default function LookupPage({
                 </div>
               )}
               <div className="flex-grow" />
-            </motion.div>
+            </div>
           )}
 
-          {!loading && !status && (() => {
+          {!status && (() => {
             const hasErrorRaw = !!(result && (result.rawWhoisContent || result.rawRdapContent));
             return (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
+            <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
             >
               <div className={cn(hasErrorRaw ? "lg:col-span-8" : "lg:col-span-12", "space-y-6")}>
@@ -4892,7 +4892,7 @@ export default function LookupPage({
                 )}
 
                 {/* External search engine links — controlled by admin toggle */}
-                {!loading && queryType === "domain" && enableSearchLinks && (
+                {queryType === "domain" && enableSearchLinks && (
                   <div className="glass-panel border border-border rounded-xl p-5">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
                       <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -5063,11 +5063,11 @@ export default function LookupPage({
                   />
                 </div>
               )}
-            </motion.div>
+            </div>
             );
           })()}
 
-          {!loading && status && result && (
+          {status && result && (
             <>
               <motion.div
                 variants={CARD_CONTAINER_VARIANTS}
@@ -6675,6 +6675,10 @@ export default function LookupPage({
               </motion.div>
             </>
           )}
+
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </ScrollArea>
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
