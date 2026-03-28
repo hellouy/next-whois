@@ -966,6 +966,8 @@
     "register_strength_strong": "Сильный",
     "register_strength_very_strong": "Очень сильный",
     "register_captcha_label": "Проверка captcha",
+    "register_captcha_hint": "Пройдите проверку captcha выше перед отправкой кода",
+    "register_captcha_verified": "Проверено",
     "register_terms": "Регистрируясь, вы соглашаетесь с нашими ",
     "register_terms_link": "Условиями использования и Политикой конфиденциальности",
     "register_submit": "Создать аккаунт",

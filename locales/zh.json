@@ -966,6 +966,8 @@
     "register_strength_strong": "强",
     "register_strength_very_strong": "很强",
     "register_captcha_label": "人机验证",
+    "register_captcha_hint": "请先完成上方人机验证，再点击发送验证码",
+    "register_captcha_verified": "验证通过",
     "register_terms": "注册即表示你同意我们的",
     "register_terms_link": "服务条款和隐私政策",
     "register_submit": "创建账户",

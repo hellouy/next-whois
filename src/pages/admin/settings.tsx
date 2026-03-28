@@ -1061,10 +1061,14 @@ export default function AdminSettingsPage() {
                         <option value="">不启用（关闭人机验证）</option>
                         <option value="turnstile">Cloudflare Turnstile（免费、无感知，推荐）</option>
                         <option value="hcaptcha">hCaptcha（注重隐私）</option>
+                        <option value="mtcaptcha">MTCaptcha（企业级、合规性强）</option>
                       </select>
                       <p className="text-[11px] text-muted-foreground">
-                        推荐使用 Cloudflare Turnstile，免费且对用户无感知，注册 →{" "}
-                        <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cloudflare Dashboard</a>
+                        {form.captcha_provider === "mtcaptcha" ? (
+                          <>MTCaptcha 注册 → <a href="https://www.mtcaptcha.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">mtcaptcha.com</a></>
+                        ) : (
+                          <>推荐使用 Cloudflare Turnstile，免费且对用户无感知，注册 → <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cloudflare Dashboard</a></>
+                        )}
                       </p>
                     </div>
 
@@ -1099,7 +1103,7 @@ export default function AdminSettingsPage() {
                       <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-700/30">
                         <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">使用提醒</p>
                         <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
-                          同时填写 Site Key 和 Secret Key 才会启用验证。注册页将在"发送验证码"之后显示 CAPTCHA 组件，通过后方可提交注册。
+                          同时填写 Site Key 和 Secret Key 才会启用验证。注册页将在邮件输入框下方显示 CAPTCHA 组件，用户须先通过验证，"发送验证码"按钮才会激活。
                         </p>
                       </div>
                     )}

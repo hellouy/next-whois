@@ -966,6 +966,8 @@
     "register_strength_strong": "Strong",
     "register_strength_very_strong": "Very Strong",
     "register_captcha_label": "Captcha Verification",
+    "register_captcha_hint": "Complete the verification above before sending the code",
+    "register_captcha_verified": "Verified",
     "register_terms": "By registering, you agree to our ",
     "register_terms_link": "Terms & Privacy Policy",
     "register_submit": "Create Account",

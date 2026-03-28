@@ -966,6 +966,8 @@
     "register_strength_strong": "강함",
     "register_strength_very_strong": "매우 강함",
     "register_captcha_label": "캡차 인증",
+    "register_captcha_hint": "코드를 보내기 전에 위의 캡차를 완료해 주세요",
+    "register_captcha_verified": "인증 완료",
     "register_terms": "가입함으로써 ",
     "register_terms_link": "이용약관 및 개인정보처리방침에 동의합니다",
     "register_submit": "계정 만들기",

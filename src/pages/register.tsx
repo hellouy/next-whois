@@ -72,6 +72,31 @@ export default function RegisterPage() {
   React.useEffect(() => {
     if (!captchaProvider || !captchaSiteKey) return;
     const scriptId = `captcha-script-${captchaProvider}`;
+    const w = window as unknown as Record<string, unknown>;
+
+    if (captchaProvider === "mtcaptcha") {
+      (w as any).mtcaptchaConfig = {
+        sitekey: captchaSiteKey,
+        callback: (detail: { verifyResult: string }) => setCaptchaToken(detail.verifyResult || ""),
+        "expired-callback": () => setCaptchaToken(""),
+        "error-callback": () => setCaptchaToken(""),
+      };
+      if (!document.getElementById(scriptId)) {
+        const script = document.createElement("script");
+        script.id = scriptId;
+        script.src = "https://service.mtcaptcha.com/mtcv1/client/mtcaptcha.min.js";
+        script.async = true;
+        document.head.appendChild(script);
+      } else if ((w as any).mtcaptcha) {
+        setTimeout(() => {
+          if (!captchaRef.current || captchaWidgetId.current !== null) return;
+          (w as any).mtcaptcha.renderUI(captchaRef.current);
+          captchaWidgetId.current = true;
+        }, 200);
+      }
+      return;
+    }
+
     if (!document.getElementById(scriptId)) {
       const scriptUrls: Record<string, string> = {
         turnstile: "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
@@ -90,7 +115,6 @@ export default function RegisterPage() {
     function renderCaptcha() {
       setTimeout(() => {
         if (!captchaRef.current || captchaWidgetId.current !== null) return;
-        const w = window as unknown as Record<string, unknown>;
         if (captchaProvider === "turnstile" && w.turnstile) {
           captchaWidgetId.current = (w.turnstile as {
             render: (el: HTMLElement, opts: Record<string, unknown>) => unknown;
@@ -116,7 +140,10 @@ export default function RegisterPage() {
 
   function resetCaptcha() {
     const w = window as unknown as Record<string, unknown>;
-    if (captchaProvider === "turnstile" && w.turnstile && captchaWidgetId.current !== null) {
+    if (captchaProvider === "mtcaptcha" && (w as any).mtcaptcha) {
+      (w as any).mtcaptcha.resetUI();
+      captchaWidgetId.current = null;
+    } else if (captchaProvider === "turnstile" && w.turnstile && captchaWidgetId.current !== null) {
       (w.turnstile as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
     } else if (captchaProvider === "hcaptcha" && w.hcaptcha && captchaWidgetId.current !== null) {
       (w.hcaptcha as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
@@ -127,6 +154,10 @@ export default function RegisterPage() {
   async function handleSendCode() {
     if (!email.trim()) { setError(t("auth.register_err_email_required")); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError(t("auth.register_err_email_invalid")); return; }
+    if (captchaProvider && captchaSiteKey && !captchaToken) {
+      setError(t("auth.register_err_captcha"));
+      return;
+    }
     setSendingCode(true);
     setError(null);
     try {
@@ -311,10 +342,12 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={handleSendCode}
-                    disabled={sendingCode || codeCooldown > 0 || loading}
+                    disabled={sendingCode || codeCooldown > 0 || loading || !!(captchaProvider && captchaSiteKey && !captchaToken)}
                     className={cn(
                       "shrink-0 h-10 px-3 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap",
-                      codeCooldown > 0
+                      (captchaProvider && captchaSiteKey && !captchaToken)
+                        ? "border-border text-muted-foreground/50 cursor-not-allowed opacity-60"
+                        : codeCooldown > 0
                         ? "border-border text-muted-foreground cursor-not-allowed"
                         : codeSent
                         ? "border-emerald-400/60 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
@@ -332,6 +365,29 @@ export default function RegisterPage() {
                   </button>
                 </div>
               </div>
+
+              {/* CAPTCHA widget — shown directly after email, must be completed before sending code */}
+              {captchaProvider && captchaSiteKey && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <RiShieldKeyholeLine className="w-3.5 h-3.5 text-muted-foreground/70" />
+                    <span className="text-xs font-semibold">{t("auth.register_captcha_label")}</span>
+                    {captchaToken && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 ml-auto">
+                        <RiCheckLine className="w-3 h-3" />{t("auth.register_captcha_verified")}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    ref={captchaRef}
+                    className={cn("w-full", captchaProvider === "mtcaptcha" && "mtcaptcha")}
+                    {...(captchaProvider === "mtcaptcha" ? { "data-sitekey": captchaSiteKey } : {})}
+                  />
+                  {!captchaToken && (
+                    <p className="text-[10px] text-muted-foreground px-0.5">{t("auth.register_captcha_hint")}</p>
+                  )}
+                </div>
+              )}
 
               {/* Email verification code */}
               <AnimatePresence>
@@ -490,25 +546,6 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-
-              {/* CAPTCHA widget */}
-              {captchaProvider && captchaSiteKey && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <RiShieldKeyholeLine className="w-3.5 h-3.5 text-muted-foreground/70" />
-                    <span className="text-xs font-semibold">{t("auth.register_captcha_label")}</span>
-                  </div>
-                  <div ref={captchaRef} className="w-full" />
-                  {!captchaToken && (
-                    <p className="text-[10px] text-muted-foreground px-0.5">{t("auth.register_err_captcha")}</p>
-                  )}
-                  {captchaToken && (
-                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 px-0.5 flex items-center gap-1">
-                      <RiCheckLine className="w-3 h-3" />{t("auth.register_code_sent")}
-                    </p>
-                  )}
-                </div>
-              )}
 
               {/* Error */}
               <AnimatePresence>
