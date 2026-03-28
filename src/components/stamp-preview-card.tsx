@@ -9,7 +9,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import {
   RiShieldCheckLine, RiArrowRightSLine,
-  RiAwardLine,
+  RiGlobalLine,
 } from "@remixicon/react";
 
 /* ── Theme definitions (mirror of [...query].tsx CARD_THEMES) ── */
@@ -54,8 +54,18 @@ const DEMO: Required<StampPreviewData> & { icon: React.ElementType } = {
   description: "全球 WHOIS & RDAP 域名信息查询平台，多协议数据源，实时解析全球域名注册信息。",
   link:        "https://x.rw",
   tagLabel:    "官方认证",
-  icon:        RiAwardLine,
+  icon:        RiGlobalLine,
 };
+
+/* ── Monogram avatar — replaces generic icon for a unique brand identity ── */
+function Monogram({ name, className, textClass }: { name: string; className?: string; textClass?: string }) {
+  const chars = name.replace(/[•·\s]/g, "").slice(0, 2).toUpperCase();
+  return (
+    <div className={cn("flex items-center justify-center font-black select-none", className)}>
+      <span className={textClass}>{chars}</span>
+    </div>
+  );
+}
 
 export function StampPreviewCard({
   themeKey,
@@ -72,10 +82,6 @@ export function StampPreviewCard({
   const desc     = data?.description || DEMO.description;
   const link     = data?.link       || DEMO.link;
   const tagLabel = data?.tagLabel   || DEMO.tagLabel;
-  const Icon     = data?.icon       || DEMO.icon;
-
-  const linkHost = (() => { try { return new URL(link).hostname; } catch { return link; } })();
-  const initial  = (tagName || "X")[0].toUpperCase();
 
   /* ════════════════════════════════════════
      Layout: celebrate — 中国红·节庆
@@ -104,7 +110,7 @@ export function StampPreviewCard({
       `}</style>
       <div className="rounded-2xl overflow-hidden shadow-lg bg-white">
         {/* Hero */}
-        <div className="relative pt-5 pb-10 overflow-hidden text-center"
+        <div className="relative pt-5 pb-9 overflow-hidden text-center"
           style={{background:"linear-gradient(160deg,#C8102E 0%,#7B0D1E 100%)"}}>
           {/* shimmer sweep */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -145,23 +151,20 @@ export function StampPreviewCard({
           </div>
         </div>
 
-        {/* Gold icon */}
-        <div className="flex justify-center -mt-8 relative z-10">
+        {/* Gold monogram avatar */}
+        <div className="flex justify-center -mt-7 relative z-10">
           <div className="w-[54px] h-[54px] rounded-full border-[3px] border-white flex items-center justify-center"
             style={{background:"linear-gradient(135deg,#F7C948 0%,#D4AF37 50%,#B8860B 100%)",
               animation:"cel-gold-glow 2s ease-in-out infinite"}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M4 13l6 7L20 6" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Monogram name={tagName} textClass="text-[15px] text-white/90 leading-none" />
           </div>
         </div>
 
         {/* Info */}
         <div className="px-4 pt-2 pb-4 text-center">
           <p className="text-[14.5px] font-black text-gray-900 leading-tight tracking-tight mt-1">{tagName}</p>
-          <p className="text-[7px] font-mono text-gray-400 mt-0.5 tracking-wider">{domain}</p>
-          {desc && <p className="text-[7.5px] text-gray-500 mt-2 mb-3 leading-relaxed line-clamp-2">{desc}</p>}
-          <a href={link} className="inline-flex items-center gap-1 px-5 py-2 rounded-full text-white text-[9px] font-bold"
+          {desc && <p className="text-[7.5px] text-gray-400 mt-2 mb-3 leading-relaxed line-clamp-2">{desc}</p>}
+          <a href={link} className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-white text-[8.5px] font-bold"
             style={{background:"linear-gradient(135deg,#D4AF37,#B8860B)",
               boxShadow:"0 3px 12px rgba(180,140,30,0.35)"}}>
             访问主页 <RiArrowRightSLine style={{width:10,height:10,opacity:.9}} />
@@ -204,9 +207,13 @@ export function StampPreviewCard({
           0%,100% { opacity: .4; }
           50%     { opacity: .65; }
         }
+        @keyframes neon-mono-glow {
+          0%,100% { text-shadow: 0 0 8px rgba(0,210,255,0.5); }
+          50%     { text-shadow: 0 0 20px rgba(0,210,255,0.9), 0 0 40px rgba(0,210,255,0.4); }
+        }
       `}</style>
       <div className="rounded-2xl overflow-hidden shadow-lg" style={{background:"#050d18"}}>
-        <div className="relative flex flex-col items-center pt-6 pb-5 overflow-hidden" style={{background:"#050d18"}}>
+        <div className="relative flex flex-col items-center pt-5 pb-4 overflow-hidden" style={{background:"#050d18"}}>
           {/* bg glow */}
           <div className="absolute inset-0 pointer-events-none"
             style={{background:"radial-gradient(ellipse 85% 65% at 50% 0%,rgba(0,210,255,0.14) 0%,rgba(123,47,190,0.08) 55%,transparent 80%)",
@@ -227,26 +234,25 @@ export function StampPreviewCard({
               <RiShieldCheckLine style={{width:8,height:8}} />{tagLabel}
             </span>
           </div>
-          {/* icon ring */}
-          <div className="relative z-10 w-[66px] h-[66px] rounded-full flex items-center justify-center"
+          {/* monogram ring */}
+          <div className="relative z-10 w-[60px] h-[60px] rounded-full flex items-center justify-center"
             style={{background:"rgba(0,210,255,0.05)",border:"2px solid rgba(0,210,255,0.45)",
               animation:"neon-ring 2.4s ease-in-out infinite"}}>
-            <Icon className="w-7 h-7 text-cyan-400"/>
+            <span className="font-black text-[14px] leading-none select-none"
+              style={{color:"rgba(0,210,255,0.85)",animation:"neon-mono-glow 2.4s ease-in-out infinite"}}>
+              {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
+            </span>
           </div>
-          {/* domain */}
-          <p className="relative z-10 text-[6px] font-mono tracking-[0.25em] uppercase mt-2"
-            style={{color:"rgba(0,210,255,0.3)"}}>
-            {domain}
-          </p>
         </div>
         {/* info */}
         <div className="px-4 pt-1.5 pb-4 text-center">
           <p className="text-white text-[14px] font-black leading-tight tracking-tight"
             style={{textShadow:"0 0 18px rgba(0,210,255,0.4)",
               animation:"neon-title-flicker 5s ease-in-out infinite"}}>{tagName}</p>
+          <p className="text-[6px] font-mono tracking-[0.2em] mt-0.5" style={{color:"rgba(0,210,255,0.3)"}}>{domain}</p>
           {desc && <p className="text-[7.5px] leading-relaxed mt-1.5 mb-3.5 line-clamp-2"
             style={{color:"rgba(100,130,160,0.85)"}}>{desc}</p>}
-          <a href={link} className="inline-flex items-center gap-1 px-5 py-2 rounded-full text-[9px] font-bold text-white"
+          <a href={link} className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-[8.5px] font-bold text-white"
             style={{background:"linear-gradient(135deg,#00D2FF,#7B2FBE)",
               boxShadow:"0 0 18px rgba(0,210,255,0.4)"}}>
             访问主页 <RiArrowRightSLine style={{width:10,height:10,opacity:.9}} />
@@ -267,45 +273,44 @@ export function StampPreviewCard({
           50%  { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        @keyframes grad-float {
+          0%,100% { transform: translateY(0px); }
+          50%     { transform: translateY(-3px); }
+        }
       `}</style>
       <div className="rounded-2xl overflow-hidden shadow-lg"
         style={{background:"linear-gradient(135deg,#FF6B6B,#FFD93D,#6BCB77,#4D96FF,#C77DFF,#FF6B6B)",
           backgroundSize:"300% 300%",animation:"grad-shift 5s ease infinite"}}>
         {/* badge */}
-        <div className="flex justify-center pt-5 pb-1">
+        <div className="flex justify-center pt-4 pb-1">
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[7.5px] font-bold"
             style={{background:"rgba(255,255,255,0.45)",backdropFilter:"blur(8px)",
-              border:"1px solid rgba(255,255,255,0.6)",color:"rgba(20,20,20,0.8)"}}>
+              border:"1px solid rgba(255,255,255,0.6)",color:"rgba(20,20,20,0.75)"}}>
             <RiShieldCheckLine style={{width:8,height:8}} />{tagLabel}
           </span>
         </div>
-        {/* icon */}
-        <div className="flex justify-center my-2">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{background:"rgba(255,255,255,0.35)",backdropFilter:"blur(10px)",
-              border:"1.5px solid rgba(255,255,255,0.6)",boxShadow:"0 4px 20px rgba(0,0,0,0.1)"}}>
-            <Icon className="w-5 h-5" style={{color:"rgba(20,20,20,0.75)"}} />
+        {/* floating monogram */}
+        <div className="flex justify-center my-2" style={{animation:"grad-float 3s ease-in-out infinite"}}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-[18px]"
+            style={{background:"rgba(255,255,255,0.42)",backdropFilter:"blur(12px)",
+              border:"1.5px solid rgba(255,255,255,0.65)",boxShadow:"0 4px 24px rgba(0,0,0,0.1)",
+              color:"rgba(20,20,20,0.8)"}}>
+            {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
           </div>
         </div>
         {/* title + desc */}
-        <div className="px-4 text-center pb-3">
+        <div className="px-4 text-center pb-2">
           <p className="font-black text-gray-900 leading-tight tracking-tight"
-            style={{fontSize:18,textShadow:"0 1px 6px rgba(255,255,255,0.7)"}}>{tagName}</p>
-          <p className="text-[6.5px] font-mono text-gray-700/60 tracking-wider mt-0.5">{domain}</p>
-          {desc && <p className="text-[7.5px] leading-relaxed mt-1.5 line-clamp-2"
-            style={{color:"rgba(20,20,20,0.6)",textShadow:"0 1px 3px rgba(255,255,255,0.5)"}}>{desc}</p>}
+            style={{fontSize:16,textShadow:"0 1px 6px rgba(255,255,255,0.7)"}}>{tagName}</p>
+          {desc && <p className="text-[7px] leading-relaxed mt-1.5 line-clamp-2"
+            style={{color:"rgba(20,20,20,0.55)",textShadow:"0 1px 3px rgba(255,255,255,0.5)"}}>{desc}</p>}
         </div>
-        {/* CTA */}
-        <div className="px-3 pb-3.5">
-          <div className="rounded-[14px] px-3 py-2.5 flex items-center justify-between gap-2"
-            style={{background:"rgba(255,255,255,0.82)",backdropFilter:"blur(16px)",
-              boxShadow:"0 2px 12px rgba(0,0,0,0.08)"}}>
-            <p className="text-[6px] font-mono truncate flex-1" style={{color:"rgba(80,80,80,0.5)"}}>{linkHost}</p>
-            <a href={link} className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[8.5px] font-bold text-white shrink-0"
-              style={{background:"rgba(10,10,20,0.85)"}}>
-              访问主页 <RiArrowRightSLine style={{width:9,height:9,opacity:.8}} />
-            </a>
-          </div>
+        {/* CTA — simple centered pill button */}
+        <div className="flex justify-center pb-4 pt-1">
+          <a href={link} className="inline-flex items-center gap-1 px-5 py-2 rounded-full text-[8.5px] font-bold text-white"
+            style={{background:"rgba(10,10,20,0.82)",backdropFilter:"blur(8px)"}}>
+            访问主页 <RiArrowRightSLine style={{width:10,height:10,opacity:.8}} />
+          </a>
         </div>
       </div>
     </>
@@ -332,14 +337,16 @@ export function StampPreviewCard({
           50%     { opacity: 1;  transform: scale(1.04); }
         }
       `}</style>
-      <div className="rounded-2xl overflow-hidden shadow-lg flex" style={{minHeight:148}}>
-        {/* Left black panel */}
-        <div className="relative flex flex-col items-center justify-center w-[38%] shrink-0 overflow-hidden"
+      <div className="rounded-2xl overflow-hidden shadow-lg flex" style={{minHeight:140}}>
+        {/* Left black panel — monogram */}
+        <div className="relative flex flex-col items-center justify-center w-[36%] shrink-0 overflow-hidden"
           style={{background:"#000"}}>
-          {/* ghost initial */}
+          {/* ghost initial watermark */}
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden select-none pointer-events-none">
             <span className="font-black select-none"
-              style={{fontSize:100,color:"rgba(255,255,255,0.04)",lineHeight:1}}>{initial}</span>
+              style={{fontSize:80,color:"rgba(255,255,255,0.04)",lineHeight:1}}>
+              {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 1).toUpperCase()}
+            </span>
           </div>
           {/* shine sweep */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -352,17 +359,15 @@ export function StampPreviewCard({
           {/* animated divider bar */}
           <div className="absolute top-0 right-0 w-[2.5px] h-full"
             style={{animation:"split-bar 2.5s ease-in-out infinite"}}/>
-          {/* icon */}
-          <div className="relative z-10 w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)"}}>
-            <Icon className="w-5 h-5 text-white/60"/>
+          {/* monogram */}
+          <div className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center font-black text-[14px] text-white/80"
+            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)"}}>
+            {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
           </div>
-          <p className="relative z-10 font-mono tracking-widest uppercase text-center px-2 mt-1.5"
-            style={{fontSize:5.5,color:"rgba(255,255,255,0.15)"}}>{domain}</p>
         </div>
 
         {/* Right white panel */}
-        <div className="flex-1 flex flex-col justify-between px-3 py-3.5" style={{background:"#FAFAFA"}}>
+        <div className="flex-1 flex flex-col justify-between px-3 py-3" style={{background:"#FAFAFA"}}>
           <div>
             <span className="inline-flex items-center gap-0.5 text-[6.5px] font-bold px-2 py-0.5 rounded-md mb-1.5"
               style={{background:"rgba(99,102,241,0.08)",color:"#6366F1",border:"1px solid rgba(99,102,241,0.15)",
@@ -370,8 +375,7 @@ export function StampPreviewCard({
               <RiShieldCheckLine style={{width:7,height:7}} />{tagLabel}
             </span>
             <p className="font-black text-gray-900 leading-none tracking-tight" style={{fontSize:17}}>{tagName}</p>
-            <p className="text-[7px] mt-0.5 font-mono" style={{color:"#b0b7c3"}}>{domain}</p>
-            {desc && <p className="text-[7.5px] leading-relaxed mt-1.5 line-clamp-2" style={{color:"#9ca3af"}}>{desc}</p>}
+            {desc && <p className="text-[7px] leading-relaxed mt-1.5 line-clamp-2" style={{color:"#9ca3af"}}>{desc}</p>}
           </div>
           <a href={link} className="flex items-center justify-between mt-2 px-2.5 py-1.5 rounded-[10px] text-white text-[8px] font-bold"
             style={{background:"#111"}}>
@@ -404,10 +408,10 @@ export function StampPreviewCard({
           18%     { background: #FFF100; }
           19%     { background: #FFE500; }
         }
-        @keyframes flash-title {
-          0%,100% { transform: scale(1);    }
-          18%     { transform: scale(1.06); }
-          19%     { transform: scale(1);    }
+        @keyframes flash-mono-pulse {
+          0%,100% { transform: scale(1);    opacity: .85; }
+          18%     { transform: scale(1.08); opacity: 1;   }
+          19%     { transform: scale(1);    opacity: .85; }
         }
         @keyframes flash-cta {
           0%,100% { box-shadow: 0 2px 8px rgba(255,56,0,0.28);  }
@@ -416,21 +420,20 @@ export function StampPreviewCard({
       `}</style>
       <div className="rounded-2xl overflow-hidden shadow-lg">
         {/* top bar */}
-        <div className="px-3 py-2 flex items-center gap-1.5" style={{background:"#FF3800"}}>
-          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-            style={{background:"rgba(255,255,255,0.2)"}}>
-            <Icon className="w-2.5 h-2.5 text-white"/>
+        <div className="px-3 py-2 flex items-center gap-2" style={{background:"#FF3800"}}>
+          <div className="w-5 h-5 rounded-md flex items-center justify-center font-black text-[9px] text-white/90 shrink-0"
+            style={{background:"rgba(255,255,255,0.15)"}}>
+            {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 1).toUpperCase()}
           </div>
-          <p className="text-[7.5px] font-mono flex-1 truncate" style={{color:"rgba(255,255,255,0.8)"}}>{domain}</p>
-          <span className="text-[7px] font-bold px-1.5 py-0.5 rounded"
+          <span className="text-[7px] font-bold px-1.5 py-0.5 rounded ml-auto"
             style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.75)"}}>
             {tagLabel}
           </span>
         </div>
         {/* body */}
-        <div className="flex" style={{minHeight:112}}>
-          {/* Left yellow */}
-          <div className="w-[42%] shrink-0 relative overflow-hidden flex flex-col justify-center px-3 py-4"
+        <div className="flex" style={{minHeight:108}}>
+          {/* Left yellow — animated monogram only */}
+          <div className="w-[40%] shrink-0 relative overflow-hidden flex flex-col items-center justify-center px-3 py-4"
             style={{animation:"flash-panel 2.2s ease-in-out infinite"}}>
             <svg className="absolute top-2 right-2 pointer-events-none"
               style={{animation:"flash-bolt-a 2.2s ease-in-out infinite"}}
@@ -442,18 +445,18 @@ export function StampPreviewCard({
               width={8} height={13} viewBox="0 0 10 18" fill="rgba(255,80,0,0.35)">
               <path d="M7 0L1 10h5L3 18l8-11H6L7 0Z"/>
             </svg>
-            <p className="font-black leading-tight tracking-tight relative z-10"
-              style={{fontSize:16,color:"#111",
-                animation:"flash-title 2.2s ease-in-out infinite",transformOrigin:"left center"}}>
-              {tagName}
-            </p>
+            {/* monogram — no duplicate tagName text */}
+            <div className="relative z-10 font-black leading-none text-center"
+              style={{fontSize:26,color:"#111",
+                animation:"flash-mono-pulse 2.2s ease-in-out infinite"}}>
+              {(tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
+            </div>
           </div>
           {/* Right white */}
           <div className="flex-1 flex flex-col justify-between px-3 py-3 bg-white">
             <div>
               <p className="font-black text-gray-900 leading-none tracking-tight" style={{fontSize:15}}>{tagName}</p>
-              <p className="text-[6.5px] font-mono text-gray-400 mt-0.5 tracking-wider">{domain}</p>
-              {desc && <p className="text-[7.5px] text-gray-500 leading-relaxed mt-1.5 line-clamp-2">{desc}</p>}
+              {desc && <p className="text-[7.5px] text-gray-400 leading-relaxed mt-1.5 line-clamp-2">{desc}</p>}
             </div>
             <a href={link} className="inline-flex items-center gap-0.5 mt-2 px-3.5 py-1.5 rounded-full text-[8.5px] font-bold text-white"
               style={{background:"linear-gradient(135deg,#FF3800,#FF6800)",
@@ -470,25 +473,27 @@ export function StampPreviewCard({
      Layout: default — 8 standard themes
   ════════════════════════════════════════ */
   const isDarkCard = t.cardBg === "bg-zinc-950" || t.cardBg === "bg-slate-900";
+  const mono = (tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase();
+
   return (
     <div className={cn("rounded-2xl overflow-hidden shadow-lg", t.cardBg)}>
-      {/* ── Hero ── */}
-      <div className={cn("relative px-4 pt-9 pb-12 text-center overflow-hidden", t.hero)}>
+      {/* ── Hero — compact, monogram-centered ── */}
+      <div className={cn("relative px-4 pt-5 pb-10 text-center overflow-hidden", t.hero)}>
         <div className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "14px 14px" }} />
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-        <div className="relative flex flex-col items-center gap-1.5">
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/35 to-transparent pointer-events-none" />
+        {/* monogram avatar */}
+        <div className="relative flex flex-col items-center gap-0">
           <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-white/15 blur-md scale-125 pointer-events-none" />
-            <div className="relative w-12 h-12 rounded-full bg-white/20 border border-white/30 flex items-center justify-center shadow-xl backdrop-blur-sm ring-4 ring-white/[0.07]">
-              <Icon className="w-[22px] h-[22px] text-white drop-shadow-md" />
+            <div className="absolute inset-0 rounded-2xl bg-white/15 blur-md scale-125 pointer-events-none" />
+            <div className="relative w-12 h-12 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center shadow-xl backdrop-blur-sm ring-4 ring-white/[0.07] font-black text-white/90 text-[15px] leading-none select-none">
+              {mono}
             </div>
           </div>
-          <p className="text-[6px] text-white/40 font-mono tracking-[0.28em] uppercase">{domain}</p>
         </div>
       </div>
 
-      {/* ── Floating card ── */}
+      {/* ── Floating info card ── */}
       <div className={cn("relative -mt-5 mx-2 mb-2 rounded-[18px] border shadow-xl overflow-hidden", t.cardBg, t.cardBorder)}>
         {/* theme accent stripe */}
         <div className={cn("h-[3px] w-full", t.hero)} />
@@ -507,9 +512,8 @@ export function StampPreviewCard({
           {desc && (
             <p className={cn("text-[7.5px] leading-[1.6] mt-2 mb-2.5 line-clamp-2", isDarkCard ? "text-zinc-500" : "text-foreground/50")}>{desc}</p>
           )}
-          {/* CTA row */}
-          <div className={cn("flex items-center justify-between gap-2 pt-2 border-t", isDarkCard ? "border-zinc-800" : "border-border/30")}>
-            <p className={cn("text-[6px] font-mono truncate flex-1", isDarkCard ? "text-zinc-700" : "text-foreground/20")}>{linkHost}</p>
+          {/* CTA — button only, no redundant domain text */}
+          <div className="pt-2 border-t flex justify-end" style={{borderColor: isDarkCard ? "rgba(63,63,70,1)" : "rgba(0,0,0,0.07)"}}>
             <a href={link} className={cn(
               "inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[8.5px] font-bold tracking-wide shrink-0",
               t.btn

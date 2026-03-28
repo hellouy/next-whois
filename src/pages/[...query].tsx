@@ -5762,11 +5762,8 @@ export default function LookupPage({
 
                             const CtaLink = ({ btnCls }: { btnCls?: string }) => stamp.link ? (
                               <a href={stamp.link} target="_blank" rel="noopener noreferrer"
-                                className={cn("flex items-center justify-between w-full px-4 py-3 rounded-2xl shadow-md transition-all hover:opacity-90 active:scale-[0.98]", btnCls ?? theme.btn)}>
-                                <div className="flex flex-col items-start gap-0.5">
-                                  <span className="text-[14px] font-bold leading-none">{isChinese ? "访问主页" : "Visit Profile"}</span>
-                                  {linkHostname && <span className="text-[10px] font-normal opacity-55 leading-none">{linkHostname}</span>}
-                                </div>
+                                className={cn("flex items-center justify-center gap-2 w-full px-4 py-3 rounded-2xl shadow-md transition-all hover:opacity-90 active:scale-[0.98]", btnCls ?? theme.btn)}>
+                                <span className="text-[14px] font-bold leading-none">{isChinese ? "访问主页" : "Visit Profile"}</span>
                                 <RiArrowRightSLine className="w-5 h-5 opacity-70 shrink-0" />
                               </a>
                             ) : (
@@ -5951,25 +5948,17 @@ export default function LookupPage({
                                   </p>
                                 </div>
 
-                                {/* ── Bottom frosted CTA ── */}
-                                <div className="relative z-10 px-4 pb-6 pt-0">
-                                  <div className="rounded-[20px] overflow-hidden"
-                                    style={{background:"rgba(255,255,255,0.88)",backdropFilter:"blur(20px)"}}>
-                                    <div className="px-4 py-3">
-                                      <p className="text-[10px] font-mono tracking-wider text-center mb-2.5" style={{color:"rgba(60,60,60,0.45)"}}>
-                                        {result.domain || target}
-                                      </p>
-                                      {stamp.link
-                                        ? <a href={stamp.link} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center justify-between w-full px-5 py-3.5 rounded-[14px] text-white text-[14px] font-bold transition-all active:scale-[0.98]"
-                                            style={{background:"rgba(8,10,25,0.88)"}}>
-                                            <span>{isChinese ? "访问主页" : "Visit Profile"}</span>
-                                            <RiArrowRightSLine className="w-5 h-5 opacity-60 shrink-0"/>
-                                          </a>
-                                        : null
-                                      }
-                                    </div>
-                                  </div>
+                                {/* ── CTA — clean centered button ── */}
+                                <div className="relative z-10 flex justify-center pb-8 pt-2">
+                                  {stamp.link
+                                    ? <a href={stamp.link} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-8 py-3 rounded-full text-white text-[14px] font-bold transition-all active:scale-[0.98]"
+                                        style={{background:"rgba(8,10,25,0.82)",backdropFilter:"blur(12px)"}}>
+                                        <span>{isChinese ? "访问主页" : "Visit Profile"}</span>
+                                        <RiArrowRightSLine className="w-5 h-5 opacity-70 shrink-0"/>
+                                      </a>
+                                    : null
+                                  }
                                 </div>
                               </div>
                             );
@@ -6021,29 +6010,22 @@ export default function LookupPage({
                                     <p className="text-[9px] font-semibold uppercase tracking-[0.22em] mb-2" style={{color:"#9ca3af"}}>
                                       {isChinese ? "品牌认领" : "Brand Verified"}
                                     </p>
-                                    <h2 className="font-black text-gray-900 leading-[1.0] tracking-tight mb-1.5"
+                                    <h2 className="font-black text-gray-900 leading-[1.0] tracking-tight mb-2"
                                       style={{fontSize:30}}>{stamp.tagName}</h2>
-                                    <p className="text-[10px] mb-3 font-mono" style={{color:"#b0b7c3"}}>
-                                      {isChinese ? `已认领 · ${result.domain || target}` : `Claimed · ${result.domain || target}`}
-                                    </p>
                                     {stamp.description && (
                                       <p className="text-[11.5px] leading-relaxed" style={{color:"#6b7280"}}>{stamp.description}</p>
                                     )}
                                   </div>
 
-                                  {/* Input + button row */}
+                                  {/* CTA */}
                                   <div className="pt-4">
                                     {stamp.link
-                                      ? <div className="flex items-center gap-2">
-                                          <div className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-[11px] font-mono truncate" style={{color:"#d1d5db"}}>
-                                            {linkHostname || result.domain || target}
-                                          </div>
-                                          <a href={stamp.link} target="_blank" rel="noopener noreferrer"
-                                            className="shrink-0 px-4 py-2.5 text-white text-[11px] font-bold rounded-lg transition-all active:scale-[0.97]"
-                                            style={{background:"#111827"}}>
-                                            {isChinese ? "访问" : "Visit"}
-                                          </a>
-                                        </div>
+                                      ? <a href={stamp.link} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center justify-between w-full px-4 py-2.5 text-white text-[12px] font-bold rounded-xl transition-all active:scale-[0.97]"
+                                          style={{background:"#111827"}}>
+                                          <span>{isChinese ? "访问主页" : "Visit Profile"}</span>
+                                          <RiArrowRightSLine className="w-4 h-4 opacity-70" />
+                                        </a>
                                       : <p className="text-[10px] font-mono text-center py-2" style={{color:"#d1d5db"}}>{isChinese ? "未设置主页链接" : "No profile link"}</p>
                                     }
                                   </div>
@@ -6073,8 +6055,8 @@ export default function LookupPage({
 
                                 {/* ── Two-column body ── */}
                                 <div className="flex" style={{minHeight:256}}>
-                                  {/* Left: electric yellow + brand text + lightning */}
-                                  <div className="w-[44%] shrink-0 flex flex-col justify-center px-4 pb-5 pt-5 relative overflow-hidden" style={{background:"#FFE500"}}>
+                                  {/* Left: electric yellow + monogram + lightning */}
+                                  <div className="w-[44%] shrink-0 flex flex-col items-center justify-center px-4 pb-5 pt-5 relative overflow-hidden" style={{background:"#FFE500"}}>
                                     {/* Lightning bolt decoration */}
                                     <svg className="absolute top-3 right-3 pointer-events-none" width={18} height={28} viewBox="0 0 10 18" fill="rgba(255,80,0,0.4)">
                                       <path d="M7 0L1 10h5L3 18l8-11H6L7 0Z"/>
@@ -6082,12 +6064,10 @@ export default function LookupPage({
                                     <svg className="absolute bottom-4 left-3 pointer-events-none" width={11} height={17} viewBox="0 0 10 18" fill="rgba(255,80,0,0.25)">
                                       <path d="M7 0L1 10h5L3 18l8-11H6L7 0Z"/>
                                     </svg>
-                                    <p className="font-black text-[10.5px] uppercase tracking-wide mb-2" style={{color:"#FF3800", lineHeight:1}}>
-                                      {isChinese ? lbl.zh : lbl.en}
-                                    </p>
-                                    <p className="font-black leading-tight tracking-tight" style={{fontSize:26, color:"#111"}}>
-                                      {stamp.tagName}
-                                    </p>
+                                    {/* monogram — no duplicate tagName text */}
+                                    <div className="font-black leading-none tracking-tight select-none" style={{fontSize:40, color:"#111"}}>
+                                      {(stamp.tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
+                                    </div>
                                   </div>
 
                                   {/* Right: white + star sparkles + content */}
@@ -6130,22 +6110,19 @@ export default function LookupPage({
                             const isDarkCard = theme.cardBg === "bg-zinc-950" || theme.cardBg === "bg-slate-900";
                             return (
                               <div key={stamp.id}>
-                                {/* ── Hero ── */}
-                                <div className={cn("relative px-5 pt-10 pb-14 text-center select-none overflow-hidden", theme.hero)}>
+                                {/* ── Hero — compact monogram ── */}
+                                <div className={cn("relative px-5 pt-8 pb-12 text-center select-none overflow-hidden", theme.hero)}>
                                   <div className="absolute inset-0 opacity-[0.04]"
                                     style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
-                                  <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
+                                  <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent" />
                                   <CloseBtn />
-                                  <div className="relative flex flex-col items-center gap-2.5">
+                                  <div className="relative flex flex-col items-center">
                                     <div className="relative">
-                                      <div className="absolute inset-0 rounded-full bg-white/15 blur-xl scale-150 pointer-events-none" />
-                                      <div className="relative w-[62px] h-[62px] rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-2xl ring-8 ring-white/[0.06]">
-                                        <StampIcon className="w-7 h-7 text-white drop-shadow-lg" />
+                                      <div className="absolute inset-0 rounded-2xl bg-white/15 blur-xl scale-150 pointer-events-none" />
+                                      <div className="relative w-[62px] h-[62px] rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-2xl ring-8 ring-white/[0.06] font-black text-white/90 text-[18px] leading-none">
+                                        {(stamp.tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
                                       </div>
                                     </div>
-                                    <p className="text-[9px] text-white/35 font-mono tracking-[0.3em] uppercase">
-                                      {result.domain || target}
-                                    </p>
                                   </div>
                                 </div>
 
