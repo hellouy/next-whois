@@ -27,20 +27,25 @@ interface HomeSeo {
   twitterCard: string;
   logoText: string;
   tagline: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  searchPlaceholder: string;
   showStats: boolean;
 }
 
-function XRWDisplay({ tagline }: { tagline: string }) {
+function XRWDisplay({ heroTitle, tagline }: { heroTitle: string; tagline: string }) {
   const settings = useSiteSettings();
-  const logoText = settings.site_logo_text || "X.RW";
+  // home_hero_title overrides site_logo_text; home_hero_subtitle overrides tagline prop
+  const displayTitle = settings.home_hero_title || heroTitle || settings.site_logo_text || "X.RW";
+  const displayTagline = settings.home_hero_subtitle || tagline;
   return (
     <div className="w-full flex flex-col items-center justify-center select-none gap-2">
       <span className="text-shimmer text-4xl font-bold tracking-[0.22em]">
-        {logoText}
+        {displayTitle}
       </span>
-      {tagline && (
+      {displayTagline && (
         <span className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase">
-          {tagline}
+          {displayTagline}
         </span>
       )}
     </div>
@@ -146,7 +151,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
       <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 min-h-[calc(100vh-4rem)]">
         <div className="mb-4">
           <div className="relative group">
-            <SearchBox onSearch={handleSearch} loading={loading} autoFocus />
+            <SearchBox onSearch={handleSearch} loading={loading} autoFocus placeholder={seo.searchPlaceholder || undefined} />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
               <KeyboardShortcut k="/" />
             </div>
@@ -172,7 +177,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
         {/* Mobile: centered brand display */}
         {!loading && (
           <div className="sm:hidden flex items-center justify-center" style={{ height: "calc(100vh - 19rem)" }}>
-            <XRWDisplay tagline={seo.tagline} />
+            <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
           </div>
         )}
 
@@ -240,6 +245,7 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const [
     siteTitle, siteDesc, siteKeywords, siteLogo, siteSubtitle,
     ogSiteName, ogImage, twitterCard, homeShowStats,
+    homeHeroTitle, homeHeroSubtitle, homePlaceholder,
   ] = await Promise.all([
     getSetting("site_title"),
     getSetting("site_description"),
@@ -250,10 +256,14 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     getSetting("og_image"),
     getSetting("twitter_card"),
     getSetting("home_show_stats"),
-  ]).catch(() => Array(9).fill("") as string[]);
+    getSetting("home_hero_title"),
+    getSetting("home_hero_subtitle"),
+    getSetting("home_placeholder"),
+  ]).catch(() => Array(12).fill("") as string[]);
 
   const logoText   = siteLogo   || DEFAULT_LOGO;
-  const tagline    = siteSubtitle || DEFAULT_TAGLINE;
+  const tagline    = homeHeroSubtitle || siteSubtitle || DEFAULT_TAGLINE;
+  const heroTitle  = homeHeroTitle || logoText;
   const title      = siteTitle  || DEFAULT_TITLE;
   const desc       = siteDesc   || DEFAULT_DESC;
   const keywords   = siteKeywords || DEFAULT_KEYWORDS;
@@ -269,18 +279,24 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     twitterCard: twitterCard || "summary_large_image",
     logoText,
     tagline,
+    heroTitle,
+    heroSubtitle: homeHeroSubtitle || "",
+    searchPlaceholder: homePlaceholder || "",
     showStats: homeShowStats === "1",
   };
 
   const initialSiteSettings = {
-    site_logo_text:    logoText,
-    site_title:        title,
-    site_description:  desc,
-    site_keywords:     keywords,
-    og_site_name:      siteName,
-    og_image:          ogImage || "",
-    twitter_card:      twitterCard || "summary_large_image",
-    site_subtitle:     tagline,
+    site_logo_text:       logoText,
+    site_title:           title,
+    site_description:     desc,
+    site_keywords:        keywords,
+    og_site_name:         siteName,
+    og_image:             ogImage || "",
+    twitter_card:         twitterCard || "summary_large_image",
+    site_subtitle:        siteSubtitle || "",
+    home_hero_title:      homeHeroTitle || "",
+    home_hero_subtitle:   homeHeroSubtitle || "",
+    home_placeholder:     homePlaceholder || "",
   };
 
   return { props: { origin, seo, initialSiteSettings } };

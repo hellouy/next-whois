@@ -139,6 +139,7 @@ interface SearchBoxProps {
   loading?: boolean;
   className?: string;
   autoFocus?: boolean;
+  placeholder?: string;
 }
 
 interface SuggestionGroup {
@@ -152,6 +153,7 @@ export function SearchBox({
   loading = false,
   className,
   autoFocus = false,
+  placeholder: placeholderProp,
 }: SearchBoxProps) {
   const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(initialValue);
@@ -516,7 +518,7 @@ export function SearchBox({
           ref={inputRef}
           id="main-search-input"
           className="w-full text-left pl-12 pr-12 transition-all duration-300 hover:shadow focus-visible:ring-primary/20 focus-visible:ring-offset-0"
-          placeholder={t("search_placeholder")}
+          placeholder={placeholderProp || t("search_placeholder")}
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
