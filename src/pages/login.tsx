@@ -68,6 +68,10 @@ export default function LoginPage() {
   const logoText = settings.site_logo_text || "X.RW";
   const subtitle = settings.site_subtitle || "RDAP+WHOIS";
 
+  // Hide the login form while the session is loading (avoids a flash of the
+  // form for already-authenticated users who are about to be redirected).
+  if (status === "loading" || status === "authenticated") return null;
+
   return (
     <>
       <Head><title key="title">{`${t("auth.login_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>

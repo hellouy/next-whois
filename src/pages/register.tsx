@@ -208,6 +208,10 @@ export default function RegisterPage() {
     }
   }
 
+  // Hide the form while the session is loading or if already authenticated
+  // (the useEffect above will redirect them to /dashboard).
+  if (status === "loading" || status === "authenticated") return null;
+
   const logoText = settings.site_logo_text || "X.RW";
   const registrationOpen = settings.allow_registration !== "" ? settings.allow_registration === "1" : true;
 

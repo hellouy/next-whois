@@ -228,6 +228,13 @@ function writeSessionCache(s: Partial<SiteSettings>) {
   try { sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s)); } catch {}
 }
 
+// On the server useLayoutEffect is a no-op (and triggers a warning), so we
+// fall back to useEffect there.  On the client we use useLayoutEffect so the
+// sessionStorage cache is applied synchronously BEFORE the first paint,
+// eliminating any visible "X.RW → real name" flash for returning visitors.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+
 export function SiteSettingsProvider({
   children,
   initialSettings,
@@ -235,9 +242,9 @@ export function SiteSettingsProvider({
   children: React.ReactNode;
   initialSettings?: Partial<SiteSettings>;
 }) {
-  // NOTE: Do NOT read sessionStorage here — the initializer runs on the server
-  // too (as undefined), causing a hydration mismatch when the client has a
-  // cached value. Apply the session cache only after mount in useEffect.
+  // initialSettings may come from SSR props (e.g. the homepage passes them).
+  // The useState initializer runs on both server and client, so both start with
+  // the same value — no hydration mismatch.
   const [settings, setSettings] = React.useState<SiteSettings>({
     ...DEFAULT_SETTINGS,
     ...(initialSettings || {}),
@@ -256,17 +263,24 @@ export function SiteSettingsProvider({
       .catch(() => {});
   }, []);
 
-  React.useEffect(() => {
-    // Apply any previously-cached settings first (instant, no network round-trip).
-    // If cache exists the UI already has the right values, so we can afford
-    // to defer the network refresh — it's not on the critical render path.
+  // --- Phase 1: apply cached settings BEFORE the first paint ---
+  // useLayoutEffect fires synchronously after React hydrates the DOM but
+  // before the browser paints the frame.  Reading sessionStorage here means
+  // the user never sees the default "X.RW" text — only the cached real value.
+  useIsomorphicLayoutEffect(() => {
     const cache = readSessionCache();
     if (cache) {
       setSettings({ ...DEFAULT_SETTINGS, ...(initialSettings || {}), ...cache });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // --- Phase 2: network refresh + live-update listeners ---
+  // These don't need to block the paint, so a regular useEffect is fine.
+  React.useEffect(() => {
+    const cache = readSessionCache();
     // Delay first fetch: sessionStorage already hydrates the UI.
-    // Without cache we still fetch quickly (500ms) so the first view isn't stale.
+    // Without cache we still fetch quickly (500 ms) so the first view isn't stale.
     const initialDelay = setTimeout(fetchSettings, cache ? 1500 : 500);
 
     function onStorage(e: StorageEvent) {

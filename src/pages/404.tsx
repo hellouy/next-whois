@@ -168,8 +168,16 @@ export default function NotFoundPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [rawPath, setRawPath] = useState("");
+  // whenDate must start as a fixed empty string so SSR and client first-render
+  // produce identical HTML.  We fill it in via useEffect (client-only).
+  const [whenDate, setWhenDate] = useState("");
+  // randomFact likewise: start with a fixed entry so SSR matches client.
+  const [randomFact, setRandomFact] = useState(FUN_FACTS[0]);
+
   useEffect(() => {
     setRawPath(window.location.pathname.replace(/^\//, "") || "");
+    setWhenDate(new Date().toUTCString());
+    setRandomFact(FUN_FACTS[Math.floor(Math.random() * FUN_FACTS.length)]);
   }, []);
 
   const looksLikeDomain = rawPath.includes(".");
@@ -190,14 +198,9 @@ export default function NotFoundPage() {
       { text: ";; (empty — nothing exists here)", delay: 1600, dim: true },
       { text: ";; Query time: 404 msec", delay: 1900 },
       { text: ";; SERVER: 9.9.9.9#53 (Quad9)", delay: 2100 },
-      { text: `;; WHEN: ${new Date().toUTCString()}`, delay: 2350 },
+      { text: `;; WHEN: ${whenDate}`, delay: 2350 },
     ];
-  }, [rawPath]);
-
-  const randomFact = useMemo(
-    () => FUN_FACTS[Math.floor(Math.random() * FUN_FACTS.length)],
-    [],
-  );
+  }, [rawPath, whenDate]);
 
   useEffect(() => {
     if (looksLikeDomain && rawPath) {
