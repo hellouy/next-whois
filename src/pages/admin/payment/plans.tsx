@@ -28,6 +28,7 @@ type Plan = {
   duration_days: number | null;
   is_recurring: boolean;
   grants_subscription: boolean;
+  balance_grant_cents: number;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -65,6 +66,7 @@ function PlanForm({ initial, onSave, onCancel, saving }: {
     ) : "",
     is_recurring: initial?.is_recurring ?? false,
     grants_subscription: initial?.grants_subscription ?? true,
+    balance_grant_cents: initial?.balance_grant_cents?.toString() ?? "0",
     sort_order: initial?.sort_order?.toString() ?? "0",
   });
 
@@ -106,6 +108,10 @@ function PlanForm({ initial, onSave, onCancel, saving }: {
         <div>
           <Label className="text-xs mb-1.5 block">展示排序（数字越小越靠前）</Label>
           <Input value={form.sort_order} onChange={e => set("sort_order", e.target.value)} className="h-8 text-sm" type="number" />
+        </div>
+        <div>
+          <Label className="text-xs mb-1.5 block">充值余额（分）<span className="text-muted-foreground ml-1">付款后自动到账，0 = 不充值</span></Label>
+          <Input value={form.balance_grant_cents} onChange={e => set("balance_grant_cents", e.target.value)} className="h-8 text-sm" type="number" min="0" placeholder="如 5000 = ¥50.00" />
         </div>
       </div>
 
@@ -283,6 +289,9 @@ export default function PaymentPlansAdmin() {
                         )}
                         {plan.is_recurring && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">周期性</span>
+                        )}
+                        {(plan.balance_grant_cents ?? 0) > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">+¥{(plan.balance_grant_cents / 100).toFixed(0)} 余额</span>
                         )}
                       </div>
                       {plan.description && (

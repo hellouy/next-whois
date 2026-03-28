@@ -11,6 +11,7 @@ import {
   RiShieldUserLine, RiRadarLine, RiFireLine, RiServerLine,
   RiCodeBoxLine, RiWrenchLine, RiMoneyDollarCircleLine,
   RiPaletteLine, RiErrorWarningLine, RiGithubLine,
+  RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine, RiRadarFill,
 } from "@remixicon/react";
 
 type Stats = {
@@ -127,6 +128,11 @@ export default function AdminIndexPage() {
     { href: "/admin/notify",            label: "邮件通知",    desc: "向用户发送群发通知",          icon: RiBellLine,       color: "text-blue-400" },
     { href: "/admin/stamp-styles",      label: "印章样式",    desc: "品牌印章风格配置",            icon: RiPaletteLine,    color: "text-fuchsia-500" },
     { href: "/admin/tld-lifecycle-feedback", label: "生命周期反馈", desc: "查看 TLD 爬取异常反馈",  icon: RiErrorWarningLine, color: "text-orange-400" },
+    { href: "/admin/tld-probe",         label: "TLD 探针",    desc: "探测 TLD 查询通道可用性",     icon: RiRadarFill,      color: "text-sky-600" },
+    { href: "/admin/links",             label: "友情链接",    desc: "管理外部链接/友链展示",        icon: RiLinksLine,      color: "text-blue-400" },
+    { href: "/admin/og-styles",         label: "OG 卡片",     desc: "域名分享图样式配置",           icon: RiImageLine,      color: "text-indigo-500" },
+    { href: "/admin/sponsors",          label: "赞助商",      desc: "赞助商列表与展示管理",         icon: RiHeart3Line,     color: "text-rose-500" },
+    { href: "/admin/changelog",         label: "更新日志",    desc: "版本发布记录与公告",           icon: RiHistoryLine,    color: "text-emerald-500" },
     { href: "/admin/git-fix",           label: "Git 修复",    desc: "代码仓库问题修复工具",        icon: RiGithubLine,     color: "text-neutral-500" },
   ];
 

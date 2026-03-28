@@ -14,6 +14,7 @@ export interface PaymentPlan {
   duration_days: number | null;
   is_recurring: boolean;
   grants_subscription: boolean;
+  balance_grant_cents: number;
   is_active: boolean;
   sort_order: number;
 }
@@ -40,7 +41,9 @@ export function genOrderId(): string {
 export async function getActivePlans(): Promise<PaymentPlan[]> {
   const rows = await many<PaymentPlan>(
     `SELECT id, name, description, price::float AS price, currency,
-            duration_days, is_recurring, grants_subscription, is_active, sort_order
+            duration_days, is_recurring, grants_subscription,
+            COALESCE(balance_grant_cents, 0) AS balance_grant_cents,
+            is_active, sort_order
      FROM payment_plans WHERE is_active = true ORDER BY sort_order ASC, price ASC`
   );
   return rows;
@@ -54,7 +57,9 @@ export async function createOrder(params: {
 }): Promise<{ order: PaymentOrder; plan: PaymentPlan }> {
   const plan = await one<PaymentPlan>(
     `SELECT id, name, description, price::float AS price, currency,
-            duration_days, is_recurring, grants_subscription, is_active, sort_order
+            duration_days, is_recurring, grants_subscription,
+            COALESCE(balance_grant_cents, 0) AS balance_grant_cents,
+            is_active, sort_order
      FROM payment_plans WHERE id = $1 AND is_active = true`,
     [params.planId]
   );
@@ -65,10 +70,11 @@ export async function createOrder(params: {
 
   await run(
     `INSERT INTO payment_orders
-       (id, user_id, user_email, plan_id, plan_name, amount, currency, provider, status, expired_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9)`,
+       (id, user_id, user_email, plan_id, plan_name, amount, currency, provider, status, expired_at, balance_grant_cents)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10)`,
     [id, params.userId, params.userEmail, plan.id, plan.name,
-     plan.price, plan.currency, params.provider, expiredAt.toISOString()]
+     plan.price, plan.currency, params.provider, expiredAt.toISOString(),
+     plan.balance_grant_cents ?? 0]
   );
 
   const order = await one<PaymentOrder>(
@@ -105,12 +111,22 @@ export async function markOrderPaid(params: {
   );
 
   let grantsSubscription = false;
+  let balanceGrantCents = 0;
   if (order.plan_id) {
-    const plan = await one<{ grants_subscription: boolean }>(
-      `SELECT grants_subscription FROM payment_plans WHERE id = $1`,
+    const plan = await one<{ grants_subscription: boolean; balance_grant_cents: number }>(
+      `SELECT grants_subscription, COALESCE(balance_grant_cents, 0) AS balance_grant_cents FROM payment_plans WHERE id = $1`,
       [order.plan_id]
     );
     grantsSubscription = plan?.grants_subscription ?? false;
+    balanceGrantCents = plan?.balance_grant_cents ?? 0;
+  }
+  // Also check the order-level balance_grant_cents (populated at order creation)
+  if (!balanceGrantCents) {
+    const orderRow = await one<{ balance_grant_cents: number }>(
+      `SELECT COALESCE(balance_grant_cents, 0) AS balance_grant_cents FROM payment_orders WHERE id = $1`,
+      [params.orderId]
+    );
+    balanceGrantCents = orderRow?.balance_grant_cents ?? 0;
   }
 
   if (grantsSubscription) {
@@ -145,6 +161,28 @@ export async function markOrderPaid(params: {
         await run(
           `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL WHERE email = $1`,
           [order.user_email]
+        );
+      }
+    }
+  }
+
+  // Credit balance if applicable
+  if (balanceGrantCents > 0) {
+    const uid = order.user_id;
+    const email = order.user_email;
+    if (uid) {
+      await run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [uid, balanceGrantCents]);
+      await run(
+        `INSERT INTO balance_transactions (user_id, amount_cents, type, description) VALUES ($1, $2, 'recharge', $3)`,
+        [uid, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
+      );
+    } else if (email) {
+      const u = await one<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
+      if (u) {
+        await run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [u.id, balanceGrantCents]);
+        await run(
+          `INSERT INTO balance_transactions (user_id, amount_cents, type, description) VALUES ($1, $2, 'recharge', $3)`,
+          [u.id, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
         );
       }
     }

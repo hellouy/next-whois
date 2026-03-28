@@ -310,6 +310,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS fetch_strategy      TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS scrape_attempts     INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS manually_edited     BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE payment_plans ADD COLUMN IF NOT EXISTS balance_grant_cents INTEGER NOT NULL DEFAULT 0`,
 ];
 
 const CREATE_INDEXES = [

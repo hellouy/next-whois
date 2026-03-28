@@ -86,6 +86,20 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
   const [balanceAdjustment, setBalanceAdjustment] = React.useState("");
   const [balanceNote, setBalanceNote] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [showTxHistory, setShowTxHistory] = React.useState(false);
+  const [txHistory, setTxHistory] = React.useState<{id:number;amount_cents:number;type:string;description:string|null;created_at:string}[]>([]);
+  const [txLoading, setTxLoading] = React.useState(false);
+
+  async function loadTxHistory() {
+    if (txLoading) return;
+    setTxLoading(true);
+    try {
+      const r = await fetch(`/api/admin/balance-transactions?userId=${user.id}`);
+      const d = await r.json();
+      setTxHistory(d.transactions ?? []);
+    } catch { setTxHistory([]); }
+    finally { setTxLoading(false); }
+  }
 
   async function handleSave() {
     if (!email.trim()) { toast.error("邮箱不能为空"); return; }
@@ -243,6 +257,39 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
                 placeholder="备注（可选，如：活动奖励）"
                 className="h-9 rounded-xl text-xs"
               />
+            )}
+            <button
+              type="button"
+              onClick={() => { setShowTxHistory(v => !v); if (!showTxHistory) loadTxHistory(); }}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mt-1 w-fit"
+            >
+              <RiHistoryLine className="w-3 h-3" />
+              {showTxHistory ? "隐藏余额记录" : "查看余额记录"}
+            </button>
+            {showTxHistory && (
+              <div className="rounded-xl border border-border bg-muted/30 overflow-hidden mt-1">
+                {txLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <RiLoader4Line className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : txHistory.length === 0 ? (
+                  <p className="text-center text-xs text-muted-foreground py-4">暂无余额记录</p>
+                ) : (
+                  <div className="divide-y divide-border max-h-48 overflow-y-auto">
+                    {txHistory.map(tx => (
+                      <div key={tx.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs truncate text-muted-foreground">{tx.description ?? tx.type}</p>
+                          <p className="text-[10px] text-muted-foreground/60">{new Date(tx.created_at).toLocaleString("zh-CN")}</p>
+                        </div>
+                        <span className={`text-xs font-semibold shrink-0 ${tx.amount_cents >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                          {tx.amount_cents >= 0 ? "+" : ""}{(tx.amount_cents / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

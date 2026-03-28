@@ -24,6 +24,7 @@ import {
   RiMailSendLine,
   RiFireLine,
   RiPaletteLine, RiGiftLine, RiGithubLine, RiErrorWarningLine,
+  RiRadarFill,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -60,6 +61,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/tld-lifecycle",          labelKey: "admin.nav_tld_lifecycle",         icon: RiTimeLine,           activeIcon: RiTimeLine },
       { href: "/admin/tld-lifecycle-feedback", labelKey: "admin.nav_tld_lifecycle_feedback", icon: RiErrorWarningLine,   activeIcon: RiErrorWarningLine },
+      { href: "/admin/tld-probe",              labelKey: "admin.nav_tld_probe",              icon: RiRadarFill,          activeIcon: RiRadarFill },
       { href: "/admin/invite-codes",           labelKey: "admin.nav_codes",                 icon: RiKeyLine,            activeIcon: RiKeyFill },
       { href: "/admin/activation-codes",       labelKey: "admin.nav_activation_codes",      icon: RiGiftLine,           activeIcon: RiGiftLine },
       { href: "/admin/access-keys",            labelKey: "admin.nav_access_keys",           icon: RiShieldUserLine,     activeIcon: RiShieldUserLine },

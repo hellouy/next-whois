@@ -65,6 +65,7 @@ type Plan = {
   description: string | null;
   is_recurring: boolean;
   grants_subscription: boolean;
+  balance_grant_cents: number;
 };
 
 type Stamp = {
@@ -1875,9 +1876,15 @@ export default function DashboardPage() {
                                   {badge}
                                 </span>
                               )}
-                              <RiVipCrownLine className={cn("w-4 h-4", isHighlight ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />
+                              {p.balance_grant_cents > 0 && !p.grants_subscription
+                                ? <RiCoinLine className={cn("w-4 h-4", isHighlight ? "text-amber-500" : "text-muted-foreground group-hover:text-amber-500")} />
+                                : <RiVipCrownLine className={cn("w-4 h-4", isHighlight ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />}
                               <p className="text-[10px] font-semibold leading-tight line-clamp-1">{p.name}</p>
-                              <p className="text-[9px] text-muted-foreground">{fmtDur(p)}</p>
+                              {p.balance_grant_cents > 0 ? (
+                                <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">+¥{(p.balance_grant_cents / 100).toFixed(0)} 余额</p>
+                              ) : (
+                                <p className="text-[9px] text-muted-foreground">{fmtDur(p)}</p>
+                              )}
                               <p className="text-[10px] font-bold text-violet-600 dark:text-violet-400 mt-0.5">{fmtPrice(p)}</p>
                             </Link>
                           );

@@ -76,11 +76,29 @@ Updated `git-force-push.ts` to support two modes:
 - **`force`**: `git push --force` — overwrites remote, use when there's no valid data on remote
 - Both modes: auto-remove `index.lock`, abort pending merges/rebases, show last 3 commits before push
 
-Updated `git-fix.tsx` admin page:
-- Mode selector UI (Sync Push recommended / Force Push)
-- Show/hide token button
-- Colored log output (green = success, red = error)
+Updated `git-fix.tsx` admin page (rewritten with AdminLayout, Tailwind/components):
+- Mode selector UI (Sync Push recommended / Force Push) — consistent design system
+- Show/hide token button using RiEyeLine/RiEyeOffLine icons
+- Colored log output with Tailwind bg/text classes
 - Contextual hint when push fails (suggest switching mode)
+
+### Balance Recharge via Payment (Gap 1 resolved, 2026-03-28)
+- `payment_plans.balance_grant_cents` column added (ALTER TABLE migration in `src/lib/db.ts`)
+- `src/lib/payment.ts`:
+  - `PaymentPlan` type + `getActivePlans()` now include `balance_grant_cents`
+  - `createOrder()` stores `balance_grant_cents` from plan onto the order
+  - `markOrderPaid()` credits `users.balance_cents` and inserts `balance_transactions` record when `balance_grant_cents > 0`
+- `src/pages/api/admin/payment/plans.ts`: GET/POST/PUT all include `balance_grant_cents`
+- `src/pages/admin/payment/plans.tsx`: form field for balance_grant_cents (in cents), badge in plan card
+- `src/pages/dashboard.tsx` plan cards: shows `+¥X 余额` badge and coin icon for balance plans
+- `src/pages/payment/checkout.tsx`: Plan type + card badge + order summary row for balance grants
+
+### Balance Transaction History in Admin (Gap 2 resolved)
+- `src/pages/api/admin/balance-transactions.ts`: GET endpoint returns last 100 transactions for a user
+- `src/pages/admin/users.tsx` EditModal: "查看余额记录" toggle shows inline scrollable transaction list
+
+### TLD Probe Admin Page (Gap 4 resolved)
+- `src/pages/admin/tld-probe.tsx`: full admin UI — stat cards (static fallback count, RDAP/WHOIS known counts), TLD input with presets, probe execution, filterable results table with result badges and latency column
 
 ### New Admin API: TLD Probe (`/api/admin/tld-probe`)
 - **GET**: Returns `static_always_fallback`, `rdap_overrides_known`, `whois_known` lists

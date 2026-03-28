@@ -19,6 +19,7 @@ type Plan = {
   id: string; name: string; description: string | null;
   price: number; currency: string; duration_days: number | null;
   is_recurring: boolean; grants_subscription: boolean;
+  balance_grant_cents: number;
 };
 
 const CURRENCY_SYMBOL: Record<string, string> = {
@@ -186,6 +187,11 @@ export default function PaymentCheckout() {
                             {t("payment.checkout_includes_access")}
                           </span>
                         )}
+                        {(p.balance_grant_cents ?? 0) > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-medium">
+                            +¥{(p.balance_grant_cents / 100).toFixed(0)} 余额
+                          </span>
+                        )}
                       </div>
                       {p.description && (
                         <p className="text-xs text-muted-foreground mt-0.5">{p.description}</p>
@@ -271,6 +277,12 @@ export default function PaymentCheckout() {
                     : t("payment.checkout_lifetime")
                   }</span>
                 </div>
+                {(plan.balance_grant_cents ?? 0) > 0 && (
+                  <div className="flex justify-between text-[11px] text-amber-600 dark:text-amber-400">
+                    <span>余额充值</span>
+                    <span className="font-medium">+¥{(plan.balance_grant_cents / 100).toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t border-border/40 pt-2 flex justify-between font-bold">
                   <span>{t("payment.checkout_total")}</span>
                   <span className="text-primary">{sym}{plan.price.toFixed(2)}</span>
