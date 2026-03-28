@@ -26,6 +26,7 @@ import {
   RiPaletteLine, RiGithubLine, RiErrorWarningLine,
   RiRadarFill,
   RiGlobalLine,
+  RiDownloadLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -75,10 +76,11 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: "admin.nav_system",
     items: [
-      { href: "/admin/system",   labelKey: "admin.nav_system_label", icon: RiServerLine,    activeIcon: RiServerFill },
-      { href: "/admin/api",      labelKey: "admin.nav_api",          icon: RiPlugLine,      activeIcon: RiPlugFill },
-      { href: "/admin/git-fix",  labelKey: "admin.nav_git_fix",      icon: RiGithubLine,    activeIcon: RiGithubLine },
-      { href: "/admin/settings", labelKey: "admin.nav_settings",     icon: RiSettings4Line, activeIcon: RiSettings4Fill },
+      { href: "/admin/system",    labelKey: "admin.nav_system_label", icon: RiServerLine,    activeIcon: RiServerFill },
+      { href: "/admin/api",       labelKey: "admin.nav_api",          icon: RiPlugLine,      activeIcon: RiPlugFill },
+      { href: "/admin/db-export", labelKey: "admin.nav_db_export",    icon: RiDownloadLine,  activeIcon: RiDownloadLine },
+      { href: "/admin/git-fix",   labelKey: "admin.nav_git_fix",      icon: RiGithubLine,    activeIcon: RiGithubLine },
+      { href: "/admin/settings",  labelKey: "admin.nav_settings",     icon: RiSettings4Line, activeIcon: RiSettings4Fill },
     ],
   },
 ];
