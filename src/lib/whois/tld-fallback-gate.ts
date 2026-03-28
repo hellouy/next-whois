@@ -53,6 +53,13 @@ const STATIC_ALWAYS_FALLBACK = new Set<string>([
   "mf",  // Saint Martin — French side, no separate public RDAP
   "mh",  // Marshall Islands — WHOIS null, no public RDAP
   "va",  // Vatican City — very small registry, no public RDAP
+
+  // ── Wrong/unreachable WHOIS server from cloud infrastructure ──────────────
+  // cctld-whois-servers.json maps .bf → whois.ripe.net (RIPE IP/ASN registry,
+  // NOT a domain-registration WHOIS — returns nothing useful for .bf names).
+  "bf",  // Burkina Faso — cctld server (RIPE) doesn't serve .bf domain data
+  // whois.bnnic.bn responds to LAN/regional nets but blocks cloud infrastructure IPs.
+  "bn",  // Brunei — whois.bnnic.bn unreachable from cloud; use third-party
 ]);
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
