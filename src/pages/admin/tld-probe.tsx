@@ -209,7 +209,9 @@ export default function TldProbePage() {
                             {row.method ?? (row.note ?? "—")}
                           </td>
                           <td className="px-3 py-2.5 text-right text-xs text-muted-foreground">
-                            {row.latencyMs > 0 ? `${row.latencyMs}ms` : "—"}
+                            {row.result === "static_fallback" ? (
+                              <span className="text-violet-500 font-medium">本地</span>
+                            ) : row.latencyMs > 0 ? `${row.latencyMs}ms` : "—"}
                           </td>
                         </tr>
                       );

@@ -66,6 +66,7 @@ export default function AdminChangelogPage() {
   const [loading, setLoading] = React.useState(true);
   const [quickType, setQuickType] = React.useState<ChangeType>("new");
   const [quickZh, setQuickZh] = React.useState("");
+  const [quickEn, setQuickEn] = React.useState("");
   const [quickDate, setQuickDate] = React.useState(todayStr());
   const [quickAdding, setQuickAdding] = React.useState(false);
   const [editing, setEditing] = React.useState<Entry | null>(null);
@@ -104,7 +105,7 @@ export default function AdminChangelogPage() {
           entry_date: quickDate,
           type: quickType,
           zh: quickZh.trim(),
-          en: "",
+          en: quickEn.trim(),
           version: VERSION,
         }),
       });
@@ -112,6 +113,7 @@ export default function AdminChangelogPage() {
       if (!res.ok) throw new Error(data.error);
       toast.success("已添加");
       setQuickZh("");
+      setQuickEn("");
       setQuickDate(todayStr());
       await load();
       zhInputRef.current?.focus();
@@ -252,6 +254,13 @@ export default function AdminChangelogPage() {
                 : <RiAddLine className="w-3.5 h-3.5" />}
             </Button>
           </div>
+          <Input
+            className="text-sm text-muted-foreground"
+            placeholder="English description (optional)"
+            value={quickEn}
+            onChange={e => setQuickEn(e.target.value)}
+            disabled={quickAdding}
+          />
         </form>
 
         {/* ── Grouped entries ── */}

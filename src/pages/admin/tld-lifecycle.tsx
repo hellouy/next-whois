@@ -108,7 +108,8 @@ export default function AdminTldLifecyclePage() {
     return allTlds.filter(r =>
       r.tld.startsWith(q) ||
       r.tld.includes(q) ||
-      (r.registry ?? "").toLowerCase().includes(q)
+      (r.registry ?? "").toLowerCase().includes(q) ||
+      (r.notes ?? "").toLowerCase().includes(q)
     );
   }, [allTlds, search]);
 
