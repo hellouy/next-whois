@@ -852,15 +852,24 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
         // Scheduled path: start WHOIS after the normal shadow delay.
         _shadowTimerId = setTimeout(runShadowWhois, RDAP_DIRECT_WHOIS_SHADOW_MS);
 
-        // Fail-fast path: if RDAP rejects with a clear non-timeout error
-        // (e.g. ECONNREFUSED, HTTP 4xx, DNS failure), there is no point waiting
-        // the full 2 s — start WHOIS immediately so total latency is
-        //   RDAP_fail_time + WHOIS_TIMEOUT  instead of  RDAP_DIRECT_WHOIS_SHADOW_MS + WHOIS_TIMEOUT.
-        rdapPromise.catch((err: unknown) => {
-          const msg = (err as Error)?.message?.toLowerCase() ?? "";
-          const isTimeout = msg.includes("timeout") || msg.includes("timed out") || msg.includes("abort");
-          if (!isTimeout) runShadowWhois();
-        });
+        // Fail-fast path: if RDAP fails for any non-timeout reason, start WHOIS
+        // immediately instead of waiting the full 2 s shadow delay.
+        //
+        // Two cases:
+        //  a) RDAP rejects (thrown exception): ECONNREFUSED, DNS failure, etc.
+        //  b) RDAP resolves with an errorCode object (e.g. 404 from a broken
+        //     server, 400 bad request, etc.).  Even a legitimate "domain not
+        //     found" 404 is safe to follow with WHOIS — WHOIS will also say
+        //     "not found", and if the RDAP server is broken (404 for every path)
+        //     WHOIS may actually succeed where RDAP cannot.
+        rdapPromise.then(
+          (v: any) => { if (v && v.errorCode) runShadowWhois(); },
+          (err: unknown) => {
+            const msg = (err as Error)?.message?.toLowerCase() ?? "";
+            const isTimeout = msg.includes("timeout") || msg.includes("timed out") || msg.includes("abort");
+            if (!isTimeout) runShadowWhois();
+          },
+        );
       })
     : Promise.resolve(null);
   // Call to suppress linter warning about unused variable

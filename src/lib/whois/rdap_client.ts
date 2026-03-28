@@ -239,7 +239,10 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   co: "https://rdap.cctld.co/",
   cr: "https://rdap.nic.cr/",
   cu: "https://rdap.nic.cu/",
-  cv: "https://rdap.nic.cv/",
+  // cv: removed — rdap.nic.cv returns HTTP 404 for ALL paths (server broken/unconfigured as of 2025).
+  //   Port 43 WHOIS (whois.nic.cv) also returns ECONNREFUSED.  Registry moved to ola.cv with no
+  //   public machine-readable WHOIS.  Keeping cv in the override would make rdapIsDirect=true,
+  //   delaying the WHOIS fallback by RDAP_DIRECT_WHOIS_SHADOW_MS for every query unnecessarily.
   dm: "https://rdap.nic.dm/",
   ec: "https://rdap.registry.ec/",
   gd: "https://rdap.centralnic.com/gd/",           // IANA: CentralNIC
