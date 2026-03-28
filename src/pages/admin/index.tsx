@@ -7,7 +7,9 @@ import {
   RiSettings4Line, RiLoader4Line, RiArrowRightLine, RiUserForbidLine,
   RiFeedbackLine, RiTimeLine, RiGhostLine, RiVipCrownLine,
   RiAddLine, RiBarChartLine, RiBankCardLine, RiCheckDoubleLine,
-  RiRefreshLine,
+  RiRefreshLine, RiPlugLine, RiRobot2Line, RiKeyLine, RiGiftLine,
+  RiShieldUserLine, RiRadarLine, RiFireLine, RiServerLine,
+  RiCodeBoxLine, RiWrenchLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -103,16 +105,24 @@ export default function AdminIndexPage() {
   React.useEffect(() => { loadStats(); }, []);
 
   const QUICK_ACTIONS = [
-    { href: "/admin/search-records",    label: "查询记录", desc: "查看统计、分类、逐条清理" },
-    { href: "/admin/settings",          label: "网站设置", desc: "标题、OG标签、公告" },
-    { href: "/admin/users",             label: "用户管理", desc: "编辑、订阅、停用、删除" },
-    { href: "/admin/stamps",            label: "品牌审核", desc: "审核品牌认领申请" },
-    { href: "/admin/reminders",         label: "提醒管理", desc: "管理域名到期订阅" },
-    { href: "/admin/feedback",          label: "用户反馈", desc: "查看用户提交的反馈" },
-    { href: "/admin/payment/plans",     label: "套餐管理", desc: "新增/编辑订阅套餐" },
-    { href: "/admin/payment/orders",    label: "订单管理", desc: "查看支付订单与收款" },
-    { href: "/admin/tld-fallback",      label: "TLD 兜底", desc: "查看并管理第三方备用查询" },
-    { href: "/admin/system",            label: "系统状态", desc: "数据库、查询趋势" },
+    { href: "/admin/settings",          label: "网站设置",    desc: "标题、功能开关、公告",        icon: RiSettings4Line,  color: "text-blue-500" },
+    { href: "/admin/users",             label: "用户管理",    desc: "编辑、订阅、停用、删除",      icon: RiUserLine,       color: "text-violet-500" },
+    { href: "/admin/search-records",    label: "查询记录",    desc: "统计、分类、逐条清理",        icon: RiSearchLine,     color: "text-emerald-500" },
+    { href: "/admin/feedback",          label: "用户反馈",    desc: "查看用户提交的反馈",          icon: RiFeedbackLine,   color: "text-rose-500" },
+    { href: "/admin/stamps",            label: "品牌审核",    desc: "审核品牌认领申请",            icon: RiShieldCheckLine,color: "text-amber-500" },
+    { href: "/admin/reminders",         label: "到期提醒",    desc: "管理域名到期订阅",            icon: RiBellLine,       color: "text-cyan-500" },
+    { href: "/admin/payment/plans",     label: "套餐管理",    desc: "新增/编辑订阅套餐",           icon: RiVipCrownLine,   color: "text-indigo-500" },
+    { href: "/admin/payment/orders",    label: "订单管理",    desc: "支付订单与收款明细",          icon: RiBankCardLine,   color: "text-green-500" },
+    { href: "/admin/api",               label: "API 接入",    desc: "AI Key · 第三方数据源",       icon: RiPlugLine,       color: "text-orange-500" },
+    { href: "/admin/tld-lifecycle",     label: "TLD 爬取",    desc: "AI 批量爬取 TLD 生命周期",    icon: RiRobot2Line,     color: "text-purple-500" },
+    { href: "/admin/tld-fallback",      label: "TLD 兜底",    desc: "第三方备用查询源管理",        icon: RiRadarLine,      color: "text-sky-500" },
+    { href: "/admin/tld-rules",         label: "TLD 规则",    desc: "自定义解析规则配置",          icon: RiCodeBoxLine,    color: "text-teal-500" },
+    { href: "/admin/invite-codes",      label: "邀请码",      desc: "生成/管理注册邀请码",         icon: RiKeyLine,        color: "text-lime-600" },
+    { href: "/admin/activation-codes",  label: "激活码",      desc: "付费激活码批量管理",          icon: RiGiftLine,       color: "text-pink-500" },
+    { href: "/admin/access-keys",       label: "访问密钥",    desc: "API 访问控制密钥",            icon: RiShieldUserLine, color: "text-slate-500" },
+    { href: "/admin/hot-prefixes",      label: "热搜词",      desc: "首页热门搜索词管理",          icon: RiFireLine,       color: "text-red-500" },
+    { href: "/admin/system",            label: "系统状态",    desc: "数据库连接、查询趋势",        icon: RiServerLine,     color: "text-gray-500" },
+    { href: "/admin/notify",            label: "邮件通知",    desc: "向用户发送群发通知",          icon: RiBellLine,       color: "text-blue-400" },
   ];
 
   return (
@@ -274,16 +284,19 @@ export default function AdminIndexPage() {
           <h3 className="text-sm font-bold flex items-center gap-2">
             <RiSettings4Line className="w-4 h-4 text-primary" />快捷操作
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {QUICK_ACTIONS.map(({ href, label, desc }) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {QUICK_ACTIONS.map(({ href, label, desc, icon: Icon, color }) => (
               <button
                 key={href}
                 type="button"
                 onClick={() => router.push(href, undefined, { locale: false })}
                 className="glass-panel border border-border/60 rounded-xl p-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left active:scale-[0.98]"
               >
-                <p className="text-sm font-semibold group-hover:text-primary transition-colors">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} />
+                  <p className="text-sm font-semibold group-hover:text-primary transition-colors truncate">{label}</p>
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug">{desc}</p>
               </button>
             ))}
           </div>

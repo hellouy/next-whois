@@ -400,11 +400,12 @@ const SECTIONS: Section[] = [
   },
   {
     id: "announcement",
-    title: "公告横幅",
+    title: "公告与维护",
     icon: RiMegaphoneLine,
     color: "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400",
     fields: [
       { key: "site_announcement", label: "公告横幅内容", desc: "显示在页面顶部的公告文字（留空则不显示公告条）", placeholder: "🎉 欢迎使用 X.RW！", icon: RiMegaphoneLine },
+      { key: "maintenance_message", label: "维护模式自定义消息", desc: "维护页面显示给访客的额外说明（开启维护模式时生效，留空则显示 site_announcement 内容）", placeholder: "预计维护时间：今晚 22:00 - 23:00，感谢您的耐心等待 🙏", icon: RiAlertLine, multiline: false },
     ],
   },
   {
@@ -847,6 +848,25 @@ export default function AdminSettingsPage() {
                       </div>
                     );
                   })}
+
+                  {/* AI service quick link card */}
+                  <a
+                    href="/admin/api"
+                    className="block glass-panel border border-dashed border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:bg-primary/5 transition-all group"
+                  >
+                    <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border/60 bg-muted/20">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
+                        <RiFingerprint2Line className="w-3.5 h-3.5" />
+                      </div>
+                      <h3 className="text-sm font-bold">AI 服务 & API 接入</h3>
+                      <span className="ml-auto text-[10px] text-muted-foreground group-hover:text-primary transition-colors">前往配置 →</span>
+                    </div>
+                    <div className="px-5 py-3">
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        AI 大模型密钥（智谱、Groq、Gemini、DeepSeek、百炼、月之暗面、SiliconFlow）、第三方数据源接入、Resend 邮件服务等配置均在「API 接入」页面管理。
+                      </p>
+                    </div>
+                  </a>
                 </div>
               )}
 

@@ -145,9 +145,19 @@ function AnnouncementBanner() {
   );
 }
 
+const MAINTENANCE_TIPS = [
+  "工程师正在努力敲代码，请稍候 ☕",
+  "系统升级中，回来会更好用的 🚀",
+  "正在给服务器「喂」新功能 🍕",
+  "比你以为的快，比你想的更值得等待 ✨",
+  "稍等片刻，我们在给它打补丁 🩹",
+];
+
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const settings = useSiteSettings();
   const [sessionEmail, setSessionEmail] = React.useState<string | null | undefined>(undefined);
+  const [tipIndex, setTipIndex] = React.useState(0);
+  const [dots, setDots] = React.useState(".");
 
   React.useEffect(() => {
     if (settings.maintenance_mode !== "1") return;
@@ -157,24 +167,93 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
       .catch(() => setSessionEmail(null));
   }, [settings.maintenance_mode]);
 
+  React.useEffect(() => {
+    if (settings.maintenance_mode !== "1") return;
+    const tipTimer = setInterval(() => setTipIndex(i => (i + 1) % MAINTENANCE_TIPS.length), 3500);
+    const dotTimer = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 500);
+    return () => { clearInterval(tipTimer); clearInterval(dotTimer); };
+  }, [settings.maintenance_mode]);
+
   if (settings.maintenance_mode !== "1") return <>{children}</>;
   if (sessionEmail === undefined) return null;
   if (sessionEmail && sessionEmail.toLowerCase().trim() === ADMIN_EMAIL) return <>{children}</>;
 
+  const customMsg = settings.maintenance_message || settings.site_announcement;
+
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background px-6 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center mb-5">
-        <RiWrenchLine className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background px-6 text-center overflow-hidden">
+      {/* Subtle dot-grid background */}
+      <div
+        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06]"
+        style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "28px 28px" }}
+      />
+
+      {/* Animated icon cluster */}
+      <div className="relative mb-8">
+        {/* Outer slow orbit ring */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-28 h-28 rounded-full border border-amber-200/40 dark:border-amber-700/30 animate-spin" style={{ animationDuration: "8s" }} />
+        </div>
+        {/* Inner faster orbit */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full border border-dashed border-amber-300/50 dark:border-amber-600/40 animate-spin" style={{ animationDuration: "4s", animationDirection: "reverse" }} />
+        </div>
+        {/* Center icon */}
+        <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/60 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center shadow-lg">
+          <RiWrenchLine className="w-9 h-9 text-amber-600 dark:text-amber-400 animate-bounce" style={{ animationDuration: "2s" }} />
+        </div>
+        {/* Small satellites */}
+        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-400/80 dark:bg-blue-500/60 flex items-center justify-center text-white text-[10px] animate-pulse">⚙</div>
+        <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-emerald-400/80 dark:bg-emerald-500/60 flex items-center justify-center text-white text-[8px] animate-pulse" style={{ animationDelay: "0.5s" }}>✦</div>
       </div>
-      <h1 className="text-xl font-bold mb-2">站点维护中</h1>
-      <p className="text-sm text-muted-foreground max-w-xs">
-        系统正在升级维护，请稍后再访问。感谢您的耐心等待。
+
+      {/* Title */}
+      <h1 className="text-2xl font-bold mb-2 tracking-tight">
+        <span className="bg-gradient-to-r from-amber-600 to-orange-500 dark:from-amber-400 dark:to-orange-400 bg-clip-text text-transparent">
+          系统维护中
+        </span>
+        <span className="text-amber-600/60 dark:text-amber-400/60 font-normal ml-0.5">{dots}</span>
+      </h1>
+
+      {/* Progress bar (infinite looping) */}
+      <div className="w-48 h-1 rounded-full bg-muted overflow-hidden mb-5">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400"
+          style={{
+            animation: "maintenance-bar 2.5s ease-in-out infinite",
+            width: "40%",
+          }}
+        />
+      </div>
+
+      {/* Rotating tip */}
+      <p className="text-sm text-muted-foreground max-w-xs min-h-[2.5rem] flex items-center justify-center px-2">
+        {MAINTENANCE_TIPS[tipIndex]}
       </p>
-      {settings.site_announcement && (
-        <p className="mt-4 text-xs text-muted-foreground/70 border border-border rounded-xl px-4 py-2 max-w-xs">
-          {settings.site_announcement}
-        </p>
+
+      {/* Custom message */}
+      {customMsg && (
+        <div className="mt-4 px-4 py-2.5 rounded-xl border border-border bg-muted/40 max-w-sm text-xs text-muted-foreground leading-relaxed">
+          {customMsg}
+        </div>
       )}
+
+      {/* Refresh button */}
+      <button
+        onClick={() => window.location.reload()}
+        className="mt-6 px-4 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+      >
+        刷新试试
+      </button>
+
+      {/* Keyframe injection */}
+      <style>{`
+        @keyframes maintenance-bar {
+          0%   { transform: translateX(-100%); }
+          50%  { transform: translateX(150%); }
+          100% { transform: translateX(-100%); }
+        }
+      `}</style>
     </div>
   );
 }

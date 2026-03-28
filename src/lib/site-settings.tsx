@@ -26,6 +26,7 @@ export interface SiteSettings {
   require_login: string;
   disable_login: string;
   maintenance_mode: string;
+  maintenance_message: string;
   query_only_mode: string;
   hide_raw_whois: string;
   // Core feature toggles
@@ -132,6 +133,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   require_login: "",
   disable_login: "",
   maintenance_mode: "",
+  maintenance_message: "",
   query_only_mode: "",
   hide_raw_whois: "",
   enable_search_links: "1",
