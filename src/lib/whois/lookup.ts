@@ -233,8 +233,9 @@ function queryWhoisTcp(
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const net = require("node:net") as typeof import("net");
+    const { makeDnsFallbackLookup } = require("./dns-resolver") as typeof import("./dns-resolver");
     let data = "";
-    const socket = net.connect({ host, port }, () =>
+    const socket = net.connect({ host, port, lookup: makeDnsFallbackLookup() }, () =>
       socket.write(query + "\r\n"),
     );
     socket.setTimeout(timeoutMs);

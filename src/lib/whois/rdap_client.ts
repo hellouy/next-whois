@@ -193,7 +193,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   af: "https://rdap.nic.af/",
   as: "https://rdap.nic.as/",
   au: "https://rdap.cctld.au/rdap/",
-  bn: "https://rdap.bnnic.bn/",
+  // bn: rdap.bnnic.bn is NXDOMAIN (no RDAP service); WHOIS via whois.bnnic.bn works with DoH fallback
   bt: "https://rdap.nic.bt/",
   cc: "https://tld-rdap.verisign.com/cc/v1/",
   ck: "https://rdap.coccaregistry.org/",              // CoCCA (Cook Islands)

@@ -54,10 +54,9 @@ const STATIC_ALWAYS_FALLBACK = new Set<string>([
   "mh",  // Marshall Islands — WHOIS null, no public RDAP
   "va",  // Vatican City — very small registry, no public RDAP
 
-  // ── Wrong/unreachable WHOIS server from cloud infrastructure ──────────────
   // NOTE: .bf was here previously but now uses CoCCA RDAP (rdap.coccaregistry.org).
-  // whois.bnnic.bn AND rdap.bnnic.bn both have DNS failure from cloud infra.
-  "bn",  // Brunei — bnnic.bn (WHOIS+RDAP) unreachable from cloud; use third-party
+  // NOTE: .bn was here previously but whois.bnnic.bn (202.152.92.245) is reachable
+  //       from cloud once the hostname resolves — DNS-over-HTTPS fallback handles it.
 ]);
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
