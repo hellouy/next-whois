@@ -19,6 +19,8 @@ type Reminder = {
   email: string;
   active: boolean;
   expiration_date: string | null;
+  whois_expiry_date: string | null;
+  whois_synced_at: string | null;
   days_before: number | null;
   cancel_reason: string | null;
   cancelled_at: string | null;
@@ -298,6 +300,12 @@ export default function AdminRemindersPage() {
                       </span>
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <RiCalendarLine className="w-3 h-3" />到期：{fmt(reminder.expiration_date)}
+                        {reminder.whois_synced_at && (
+                          <span className="ml-1 text-[9px] px-1 py-0.5 rounded bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 font-medium"
+                            title={`WHOIS核验：${fmt(reminder.whois_synced_at)}`}>
+                            WHOIS ✓
+                          </span>
+                        )}
                       </span>
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                         <RiTimeLine className="w-3 h-3" />订阅于 {fmtRelative(reminder.created_at)}

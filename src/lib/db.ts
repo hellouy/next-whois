@@ -302,6 +302,8 @@ const ALTER_COLUMNS = [
   `ALTER TABLE stamps        ADD COLUMN IF NOT EXISTS card_theme          TEXT NOT NULL DEFAULT 'app'`,
   `ALTER TABLE invite_codes  ADD COLUMN IF NOT EXISTS expires_at          TIMESTAMPTZ`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS thresholds_json     TEXT`,
+  `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS whois_synced_at     TIMESTAMPTZ`,
+  `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS whois_expiry_date   TEXT`,
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS balance_cents       INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS membership_plan     TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS model_used          TEXT`,

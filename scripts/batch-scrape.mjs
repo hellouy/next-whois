@@ -486,19 +486,64 @@ async function fetchPageText(tld, ianaUrl) {
 }
 
 // ── AI providers ──────────────────────────────────────────────────────────────
-const AI_PROVIDERS = [
-  { key: process.env.ZHIPU_API_KEY,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",              model: "glm-4-flashx",               name: "GLM-4-FlashX" },
-  { key: process.env.ZHIPU_API_KEY,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",              model: "glm-4-flash",                name: "GLM-4-Flash" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "qwen-qwq-32b",               name: "QwQ-32B (Groq)" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "llama-3.3-70b-versatile",    name: "Llama-3.3-70B (Groq)" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "mixtral-8x7b-32768",         name: "Mixtral-8x7B (Groq)" },
-  { key: process.env.GEMINI_API_KEY,    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.0-flash",      name: "Gemini-2.0-Flash" },
-  { key: process.env.DEEPSEEK_API_KEY,  endpoint: "https://api.deepseek.com/v1/chat/completions",                       model: "deepseek-chat",              name: "DeepSeek-V3" },
-  { key: process.env.DASHSCOPE_API_KEY, endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-turbo",                 name: "Qwen-Turbo" },
-  { key: process.env.MOONSHOT_API_KEY,  endpoint: "https://api.moonshot.cn/v1/chat/completions",                        model: "moonshot-v1-8k",             name: "Kimi-8k" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "gemma2-9b-it",               name: "Gemma2-9B (Groq)" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "llama-3.1-8b-instant",       name: "Llama-3.1-8B Instant (Groq)" },
-].filter(p => p.key);
+// Will be populated in main() after loading keys from env + site_settings DB
+let AI_PROVIDERS = [];
+
+/**
+ * Load AI API keys from the site_settings DB table (admin-configured).
+ * Returns a map of provider name → key string.
+ * Keys stored: api_ai_groq_key, api_ai_gemini_key, api_ai_deepseek_key,
+ *              api_ai_dashscope_key, api_ai_zhipu_key, api_ai_moonshot_key
+ */
+async function loadAiKeysFromDb() {
+  const keys = {};
+  try {
+    const rows = await pool.query(
+      `SELECT key, value FROM site_settings
+       WHERE key IN ('api_ai_groq_key','api_ai_gemini_key','api_ai_deepseek_key',
+                     'api_ai_dashscope_key','api_ai_zhipu_key','api_ai_moonshot_key')
+         AND value IS NOT NULL AND value <> ''`
+    );
+    for (const r of rows.rows) {
+      const name = r.key.replace("api_ai_", "").replace("_key", "");
+      keys[name] = r.value.trim();
+    }
+    if (Object.keys(keys).length > 0) {
+      console.log(`   📦 DB keys loaded: ${Object.keys(keys).join(", ")}`);
+    }
+  } catch (e) {
+    console.warn("   ⚠️  无法从DB读取AI Key:", e.message);
+  }
+  return keys;
+}
+
+/**
+ * Build the AI_PROVIDERS list, merging env vars (higher priority) and DB keys.
+ * Environment variable keys always override DB keys of the same provider.
+ */
+async function buildAiProviders() {
+  const db = await loadAiKeysFromDb();
+  const groq      = process.env.GROQ_API_KEY      || db.groq;
+  const gemini    = process.env.GEMINI_API_KEY    || db.gemini;
+  const deepseek  = process.env.DEEPSEEK_API_KEY  || db.deepseek;
+  const dashscope = process.env.DASHSCOPE_API_KEY || db.dashscope;
+  const zhipu     = process.env.ZHIPU_API_KEY     || db.zhipu;
+  const moonshot  = process.env.MOONSHOT_API_KEY  || db.moonshot;
+
+  return [
+    { key: zhipu,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",                    model: "glm-4-flashx",            name: "GLM-4-FlashX" },
+    { key: zhipu,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",                    model: "glm-4-flash",             name: "GLM-4-Flash" },
+    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "llama-3.3-70b-versatile", name: "Llama-3.3-70B (Groq)" },
+    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "qwen-qwq-32b",            name: "QwQ-32B (Groq)" },
+    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "mixtral-8x7b-32768",      name: "Mixtral-8x7B (Groq)" },
+    { key: gemini,    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.0-flash",        name: "Gemini-2.0-Flash" },
+    { key: deepseek,  endpoint: "https://api.deepseek.com/v1/chat/completions",                             model: "deepseek-chat",           name: "DeepSeek-V3" },
+    { key: dashscope, endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",       model: "qwen-turbo",              name: "Qwen-Turbo" },
+    { key: moonshot,  endpoint: "https://api.moonshot.cn/v1/chat/completions",                              model: "moonshot-v1-8k",          name: "Kimi-8k" },
+    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "gemma2-9b-it",            name: "Gemma2-9B (Groq)" },
+    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "llama-3.1-8b-instant",    name: "Llama-3.1-8B Instant (Groq)" },
+  ].filter(p => p.key);
+}
 
 async function callAI(messages, providerIndex = 0) {
   for (let i = providerIndex; i < AI_PROVIDERS.length; i++) {
@@ -907,10 +952,16 @@ async function main() {
   console.log("║       TLD 生命周期批量爬取器 v2.1 (batch-scrape.mjs)        ║");
   console.log("╚══════════════════════════════════════════════════════════════╝");
 
+  // Load AI providers: env vars + DB site_settings keys
+  console.log("⏳ 加载 AI 提供商配置...");
+  AI_PROVIDERS = SEED_ONLY ? [] : await buildAiProviders();
+
   if (SEED_ONLY) {
     console.log("🌱 模式: --seed-only (仅将IANA全量TLD入库，使用默认生命周期值，无需AI)");
   } else if (AI_PROVIDERS.length === 0) {
-    console.error("❌ 未找到 AI API Key（GROQ_API_KEY / GEMINI_API_KEY / DEEPSEEK_API_KEY 等）");
+    console.error("❌ 未找到 AI API Key");
+    console.error("   支持的环境变量: GROQ_API_KEY / GEMINI_API_KEY / DEEPSEEK_API_KEY / DASHSCOPE_API_KEY 等");
+    console.error("   或在管理后台 → 设置 → API → 填写对应 Key");
     console.error("   提示: 先运行 --seed-only 将全部TLD入库，再配置AI Key后运行AI抓取");
     process.exit(1);
   } else {

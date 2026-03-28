@@ -7,6 +7,32 @@ import { sendEmail, subscriptionConfirmHtml, getSiteLabel } from "@/lib/email";
 import { computeLifecycle, fmtDate } from "@/lib/lifecycle";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
+import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+
+/**
+ * Try to get the domain's real expiration date from WHOIS/RDAP.
+ * Returns null if unavailable or if the lookup takes too long.
+ */
+async function fetchWhoisExpiry(domain: string): Promise<{ date: string; eppStatus: string[] } | null> {
+  try {
+    const result = await Promise.race([
+      lookupWhoisWithCache(domain),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (!result || !result.result) return null;
+    const expiry = result.result.expirationDate;
+    const epp: string[] = Array.isArray(result.result.status)
+      ? result.result.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
+      : [];
+    if (!expiry || expiry === "Unknown") return null;
+    const d = new Date(expiry);
+    if (isNaN(d.getTime())) return null;
+    // Format as YYYY-MM-DD
+    return { date: d.toISOString().slice(0, 10), eppStatus: epp };
+  } catch {
+    return null;
+  }
+}
 
 const FREE_TIER_LIMIT = 5;
 
@@ -95,7 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
   const cleanEmail   = String(email).trim();
-  const expDate      = expirationDate ? String(expirationDate) : null;
+  const userExpDate  = expirationDate ? String(expirationDate) : null;
   const cancelToken  = randomBytes(20).toString("hex");
   const id           = randomBytes(8).toString("hex");
 
@@ -114,9 +140,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await run(
         `UPDATE reminders
          SET expiration_date = $1, active = true, cancelled_at = NULL,
-             cancel_reason = NULL, cancel_token = $2, phase_flags = $3, thresholds_json = $4
+             cancel_reason = NULL, cancel_token = $2, phase_flags = $3, thresholds_json = $4,
+             whois_synced_at = NULL, whois_expiry_date = NULL
          WHERE id = $5`,
-        [expDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds), reminderId],
+        [userExpDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds), reminderId],
       );
       await run("DELETE FROM reminder_logs WHERE reminder_id = $1", [reminderId]);
     } else {
@@ -125,7 +152,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await run(
         `INSERT INTO reminders (id, domain, email, expiration_date, active, cancel_token, phase_flags, thresholds_json)
          VALUES ($1, $2, $3, $4, true, $5, $6, $7)`,
-        [reminderId, cleanDomain, cleanEmail, expDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds)],
+        [reminderId, cleanDomain, cleanEmail, userExpDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds)],
       );
     }
   } catch (dbErr: any) {
@@ -133,9 +160,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "数据库写入失败，请稍后重试" });
   }
 
+  // ── WHOIS sync: verify expiry date against live registry data ──────────────
+  // Runs after DB save; result updates stored expiry if WHOIS provides one.
+  let verifiedExpDate = userExpDate;
+  let eppStatuses: string[] = [];
+  const whoisData = await fetchWhoisExpiry(cleanDomain);
+  if (whoisData) {
+    eppStatuses = whoisData.eppStatus;
+    const whoisDate = whoisData.date;
+    // Accept WHOIS date as authoritative unless user-provided date is much newer
+    // (user might have manually renewed and WHOIS not yet updated)
+    const useDateFromWhois = !userExpDate || (() => {
+      const ud = new Date(userExpDate).getTime();
+      const wd = new Date(whoisDate).getTime();
+      const diffDays = Math.abs(ud - wd) / 86_400_000;
+      // If WHOIS date is within 7 days of user date or WHOIS is later → use WHOIS
+      return diffDays <= 7 || wd > ud;
+    })();
+    if (useDateFromWhois) {
+      verifiedExpDate = whoisDate;
+      await run(
+        `UPDATE reminders
+         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW()
+         WHERE id = $3`,
+        [whoisDate, whoisDate, reminderId],
+      ).catch((e: Error) => console.warn("[remind/submit] WHOIS date update failed:", e.message));
+    }
+  }
+
   // Use admin-curated and AI-scraped lifecycle overrides for accurate email info
   const overrides = await loadLifecycleOverrides().catch(() => ({}));
-  const lc = computeLifecycle(cleanDomain, expDate, undefined, overrides);
+  const lc = computeLifecycle(cleanDomain, verifiedExpDate, eppStatuses.length ? eppStatuses : undefined, overrides);
   const lifecycleInfo = lc ? {
     phase:           lc.phase,
     graceEnd:        fmtDate(lc.graceEnd),
@@ -156,7 +211,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : `✅ 域名订阅已设置 · ${cleanDomain}`,
     html: subscriptionConfirmHtml({
       domain: cleanDomain,
-      expirationDate: expDate,
+      expirationDate: verifiedExpDate,
       cancelToken: cancelTok,
       thresholds: selectedThresholds,
       regStatusType: regStatusType ? String(regStatusType) : undefined,

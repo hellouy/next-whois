@@ -16,6 +16,67 @@ import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdmin } from "@/lib/admin";
+import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+
+/** Stale threshold: refresh WHOIS if older than 7 days for near-expiry domains */
+const WHOIS_STALE_DAYS = 7;
+/** Only sync WHOIS for reminders within this many days of expiry */
+const WHOIS_SYNC_WINDOW_DAYS = 90;
+/** Max WHOIS lookups per cron run to avoid rate limits */
+const WHOIS_SYNC_LIMIT = 5;
+
+/**
+ * Refresh WHOIS expiry date for reminders that are approaching expiry and have
+ * stale WHOIS data. Updates DB in-place and returns a map of reminderId → new date.
+ */
+async function refreshStaleWhoisDates(
+  reminders: Array<{ id: string; domain: string; expiration_date: string | null; whois_synced_at: string | null }>,
+): Promise<Map<string, { date: string; eppStatus: string[] }>> {
+  const now = Date.now();
+  const msPerDay = 86_400_000;
+  const staleMs = WHOIS_STALE_DAYS * msPerDay;
+  const windowMs = WHOIS_SYNC_WINDOW_DAYS * msPerDay;
+
+  // Pick candidates: within sync window, stale or never synced
+  const candidates = reminders.filter((r) => {
+    if (!r.expiration_date) return false;
+    const expMs = new Date(r.expiration_date).getTime();
+    const daysToExpiry = (expMs - now) / msPerDay;
+    if (daysToExpiry < -30 || daysToExpiry > WHOIS_SYNC_WINDOW_DAYS) return false;
+    const lastSync = r.whois_synced_at ? new Date(r.whois_synced_at).getTime() : 0;
+    return now - lastSync > staleMs;
+  }).slice(0, WHOIS_SYNC_LIMIT);
+
+  const updated = new Map<string, { date: string; eppStatus: string[] }>();
+  await Promise.all(candidates.map(async (r) => {
+    try {
+      const res = await Promise.race([
+        lookupWhoisWithCache(r.domain),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+      ]);
+      if (!res?.result) return;
+      const expiry = res.result.expirationDate;
+      const epp: string[] = Array.isArray(res.result.status)
+        ? res.result.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
+        : [];
+      if (!expiry || expiry === "Unknown") return;
+      const d = new Date(expiry);
+      if (isNaN(d.getTime())) return;
+      const dateStr = d.toISOString().slice(0, 10);
+      await run(
+        `UPDATE reminders
+         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW()
+         WHERE id = $3`,
+        [dateStr, dateStr, r.id],
+      );
+      updated.set(r.id, { date: dateStr, eppStatus: epp });
+      console.log(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
+    } catch (e: any) {
+      console.warn(`[process] WHOIS refresh failed for ${r.domain}:`, e?.message ?? e);
+    }
+  }));
+  return updated;
+}
 
 const DEFAULT_THRESHOLDS = [60, 30, 10, 5, 1];
 const DROP_SOON_KEY = -4;   // 7 days before drop date
@@ -51,11 +112,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const remindersRaw = await many<{
       id: string; domain: string; email: string;
-      expiration_date: string | null; cancel_token: string; phase_flags: string | null; thresholds_json: string | null;
+      expiration_date: string | null; cancel_token: string; phase_flags: string | null;
+      thresholds_json: string | null; whois_synced_at: string | null; whois_expiry_date: string | null;
     }>(
-      `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json
+      `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json,
+              whois_synced_at, whois_expiry_date
        FROM reminders WHERE active = true AND expiration_date IS NOT NULL`,
     );
+
+    // Refresh WHOIS data for near-expiry domains with stale sync dates (non-blocking batch)
+    const whoisRefreshed = await refreshStaleWhoisDates(remindersRaw).catch((e) => {
+      console.warn("[process] WHOIS batch refresh error:", e?.message ?? e);
+      return new Map<string, { date: string; eppStatus: string[] }>();
+    });
 
     const reminderIds = remindersRaw.map((r) => r.id);
     const logsRaw = reminderIds.length > 0
@@ -73,14 +142,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const reminders = remindersRaw.map((r) => ({
       ...r,
+      // Prefer WHOIS-refreshed data from this run, then stored whois_expiry_date, then user-entered
+      effective_expiry: whoisRefreshed.get(r.id)?.date ?? r.whois_expiry_date ?? r.expiration_date,
+      epp_status:       whoisRefreshed.get(r.id)?.eppStatus ?? [],
       sent_keys: logsByReminder[r.id] ?? [],
     }));
 
-    const results = { sent: 0, expired: 0, skipped: 0 };
+    const results = { sent: 0, expired: 0, skipped: 0, whois_refreshed: whoisRefreshed.size };
 
     for (const reminder of reminders) {
       try {
-        const lc = computeLifecycle(reminder.domain, reminder.expiration_date, undefined, overrides);
+        const lc = computeLifecycle(
+          reminder.domain,
+          reminder.effective_expiry,
+          reminder.epp_status.length ? reminder.epp_status : undefined,
+          overrides,
+        );
         if (!lc) { results.skipped++; continue; }
 
         const now = new Date();

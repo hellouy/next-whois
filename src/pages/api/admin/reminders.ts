@@ -25,7 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (filter === "inactive") conditions.push("active = false");
 
       const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-      const q = `SELECT id, domain, email, expiration_date, active, days_before, cancel_reason, cancelled_at, phase_flags, created_at
+      const q = `SELECT id, domain, email, expiration_date, whois_expiry_date, whois_synced_at,
+                        active, days_before, cancel_reason, cancelled_at, phase_flags, created_at
                  FROM reminders${where}
                  ORDER BY created_at DESC
                  LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
