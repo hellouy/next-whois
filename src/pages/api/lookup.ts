@@ -117,14 +117,12 @@ export default async function handler(
   const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl } =
     await lookupWhoisWithCache(trimmed, { nocache });
 
-  // Record EVERY query attempt — successful or failed, logged-in or anonymous.
-  // Use the actual result when available; fall back to initialWhoisAnalyzeResult
-  // so even failed/errored lookups appear in admin stats.
-  saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail).catch(() => {});
-
   if (!status) {
     return res.status(500).json({ time, status, error, dnsProbe, registryUrl });
   }
+
+  // Record every successful lookup — logged-in or anonymous, cached or fresh.
+  saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail).catch(() => {});
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
   // CDN edge cache also honours the same expiry windows as Redis.
