@@ -111,7 +111,9 @@ export const SEED_PREFIXES: Array<{
   { prefix: "renren",     category: "cn",      weight: 14, source: "manual" },
 ];
 
+let _schemaReady = false;
 async function ensureSchema() {
+  if (_schemaReady) return;
   await run(`
     CREATE TABLE IF NOT EXISTS hot_prefixes (
       id         SERIAL PRIMARY KEY,
@@ -128,6 +130,7 @@ async function ensureSchema() {
       CONSTRAINT hot_prefixes_prefix_uniq UNIQUE (prefix)
     )
   `);
+  _schemaReady = true;
 }
 
 async function invalidateCache() {

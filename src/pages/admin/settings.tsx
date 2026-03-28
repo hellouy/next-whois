@@ -537,14 +537,6 @@ const FEATURE_GROUPS: { title: string; icon: React.ElementType; color: string; i
       { key: "enable_sponsor", label: "赞助页面", desc: "在导航中显示赞助支持页面入口", onColor: "bg-rose-500" },
     ],
   },
-  {
-    title: "首页展示",
-    icon: RiHomeLine,
-    color: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400",
-    items: [
-      { key: "home_show_stats", label: "显示统计数字", desc: "首页显示总查询次数等实时统计数据", onColor: "bg-emerald-500" },
-    ],
-  },
 ];
 
 function Toggle({ value, onChange, onColor }: { value: boolean; onChange: (v: boolean) => void; onColor: string }) {

@@ -14,24 +14,61 @@ import { motion } from "framer-motion";
 import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
 import { getOrigin } from "@/lib/seo";
 import type { GetServerSideProps } from "next";
+import { getSetting } from "@/lib/server/site-settings-server";
 
-function XRWDisplay() {
+interface HomeSeo {
+  title: string;
+  description: string;
+  keywords: string;
+  ogTitle: string;
+  ogImage: string;
+  ogSiteName: string;
+  twitterCard: string;
+  logoText: string;
+  tagline: string;
+  showStats: boolean;
+}
+
+function XRWDisplay({ tagline }: { tagline: string }) {
+  const settings = useSiteSettings();
+  const logoText = settings.site_logo_text || "X.RW";
   return (
     <div className="w-full flex flex-col items-center justify-center select-none gap-2">
       <span className="text-shimmer text-4xl font-bold tracking-[0.22em]">
-        X.RW
+        {logoText}
       </span>
-      <span className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase">
-        NiC.RW 提供技术支持
-      </span>
+      {tagline && (
+        <span className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase">
+          {tagline}
+        </span>
+      )}
     </div>
   );
 }
 
-export default function HomePage({ origin }: { origin: string }) {
+function usePublicStats(enabled: boolean) {
+  const [stats, setStats] = React.useState<{ totalSearches: number; todaySearches: number } | null>(null);
+  React.useEffect(() => {
+    if (!enabled) return;
+    fetch("/api/public-stats")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.enabled) setStats({ totalSearches: d.totalSearches, todaySearches: d.todaySearches }); })
+      .catch(() => {});
+  }, [enabled]);
+  return stats;
+}
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${Math.floor(n / 1000)}K`;
+  return n.toLocaleString();
+}
+
+export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
+  const stats = usePublicStats(seo.showStats);
 
   useEffect(() => {
     const handleStart = (url: string) => { if (isSearchRoute(url)) setLoading(true); };
@@ -58,30 +95,30 @@ export default function HomePage({ origin }: { origin: string }) {
   );
 
   const siteUrl = origin || "";
-  const homeDescription = "免费在线 WHOIS / RDAP 域名查询工具，支持查询域名注册信息、注册商、注册日期、到期时间、DNS、状态等，支持国际域名和 IP 地址查询。";
+  const ogImage = seo.ogImage || `${siteUrl}/api/og?theme=dark`;
 
   return (
     <>
     <Head>
-      <title>RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具</title>
-      <meta name="description" content={homeDescription} />
-      <meta name="keywords" content="whois查询, rdap, 域名查询, 域名注册信息, 域名到期, whois工具, 域名信息, ip查询, 域名状态" />
+      <title>{seo.title}</title>
+      <meta name="description" content={seo.description} />
+      {seo.keywords && <meta name="keywords" content={seo.keywords} />}
       <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
       <link rel="canonical" href={siteUrl + "/"} />
 
       <meta property="og:type" content="website" />
       <meta property="og:url" content={siteUrl + "/"} />
-      <meta property="og:title" content="RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具" />
-      <meta property="og:description" content={homeDescription} />
-      <meta property="og:image" content={`${siteUrl}/api/og?theme=dark`} />
+      <meta property="og:site_name" content={seo.ogSiteName} />
+      <meta property="og:title" content={seo.ogTitle} />
+      <meta property="og:description" content={seo.description} />
+      <meta property="og:image" content={ogImage} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
-      <meta property="og:locale" content="zh_CN" />
 
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content="RDAP+WHOIS 域名查询" />
-      <meta name="twitter:description" content={homeDescription} />
-      <meta name="twitter:image" content={`${siteUrl}/api/og?theme=dark`} />
+      <meta name="twitter:card" content={seo.twitterCard || "summary_large_image"} />
+      <meta name="twitter:title" content={seo.ogTitle} />
+      <meta name="twitter:description" content={seo.description} />
+      <meta name="twitter:image" content={ogImage} />
 
       <script
         type="application/ld+json"
@@ -89,10 +126,9 @@ export default function HomePage({ origin }: { origin: string }) {
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
-            "name": "RDAP+WHOIS 域名查询",
+            "name": seo.ogSiteName,
             "url": siteUrl,
-            "description": homeDescription,
-            "inLanguage": "zh-CN",
+            "description": seo.description,
             "potentialAction": {
               "@type": "SearchAction",
               "target": {
@@ -117,10 +153,25 @@ export default function HomePage({ origin }: { origin: string }) {
           <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
         </div>
 
-        {/* Mobile: centered X.RW brand display */}
+        {/* Stats bar — shown when home_show_stats is enabled */}
+        {seo.showStats && stats && !loading && (
+          <div className="flex justify-center gap-6 mt-3 mb-1">
+            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+              <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
+              次总查询
+            </span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+              <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
+              次今日查询
+            </span>
+          </div>
+        )}
+
+        {/* Mobile: centered brand display */}
         {!loading && (
-          <div className="sm:hidden flex items-center justify-center" style={{ height: "calc(100vh - 16rem)" }}>
-            <XRWDisplay />
+          <div className="sm:hidden flex items-center justify-center" style={{ height: "calc(100vh - 19rem)" }}>
+            <XRWDisplay logoText={seo.logoText} tagline={seo.tagline} />
           </div>
         )}
 
@@ -176,6 +227,49 @@ export default function HomePage({ origin }: { origin: string }) {
   );
 }
 
+const DEFAULT_TITLE       = "RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具";
+const DEFAULT_DESC        = "免费在线 WHOIS / RDAP 域名查询工具，支持查询域名注册信息、注册商、注册日期、到期时间、DNS、状态等，支持国际域名和 IP 地址查询。";
+const DEFAULT_KEYWORDS    = "whois查询, rdap, 域名查询, 域名注册信息, 域名到期, whois工具, 域名信息, ip查询, 域名状态";
+const DEFAULT_LOGO        = "X.RW";
+const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
+
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  return { props: { origin: getOrigin(req) } };
+  const origin = getOrigin(req);
+
+  const [
+    siteTitle, siteDesc, siteKeywords, siteLogo, siteSubtitle,
+    ogSiteName, ogImage, twitterCard, homeShowStats,
+  ] = await Promise.all([
+    getSetting("site_title"),
+    getSetting("site_description"),
+    getSetting("site_keywords"),
+    getSetting("site_logo_text"),
+    getSetting("site_subtitle"),
+    getSetting("og_site_name"),
+    getSetting("og_image"),
+    getSetting("twitter_card"),
+    getSetting("home_show_stats"),
+  ]).catch(() => Array(9).fill("") as string[]);
+
+  const logoText   = siteLogo   || DEFAULT_LOGO;
+  const tagline    = siteSubtitle || DEFAULT_TAGLINE;
+  const title      = siteTitle  || DEFAULT_TITLE;
+  const desc       = siteDesc   || DEFAULT_DESC;
+  const keywords   = siteKeywords || DEFAULT_KEYWORDS;
+  const siteName   = ogSiteName || logoText;
+
+  const seo: HomeSeo = {
+    title,
+    description: desc,
+    keywords,
+    ogTitle: title,
+    ogImage: ogImage || "",
+    ogSiteName: siteName,
+    twitterCard: twitterCard || "summary_large_image",
+    logoText,
+    tagline,
+    showStats: homeShowStats === "1",
+  };
+
+  return { props: { origin, seo } };
 };

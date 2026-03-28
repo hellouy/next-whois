@@ -2,7 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes } from "crypto";
 import { run, isDbReady } from "@/lib/db-query";
 
+let _tableReady = false;
 async function ensureTable() {
+  if (_tableReady) return;
   await run(`
     CREATE TABLE IF NOT EXISTS tld_lifecycle_feedback (
       id                       VARCHAR(16) PRIMARY KEY,
@@ -22,6 +24,7 @@ async function ensureTable() {
       reviewed_by              VARCHAR(255)
     )
   `);
+  _tableReady = true;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
