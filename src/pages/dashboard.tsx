@@ -29,6 +29,7 @@ import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import type { HistoryItem } from "@/lib/history";
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
+import { StampPreviewCard, STAMP_CARD_THEMES } from "@/components/stamp-preview-card";
 
 type Subscription = {
   id: string; domain: string; expiration_date: string | null;
@@ -69,7 +70,7 @@ type Plan = {
 };
 
 type Stamp = {
-  id: string; domain: string; tag_name: string; tag_style: string;
+  id: string; domain: string; tag_name: string; tag_style: string; card_theme: string;
   link: string | null; description: string | null; nickname: string;
   verified: boolean; verified_at: string | null; created_at: string;
 };
@@ -132,10 +133,12 @@ const EDIT_TAG_STYLES: {
 function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; onClose: () => void; onSaved: () => void; isMember: boolean }) {
   const [tagName, setTagName] = React.useState(stamp.tag_name);
   const [tagStyle, setTagStyle] = React.useState(stamp.tag_style);
+  const [cardTheme, setCardTheme] = React.useState(stamp.card_theme || "app");
   const [link, setLink] = React.useState(stamp.link || "");
   const [description, setDescription] = React.useState(stamp.description || "");
   const [nickname, setNickname] = React.useState(stamp.nickname);
   const [saving, setSaving] = React.useState(false);
+  const [themePickerOpen, setThemePickerOpen] = React.useState(false);
   const { t, locale } = useTranslation();
   const isZh = locale.startsWith("zh");
 
@@ -145,7 +148,7 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
       const res = await fetch(`/api/user/stamps?id=${stamp.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tagName, tagStyle, link, description, nickname }),
+        body: JSON.stringify({ tagName, tagStyle, cardTheme, link, description, nickname }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success(t("dashboard.save_success"));
@@ -158,124 +161,205 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
     }
   }
 
+  const curTheme = STAMP_CARD_THEMES[cardTheme];
+  const selStyle = EDIT_TAG_STYLES.find(ts => ts.value === tagStyle) || EDIT_TAG_STYLES[0];
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-6 sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 space-y-4 max-h-[88vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold flex items-center gap-2">
-            <RiPencilLine className="w-4 h-4 text-primary" />{t("dashboard.edit_stamp_title")}
-          </h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
-            <RiCloseLine className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <Label className="text-xs font-semibold">{t("dashboard.tag_label")}</Label>
-              {!isMember && <span className="text-[10px] text-amber-500">{t("dashboard.tag_limit_free")}</span>}
+    <>
+      {/* ── Theme picker overlay ── */}
+      {themePickerOpen && (
+        <div className="fixed inset-0 z-[80] flex flex-col items-stretch" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+          <div className="flex-1" onClick={() => setThemePickerOpen(false)} />
+          <div className="bg-background rounded-t-2xl shadow-2xl max-h-[82vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div>
+                <p className="font-bold text-base">{isZh ? "选择弹窗样式" : "Card Theme"}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{isZh ? "点击样式即可选中并关闭" : "Tap to select"}</p>
+              </div>
+              <button type="button" onClick={() => setThemePickerOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground">
+                <RiCloseLine className="w-4 h-4" />
+              </button>
             </div>
-            <Input value={tagName} onChange={e => setTagName(e.target.value)} maxLength={isMember ? 32 : 5} className="h-9 rounded-xl text-sm" />
+            <div className="overflow-y-auto px-5 py-4 space-y-5">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">{isZh ? "标准配色" : "Standard"}</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !th.special).map(([key, th]) => (
+                    <button key={key} type="button"
+                      onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all active:scale-[0.97]",
+                        cardTheme === key ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/40"
+                      )}>
+                      <span className={cn("w-full h-6 rounded-lg", th.hero)} />
+                      <span className="text-[10px] font-semibold leading-none">{th.label}</span>
+                      {cardTheme === key && <span className="text-[8px] text-primary font-bold uppercase tracking-widest">{isZh ? "已选" : "✓"}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                  {isZh ? "特殊排版" : "Special layouts"} <span className="normal-case font-normal opacity-60">· {isZh ? "实际效果预览" : "preview"}</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !!th.special).map(([key, th]) => (
+                    <button key={key} type="button"
+                      onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                      className={cn(
+                        "flex flex-col gap-2 rounded-xl border-2 overflow-hidden transition-all active:scale-[0.97]",
+                        cardTheme === key ? "border-primary" : "border-transparent hover:border-border"
+                      )}>
+                      <div className="pointer-events-none scale-[0.72] origin-top-left w-[138.8%]">
+                        <StampPreviewCard themeKey={key} />
+                      </div>
+                      <div className="flex items-center justify-between px-2 pb-2 -mt-[28%]">
+                        <span className="text-[11px] font-semibold">{th.special} {th.label}</span>
+                        {cardTheme === key && <span className="text-[9px] text-primary font-bold uppercase tracking-widest">{isZh ? "已选" : "✓"}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pb-safe" />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <Label className="text-xs font-semibold">{t("dashboard.tag_style")}</Label>
-              {!isMember && <span className="text-[10px] text-violet-600 flex items-center gap-0.5"><RiVipCrownLine className="w-3 h-3"/>{t("dashboard.member_only")}</span>}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {EDIT_TAG_STYLES.map(ts => {
-                const Icon = ts.icon;
-                const isFree = ts.value === "personal";
-                const locked = !isMember && !isFree;
-                return (
-                  <button key={ts.value} type="button"
-                    onClick={() => { if (!locked) setTagStyle(ts.value); else toast.info(t("dashboard.upgrade_style_toast")); }}
-                    title={locked ? t("dashboard.member_style_tooltip") : undefined}
-                    className={cn(
-                      "relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border-2 transition-all active:scale-[0.96]",
-                      locked ? "opacity-40 cursor-not-allowed border-transparent" : tagStyle === ts.value
-                        ? "border-white/60 ring-2 ring-offset-1 ring-primary scale-105 shadow-md"
-                        : "border-transparent opacity-75 hover:opacity-100",
-                      ts.color
-                    )}>
-                    {locked ? <RiLockLine className="w-3 h-3 shrink-0" /> : <Icon className="w-3 h-3 shrink-0" />}
-                    {isZh ? ts.zhLabel : ts.enLabel}
-                    {isFree && !isMember && (
-                      <span className="ml-0.5 text-[7px] font-bold bg-white/30 px-1 py-0.5 rounded-full leading-tight">{t("dashboard.tag_free")}</span>
-                    )}
-                  </button>
-                );
-              })}
+        </div>
+      )}
+
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-6 sm:p-4">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 space-y-4 max-h-[88vh] overflow-y-auto">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <RiPencilLine className="w-4 h-4 text-primary" />{t("dashboard.edit_stamp_title")}
+            </h2>
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
+              <RiCloseLine className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
+
+          <div className="space-y-3">
+            {/* Tag name */}
+            <div className="space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <Label className="text-xs font-semibold">{t("dashboard.tag_label")}</Label>
+                {!isMember && <span className="text-[10px] text-amber-500">{t("dashboard.tag_limit_free")}</span>}
+              </div>
+              <Input value={tagName} onChange={e => setTagName(e.target.value)} maxLength={isMember ? 32 : 5} className="h-9 rounded-xl text-sm" />
             </div>
 
-            {/* Live style preview */}
-            {(() => {
-              const sel = EDIT_TAG_STYLES.find(ts => ts.value === tagStyle) || EDIT_TAG_STYLES[0];
-              const Icon = sel.icon;
-              return (
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={tagStyle}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl border-l-4 mt-2",
-                      sel.previewBg, sel.previewBorder
-                    )}
-                  >
-                    <Icon className={cn("w-5 h-5 shrink-0", sel.previewIcon)} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-mono text-muted-foreground truncate">{stamp.domain}</span>
-                        <span className={cn("inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold", sel.color)}>
-                          <Icon className="w-2.5 h-2.5" />
-                          {tagName || (isZh ? sel.zhLabel : sel.enLabel)}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{nickname || t("dashboard.nickname")}</p>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-              );
-            })()}
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">{t("dashboard.nickname")}</Label>
-            <Input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={50} className="h-9 rounded-xl text-sm" />
-          </div>
-          {isMember ? (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">{t("dashboard.link")} <span className="text-muted-foreground font-normal">{t("dashboard.optional")}</span></Label>
-                <Input value={link} onChange={e => setLink(e.target.value)} maxLength={200} placeholder="https://" className="h-9 rounded-xl text-sm" />
+            {/* Tag style */}
+            <div className="space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <Label className="text-xs font-semibold">{t("dashboard.tag_style")}</Label>
+                {!isMember && <span className="text-[10px] text-violet-600 flex items-center gap-0.5"><RiVipCrownLine className="w-3 h-3"/>{t("dashboard.member_only")}</span>}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">{t("dashboard.description")} <span className="text-muted-foreground font-normal">{t("dashboard.optional")}</span></Label>
-                <Input value={description} onChange={e => setDescription(e.target.value)} maxLength={200} className="h-9 rounded-xl text-sm" />
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-violet-50/50 dark:bg-violet-950/10 border border-dashed border-violet-200/60 dark:border-violet-800/40">
-              <RiVipCrownLine className="w-4 h-4 text-violet-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300">{t("dashboard.link_member_title")}</p>
-                <p className="text-[10px] text-muted-foreground/70 leading-relaxed">{t("dashboard.link_member_desc")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {EDIT_TAG_STYLES.map(ts => {
+                  const Icon = ts.icon;
+                  const isFree = ts.value === "personal";
+                  const locked = !isMember && !isFree;
+                  return (
+                    <button key={ts.value} type="button"
+                      onClick={() => { if (!locked) setTagStyle(ts.value); else toast.info(t("dashboard.upgrade_style_toast")); }}
+                      title={locked ? t("dashboard.member_style_tooltip") : undefined}
+                      className={cn(
+                        "relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border-2 transition-all active:scale-[0.96]",
+                        locked ? "opacity-40 cursor-not-allowed border-transparent" : tagStyle === ts.value
+                          ? "border-white/60 ring-2 ring-offset-1 ring-primary scale-105 shadow-md"
+                          : "border-transparent opacity-75 hover:opacity-100",
+                        ts.color
+                      )}>
+                      {locked ? <RiLockLine className="w-3 h-3 shrink-0" /> : <Icon className="w-3 h-3 shrink-0" />}
+                      {isZh ? ts.zhLabel : ts.enLabel}
+                      {isFree && !isMember && (
+                        <span className="ml-0.5 text-[7px] font-bold bg-white/30 px-1 py-0.5 rounded-full leading-tight">{t("dashboard.tag_free")}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </div>
-        <div className="flex gap-2 pt-1">
-          <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
-          <Button onClick={handleSave} disabled={saving} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
-            {saving ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.saving")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.save")}</>}
-          </Button>
+
+            {/* Card theme picker */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">{isZh ? "弹窗样式" : "Card Theme"}</Label>
+              <button type="button" onClick={() => setThemePickerOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-muted/30 hover:bg-muted/60 transition-colors text-left">
+                <span className={cn("w-5 h-5 rounded-md shrink-0 overflow-hidden flex items-center justify-center text-xs", curTheme?.hero ?? "bg-zinc-700")}>
+                  {curTheme?.special && <span className="leading-none">{curTheme.special}</span>}
+                </span>
+                <span className="text-sm font-medium flex-1">
+                  {curTheme?.label ?? cardTheme}
+                  {curTheme?.special && <span className="ml-1.5 text-muted-foreground text-xs font-normal">· {isZh ? "特殊排版" : "special"}</span>}
+                </span>
+                <span className="text-[11px] text-muted-foreground font-medium shrink-0">{isZh ? "点击更换 ›" : "Change ›"}</span>
+              </button>
+            </div>
+
+            {/* Nickname */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">{t("dashboard.nickname")}</Label>
+              <Input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={50} className="h-9 rounded-xl text-sm" />
+            </div>
+
+            {/* Link + description (members only) */}
+            {isMember ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">{t("dashboard.link")} <span className="text-muted-foreground font-normal">{t("dashboard.optional")}</span></Label>
+                  <Input value={link} onChange={e => setLink(e.target.value)} maxLength={200} placeholder="https://" className="h-9 rounded-xl text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">{t("dashboard.description")} <span className="text-muted-foreground font-normal">{t("dashboard.optional")}</span></Label>
+                  <Input value={description} onChange={e => setDescription(e.target.value)} maxLength={200} className="h-9 rounded-xl text-sm" />
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-violet-50/50 dark:bg-violet-950/10 border border-dashed border-violet-200/60 dark:border-violet-800/40">
+                <RiVipCrownLine className="w-4 h-4 text-violet-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300">{t("dashboard.link_member_title")}</p>
+                  <p className="text-[10px] text-muted-foreground/70 leading-relaxed">{t("dashboard.link_member_desc")}</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Live popup preview ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <RiEyeLine className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{isZh ? "弹窗实际效果" : "Preview"}</span>
+                <div className="flex-1 h-px bg-border/50" />
+              </div>
+              <div className="rounded-2xl overflow-hidden shadow-sm border border-border/30">
+                <StampPreviewCard
+                  themeKey={cardTheme || "app"}
+                  data={{
+                    tagName: tagName || stamp.tag_name,
+                    domain: stamp.domain,
+                    description: description || undefined,
+                    link: link || undefined,
+                    tagLabel: isZh ? (selStyle.zhLabel) : selStyle.enLabel,
+                    icon: selStyle.icon,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
+            <Button onClick={handleSave} disabled={saving} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
+              {saving ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.saving")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.save")}</>}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

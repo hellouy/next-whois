@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "GET") {
     try {
       const rows = await many(
-        `SELECT id, domain, tag_name, tag_style, link, description, nickname,
+        `SELECT id, domain, tag_name, tag_style, card_theme, link, description, nickname,
                 verified, verified_at, created_at
          FROM stamps WHERE email = $1 ORDER BY created_at DESC`,
         [session.user.email],
@@ -34,13 +34,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     if (!existing) return res.status(404).json({ error: "Stamp not found" });
 
-    const { tagName, tagStyle, link, description, nickname } = req.body;
+    const ALLOWED_TAG_STYLES  = ["personal","official","brand","verified","partner","dev","warning","premium"];
+    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","gradient","celebrate","split","flash","neon"];
+
+    const { tagName, tagStyle, cardTheme, link, description, nickname } = req.body;
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
 
     if (tagName !== undefined) { setClauses.push(`tag_name = $${idx++}`); values.push(String(tagName).trim().slice(0, 32)); }
-    if (tagStyle !== undefined) { setClauses.push(`tag_style = $${idx++}`); values.push(String(tagStyle)); }
+    if (tagStyle !== undefined) {
+      const safe = ALLOWED_TAG_STYLES.includes(String(tagStyle)) ? String(tagStyle) : "personal";
+      setClauses.push(`tag_style = $${idx++}`); values.push(safe);
+    }
+    if (cardTheme !== undefined) {
+      const safe = ALLOWED_CARD_THEMES.includes(String(cardTheme)) ? String(cardTheme) : "app";
+      setClauses.push(`card_theme = $${idx++}`); values.push(safe);
+    }
     if (link !== undefined) { setClauses.push(`link = $${idx++}`); values.push(String(link).trim().slice(0, 200)); }
     if (description !== undefined) { setClauses.push(`description = $${idx++}`); values.push(String(description).trim().slice(0, 200)); }
     if (nickname !== undefined) { setClauses.push(`nickname = $${idx++}`); values.push(String(nickname).trim().slice(0, 50)); }
