@@ -51,6 +51,23 @@ import("@/lib/whois/tld-fallback-gate").then(m => {
   // Trigger the lazy DB load by calling isTldFallbackEnabled with a dummy domain.
   m.isTldFallbackEnabled("warmup.com").catch(() => {});
 }).catch(() => {});
+// Pre-warm DNS for the most-queried WHOIS servers so the first real request
+// hits the in-process cache instead of paying a system-DNS or DoH round-trip.
+warmupDnsCache([
+  "whois.verisign-grs.com",  // .com / .net
+  "whois.pir.org",           // .org
+  "whois.iana.org",          // IANA referral fallback
+  "whois.afilias.net",       // .info, .mobi, .asia
+  "whois.nic.fr",            // .fr
+  "whois.denic.de",          // .de
+  "whois.cnnic.cn",          // .cn
+  "whois.nic.uk",            // .uk
+  "whois.apnic.net",         // IP / APNIC
+  "whois.arin.net",          // IP / ARIN
+  "whois.ripe.net",          // IP / RIPE
+  "whois.lacnic.net",        // IP / LACNIC
+  "whois.afrinic.net",       // IP / AFRINIC
+]);
 import { domainToASCII } from "url";
 import {
   getCustomServerEntry,
@@ -62,6 +79,7 @@ import {
   HttpServerEntry,
 } from "@/lib/whois/custom-servers";
 import { probeDomain } from "@/lib/whois/dns-check";
+import { warmupDnsCache } from "@/lib/whois/dns-resolver";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupYisi } from "@/lib/whois/yisi-fallback";
 import { lookupTianhu } from "@/lib/whois/tianhu-fallback";
@@ -494,6 +512,11 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
     return { raw, structured, server: lastServer };
   }
 
+  // Inner whoiser timeout must be shorter than the outer withTimeout(getLookupWhois, WHOIS_TIMEOUT)
+  // wrapper so whoiser can clean up its own TCP connections before the outer deadline fires.
+  // Using WHOIS_TIMEOUT - 300 ms gives a 300 ms cleanup window.
+  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
+
   // ── Attempt 1: local bootstrap host (or whoiser auto-discovery if no bootstrap) ──
   let primaryResult: WhoisRawResult | null = null;
   let primaryError: unknown = null;
@@ -501,7 +524,7 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
     const data = await whoisDomain(domainToQuery, {
       raw: true,
       follow,
-      timeout: LOOKUP_TIMEOUT,
+      timeout: innerTimeout,
       ...(bootstrapWhoisHost ? { host: bootstrapWhoisHost } : {}),
     });
     primaryResult = extractRawFromData(data);
@@ -518,7 +541,7 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
       const data = await whoisDomain(domainToQuery, {
         raw: true,
         follow,
-        timeout: LOOKUP_TIMEOUT,
+        timeout: innerTimeout,
         // no host: whoiser auto-discovers via IANA
       });
       const result = extractRawFromData(data);
@@ -725,22 +748,21 @@ export async function lookupWhoisWithCache(
 }
 
 // After RDAP succeeds, wait at most this long for WHOIS (for raw content merging).
-// 350 ms is enough to catch WHOIS responses that arrive just after RDAP without
+// 200 ms is enough to catch WHOIS responses that arrive just after RDAP without
 // meaningfully delaying the response when WHOIS is truly slow.
-const WHOIS_MERGE_WAIT_MS = 350;
+const WHOIS_MERGE_WAIT_MS = 200;
 
 // After WHOIS succeeds (possibly with empty data), wait at most this long for
-// RDAP to finish before giving up on it.  RDAP often wins the race on warm
-// connections but can be slow on first query (cold TLS / DNS).  600 ms
-// is enough for most cold-start RDAP responses while keeping latency low.
-const RDAP_MERGE_WAIT_MS = 600;
+// RDAP to finish before giving up on it.  400 ms covers warm RDAP connections
+// while keeping latency low; RDAP that takes >400 ms after WHOIS wins is rare.
+const RDAP_MERGE_WAIT_MS = 400;
 
 // Separate timeout caps for each protocol.
-// RDAP: ccTLD overrides now bypass IANA bootstrap (fast direct fetch) — 4 s
-//       gives ccTLD RDAP servers enough headroom while failing faster on dead ones.
-// WHOIS TCP varies more; give legitimate slow servers 3 s before giving up.
-const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  4_000);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 3_000);
+// RDAP: HTTP/JSON — 3.5 s is ample for any live RDAP server.
+// WHOIS TCP: 2.5 s — most responsive WHOIS servers reply in < 1 s;
+//   unresponsive ones are just as unresponsive at 3 s.
+const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 2_500);
 
 // How long to wait for native lookups before starting third-party fallbacks
 // in parallel.  Set shorter than WHOIS_TIMEOUT so that slow WHOIS servers
@@ -749,16 +771,16 @@ const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 3_000);
 const FALLBACK_START_MS = intEnv("FALLBACK_START_MS", 500);
 
 // For rdapIsDirect ccTLDs: WHOIS is normally skipped from the race entirely
-// so a fast RDAP response costs zero extra TCP connections.  But on cold Vercel
-// starts the RDAP server may take 3–5 s to respond, and the sequential fallback
-// (RDAP_TIMEOUT + WHOIS_TIMEOUT = 9 s) can be painfully slow.
+// so a fast RDAP response costs zero extra TCP connections.  But on cold starts
+// the RDAP server may take 3–4 s to respond.
 //
 // Shadow WHOIS: after this delay, WHOIS is launched in PARALLEL with the still-
 // pending RDAP promise.  This caps total worst-case latency at
-//   max(RDAP_TIMEOUT, RDAP_DIRECT_WHOIS_SHADOW_MS + WHOIS_TIMEOUT) = max(5 s, 6 s) = 6 s
-// instead of 5 + 4 = 9 s, while still letting a fast RDAP (<2 s) win without
-// ever opening a WHOIS TCP connection.
-const RDAP_DIRECT_WHOIS_SHADOW_MS = intEnv("RDAP_DIRECT_WHOIS_SHADOW_MS", 2_000);
+//   max(RDAP_TIMEOUT, RDAP_DIRECT_WHOIS_SHADOW_MS + WHOIS_TIMEOUT)
+//   = max(3.5 s, 1.5 + 2.5) = max(3.5, 4.0) = 4.0 s
+// instead of the old 3.5 + 3 = 6.5 s worst case, while still letting a fast
+// RDAP (< 1.5 s) win without ever opening a WHOIS TCP connection.
+const RDAP_DIRECT_WHOIS_SHADOW_MS = intEnv("RDAP_DIRECT_WHOIS_SHADOW_MS", 1_500);
 
 export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const startTime = performance.now();

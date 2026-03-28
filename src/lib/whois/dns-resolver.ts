@@ -12,11 +12,11 @@
  * resolved IP on port 43 works and returns correct WHOIS data.
  *
  * Strategy:
- *   1. Try system DNS via dns.promises.resolve4() — zero extra latency.
- *   2. On ENOTFOUND / ESERVFAIL, fall back to Cloudflare DoH (pure HTTPS,
- *      no extra dependencies).
- *   3. Cache successful DoH answers with their DNS TTL (min 60 s, max 1 h).
- *   4. Return the original error if DoH also fails.
+ *   1. Check in-process cache (zero latency within the same invocation).
+ *   2. Check Redis cache (persists across cold starts — avoids DoH round-trip).
+ *   3. Try system DNS via dns.promises.resolve4() — zero extra latency.
+ *   4. On ENOTFOUND / ESERVFAIL, fall back to Cloudflare DoH (pure HTTPS).
+ *   5. Cache successful answers in both Redis and in-process cache.
  *
  * Usage: call resolveWithDohFallback(host) before net.connect() and pass the
  * returned IP as the host.  This avoids Node.js v20 net.connect lookup-option
@@ -29,6 +29,9 @@ import * as https from "https";
 // ── DoH response TTL bounds ───────────────────────────────────────────────────
 const MIN_TTL_MS = 60_000;
 const MAX_TTL_MS = 3_600_000;
+const REDIS_DNS_PREFIX = "dns:v4:";
+// Store in Redis for up to 1 hour regardless of DNS TTL (WHOIS server IPs are stable)
+const REDIS_DNS_TTL_S = 3_600;
 
 interface CacheEntry {
   ip: string;
@@ -42,6 +45,32 @@ function cachedIp(host: string): string | null {
   if (entry && entry.expires > Date.now()) return entry.ip;
   _cache.delete(host);
   return null;
+}
+
+function setCached(host: string, ip: string, ttlMs: number) {
+  _cache.set(host, { ip, expires: Date.now() + ttlMs });
+}
+
+// ── Redis-backed DNS cache (persists across cold starts) ──────────────────────
+async function redisGetDns(host: string): Promise<string | null> {
+  try {
+    const { redis, isRedisAvailable } = await import("@/lib/server/redis");
+    if (!isRedisAvailable() || !redis) return null;
+    const val = await redis.get(REDIS_DNS_PREFIX + host);
+    return val || null;
+  } catch {
+    return null;
+  }
+}
+
+async function redisSetDns(host: string, ip: string): Promise<void> {
+  try {
+    const { redis, isRedisAvailable } = await import("@/lib/server/redis");
+    if (!isRedisAvailable() || !redis) return;
+    await redis.set(REDIS_DNS_PREFIX + host, ip, "EX", REDIS_DNS_TTL_S);
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -78,7 +107,7 @@ function dohResolve(host: string): Promise<string> {
                   MAX_TTL_MS,
                 );
                 const ip = aRecords[0].data;
-                _cache.set(host, { ip, expires: Date.now() + ttlMs });
+                setCached(host, ip, ttlMs);
                 return resolve(ip);
               }
             }
@@ -102,12 +131,14 @@ function dohResolve(host: string): Promise<string> {
  * Resolves a hostname to an IPv4 address, using Cloudflare DoH as a fallback
  * when the system resolver returns ENOTFOUND or ESERVFAIL.
  *
+ * Resolution order:
+ *   1. In-process memory cache (zero latency)
+ *   2. Redis cache (persists across cold starts)
+ *   3. System DNS resolver
+ *   4. Cloudflare DoH
+ *
  * Returns the original hostname unchanged if it is already an IP address,
  * so callers can pass the result directly to net.connect({ host }).
- *
- * Usage in queryWhoisTcp:
- *   const ip = await resolveWithDohFallback(host);
- *   net.connect({ host: ip, port }, ...)
  */
 export async function resolveWithDohFallback(host: string): Promise<string> {
   // Already an IP — nothing to resolve
@@ -115,14 +146,26 @@ export async function resolveWithDohFallback(host: string): Promise<string> {
     return host;
   }
 
-  // Check DoH cache first (avoid even a system-DNS round-trip on repeated queries)
-  const cached = cachedIp(host);
-  if (cached) return cached;
+  // 1. In-process cache (zero latency within the same invocation)
+  const memHit = cachedIp(host);
+  if (memHit) return memHit;
 
-  // Try system DNS
+  // 2. Redis cache (survives cold starts)
+  const redisHit = await redisGetDns(host);
+  if (redisHit) {
+    setCached(host, redisHit, MAX_TTL_MS);
+    return redisHit;
+  }
+
+  // 3. System DNS
   try {
     const addrs = await dns.promises.resolve4(host);
-    if (addrs.length > 0) return addrs[0];
+    if (addrs.length > 0) {
+      const ip = addrs[0];
+      setCached(host, ip, MIN_TTL_MS * 5);
+      redisSetDns(host, ip).catch(() => {});
+      return ip;
+    }
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== "ENOTFOUND" && code !== "ESERVFAIL" && code !== "EAI_AGAIN") {
@@ -131,5 +174,19 @@ export async function resolveWithDohFallback(host: string): Promise<string> {
     // Fall through to DoH
   }
 
-  return dohResolve(host);
+  // 4. Cloudflare DoH fallback
+  const ip = await dohResolve(host);
+  redisSetDns(host, ip).catch(() => {});
+  return ip;
+}
+
+/**
+ * Pre-warm DNS cache for a list of well-known WHOIS server hostnames.
+ * Called at module load so the first real request hits the cache.
+ * Failures are silently ignored — warmup is best-effort.
+ */
+export function warmupDnsCache(hosts: string[]): void {
+  for (const host of hosts) {
+    resolveWithDohFallback(host).catch(() => {});
+  }
 }
