@@ -341,6 +341,30 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_activation_codes_used    ON activation_codes (used)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_user_id       ON balance_transactions (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_created       ON balance_transactions (created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS tld_registry_info (
+    tld              TEXT        PRIMARY KEY,
+    tld_type         TEXT,
+    status           TEXT,
+    manager          TEXT,
+    registry_url     TEXT,
+    whois_server     TEXT,
+    country          TEXT,
+    address          TEXT,
+    nameservers      TEXT,
+    created_date     TEXT,
+    changed_date     TEXT,
+    iana_url         TEXT,
+    probe_result     TEXT,
+    probe_method     TEXT,
+    probe_latency_ms INTEGER,
+    probed_at        TIMESTAMPTZ,
+    scan_error       TEXT,
+    scraped_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_tld_registry_type    ON tld_registry_info (tld_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_tld_registry_status  ON tld_registry_info (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_tld_registry_scraped ON tld_registry_info (scraped_at DESC)`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {

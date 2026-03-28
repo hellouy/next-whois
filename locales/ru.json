@@ -1583,6 +1583,7 @@
     "nav_tld_rules": "ИИ-парсинг",
     "nav_hot_prefixes": "Hot Prefixes",
     "nav_tld_lifecycle_feedback": "Коррекция TLD",
+    "nav_tld_registry": "БД Регистраторов",
     "nav_tld_probe": "Зондирование TLD",
     "nav_og_styles": "OG-карточки",
     "nav_system_label": "Система",
