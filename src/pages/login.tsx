@@ -31,6 +31,14 @@ export default function LoginPage() {
     if (status === "authenticated") router.replace("/dashboard");
   }, [status, router]);
 
+  React.useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.msg === "require_login") {
+      toast.info(t("auth.require_login_notice"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);

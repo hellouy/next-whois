@@ -936,6 +936,7 @@
     "login_err_password": "请输入密码",
     "login_err_invalid": "邮箱或密码错误，请检查后重试",
     "login_err_network": "网络错误，请稍后重试",
+    "require_login_notice": "请先登录后才能进行查询",
     "register_page_title": "注册",
     "register_closed_page_title": "注册已关闭",
     "register_title": "创建账户",

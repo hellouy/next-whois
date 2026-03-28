@@ -936,6 +936,7 @@
     "login_err_password": "Veuillez entrer votre mot de passe",
     "login_err_invalid": "E-mail ou mot de passe incorrect, veuillez vérifier et réessayer",
     "login_err_network": "Erreur réseau, veuillez réessayer plus tard",
+    "require_login_notice": "Connectez-vous pour effectuer des recherches",
     "register_page_title": "Inscription",
     "register_closed_page_title": "Inscription fermée",
     "register_title": "Créer un compte",

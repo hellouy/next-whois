@@ -936,6 +936,7 @@
     "login_err_password": "Пожалуйста, введите пароль",
     "login_err_invalid": "Неверный email или пароль, проверьте и повторите попытку",
     "login_err_network": "Ошибка сети, повторите попытку позже",
+    "require_login_notice": "Войдите в систему, чтобы выполнять запросы",
     "register_page_title": "Регистрация",
     "register_closed_page_title": "Регистрация закрыта",
     "register_title": "Создать аккаунт",

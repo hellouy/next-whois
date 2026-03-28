@@ -936,6 +936,7 @@
     "login_err_password": "Please enter your password",
     "login_err_invalid": "Incorrect email or password, please check and try again",
     "login_err_network": "Network error, please try again later",
+    "require_login_notice": "Please sign in to perform lookups",
     "register_page_title": "Register",
     "register_closed_page_title": "Registration Closed",
     "register_title": "Create Account",

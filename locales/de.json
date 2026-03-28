@@ -936,6 +936,7 @@
     "login_err_password": "Bitte geben Sie Ihr Passwort ein",
     "login_err_invalid": "Falsche E-Mail oder Passwort, bitte prüfen und erneut versuchen",
     "login_err_network": "Netzwerkfehler, bitte später erneut versuchen",
+    "require_login_notice": "Bitte melden Sie sich an, um Abfragen durchzuführen",
     "register_page_title": "Registrieren",
     "register_closed_page_title": "Registrierung geschlossen",
     "register_title": "Konto erstellen",

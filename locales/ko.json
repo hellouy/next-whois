@@ -936,6 +936,7 @@
     "login_err_password": "비밀번호를 입력해 주세요",
     "login_err_invalid": "이메일 또는 비밀번호가 올바르지 않습니다. 확인 후 다시 시도해 주세요",
     "login_err_network": "네트워크 오류가 발생했습니다. 나중에 다시 시도해 주세요",
+    "require_login_notice": "조회를 수행하려면 로그인하세요",
     "register_page_title": "회원가입",
     "register_closed_page_title": "가입 종료",
     "register_title": "계정 만들기",

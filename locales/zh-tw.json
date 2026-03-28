@@ -936,6 +936,7 @@
     "login_err_password": "請輸入密碼",
     "login_err_invalid": "電子郵件或密碼錯誤，請檢查後重試",
     "login_err_network": "網路錯誤，請稍後重試",
+    "require_login_notice": "請先登入後才能進行查詢",
     "register_page_title": "註冊",
     "register_closed_page_title": "註冊已關閉",
     "register_title": "建立帳戶",

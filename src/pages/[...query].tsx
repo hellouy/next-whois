@@ -1383,7 +1383,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     if (!session?.user?.email) {
       const locale = context.req.cookies["NEXT_LOCALE"] ?? "en";
       const callbackUrl = `/${locale}/${target}`;
-      return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, permanent: false } };
+      return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}&msg=require_login`, permanent: false } };
     }
   }
 
@@ -4188,8 +4188,11 @@ export default function LookupPage({
     responsePromise
       .then(async (r) => {
         if (r.status === 401) {
-          // require_login is enabled — redirect to login page
-          if (!cancelled) router.replace(`/login?callbackUrl=${encodeURIComponent(router.asPath)}`);
+          // require_login is enabled — show notice then redirect to login page
+          if (!cancelled) {
+            toast.warning(t("auth.require_login_notice"));
+            setTimeout(() => router.replace(`/login?callbackUrl=${encodeURIComponent(router.asPath)}&msg=require_login`), 1200);
+          }
           return null;
         }
         return r.json();

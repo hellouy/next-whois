@@ -936,6 +936,7 @@
     "login_err_password": "パスワードを入力してください",
     "login_err_invalid": "メールアドレスまたはパスワードが間違っています",
     "login_err_network": "ネットワークエラーが発生しました。後でもう一度お試しください",
+    "require_login_notice": "クエリを実行するにはログインしてください",
     "register_page_title": "新規登録",
     "register_closed_page_title": "登録終了",
     "register_title": "アカウントを作成",
