@@ -314,6 +314,8 @@ const ALTER_COLUMNS = [
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS manually_edited      BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS needs_admin_review   BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE payment_plans ADD COLUMN IF NOT EXISTS balance_grant_cents INTEGER NOT NULL DEFAULT 0`,
+  /* Drop overly-restrictive confidence check — scraper uses high/medium/low/ai */
+  `ALTER TABLE tld_rules DROP CONSTRAINT IF EXISTS tld_rules_confidence_check`,
 ];
 
 const CREATE_INDEXES = [

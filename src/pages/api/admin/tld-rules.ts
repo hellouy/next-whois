@@ -670,8 +670,13 @@ export default async function handler(
       return res.send([header, ...lines].join("\n"));
     }
 
+    /* IANA root zone has 1285 non-IDN TLDs (as of 2026-Q1, xn-- excluded).
+       The batch scraper fetches this live; we keep it as a stable reference total. */
+    const IANA_TOTAL = 1285;
     const stats = {
       total: rows.length,
+      ianaTotal: IANA_TOTAL,
+      remaining: Math.max(0, IANA_TOTAL - rows.length),
       ok: rows.filter(r => r.scrape_status === "ok" || r.manually_edited).length,
       warn_defaults: rows.filter(r => r.scrape_status === "warn_defaults" && !r.manually_edited).length,
       failed: rows.filter(r => r.scrape_status === "failed" && !r.manually_edited).length,

@@ -64,6 +64,8 @@ type TldRule = {
 
 type ScrapeStats = {
   total: number;
+  ianaTotal: number;
+  remaining: number;
   ok: number;
   warn_defaults: number;
   failed: number;
@@ -802,24 +804,71 @@ export default function AdminTldRulesPage() {
           </p>
         </div>
 
-        {/* ── Stats Overview ──────────────────────────────────────────────── */}
-        {scrapeStats && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { label: "✅ 已确认", value: scrapeStats.ok, cls: "bg-green-50 border-green-200 text-green-700 dark:bg-green-950/20 dark:border-green-900 dark:text-green-400", desc: "真实数据，可信" },
-              { label: "⚠ 仅默认值", value: scrapeStats.warn_defaults, cls: "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-950/20 dark:border-orange-900 dark:text-orange-400", desc: "AI未找到具体政策，使用30/30/5行业默认值，仍在重试" },
-              { label: "🚫 无数据", value: scrapeStats.no_data, cls: "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400", desc: "多次重试失败，需人工核查或手动录入" },
-              { label: "❌ 失败", value: scrapeStats.failed, cls: "bg-red-50 border-red-200 text-red-700 dark:bg-red-950/20 dark:border-red-900 dark:text-red-400", desc: "网络/AI错误，需重试或手动填写" },
-              { label: "⏳ 待抓取", value: scrapeStats.pending, cls: "bg-muted border-border text-muted-foreground", desc: "尚未抓取" },
-              { label: "✏ 手动修改", value: scrapeStats.manually_edited, cls: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-400", desc: "管理员手动录入，受保护" },
-            ].map(({ label, value, cls, desc }) => (
-              <div key={label} className={cn("border rounded-xl px-4 py-3 text-center", cls)} title={desc}>
-                <div className="text-2xl font-bold">{value}</div>
-                <div className="text-xs mt-0.5 font-medium">{label}</div>
+        {/* ── AI 抓取进度总览 ─────────────────────────────────────────────── */}
+        {scrapeStats && (() => {
+          const iana = scrapeStats.ianaTotal ?? 1285;
+          const inDb = scrapeStats.total;
+          const notYet = Math.max(0, iana - inDb);
+          const pct = Math.round((inDb / iana) * 100);
+          const okPct = Math.round((scrapeStats.ok / iana) * 100);
+          const warnPct = Math.round((scrapeStats.warn_defaults / iana) * 100);
+          const failPct = Math.round(((scrapeStats.failed + scrapeStats.no_data) / iana) * 100);
+          const pendPct = Math.round((scrapeStats.pending / iana) * 100);
+          const notYetPct = Math.round((notYet / iana) * 100);
+          return (
+            <div className="border rounded-xl bg-card overflow-hidden">
+              {/* Header row */}
+              <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <RiRobot2Line className="w-4 h-4 text-violet-500" />
+                  <span className="font-medium text-sm">AI 批量抓取进度</span>
+                  <span className="text-xs text-muted-foreground">
+                    — 后台批量爬取器 (Batch Scrape TLDs 工作流) 正在自动运行
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold text-muted-foreground">{inDb} / {iana} 个</span>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="px-5 py-4 space-y-3">
+                {/* Segmented progress bar */}
+                <div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>IANA 根区 {iana} 个 TLD（不含 IDN）</span>
+                    <span className="font-semibold">{pct}% 已进入数据库</span>
+                  </div>
+                  <div className="w-full h-3 rounded-full bg-muted overflow-hidden flex">
+                    <div title={`✅ 已确认 ${scrapeStats.ok}`} style={{width:`${okPct}%`}} className="h-full bg-green-500 transition-all" />
+                    <div title={`⚠️ 仅默认值 ${scrapeStats.warn_defaults}`} style={{width:`${warnPct}%`}} className="h-full bg-orange-400 transition-all" />
+                    <div title={`❌/🚫 失败 ${scrapeStats.failed + scrapeStats.no_data}`} style={{width:`${failPct}%`}} className="h-full bg-red-400 transition-all" />
+                    <div title={`⏳ 待处理 ${scrapeStats.pending}`} style={{width:`${pendPct}%`}} className="h-full bg-blue-300 transition-all" />
+                    <div title={`— 尚未入库 ${notYet}`} style={{width:`${notYetPct}%`}} className="h-full bg-muted-foreground/20 transition-all" />
+                  </div>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    {[
+                      { dot: "bg-green-500",          label: "已确认",  val: scrapeStats.ok,              desc: "实际数据，可信" },
+                      { dot: "bg-orange-400",         label: "仅默认值", val: scrapeStats.warn_defaults,   desc: "30/30/5 行业默认，AI未找到具体数据" },
+                      { dot: "bg-red-400",            label: "失败/无数据", val: scrapeStats.failed + scrapeStats.no_data, desc: "网络错误或多次重试失败" },
+                      { dot: "bg-blue-300",           label: "待处理",  val: scrapeStats.pending,         desc: "已入库，等待重新抓取" },
+                      { dot: "bg-muted-foreground/30",label: "未入库",  val: notYet,                      desc: "尚未被批量爬取器处理" },
+                    ].map(({ dot, label, val, desc }) => (
+                      <span key={label} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={desc}>
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
+                        {label} <strong className="text-foreground">{val}</strong>
+                      </span>
+                    ))}
+                    {scrapeStats.manually_edited > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400" title="管理员手动录入，受保护不被覆盖">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        手动录入 <strong>{scrapeStats.manually_edited}</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Failed / Warn / No-data records panel ───────────────────────── */}
         {!loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")).length > 0 && (
