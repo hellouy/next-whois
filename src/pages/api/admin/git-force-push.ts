@@ -128,6 +128,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     runCmd("git", ["merge", "--abort"], cwd);
     runCmd("git", ["rebase", "--abort"], cwd);
 
+    // Remove stale lock files that block fetch
+    const lockFiles = [
+      path.join(cwd, ".git", "refs", "remotes", "origin", "main.lock"),
+      path.join(cwd, ".git", "index.lock"),
+      path.join(cwd, ".git", "FETCH_HEAD.lock"),
+    ];
+    for (const lf of lockFiles) {
+      try {
+        if (fs.existsSync(lf)) {
+          fs.unlinkSync(lf);
+          log.push(`✓ 已清除锁文件: ${path.basename(lf)}`);
+        }
+      } catch {
+        log.push(`  无法清除锁文件: ${path.basename(lf)}`);
+      }
+    }
+
     // Fetch latest remote state
     const fetch = runCmd("git", ["fetch", authUrl, `refs/heads/${currentBranch}:refs/remotes/origin/${currentBranch}`], cwd, {
       ...process.env,
