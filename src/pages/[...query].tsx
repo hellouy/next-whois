@@ -4674,16 +4674,16 @@ export default function LookupPage({
           {/* Result is always in the layout flow — skeleton overlays it as an
               absolute layer only during the very first load so there is no
               key-switch, no layout-height jump, no visible "跳一下". */}
-          <div className={cn("relative", loading && data.time === 0 && "min-h-[380px] lg:min-h-[520px]")}>
+          <div className={cn("relative", loading && data.time === 0 && "min-h-[520px]")}>
             <AnimatePresence>
               {loading && data.time === 0 && (
                 <motion.div
                   key="skeleton"
                   className="absolute inset-x-0 top-0 z-10"
-                  initial={{ opacity: 0 }}
+                  initial={{ opacity: 1 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.1, ease: "easeOut" }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
                 >
                   <ResultSkeleton />
                 </motion.div>

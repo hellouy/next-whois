@@ -275,12 +275,29 @@ const STABLE_KEY_PAGES = new Set([
   "/[...query]",  // domain WHOIS results — skeleton handles loading feedback
 ]);
 
+// Regular pages (about, login, privacy, etc.) get a subtle y slide-up on enter.
 const pageVariants = {
   initial: { opacity: 0, y: 5 },
   animate: {
     opacity: 1,
     y: 0,
     transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.1, ease: "easeIn" as const },
+  },
+};
+
+// Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
+// feedback internally.  Adding a y-offset to the page-level transition compounds
+// with the skeleton's own opacity-in, producing a visible "jump" on mobile.
+// Pure opacity is the safest transition for these pages.
+const stablePageVariants = {
+  initial: { opacity: 0 },
+  animate: {
+    opacity: 1,
+    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const },
   },
   exit: {
     opacity: 0,
@@ -299,9 +316,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   // (skeleton screens, spinners, etc.) and don't need the global page-level
   // enter/exit animation for intra-page navigations. Every other page gets
   // a unique key per URL, triggering the slide-up enter / fade-out exit.
-  const animationKey = STABLE_KEY_PAGES.has(router.pathname)
-    ? router.pathname
-    : router.asPath;
+  const isStablePage = STABLE_KEY_PAGES.has(router.pathname);
+  const animationKey = isStablePage ? router.pathname : router.asPath;
 
   return (
     <SessionProvider session={session}>
@@ -330,11 +346,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={animationKey}
-                  variants={pageVariants}
+                  variants={isStablePage ? stablePageVariants : pageVariants}
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  style={{ willChange: "opacity, transform" }}
+                  style={{ willChange: isStablePage ? "opacity" : "opacity, transform" }}
                 >
                   <Component {...pageProps} />
                 </motion.div>
