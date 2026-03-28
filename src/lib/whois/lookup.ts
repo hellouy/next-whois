@@ -224,18 +224,30 @@ function isASNumber(query: string): boolean {
   return /^AS\d+$/i.test(query);
 }
 
-function queryWhoisTcp(
+async function queryWhoisTcp(
   host: string,
   port: number,
   query: string,
   timeoutMs: number,
 ): Promise<string> {
+  // Pre-resolve the hostname — bypasses cloud DNS failures (ENOTFOUND) by
+  // falling back to Cloudflare DoH when the system resolver can't find the host.
+  // We then connect directly to the IP, which avoids Node.js v20 net.connect
+  // lookup-option callback quirks entirely.
+  const { resolveWithDohFallback } = await import("./dns-resolver");
+  let resolvedHost = host;
+  try {
+    resolvedHost = await resolveWithDohFallback(host);
+  } catch {
+    // resolveWithDohFallback already tried both system DNS and DoH;
+    // keep original hostname and let net.connect surface the real error.
+  }
+
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const net = require("node:net") as typeof import("net");
-    const { makeDnsFallbackLookup } = require("./dns-resolver") as typeof import("./dns-resolver");
     let data = "";
-    const socket = net.connect({ host, port, lookup: makeDnsFallbackLookup() }, () =>
+    const socket = net.connect({ host: resolvedHost, port }, () =>
       socket.write(query + "\r\n"),
     );
     socket.setTimeout(timeoutMs);

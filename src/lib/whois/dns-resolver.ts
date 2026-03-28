@@ -2,19 +2,25 @@
  * DNS-over-HTTPS fallback resolver for WHOIS TCP connections.
  *
  * Some ccTLD WHOIS servers have valid A records in global DNS (Google 8.8.8.8,
- * Cloudflare 1.1.1.1) but are unreachable via the system resolver used by
- * cloud providers (Vercel / AWS Lambda).  This happens because the ccTLD's own
- * nameservers are not correctly delegated or reachable from cloud egress IPs.
+ * Cloudflare 1.1.1.1) but are unresolvable via the system resolver used by
+ * cloud providers (Vercel / AWS Lambda).  The ccTLD's own nameservers may not
+ * be reachable from cloud egress IPs, causing ENOTFOUND even for hosts that
+ * are perfectly accessible once you know their IP.
  *
  * Example: whois.bnnic.bn → 202.152.92.245 resolves fine via Cloudflare DoH,
- * but the system resolver returns ENOTFOUND.  The TCP connection to the resolved
- * IP works perfectly.
+ * but the Vercel system resolver returns ENOTFOUND.  The TCP connection to the
+ * resolved IP on port 43 works and returns correct WHOIS data.
  *
  * Strategy:
- *   1. Try system DNS via dns.lookup() (zero latency when it works).
- *   2. On ENOTFOUND only, fall back to Cloudflare DoH (HTTPS, no extra libs).
+ *   1. Try system DNS via dns.promises.resolve4() — zero extra latency.
+ *   2. On ENOTFOUND / ESERVFAIL, fall back to Cloudflare DoH (pure HTTPS,
+ *      no extra dependencies).
  *   3. Cache successful DoH answers with their DNS TTL (min 60 s, max 1 h).
- *   4. If DoH also fails (NXDOMAIN / timeout), return the original ENOTFOUND.
+ *   4. Return the original error if DoH also fails.
+ *
+ * Usage: call resolveWithDohFallback(host) before net.connect() and pass the
+ * returned IP as the host.  This avoids Node.js v20 net.connect lookup-option
+ * callback quirks entirely.
  */
 
 import * as dns from "dns";
@@ -40,7 +46,7 @@ function cachedIp(host: string): string | null {
 
 /**
  * Resolve a hostname to an IPv4 address using Cloudflare DNS-over-HTTPS.
- * Returns the first A record found, or rejects if none.
+ * Returns the first A record found, or rejects if NXDOMAIN / timeout.
  */
 function dohResolve(host: string): Promise<string> {
   const cached = cachedIp(host);
@@ -93,33 +99,37 @@ function dohResolve(host: string): Promise<string> {
 }
 
 /**
- * Returns a custom `lookup` function compatible with Node.js `net.connect()`.
+ * Resolves a hostname to an IPv4 address, using Cloudflare DoH as a fallback
+ * when the system resolver returns ENOTFOUND or ESERVFAIL.
  *
- * Usage:
- *   net.connect({ host, port, lookup: makeDnsFallbackLookup() }, onConnect)
+ * Returns the original hostname unchanged if it is already an IP address,
+ * so callers can pass the result directly to net.connect({ host }).
  *
- * The returned function first tries the system resolver.  Only on ENOTFOUND
- * does it attempt Cloudflare DoH.  All other errors (ECONNREFUSED, ETIMEDOUT,
- * etc.) are passed through unchanged.
+ * Usage in queryWhoisTcp:
+ *   const ip = await resolveWithDohFallback(host);
+ *   net.connect({ host: ip, port }, ...)
  */
-export function makeDnsFallbackLookup(): (
-  hostname: string,
-  options: dns.LookupOptions,
-  callback: (
-    err: NodeJS.ErrnoException | null,
-    address: string,
-    family: number,
-  ) => void,
-) => void {
-  return function dnsWithDohFallback(hostname, _options, callback) {
-    dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-      if (!err) return callback(null, address as string, family);
-      if (err.code !== "ENOTFOUND") return callback(err, "", 0);
+export async function resolveWithDohFallback(host: string): Promise<string> {
+  // Already an IP — nothing to resolve
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) {
+    return host;
+  }
 
-      // System DNS returned ENOTFOUND — try Cloudflare DoH before giving up
-      dohResolve(hostname)
-        .then((ip) => callback(null, ip, 4))
-        .catch(() => callback(err, "", 0)); // return the original ENOTFOUND
-    });
-  };
+  // Check DoH cache first (avoid even a system-DNS round-trip on repeated queries)
+  const cached = cachedIp(host);
+  if (cached) return cached;
+
+  // Try system DNS
+  try {
+    const addrs = await dns.promises.resolve4(host);
+    if (addrs.length > 0) return addrs[0];
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOTFOUND" && code !== "ESERVFAIL" && code !== "EAI_AGAIN") {
+      throw err; // propagate unexpected errors (ECONNREFUSED, etc.)
+    }
+    // Fall through to DoH
+  }
+
+  return dohResolve(host);
 }
