@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
 import React from "react";
-import type { AppProps } from "next/app";
+import type { AppProps, AppContext } from "next/app";
 import Head from "next/head";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -9,7 +9,7 @@ import { Navbar } from "@/components/navbar";
 import { useRouter } from "next/router";
 import { AnimatePresence, motion } from "framer-motion";
 import { SessionProvider } from "next-auth/react";
-import { LocaleProvider } from "@/lib/locale-context";
+import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
 import { RiMegaphoneLine, RiCloseLine, RiWrenchLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
@@ -289,7 +289,8 @@ const pageVariants = {
 
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
-  const origin: string = pageProps.origin || process.env.NEXT_PUBLIC_SITE_URL || "";
+  const origin: string = (pageProps as any).origin || process.env.NEXT_PUBLIC_SITE_URL || "";
+  const initialLocale: Locale | undefined = (pageProps as any).initialLocale;
   const router = useRouter();
   const isAdminPage = router.pathname.startsWith("/admin");
 
@@ -303,7 +304,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
 
   return (
     <SessionProvider session={session}>
-    <LocaleProvider>
+    <LocaleProvider initialLocale={initialLocale}>
     <SiteSettingsProvider initialSettings={(pageProps as any).initialSiteSettings}>
       <AppHead origin={origin} />
       <Toaster />
@@ -348,3 +349,40 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     </SessionProvider>
   );
 }
+
+/**
+ * Read the locale that the middleware injected into the request headers
+ * (x-detected-locale) and pass it to every page as initialLocale so that
+ * SSR renders in the correct language from the very first byte — no flash.
+ *
+ * Note: adding getInitialProps here opts all pages into SSR (disables
+ * automatic static optimisation), which is acceptable because this app is
+ * already SSR-heavy (WHOIS/RDAP lookups, getServerSideProps everywhere).
+ */
+App.getInitialProps = async (appCtx: AppContext) => {
+  let initialLocale: Locale = "en";
+
+  if (appCtx.ctx.req) {
+    // 1. Header injected by middleware (works for first-time visitors too)
+    const fromHeader = appCtx.ctx.req.headers["x-detected-locale"];
+    const hVal = Array.isArray(fromHeader) ? fromHeader[0] : fromHeader;
+    if (hVal && (LOCALES as readonly string[]).includes(hVal)) {
+      initialLocale = hVal as Locale;
+    } else {
+      // 2. Fallback: read NEXT_LOCALE cookie directly from the request
+      const cookieHeader = appCtx.ctx.req.headers.cookie ?? "";
+      const match = cookieHeader.match(/(?:^|;\s*)NEXT_LOCALE=([^;]+)/);
+      if (match && (LOCALES as readonly string[]).includes(match[1])) {
+        initialLocale = match[1] as Locale;
+      }
+    }
+  }
+
+  // Collect page-level props (without triggering getInitialProps on the page
+  // itself — pages with getServerSideProps handle their own data fetching).
+  const pageProps = appCtx.Component.getInitialProps
+    ? await appCtx.Component.getInitialProps(appCtx.ctx)
+    : {};
+
+  return { pageProps: { ...pageProps, initialLocale } };
+};

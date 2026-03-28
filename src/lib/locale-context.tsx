@@ -13,11 +13,15 @@ const LocaleContext = createContext<LocaleContextType>({
   setLocale: () => {},
 });
 
-function detectInitialLocale(): Locale {
+/**
+ * Client-side locale detection.
+ * Priority: NEXT_LOCALE cookie → navigator.language → "en"
+ */
+function detectClientLocale(): Locale {
   if (typeof window === "undefined") return "en";
 
   const cookie = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=([^;]+)/);
-  if (cookie && LOCALES.includes(cookie[1] as Locale)) {
+  if (cookie && (LOCALES as readonly string[]).includes(cookie[1])) {
     return cookie[1] as Locale;
   }
 
@@ -32,15 +36,33 @@ function detectInitialLocale(): Locale {
   return "en";
 }
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
+interface LocaleProviderProps {
+  children: React.ReactNode;
+  /**
+   * Server-detected locale passed from App.getInitialProps.
+   * When provided the provider uses it as the initial state so SSR and the
+   * first client render agree — eliminating the English→target language flash.
+   */
+  initialLocale?: Locale;
+}
+
+export function LocaleProvider({ children, initialLocale }: LocaleProviderProps) {
+  // Use server-detected locale (if available) so the first render is correct.
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
 
   useEffect(() => {
-    setLocaleState(detectInitialLocale());
+    // Always sync with client-side detection after hydration.
+    // This picks up cookie changes made by the language switcher between SSR
+    // and hydration, while still using initialLocale as the starting point.
+    const clientLocale = detectClientLocale();
+    if (clientLocale !== locale) {
+      setLocaleState(clientLocale);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setLocale = (newLocale: Locale) => {
-    document.cookie = `NEXT_LOCALE=${newLocale};path=/;max-age=${60 * 60 * 24 * 365}`;
+    document.cookie = `NEXT_LOCALE=${newLocale};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
     setLocaleState(newLocale);
   };
 
