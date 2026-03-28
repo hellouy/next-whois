@@ -402,6 +402,16 @@ const CREATE_INDEXES = [
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT hot_prefixes_prefix_uniq UNIQUE (prefix)
   )`,
+  `CREATE TABLE IF NOT EXISTS tld_server_failures (
+    tld            TEXT         PRIMARY KEY,
+    fail_count     INTEGER      NOT NULL DEFAULT 1,
+    error_type     TEXT         NOT NULL DEFAULT 'iana_fallback',
+    last_failed_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    repair_status  TEXT         NOT NULL DEFAULT 'pending',
+    found_server   TEXT,
+    ai_notes       TEXT,
+    repaired_at    TIMESTAMPTZ
+  )`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {

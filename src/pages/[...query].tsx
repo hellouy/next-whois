@@ -4705,7 +4705,7 @@ export default function LookupPage({
                   <Link
                     target="_blank"
                     href={result.registerPrice.externalLink}
-                    className="hidden sm:flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                    className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
                     <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
                     <span
@@ -4725,7 +4725,7 @@ export default function LookupPage({
                   <Link
                     href={result.renewPrice.externalLink}
                     target="_blank"
-                    className="hidden sm:flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                    className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
                     <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
                     <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
@@ -4735,7 +4735,7 @@ export default function LookupPage({
                   </Link>
                 )}
               {result.negotiable !== null && (
-                <div className="hidden sm:flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1">
+                <div className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1">
                   <RiExchangeDollarFill className="w-3 h-3 text-muted-foreground shrink-0" />
                   <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
                     {t("negotiable")}

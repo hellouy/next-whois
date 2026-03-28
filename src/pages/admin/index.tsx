@@ -119,6 +119,7 @@ export default function AdminIndexPage() {
     { href: "/admin/api",               label: "API 接入",    desc: "AI Key · 第三方数据源",       icon: RiPlugLine,       color: "text-orange-500" },
     { href: "/admin/tld-lifecycle",     label: "TLD 爬取",    desc: "AI 批量爬取 TLD 生命周期",    icon: RiRobot2Line,     color: "text-purple-500" },
     { href: "/admin/tld-fallback",      label: "TLD 兜底",    desc: "第三方备用查询源管理",        icon: RiRadarLine,      color: "text-sky-500" },
+    { href: "/admin/repair-queue",      label: "服务器修复",  desc: "AI 自动发现缺失 WHOIS/RDAP 服务器", icon: RiWrenchLine, color: "text-violet-500" },
     { href: "/admin/tld-rules",         label: "TLD 规则",    desc: "自定义解析规则配置",          icon: RiCodeBoxLine,    color: "text-teal-500" },
     { href: "/admin/invite-codes",      label: "邀请码",      desc: "生成/管理注册邀请码",         icon: RiKeyLine,        color: "text-lime-600" },
     { href: "/admin/activation-codes",  label: "激活码",      desc: "付费激活码批量管理",          icon: RiGiftLine,       color: "text-pink-500" },

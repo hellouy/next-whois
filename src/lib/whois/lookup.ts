@@ -86,6 +86,7 @@ import { lookupYisi } from "@/lib/whois/yisi-fallback";
 import { lookupTianhu } from "@/lib/whois/tianhu-fallback";
 import { isTldFallbackEnabled, recordTldNativeFailure, recordTldNativeSuccess, forceTldFallback, isStaticAlwaysFallback } from "@/lib/whois/tld-fallback-gate";
 import { isRdapSkipped, markRdapSkipped, markRdapSupported, initRdapSkipCache } from "@/lib/whois/tld-rdap-skip";
+import { recordTldServerFailure } from "@/lib/whois/server-failure-tracker";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
@@ -1238,6 +1239,12 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
 
   if (whoisRawData) {
     if (isIanaFallback(whoisRawData)) {
+      // IANA returned its own referral page — no WHOIS server is configured for
+      // this TLD.  Record the failure so the repair job can find the correct
+      // server via RDAP bootstrap / IANA referral query / AI lookup.
+      if (isDomainQuery && !isStaticAlwaysFallback(domain)) {
+        recordTldServerFailure(tldSuffix, "iana_fallback").catch(() => {});
+      }
       return tryYisiOrFail("No WHOIS/RDAP server available for this TLD");
     }
 

@@ -16,6 +16,7 @@ const TLD_TABS = [
   { href: "/admin/tld-rules",              label: "TLD 规则" },
   { href: "/admin/tld-fallback",           label: "查询兜底" },
   { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+  { href: "/admin/repair-queue",           label: "服务器修复" },
 ];
 
 type FallbackRow = {
