@@ -2,15 +2,22 @@ import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
 import {
   RiBankCardLine, RiLoader4Line, RiCheckDoubleLine, RiRefundLine,
   RiSearchLine, RiMoneyDollarCircleLine, RiUserLine, RiAlertLine,
   RiRefreshLine, RiCloseLine,
 } from "@remixicon/react";
+
+const PAYMENT_TABS = [
+  { href: "/admin/payment/plans",  label: "套餐管理" },
+  { href: "/admin/payment/orders", label: "订单管理" },
+];
 
 type Order = {
   id: string;
@@ -139,9 +146,10 @@ export default function PaymentOrdersAdmin() {
   }
 
   return (
-    <AdminLayout title="订单管理">
+    <AdminLayout title="支付管理">
       <Head><title>订单管理 · 后台</title></Head>
       <div className="space-y-4">
+        <PageTabs tabs={PAYMENT_TABS} />
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">

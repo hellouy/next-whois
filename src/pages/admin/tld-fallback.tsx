@@ -1,5 +1,6 @@
 import React from "react";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,13 @@ import {
   RiLoader4Line, RiDeleteBinLine, RiRefreshLine,
   RiToggleLine, RiAlertLine, RiCheckLine, RiServerLine,
 } from "@remixicon/react";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+];
 
 type FallbackRow = {
   tld: string;
@@ -111,8 +119,9 @@ export default function AdminTldFallbackPage() {
   const enabledCount = rows.filter(r => r.use_fallback).length;
 
   return (
-    <AdminLayout title="TLD 兜底统计">
+    <AdminLayout title="TLD 管理">
       <div className="space-y-5">
+        <PageTabs tabs={TLD_TABS} />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-lg font-bold">TLD 兜底查询统计</h2>

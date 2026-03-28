@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,13 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { CompareRow } from "@/pages/api/admin/tld-lifecycle-compare";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+];
 
 type TldRule = {
   tld: string;
@@ -716,10 +724,11 @@ export default function AdminTldRulesPage() {
   }
 
   return (
-    <AdminLayout>
+    <AdminLayout title="TLD 管理">
       <Head><title>TLD 生命周期规则 - AI 抓取</title></Head>
 
       <div className="space-y-6 max-w-6xl">
+        <PageTabs tabs={TLD_TABS} />
         <div>
           <h1 className="text-xl font-semibold">TLD 生命周期规则 — AI 自动抓取</h1>
           <p className="text-sm text-muted-foreground mt-1">

@@ -1,16 +1,23 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
 import {
   RiKeyLine, RiAddLine, RiDeleteBinLine, RiFileCopyLine,
   RiToggleLine, RiToggleFill, RiLoader4Line, RiCloseLine,
   RiCheckLine, RiFilterLine, RiTimeLine,
 } from "@remixicon/react";
+
+const CODES_TABS = [
+  { href: "/admin/invite-codes",     label: "邀请码" },
+  { href: "/admin/activation-codes", label: "激活码" },
+];
 
 type InviteCode = {
   id: string;
@@ -184,6 +191,7 @@ export default function InviteCodesPage() {
       <Head><title>邀请码管理 · Admin</title></Head>
 
       <div className="space-y-5">
+        <PageTabs tabs={CODES_TABS} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

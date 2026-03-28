@@ -1,5 +1,6 @@
 import React from "react";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,11 @@ import {
   RiShakeHandsLine, RiCodeSLine, RiAlertLine, RiEyeLine,
 } from "@remixicon/react";
 import { StampPreviewCard, STAMP_CARD_THEMES } from "@/components/stamp-preview-card";
+
+const STAMPS_TABS = [
+  { href: "/admin/stamps",       label: "品牌审核" },
+  { href: "/admin/stamp-styles", label: "弹窗样式" },
+];
 
 type Stamp = {
   id: string;
@@ -638,6 +644,7 @@ export default function AdminStampsPage() {
       )}
 
       <div className="space-y-5">
+        <PageTabs tabs={STAMPS_TABS} />
         {/* Header */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>

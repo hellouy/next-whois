@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import {
   RiCheckLine, RiCloseLine, RiDeleteBinLine, RiLoader4Line,
@@ -8,6 +9,13 @@ import {
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+];
 
 type FeedbackItem = {
   id: string;
@@ -109,10 +117,11 @@ export default function AdminTldLifecycleFeedbackPage() {
   const pendingCount = filter === "pending" ? items.length : null;
 
   return (
-    <AdminLayout>
+    <AdminLayout title="TLD 管理">
       <Head><title>TLD 纠错反馈 — 管理后台</title></Head>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+        <PageTabs tabs={TLD_TABS} />
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">

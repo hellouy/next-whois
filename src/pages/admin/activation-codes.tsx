@@ -1,16 +1,23 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
 import {
   RiAddLine, RiDeleteBinLine, RiFileCopyLine,
   RiLoader4Line, RiGiftLine, RiCheckLine,
   RiFilterLine, RiTimeLine, RiVipCrownLine, RiCoinLine,
 } from "@remixicon/react";
+
+const CODES_TABS = [
+  { href: "/admin/invite-codes",     label: "邀请码" },
+  { href: "/admin/activation-codes", label: "激活码" },
+];
 
 type ActivationCode = {
   id: number;
@@ -152,9 +159,10 @@ export default function ActivationCodesPage() {
   ];
 
   return (
-    <AdminLayout>
+    <AdminLayout title="激活码管理">
       <Head><title>激活码管理 · 管理后台</title></Head>
       <div className="space-y-4">
+        <PageTabs tabs={CODES_TABS} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

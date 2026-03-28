@@ -284,19 +284,17 @@ export default function AdminIndexPage() {
           <h3 className="text-sm font-bold flex items-center gap-2">
             <RiSettings4Line className="w-4 h-4 text-primary" />快捷操作
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {QUICK_ACTIONS.map(({ href, label, desc, icon: Icon, color }) => (
               <button
                 key={href}
                 type="button"
                 onClick={() => router.push(href, undefined, { locale: false })}
-                className="glass-panel border border-border/60 rounded-xl p-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left active:scale-[0.98]"
+                className="glass-panel border border-border/60 rounded-xl p-2.5 sm:p-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left active:scale-[0.98]"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} />
-                  <p className="text-sm font-semibold group-hover:text-primary transition-colors truncate">{label}</p>
-                </div>
-                <p className="text-xs text-muted-foreground leading-snug">{desc}</p>
+                <Icon className={`w-4 h-4 shrink-0 ${color} mb-1.5`} />
+                <p className="text-xs font-semibold group-hover:text-primary transition-colors leading-tight">{label}</p>
+                <p className="text-[10px] text-muted-foreground leading-snug mt-0.5 hidden sm:block">{desc}</p>
               </button>
             ))}
           </div>

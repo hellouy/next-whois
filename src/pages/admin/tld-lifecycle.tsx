@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,13 @@ import {
 import { toast } from "sonner";
 import { LIFECYCLE_TABLE } from "@/lib/lifecycle";
 import { cn } from "@/lib/utils";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+];
 
 type DbOverride = {
   id: string; tld: string;
@@ -173,10 +181,10 @@ export default function AdminTldLifecyclePage() {
   const td = "py-2.5 px-3 text-sm";
 
   return (
-    <AdminLayout>
+    <AdminLayout title="TLD 管理">
       <Head><title>TLD 生命周期规则 · 管理</title></Head>
       <div className="space-y-4 p-4 md:p-6">
-
+        <PageTabs tabs={TLD_TABS} />
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-xl font-bold">TLD 生命周期规则</h1>

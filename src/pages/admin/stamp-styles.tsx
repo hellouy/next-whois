@@ -1,8 +1,14 @@
 import React from "react";
 import { AdminLayout } from "@/components/admin-layout";
+import { PageTabs } from "@/components/page-tabs";
 import { StampPreviewCard, STAMP_CARD_THEMES } from "@/components/stamp-preview-card";
 
 const CARD_THEMES = STAMP_CARD_THEMES;
+
+const STAMPS_TABS = [
+  { href: "/admin/stamps",       label: "品牌审核" },
+  { href: "/admin/stamp-styles", label: "弹窗样式" },
+];
 
 export default function StampStylesPage() {
   const standardThemes = Object.entries(CARD_THEMES).filter(([, t]) => !t.special);
@@ -22,7 +28,8 @@ export default function StampStylesPage() {
   const previewTheme = previewKey ? CARD_THEMES[previewKey] : null;
 
   return (
-    <AdminLayout title="弹窗样式">
+    <AdminLayout title="品牌管理">
+      <PageTabs tabs={STAMPS_TABS} />
 
       {/* ── Full-size preview overlay (manual close) ── */}
       {previewKey && (
