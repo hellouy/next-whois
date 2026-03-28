@@ -299,6 +299,10 @@ const ALTER_COLUMNS = [
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS balance_cents       INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS membership_plan     TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS model_used          TEXT`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS scrape_status       TEXT    NOT NULL DEFAULT 'pending'`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS failure_reason      TEXT`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS fetch_strategy      TEXT`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS scrape_attempts     INTEGER NOT NULL DEFAULT 0`,
 ];
 
 const CREATE_INDEXES = [

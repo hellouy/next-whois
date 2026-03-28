@@ -626,13 +626,18 @@ export default async function handler(
       drop_second: number | null; drop_timezone: string | null; pre_expiry_days: number | null;
       scraped_at: string | null; updated_at: string; model_used: string | null;
       ai_reasoning: string | null; manually_edited: boolean;
+      scrape_status: string; failure_reason: string | null; fetch_strategy: string | null;
+      scrape_attempts: number;
     }>(
       `SELECT tld, grace_period_days, redemption_period_days, pending_delete_days,
               grace_period_days + redemption_period_days + pending_delete_days AS total_release_days,
               source_url, confidence,
               drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
               scraped_at, updated_at, model_used, ai_reasoning,
-              COALESCE(manually_edited, FALSE) AS manually_edited
+              COALESCE(manually_edited, FALSE) AS manually_edited,
+              COALESCE(scrape_status, 'pending') AS scrape_status,
+              failure_reason, fetch_strategy,
+              COALESCE(scrape_attempts, 0) AS scrape_attempts
        FROM tld_rules ORDER BY tld`
     );
 
@@ -664,7 +669,16 @@ export default async function handler(
       return res.send([header, ...lines].join("\n"));
     }
 
-    return res.json({ rules: rows });
+    const stats = {
+      total: rows.length,
+      ok: rows.filter(r => r.scrape_status === "ok" || r.manually_edited).length,
+      warn_defaults: rows.filter(r => r.scrape_status === "warn_defaults" && !r.manually_edited).length,
+      failed: rows.filter(r => r.scrape_status === "failed" && !r.manually_edited).length,
+      pending: rows.filter(r => r.scrape_status === "pending" && !r.manually_edited).length,
+      manually_edited: rows.filter(r => r.manually_edited).length,
+    };
+
+    return res.json({ rules: rows, stats });
   }
 
   // POST — scrape + AI extract + save
@@ -686,17 +700,19 @@ export default async function handler(
     const cleanUrl = (source_url ?? "").trim() ||
       `https://www.iana.org/domains/root/db/${cleanTld}.html`;
 
-    // ── Freshness check ───────────────────────────────────────────────────
-    // ccTLD (2-letter) = 60-day validity; gTLD = 180-day validity (stable).
-    // Skip re-scraping if data is still fresh, OR if admin has manually edited it.
+    // ── Skip check ────────────────────────────────────────────────────────
+    // Skip only if: manually edited (always protected) or scrape_status='ok' (real data already scraped).
+    // Records with warn_defaults / failed / pending are always re-attempted.
     if (!force) {
       const existing = await one<{
         scraped_at: Date | null; grace_period_days: number; redemption_period_days: number;
         pending_delete_days: number; drop_hour: number | null; drop_timezone: string | null;
-        manually_edited: boolean;
+        manually_edited: boolean; scrape_status: string;
       }>(
         `SELECT scraped_at, grace_period_days, redemption_period_days, pending_delete_days,
-                drop_hour, drop_timezone, COALESCE(manually_edited, FALSE) AS manually_edited
+                drop_hour, drop_timezone,
+                COALESCE(manually_edited, FALSE) AS manually_edited,
+                COALESCE(scrape_status, 'pending') AS scrape_status
          FROM tld_rules WHERE tld = $1`,
         [cleanTld]
       ).catch(() => null);
@@ -715,24 +731,21 @@ export default async function handler(
         });
       }
 
-      if (existing?.scraped_at) {
-        const isCcTld = cleanTld.length === 2;
-        const validityDays = isCcTld ? 60 : 180;
-        const freshUntil = new Date(existing.scraped_at.getTime() + validityDays * 86_400_000);
-        if (freshUntil > new Date()) {
-          return res.status(200).json({
-            skipped: true,
-            tld: cleanTld,
-            reason: "data_fresh",
-            fresh_until: freshUntil.toISOString(),
-            grace_period_days: existing.grace_period_days,
-            redemption_period_days: existing.redemption_period_days,
-            pending_delete_days: existing.pending_delete_days,
-            drop_hour: existing.drop_hour,
-            drop_timezone: existing.drop_timezone,
-          });
-        }
+      // Skip only if already successfully scraped (non-default data confirmed)
+      if (existing?.scrape_status === "ok") {
+        return res.status(200).json({
+          skipped: true,
+          tld: cleanTld,
+          reason: "already_ok",
+          scraped_at: existing.scraped_at?.toISOString() ?? null,
+          grace_period_days: existing.grace_period_days,
+          redemption_period_days: existing.redemption_period_days,
+          pending_delete_days: existing.pending_delete_days,
+          drop_hour: existing.drop_hour,
+          drop_timezone: existing.drop_timezone,
+        });
       }
+      // Records with warn_defaults, failed, or pending fall through to re-scrape
     }
 
     // Rate limit (anti-spam: 1 scrape per TLD per hour)
@@ -755,14 +768,20 @@ export default async function handler(
       // 2. AI extraction with multi-model fallback
       const extracted = await extractWithAI(cleanTld, pageText, finalUrl, model);
 
+      // Determine status: 'ok' if non-default data, 'warn_defaults' if only got industry defaults
+      const isAllDefaults = extracted.grace_period_days === 30 &&
+        extracted.redemption_period_days === 30 && extracted.pending_delete_days === 5;
+      const scrapeStatusVal = isAllDefaults ? "warn_defaults" : "ok";
+
       // 3. Save to DB
       await run(
         `INSERT INTO tld_rules
            (tld, grace_period_days, redemption_period_days, pending_delete_days,
             source_url, confidence, raw_excerpt, ai_reasoning, model_used,
             drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
-            scraped_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,'ai',$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+            scraped_at, updated_at,
+            scrape_status, failure_reason, scrape_attempts)
+         VALUES ($1,$2,$3,$4,$5,'ai',$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW(),$14,NULL,1)
          ON CONFLICT (tld) DO UPDATE SET
            grace_period_days      = EXCLUDED.grace_period_days,
            redemption_period_days = EXCLUDED.redemption_period_days,
@@ -778,7 +797,10 @@ export default async function handler(
            drop_timezone          = EXCLUDED.drop_timezone,
            pre_expiry_days        = EXCLUDED.pre_expiry_days,
            scraped_at             = NOW(),
-           updated_at             = NOW()`,
+           updated_at             = NOW(),
+           scrape_status          = EXCLUDED.scrape_status,
+           failure_reason         = NULL,
+           scrape_attempts        = COALESCE(tld_rules.scrape_attempts,0)+1`,
         [
           cleanTld,
           extracted.grace_period_days,
@@ -793,6 +815,7 @@ export default async function handler(
           extracted.drop_second,
           extracted.drop_timezone,
           extracted.pre_expiry_days,
+          scrapeStatusVal,
         ]
       );
 
@@ -828,6 +851,8 @@ export default async function handler(
         source_url: finalUrl,
         source_url_requested: cleanUrl,
         has_lifecycle_info: hasLifecycleInfo(pageText),
+        scrape_status: scrapeStatusVal,
+        is_defaults: isAllDefaults,
       });
     } catch (err: any) {
       // Release the rate-limit token on error so retries are possible

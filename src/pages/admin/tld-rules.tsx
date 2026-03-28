@@ -55,6 +55,19 @@ type TldRule = {
   model_used: string | null;
   ai_reasoning: string | null;
   manually_edited: boolean;
+  scrape_status: "ok" | "warn_defaults" | "failed" | "pending";
+  failure_reason: string | null;
+  fetch_strategy: string | null;
+  scrape_attempts: number;
+};
+
+type ScrapeStats = {
+  total: number;
+  ok: number;
+  warn_defaults: number;
+  failed: number;
+  pending: number;
+  manually_edited: number;
 };
 
 type EditForm = {
@@ -243,6 +256,7 @@ type CompareData = {
 export default function AdminTldRulesPage() {
   const [tab, setTab] = React.useState<Tab>("cc");
   const [rules, setRules] = React.useState<TldRule[]>([]);
+  const [scrapeStats, setScrapeStats] = React.useState<ScrapeStats | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [scraping, setScraping] = React.useState(false);
@@ -290,6 +304,7 @@ export default function AdminTldRulesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "加载失败");
       setRules(data.rules ?? []);
+      if (data.stats) setScrapeStats(data.stats);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "加载失败");
     } finally {
@@ -453,38 +468,58 @@ export default function AdminTldRulesPage() {
   }
 
   // ── Batch scrape ──────────────────────────────────────────────────────────
-  // Freshness thresholds: ccTLD (2-letter) = 60 days, gTLD = 180 days (stable)
-  function isTldFresh(tld: string): boolean {
+  // A TLD is "already done" only if scrape_status='ok' (real data) or manually_edited
+  function isTldDone(tld: string): boolean {
     const rule = rules.find(r => r.tld === tld);
     if (!rule) return false;
-    // Manually edited records are treated as "always fresh" (protected from re-scrape)
     if (rule.manually_edited) return true;
-    if (!rule.scraped_at) return false;
-    const validityDays = tld.length === 2 ? 60 : 180;
-    const freshUntil = new Date(rule.scraped_at).getTime() + validityDays * 86_400_000;
-    return Date.now() < freshUntil;
+    return rule.scrape_status === "ok";
+  }
+
+  // Single TLD retry scrape (for failed/warn records)
+  const [retrying, setRetrying] = React.useState<string | null>(null);
+  async function handleRetry(tld: string) {
+    setRetrying(tld);
+    try {
+      const res = await fetch("/api/admin/tld-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, force: true, model: selectedModel || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "重新抓取失败");
+      if (data.scrape_status === "ok") {
+        toast.success(`.${tld} 重新抓取成功！宽限${data.grace_period_days}d 赎回${data.redemption_period_days}d 待删${data.pending_delete_days}d`);
+      } else {
+        toast.warning(`.${tld} 抓取完成但仅获得默认值，AI未找到具体政策数据`);
+      }
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "重新抓取失败");
+    } finally {
+      setRetrying(null);
+    }
   }
 
   function startBatch(list: typeof batchList) {
-    // Build full item list: mark fresh/manually-edited ones immediately as "skipped"
+    // Build full item list: mark done ones (ok/manually-edited) immediately as "skipped"
     const items: BatchItem[] = list.map(t => {
       const rule = rules.find(r => r.tld === t.tld);
       if (rule?.manually_edited) {
         return { tld: t.tld, status: "skipped" as const, msg: "手动修改，已跳过" };
       }
-      if (isTldFresh(t.tld)) {
-        const validityDays = t.tld.length === 2 ? 60 : 180;
-        const freshUntil = new Date(new Date(rule!.scraped_at!).getTime() + validityDays * 86_400_000);
-        return { tld: t.tld, status: "skipped" as const, msg: `数据有效至 ${freshUntil.toISOString().slice(0, 10)}` };
+      if (isTldDone(t.tld)) {
+        const dateStr = rule?.scraped_at ? new Date(rule.scraped_at).toISOString().slice(0, 10) : "—";
+        return { tld: t.tld, status: "skipped" as const, msg: `已成功抓取 (${dateStr})` };
       }
       return { tld: t.tld, status: "pending" as const };
     });
     const pending = items.filter(i => i.status === "pending");
     if (pending.length === 0) {
-      toast.info(`所有 ${list.length} 个 TLD 数据均新鲜，无需重新抓取`);
+      toast.info(`所有 ${list.length} 个 TLD 已成功抓取，无需重新抓取`);
       return;
     }
-    toast.info(`跳过 ${items.length - pending.length} 个新鲜 TLD，准备抓取 ${pending.length} 个`);
+    toast.info(`跳过 ${items.length - pending.length} 个已成功 TLD，准备抓取/重试 ${pending.length} 个`);
     batchAbortRef.current = false;
     setBatchList(list);
     setBatchItems(items);
@@ -533,7 +568,9 @@ export default function AdminTldRulesPage() {
         } else if (data.skipped) {
           const skipMsg = data.reason === "manually_edited"
             ? "手动修改，已保护"
-            : `数据有效至 ${data.fresh_until?.slice(0,10) ?? "—"}`;
+            : data.reason === "already_ok"
+            ? `已成功抓取 (${data.scraped_at?.slice(0,10) ?? "—"})`
+            : `已跳过`;
           setBatchItems(prev => prev.map((it, i) =>
             i === batchIdx ? { ...it, status: "skipped", msg: skipMsg } : it
           ));
@@ -586,8 +623,13 @@ export default function AdminTldRulesPage() {
     if (c === "high") badge = <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">官方</span>;
     else if (c === "ai") badge = <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">AI</span>;
     else badge = <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">估算</span>;
-    const modelTip = r.model_used ? ` · ${r.model_used}` : "";
-    return <span title={`置信度: ${c}${modelTip}`}>{badge}</span>;
+    const parts = [
+      `置信度: ${c}`,
+      r.model_used ? `模型: ${r.model_used}` : "",
+      r.fetch_strategy ? `策略: ${r.fetch_strategy}` : "",
+      r.scrape_attempts > 1 ? `尝试 ${r.scrape_attempts} 次` : "",
+    ].filter(Boolean).join(" · ");
+    return <span title={parts}>{badge}</span>;
   }
 
   function qualityBadge(r: TldRule) {
@@ -612,15 +654,37 @@ export default function AdminTldRulesPage() {
         </span>
       );
     }
-    if (r.scraped_at) {
-      const quality = qualityBadge(r);
+    if (r.scrape_status === "failed") {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium"
+          title={r.failure_reason ?? "抓取失败"}>
+          <RiErrorWarningLine className="w-2.5 h-2.5" />失败
+        </span>
+      );
+    }
+    if (r.scrape_status === "warn_defaults") {
       return (
         <div className="flex flex-wrap gap-0.5">
-          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
-            <RiRobot2Line className="w-2.5 h-2.5" />已爬取
+          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium"
+            title={r.ai_reasoning ?? "仅获得行业默认值，未找到注册局具体政策"}>
+            <RiErrorWarningLine className="w-2.5 h-2.5" />仅默认值
           </span>
-          {quality}
         </div>
+      );
+    }
+    if (r.scrape_status === "ok") {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium"
+          title={`${r.fetch_strategy ?? "ai"} · ${r.model_used ?? ""}`}>
+          <RiCheckboxCircleLine className="w-2.5 h-2.5" />已确认
+        </span>
+      );
+    }
+    if (r.scraped_at) {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
+          <RiRobot2Line className="w-2.5 h-2.5" />已爬取
+        </span>
       );
     }
     return null;
@@ -648,7 +712,7 @@ export default function AdminTldRulesPage() {
             <RiPlayCircleLine className="w-4 h-4 text-violet-500" />
             {label}
             <span className="text-xs text-muted-foreground font-normal">
-              — {list.length} 个 · 国别60天 / 通用180天有效期 · 新鲜数据自动跳过
+              — {list.length} 个 · 已成功(ok)的自动跳过，失败/默认值记录自动重试，无时效限制
             </span>
           </h2>
           <div className="flex items-center gap-2 flex-wrap">
@@ -716,7 +780,7 @@ export default function AdminTldRulesPage() {
 
         {batchItems.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            点击"开始批量抓取"——新鲜数据（国别60天/通用180天内已爬）直接跳过，过期或缺失的才会重新抓取，每条间隔 1.2 秒。每次成功抓取同时写入数据库和本地 JSON 文件备份。
+            点击"开始批量抓取"——已成功确认(scrape_status=ok)的记录直接跳过，失败/仅默认值/未抓取的记录都会重新尝试。每条间隔 1.2 秒，无时效限制。每次成功抓取同时写入数据库和本地 JSON 文件备份。
           </p>
         )}
       </div>
@@ -735,6 +799,111 @@ export default function AdminTldRulesPage() {
             爬取注册局页面，多模型 AI（GLM/Groq/Gemini/DeepSeek 自动回退）提取宽限期、赎回期、精确掉落时间和时区，IANA 页面自动发现注册局生命周期子页。
           </p>
         </div>
+
+        {/* ── Stats Overview ──────────────────────────────────────────────── */}
+        {scrapeStats && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {[
+              { label: "✅ 已确认", value: scrapeStats.ok, cls: "bg-green-50 border-green-200 text-green-700 dark:bg-green-950/20 dark:border-green-900 dark:text-green-400", desc: "真实数据，可信" },
+              { label: "⚠ 仅默认值", value: scrapeStats.warn_defaults, cls: "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-950/20 dark:border-orange-900 dark:text-orange-400", desc: "AI未找到具体政策，使用30/30/5行业默认值" },
+              { label: "❌ 失败", value: scrapeStats.failed, cls: "bg-red-50 border-red-200 text-red-700 dark:bg-red-950/20 dark:border-red-900 dark:text-red-400", desc: "网络/AI错误，需重试或手动填写" },
+              { label: "⏳ 待抓取", value: scrapeStats.pending, cls: "bg-muted border-border text-muted-foreground", desc: "尚未抓取" },
+              { label: "✏ 手动修改", value: scrapeStats.manually_edited, cls: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-400", desc: "管理员手动录入，受保护" },
+            ].map(({ label, value, cls, desc }) => (
+              <div key={label} className={cn("border rounded-xl px-4 py-3 text-center", cls)} title={desc}>
+                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-xs mt-0.5 font-medium">{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Failed / Warn records panel ─────────────────────────────────── */}
+        {!loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults")).length > 0 && (
+          <div className="border rounded-xl overflow-hidden bg-card">
+            <div className="flex items-center gap-3 px-4 py-3 border-b bg-red-50/50 dark:bg-red-950/10">
+              <RiErrorWarningLine className="w-4 h-4 text-red-500" />
+              <span className="font-medium text-sm text-red-700 dark:text-red-400">
+                需要关注的记录
+              </span>
+              <span className="text-xs text-muted-foreground">
+                — 失败或仅获得默认值的 TLD，建议手动重试或填写
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {rules
+                .filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults"))
+                .map(r => (
+                  <div key={r.tld} className={cn(
+                    "flex items-start gap-3 px-4 py-3",
+                    r.scrape_status === "failed" && "bg-red-50/30 dark:bg-red-950/10",
+                    r.scrape_status === "warn_defaults" && "bg-orange-50/30 dark:bg-orange-950/10",
+                  )}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-sm">.{r.tld}</span>
+                        {sourceBadge(r)}
+                        {r.scrape_attempts > 0 && (
+                          <span className="text-[10px] text-muted-foreground">尝试 {r.scrape_attempts} 次</span>
+                        )}
+                        {r.fetch_strategy && r.scrape_status !== "failed" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{r.fetch_strategy}</span>
+                        )}
+                        {r.model_used && r.scrape_status !== "failed" && (
+                          <span className="text-[10px] text-muted-foreground">{r.model_used}</span>
+                        )}
+                      </div>
+                      {r.scrape_status === "failed" && r.failure_reason && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-mono break-all">
+                          {r.failure_reason}
+                        </p>
+                      )}
+                      {r.scrape_status === "warn_defaults" && r.ai_reasoning && (
+                        <p className="text-xs text-orange-700 dark:text-orange-400 mt-1 italic">
+                          {r.ai_reasoning}
+                        </p>
+                      )}
+                      {r.scrape_status === "warn_defaults" && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          当前值: {r.grace_period_days}d / {r.redemption_period_days}d / {r.pending_delete_days}d
+                          {r.source_url && (
+                            <> · <a href={r.source_url} target="_blank" rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline">{new URL(r.source_url).hostname}</a></>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                      <Button
+                        variant="outline" size="sm"
+                        className={cn(
+                          "h-7 gap-1 text-xs",
+                          r.scrape_status === "failed"
+                            ? "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                            : "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400"
+                        )}
+                        disabled={retrying === r.tld}
+                        onClick={() => handleRetry(r.tld)}
+                      >
+                        {retrying === r.tld
+                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                          : <RiRefreshLine className="w-3.5 h-3.5" />}
+                        重新抓取
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="h-7 gap-1 text-xs text-blue-600 hover:bg-blue-50"
+                        title="手动填写正确数据"
+                        onClick={() => startEdit(r)}
+                      >
+                        <RiEditLine className="w-3.5 h-3.5" />手动填写
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1 border-b">
@@ -856,7 +1025,11 @@ export default function AdminTldRulesPage() {
                   ) : lastResult.skipped ? (
                     <div className="flex items-start gap-2 text-yellow-700 dark:text-yellow-400">
                       <RiTimeLine className="w-4 h-4 mt-0.5 shrink-0" />
-                      .{lastResult.tld} 数据仍在有效期内（有效至 {lastResult.fresh_until?.slice(0,10)}），已跳过重爬。勾选"强制重爬"可强制覆盖。
+                      {lastResult.reason === "already_ok"
+                        ? `.${lastResult.tld} 已成功抓取（${lastResult.scraped_at?.slice(0,10) ?? "—"}），跳过重爬。勾选"强制重爬"可强制覆盖。`
+                        : lastResult.reason === "manually_edited"
+                        ? `.${lastResult.tld} 已被手动修改，自动爬取已跳过。勾选"强制重爬"可覆盖并重新抓取。`
+                        : `.${lastResult.tld} 已跳过重爬。勾选"强制重爬"可强制覆盖。`}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1129,7 +1302,8 @@ export default function AdminTldRulesPage() {
                         <tr className={cn(
                           "hover:bg-muted/30 transition-colors",
                           r.manually_edited && "bg-amber-50/40 dark:bg-amber-950/10",
-                          !r.manually_edited && isDefaultValues(r) && r.scraped_at && "bg-orange-50/30 dark:bg-orange-950/10",
+                          !r.manually_edited && r.scrape_status === "failed" && "bg-red-50/30 dark:bg-red-950/10",
+                          !r.manually_edited && r.scrape_status === "warn_defaults" && "bg-orange-50/30 dark:bg-orange-950/10",
                           isEditing && "bg-blue-50/60 dark:bg-blue-950/20"
                         )}>
                           <td className="px-4 py-2.5">

@@ -645,33 +645,53 @@ function applyKnownPolicy(tld, extracted) {
 }
 
 // ── DB save ───────────────────────────────────────────────────────────────────
-async function saveToDb(tld, ex, finalUrl, pageText) {
+async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy) {
   await dbRun(
     `INSERT INTO tld_rules
        (tld, grace_period_days, redemption_period_days, pending_delete_days,
         source_url, confidence, raw_excerpt, ai_reasoning, model_used,
         drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
-        scraped_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())
+        scraped_at, updated_at,
+        scrape_status, fetch_strategy, failure_reason,
+        scrape_attempts)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW(),$15,$16,NULL,1)
      ON CONFLICT (tld) DO UPDATE SET
        grace_period_days=$2, redemption_period_days=$3, pending_delete_days=$4,
        source_url=$5, confidence=$6, raw_excerpt=$7, ai_reasoning=$8,
        model_used=$9, drop_hour=$10, drop_minute=$11, drop_second=$12,
        drop_timezone=$13, pre_expiry_days=$14,
-       scraped_at=NOW(), updated_at=NOW()`,
+       scraped_at=NOW(), updated_at=NOW(),
+       scrape_status=$15, fetch_strategy=$16, failure_reason=NULL,
+       scrape_attempts=COALESCE(tld_rules.scrape_attempts,0)+1`,
     [
       tld,
       ex.grace_period_days, ex.redemption_period_days, ex.pending_delete_days,
       finalUrl,
-      // confidence: high if curated-database, ai otherwise
       ex.model_used === "curated-database" ? "high" : "ai",
       pageText.slice(0, 1000),
       ex.reasoning,
       ex.model_used ?? null,
       ex.drop_hour, ex.drop_minute, ex.drop_second, ex.drop_timezone,
       ex.pre_expiry_days ?? 0,
+      scrapeStatus,
+      fetchStrategy ?? null,
     ]
   );
+}
+
+async function saveFailureToDb(tld, reason) {
+  const short = reason.slice(0, 500);
+  await dbRun(
+    `INSERT INTO tld_rules
+       (tld, grace_period_days, redemption_period_days, pending_delete_days,
+        scrape_status, failure_reason, scraped_at, updated_at, scrape_attempts)
+     VALUES ($1, 30, 30, 5, 'failed', $2, NOW(), NOW(), 1)
+     ON CONFLICT (tld) DO UPDATE SET
+       scrape_status='failed', failure_reason=$2,
+       scraped_at=NOW(), updated_at=NOW(),
+       scrape_attempts=COALESCE(tld_rules.scrape_attempts,0)+1`,
+    [tld, short]
+  ).catch(e => console.warn(`  [DB] 写入失败记录出错: ${e.message}`));
 }
 
 // ── Progress tracking ─────────────────────────────────────────────────────────
@@ -688,10 +708,10 @@ function log(tld, status, msg = "") {
 async function scrapeTld(tld) {
   const ianaUrl = `https://www.iana.org/domains/root/db/${tld}.html`;
 
-  // Skip rules
+  // Skip rules — based on scrape_status, NOT time
   if (!FORCE && !CLEAR_DEFS) {
     const existing = await dbOne(
-      `SELECT scraped_at, COALESCE(manually_edited,FALSE) as manually_edited,
+      `SELECT scraped_at, scrape_status, COALESCE(manually_edited,FALSE) as manually_edited,
               grace_period_days, redemption_period_days, pending_delete_days
        FROM tld_rules WHERE tld=$1`, [tld]
     ).catch(() => null);
@@ -701,15 +721,14 @@ async function scrapeTld(tld) {
       log(tld, "skip", "手动修改，跳过");
       return;
     }
-    if (existing?.scraped_at) {
-      const validDays = tld.length === 2 ? 60 : 180;
-      const freshUntil = new Date(existing.scraped_at).getTime() + validDays * 86400000;
-      if (Date.now() < freshUntil) {
-        stats.skip++;
-        log(tld, "skip", `数据新鲜至 ${new Date(freshUntil).toISOString().slice(0,10)}`);
-        return;
-      }
+    // Only skip records that were successfully scraped (non-default real data)
+    if (existing?.scrape_status === "ok") {
+      stats.skip++;
+      const dateStr = existing.scraped_at ? new Date(existing.scraped_at).toISOString().slice(0,10) : "—";
+      log(tld, "skip", `已成功抓取 (${dateStr})，跳过`);
+      return;
     }
+    // Records with warn_defaults, failed, pending — will be re-attempted
   }
 
   if (CLEAR_DEFS && !FORCE) {
@@ -754,9 +773,10 @@ async function scrapeTld(tld) {
     }
 
     const isProblem = isProblematic(extracted);
-    const isDefault = isAllDefaults(extracted);
+    // scrape_status: 'ok' = real data found, 'warn_defaults' = only got industry defaults
+    const scrapeStatus = isProblem ? "warn_defaults" : "ok";
 
-    await saveToDb(tld, extracted, finalUrl, pageText);
+    await saveToDb(tld, extracted, finalUrl, pageText, scrapeStatus, strategy);
 
     const total = extracted.grace_period_days + extracted.redemption_period_days + extracted.pending_delete_days;
     const dropInfo = extracted.drop_hour !== null
@@ -770,7 +790,10 @@ async function scrapeTld(tld) {
     );
   } catch (err) {
     stats.err++;
-    log(tld, "err", err.message.slice(0, 120));
+    const reason = err.message.slice(0, 400);
+    log(tld, "err", reason.slice(0, 120));
+    // Always write failure record so admin can see and retry
+    await saveFailureToDb(tld, reason);
   }
 }
 
@@ -824,6 +847,7 @@ async function main() {
   if (AI_PROVIDERS.length === 0) { console.error("❌ 至少需要一个 AI API Key"); process.exit(1); }
   console.log(`✅ AI 提供商 (${AI_PROVIDERS.length}个): ${AI_PROVIDERS.map(p=>p.name).join(", ")}`);
   console.log(`📋 类型:${TYPE} 强制:${FORCE} 清默认:${CLEAR_DEFS} 并发:${CONCURRENCY} 间隔:${DELAY_MS}ms DRY:${DRY_RUN}`);
+  console.log(`ℹ️  跳过策略: 仅跳过 scrape_status='ok' 的记录 (失败/默认值记录将重新尝试，无时效限制)`);
 
   let tldList = [];
   if (SINGLE_TLD) {
