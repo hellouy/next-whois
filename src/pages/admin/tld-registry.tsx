@@ -113,6 +113,7 @@ export default function TldRegistryPage() {
 
   // Scan state
   const [scanning, setScanning] = React.useState(false);
+  const scanningRef = React.useRef(false);
   const [scanType, setScanType] = React.useState("cc");
   const [scanForce, setScanForce] = React.useState(false);
   const [concur, setConcur] = React.useState(15);
@@ -154,7 +155,8 @@ export default function TldRegistryPage() {
   }
 
   function startScan() {
-    if (scanning) return;
+    if (scanningRef.current) return;
+    scanningRef.current = true;
     setScanning(true);
     setProgress({ done: 0, total: 0, errors: 0 });
     setScanLog([]);
@@ -206,6 +208,7 @@ export default function TldRegistryPage() {
       const d = JSON.parse(e.data);
       setProgress({ done: d.done, total: d.total, errors: d.errors });
       setScanLog(l => [...l, `✅ 扫描完成：${d.done} 个 TLD，${d.errors} 个失败`]);
+      scanningRef.current = false;
       setScanning(false);
       esRef.current?.close();
       esRef.current = null;
@@ -213,8 +216,9 @@ export default function TldRegistryPage() {
     });
 
     es.addEventListener("error", () => {
-      if (scanning) {
-        setScanLog(l => [...l, "❌ 连接中断"]);
+      if (scanningRef.current) {
+        setScanLog(l => [...l, "❌ SSE 连接中断，请重试"]);
+        scanningRef.current = false;
         setScanning(false);
         esRef.current?.close();
         esRef.current = null;
@@ -223,6 +227,7 @@ export default function TldRegistryPage() {
   }
 
   function stopScan() {
+    scanningRef.current = false;
     esRef.current?.close();
     esRef.current = null;
     setScanning(false);

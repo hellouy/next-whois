@@ -365,6 +365,20 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_tld_registry_type    ON tld_registry_info (tld_type)`,
   `CREATE INDEX IF NOT EXISTS idx_tld_registry_status  ON tld_registry_info (status)`,
   `CREATE INDEX IF NOT EXISTS idx_tld_registry_scraped ON tld_registry_info (scraped_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS hot_prefixes (
+    id            SERIAL       PRIMARY KEY,
+    prefix        VARCHAR(100) NOT NULL,
+    category      VARCHAR(50)  NOT NULL DEFAULT 'general',
+    weight        INT          NOT NULL DEFAULT 10,
+    source        VARCHAR(100) NOT NULL DEFAULT 'manual',
+    sale_examples TEXT,
+    notes         TEXT,
+    enabled       BOOLEAN      NOT NULL DEFAULT true,
+    hit_count     INT          NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT hot_prefixes_prefix_uniq UNIQUE (prefix)
+  )`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {

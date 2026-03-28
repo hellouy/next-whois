@@ -172,7 +172,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
         {/* Mobile: centered brand display */}
         {!loading && (
           <div className="sm:hidden flex items-center justify-center" style={{ height: "calc(100vh - 19rem)" }}>
-            <XRWDisplay logoText={seo.logoText} tagline={seo.tagline} />
+            <XRWDisplay tagline={seo.tagline} />
           </div>
         )}
 
