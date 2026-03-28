@@ -23,7 +23,7 @@ import {
   RiBankCardLine, RiBankCardFill,
   RiMailSendLine,
   RiFireLine,
-  RiPaletteLine, RiGiftLine, RiGithubLine, RiErrorWarningLine,
+  RiPaletteLine, RiGithubLine, RiErrorWarningLine,
   RiRadarFill,
   RiGlobalLine,
 } from "@remixicon/react";
@@ -65,7 +65,6 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/tld-registry",           labelKey: "admin.nav_tld_registry",           icon: RiGlobalLine,         activeIcon: RiGlobalLine },
       { href: "/admin/tld-probe",              labelKey: "admin.nav_tld_probe",              icon: RiRadarFill,          activeIcon: RiRadarFill },
       { href: "/admin/invite-codes",           labelKey: "admin.nav_codes",                 icon: RiKeyLine,            activeIcon: RiKeyFill },
-      { href: "/admin/activation-codes",       labelKey: "admin.nav_activation_codes",      icon: RiGiftLine,           activeIcon: RiGiftLine },
       { href: "/admin/access-keys",            labelKey: "admin.nav_access_keys",           icon: RiShieldUserLine,     activeIcon: RiShieldUserLine },
       { href: "/admin/links",                  labelKey: "admin.nav_links",                 icon: RiLinksLine,          activeIcon: RiLinksLine },
       { href: "/admin/hot-prefixes",           labelKey: "admin.nav_hot_prefixes",          icon: RiFireLine,           activeIcon: RiFireLine },

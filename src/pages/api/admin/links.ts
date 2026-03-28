@@ -3,8 +3,8 @@ import { requireAdmin } from "@/lib/admin";
 import { many, one, run } from "@/lib/db-query";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const adminErr = await requireAdmin(req, res);
-  if (adminErr) return;
+  const session = await requireAdmin(req, res);
+  if (!session) return;
 
   if (req.method === "GET") {
     const links = await many<{

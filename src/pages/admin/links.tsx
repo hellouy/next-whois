@@ -78,14 +78,16 @@ export default function AdminLinksPage() {
 
   async function handleSave() {
     if (!form.name.trim()) { toast.error("请填写链接名称"); return; }
-    if (!form.url.trim()) { toast.error("请填写链接地址"); return; }
-    try { new URL(form.url.trim()); } catch { toast.error("URL 格式不正确，请以 https:// 开头"); return; }
+    let rawUrl = form.url.trim();
+    if (!rawUrl) { toast.error("请填写链接地址"); return; }
+    if (!/^https?:\/\//i.test(rawUrl)) rawUrl = `https://${rawUrl}`;
+    try { new URL(rawUrl); } catch { toast.error("URL 格式不正确"); return; }
     setSaving(true);
     try {
       const body = {
         ...(editId ? { id: editId } : {}),
         name: form.name.trim(),
-        url: form.url.trim(),
+        url: rawUrl,
         description: form.description.trim() || null,
         category: form.category.trim() || null,
         sort_order: Number(form.sort_order) || 0,
