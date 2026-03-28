@@ -38,6 +38,8 @@ export interface SiteSettings {
   enable_dns: string;
   enable_ip: string;
   enable_ssl: string;
+  enable_icp: string;
+  enable_http: string;
   enable_tools: string;
   enable_remind: string;
   enable_links: string;
@@ -144,6 +146,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   enable_dns: "1",
   enable_ip: "1",
   enable_ssl: "1",
+  enable_icp: "1",
+  enable_http: "1",
   enable_tools: "1",
   enable_remind: "1",
   enable_links: "1",

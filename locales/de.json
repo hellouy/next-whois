@@ -1586,7 +1586,8 @@
     "nav_og_styles": "OG-Karten",
     "nav_system_label": "System",
     "nav_api": "API",
-    "nav_settings": "Einstellungen"
+    "nav_settings": "Einstellungen",
+    "nav_git_fix": "Git Push Reparatur"
   },
   "common": {
     "retry": "Wiederholen",

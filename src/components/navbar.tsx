@@ -314,8 +314,8 @@ const TOOLS_SUB_ITEMS: SubPanelItem[] = [
   { href: "/dns",  labelKey: "nav_dns",         descKey: "nav_dns_desc",       icon: <RiServerLine className="h-5 w-5" />,    colorClass: "text-violet-600 dark:text-violet-400", bgClass: "bg-violet-500/10", settingKey: "enable_dns" },
   { href: "/ip",   labelKey: "nav_ip",          descKey: "nav_ip_desc",        icon: <RiMapPinLine className="h-5 w-5" />,    colorClass: "text-blue-600 dark:text-blue-400",    bgClass: "bg-blue-500/10",   settingKey: "enable_ip" },
   { href: "/ssl",  labelKey: "nav_ssl",         descKey: "nav_ssl_desc",       icon: <RiLockLine className="h-5 w-5" />,      colorClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-500/10", settingKey: "enable_ssl" },
-  { href: "/icp",  labelKey: "nav_icp",         descKey: "nav_icp_desc",       icon: <RiFileList2Line className="h-5 w-5" />, colorClass: "text-amber-600 dark:text-amber-400",  bgClass: "bg-amber-500/10" },
-  { href: "/http", labelKey: "http.page_title", descKey: "http.page_subtitle", icon: <RiWifiLine className="h-5 w-5" />,      colorClass: "text-sky-600 dark:text-sky-400",      bgClass: "bg-sky-500/10" },
+  { href: "/icp",  labelKey: "nav_icp",         descKey: "nav_icp_desc",       icon: <RiFileList2Line className="h-5 w-5" />, colorClass: "text-amber-600 dark:text-amber-400",  bgClass: "bg-amber-500/10", settingKey: "enable_icp" },
+  { href: "/http", labelKey: "http.page_title", descKey: "http.page_subtitle", icon: <RiWifiLine className="h-5 w-5" />,      colorClass: "text-sky-600 dark:text-sky-400",      bgClass: "bg-sky-500/10",   settingKey: "enable_http" },
 ];
 
 const NAV_GROUPS: NavGroup[] = [

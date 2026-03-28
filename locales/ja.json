@@ -1586,7 +1586,8 @@
     "nav_og_styles": "OGカード",
     "nav_system_label": "システム",
     "nav_api": "API",
-    "nav_settings": "設定"
+    "nav_settings": "設定",
+    "nav_git_fix": "Git プッシュ修復"
   },
   "common": {
     "retry": "再試行",

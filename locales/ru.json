@@ -1586,7 +1586,8 @@
     "nav_og_styles": "OG-карточки",
     "nav_system_label": "Система",
     "nav_api": "API",
-    "nav_settings": "Настройки"
+    "nav_settings": "Настройки",
+    "nav_git_fix": "Исправление Git Push"
   },
   "common": {
     "retry": "Повторить",

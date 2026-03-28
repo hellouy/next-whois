@@ -527,6 +527,8 @@ const FEATURE_GROUPS: { title: string; icon: React.ElementType; color: string; i
       { key: "enable_dns", label: "DNS 查询页", desc: "显示 DNS 解析查询工具入口", onColor: "bg-emerald-500" },
       { key: "enable_ip", label: "IP 查询页", desc: "显示 IP 信息查询工具入口", onColor: "bg-emerald-500" },
       { key: "enable_ssl", label: "SSL 检测页", desc: "显示 SSL 证书检测工具入口", onColor: "bg-emerald-500" },
+      { key: "enable_icp", label: "ICP 备案查询页", desc: "显示 ICP 备案信息查询工具入口", onColor: "bg-emerald-500" },
+      { key: "enable_http", label: "HTTP 检测页", desc: "显示 HTTP 请求状态检测工具入口", onColor: "bg-emerald-500" },
       { key: "enable_tools", label: "工具中心页", desc: "显示综合工具集合页入口", onColor: "bg-emerald-500" },
       { key: "enable_about", label: "关于页面", desc: "在导航中显示关于页面链接", onColor: "bg-emerald-500" },
       { key: "enable_changelog", label: "更新日志页", desc: "在导航中显示更新日志链接", onColor: "bg-emerald-500" },

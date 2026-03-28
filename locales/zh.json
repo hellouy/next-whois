@@ -1586,7 +1586,8 @@
     "nav_og_styles": "OG卡片",
     "nav_system_label": "系统",
     "nav_api": "API",
-    "nav_settings": "设置"
+    "nav_settings": "设置",
+    "nav_git_fix": "Git 推送修复"
   },
   "common": {
     "retry": "重试",

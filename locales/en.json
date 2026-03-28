@@ -1586,7 +1586,8 @@
     "nav_og_styles": "OG Cards",
     "nav_system_label": "System",
     "nav_api": "API",
-    "nav_settings": "Settings"
+    "nav_settings": "Settings",
+    "nav_git_fix": "Git Push Fix"
   },
   "common": {
     "retry": "Retry",

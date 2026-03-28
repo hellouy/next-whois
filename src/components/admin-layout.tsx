@@ -23,6 +23,7 @@ import {
   RiBankCardLine, RiBankCardFill,
   RiMailSendLine,
   RiFireLine,
+  RiPaletteLine, RiGiftLine, RiGithubLine, RiErrorWarningLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -57,20 +58,24 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: "admin.nav_config",
     items: [
-      { href: "/admin/tld-lifecycle", labelKey: "admin.nav_tld_lifecycle", icon: RiTimeLine,       activeIcon: RiTimeLine },
-      { href: "/admin/invite-codes",  labelKey: "admin.nav_codes",         icon: RiKeyLine,        activeIcon: RiKeyFill },
-      { href: "/admin/access-keys",   labelKey: "admin.nav_access_keys",   icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
-      { href: "/admin/links",         labelKey: "admin.nav_links",         icon: RiLinksLine,      activeIcon: RiLinksLine },
-      { href: "/admin/hot-prefixes",  labelKey: "admin.nav_hot_prefixes",  icon: RiFireLine,       activeIcon: RiFireLine },
-      { href: "/admin/og-styles",     labelKey: "admin.nav_og_styles",     icon: RiImageLine,      activeIcon: RiImageLine },
+      { href: "/admin/tld-lifecycle",          labelKey: "admin.nav_tld_lifecycle",         icon: RiTimeLine,           activeIcon: RiTimeLine },
+      { href: "/admin/tld-lifecycle-feedback", labelKey: "admin.nav_tld_lifecycle_feedback", icon: RiErrorWarningLine,   activeIcon: RiErrorWarningLine },
+      { href: "/admin/invite-codes",           labelKey: "admin.nav_codes",                 icon: RiKeyLine,            activeIcon: RiKeyFill },
+      { href: "/admin/activation-codes",       labelKey: "admin.nav_activation_codes",      icon: RiGiftLine,           activeIcon: RiGiftLine },
+      { href: "/admin/access-keys",            labelKey: "admin.nav_access_keys",           icon: RiShieldUserLine,     activeIcon: RiShieldUserLine },
+      { href: "/admin/links",                  labelKey: "admin.nav_links",                 icon: RiLinksLine,          activeIcon: RiLinksLine },
+      { href: "/admin/hot-prefixes",           labelKey: "admin.nav_hot_prefixes",          icon: RiFireLine,           activeIcon: RiFireLine },
+      { href: "/admin/og-styles",              labelKey: "admin.nav_og_styles",             icon: RiImageLine,          activeIcon: RiImageLine },
+      { href: "/admin/stamp-styles",           labelKey: "admin.nav_stamp_styles",          icon: RiPaletteLine,        activeIcon: RiPaletteLine },
     ],
   },
   {
     titleKey: "admin.nav_system",
     items: [
-      { href: "/admin/system",   labelKey: "admin.nav_system_label", icon: RiServerLine,   activeIcon: RiServerFill },
-      { href: "/admin/api",      labelKey: "admin.nav_api",          icon: RiPlugLine,     activeIcon: RiPlugFill },
-      { href: "/admin/settings", labelKey: "admin.nav_settings",     icon: RiSettings4Line,activeIcon: RiSettings4Fill },
+      { href: "/admin/system",   labelKey: "admin.nav_system_label", icon: RiServerLine,    activeIcon: RiServerFill },
+      { href: "/admin/api",      labelKey: "admin.nav_api",          icon: RiPlugLine,      activeIcon: RiPlugFill },
+      { href: "/admin/git-fix",  labelKey: "admin.nav_git_fix",      icon: RiGithubLine,    activeIcon: RiGithubLine },
+      { href: "/admin/settings", labelKey: "admin.nav_settings",     icon: RiSettings4Line, activeIcon: RiSettings4Fill },
     ],
   },
 ];
