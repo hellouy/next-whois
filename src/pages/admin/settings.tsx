@@ -629,10 +629,23 @@ export default function AdminSettingsPage() {
   async function handleSave() {
     setSaving(true);
     try {
+      // Only send keys that actually changed from what was loaded from the DB.
+      // This prevents a partially-loaded form from overwriting valid DB values
+      // with empty strings on save.
+      const diff: Partial<SiteSettings> = {};
+      for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof SiteSettings)[]) {
+        if (form[key] !== saved[key]) {
+          diff[key] = form[key];
+        }
+      }
+      if (Object.keys(diff).length === 0) {
+        toast.info("没有需要保存的改动");
+        return;
+      }
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(diff),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setSaved({ ...form });
