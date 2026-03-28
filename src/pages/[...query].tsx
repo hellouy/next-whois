@@ -76,6 +76,9 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import {
   getEppStatusInfo,
   getEppStatusColor,
@@ -1370,6 +1373,18 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   // handled by their own pages before they ever reach this catch-all.
   if (!looksLikeQuery(target)) {
     return { redirect: { destination: "/", permanent: false } };
+  }
+
+  // ── require_login: redirect unauthenticated users to /login ─────────────────
+  // Check this setting once with a 30 s in-process cache so SSR overhead is minimal.
+  const requireLogin = await getSettingServer("require_login");
+  if (requireLogin === "1") {
+    const session = await getServerSession(context.req, context.res, authOptions);
+    if (!session?.user?.email) {
+      const locale = context.req.cookies["NEXT_LOCALE"] ?? "en";
+      const callbackUrl = `/${locale}/${target}`;
+      return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, permanent: false } };
+    }
   }
 
   // ── CN Reserved SLD early-return (before cleanDomain rewrites the query) ──
@@ -4124,6 +4139,10 @@ export default function LookupPage({
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
+  // Track if the first client-side fetch has completed to avoid flicker:
+  // On first load, if SSR already provided data, do a silent background refresh
+  // (keep showing SSR data while fresh data loads) instead of flashing a skeleton.
+  const firstLoadDone = React.useRef(false);
 
   useEffect(() => {
     const handleStart = (url: string) => {
@@ -4147,8 +4166,18 @@ export default function LookupPage({
   // Client-side WHOIS fetch — runs when target changes (shallow nav) or
   // refreshKey increments (re-query button forces a fresh lookup).
   useEffect(() => {
-    setData(_EMPTY_WHOIS_RESULT);
-    setLoading(true);
+    // Flicker prevention: on the very first client-side render, if SSR already
+    // provided data (initialData != null), skip resetting to empty and just
+    // silently update the data in the background — no skeleton flash.
+    const isFirstLoad = !firstLoadDone.current;
+    firstLoadDone.current = true;
+    const silentRefresh = isFirstLoad && initialData != null && refreshKey === 0;
+
+    if (!silentRefresh) {
+      setData(_EMPTY_WHOIS_RESULT);
+      setLoading(true);
+    }
+
     let cancelled = false;
     // Use a pre-started fetch if handleSearch already fired one (hides SSR +
     // hydration latency ~400-700 ms inside the reported lookup time).
@@ -4157,9 +4186,16 @@ export default function LookupPage({
     const url = `/api/lookup?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
     const responsePromise = prefetched ?? fetch(url);
     responsePromise
-      .then((r) => r.json())
-      .then((d: WhoisResult) => {
-        if (!cancelled) {
+      .then(async (r) => {
+        if (r.status === 401) {
+          // require_login is enabled — redirect to login page
+          if (!cancelled) router.replace(`/login?callbackUrl=${encodeURIComponent(router.asPath)}`);
+          return null;
+        }
+        return r.json();
+      })
+      .then((d: WhoisResult | null) => {
+        if (!cancelled && d != null) {
           setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
           setLoading(false);
         }

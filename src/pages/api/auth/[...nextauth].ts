@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { one } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getSetting } from "@/lib/server/site-settings-server";
 
 // ── Brute-force tracking: failed attempts per email (in-process, single server) ─
 const failedAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -64,6 +65,10 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        // If disable_login is enabled, block all credential logins
+        const disableLogin = await getSetting("disable_login");
+        if (disableLogin === "1") return null;
 
         const email = credentials.email.toLowerCase().trim();
         const ip = String(

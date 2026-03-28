@@ -1643,10 +1643,22 @@ export default function DashboardPage() {
 
           {/* ── Membership ── */}
           {tab === "membership" && (() => {
+            // While dashboard data is still loading, show a skeleton to prevent flash
+            if (subscriptionAccessDB === null && loadingData) {
+              return (
+                <motion.div key="membership-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 animate-pulse">
+                  <div className="h-28 rounded-2xl bg-muted/50" />
+                  <div className="h-36 rounded-2xl bg-muted/50" />
+                  <div className="h-24 rounded-2xl bg-muted/50" />
+                </motion.div>
+              );
+            }
             const isLifetime = subscriptionAccessDB && !subscriptionExpiresAt;
             const expiresDate = subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null;
             const remainingDays = expiresDate ? Math.ceil((expiresDate.getTime() - Date.now()) / 86_400_000) : null;
+            const currencyCode = (siteSettings.payment_currency || "CNY").toUpperCase();
             const CURRENCY_SYM: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", HKD: "HK$" };
+            const balanceSym = CURRENCY_SYM[currencyCode] ?? currencyCode + " ";
             const STATUS_CLS: Record<string, string> = {
               paid: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-700/40",
               pending: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-700/40",
@@ -1704,7 +1716,7 @@ export default function DashboardPage() {
                       <RiWalletLine className="w-3.5 h-3.5" /> {t("dashboard.balance")}
                     </span>
                     <span className="text-sm font-bold font-mono">
-                      ¥{(balanceCents / 100).toFixed(2)}
+                      {balanceSym}{(balanceCents / 100).toFixed(2)}
                     </span>
                   </div>
                 </div>

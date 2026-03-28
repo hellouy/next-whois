@@ -11,6 +11,7 @@ import {
   setJsonRedisValue,
   deleteRedisValue,
 } from "@/lib/server/redis";
+import { invalidateSettingsCache } from "@/lib/server/site-settings-server";
 
 const ALLOWED_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
 const SERVER_ONLY_KEYS = new Set(["captcha_secret_key", "smtp_pass"]);
@@ -44,6 +45,7 @@ async function getCachedRows(): Promise<{ key: string; value: string }[]> {
 function invalidateCache() {
   _rowsCache = null;
   invalidateAdminEmailCache();
+  invalidateSettingsCache(); // clear per-key server-side cache
   if (isRedisAvailable()) {
     deleteRedisValue(REDIS_SETTINGS_KEY).catch(() => {});
   }
