@@ -295,7 +295,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   return (
     <SessionProvider session={session}>
     <LocaleProvider>
-    <SiteSettingsProvider>
+    <SiteSettingsProvider initialSettings={(pageProps as any).initialSiteSettings}>
       <AppHead origin={origin} />
       <Toaster />
       <ThemeProvider

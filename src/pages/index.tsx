@@ -272,5 +272,16 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     showStats: homeShowStats === "1",
   };
 
-  return { props: { origin, seo } };
+  const initialSiteSettings = {
+    site_logo_text:    logoText,
+    site_title:        title,
+    site_description:  desc,
+    site_keywords:     keywords,
+    og_site_name:      siteName,
+    og_image:          ogImage || "",
+    twitter_card:      twitterCard || "summary_large_image",
+    site_subtitle:     tagline,
+  };
+
+  return { props: { origin, seo, initialSiteSettings } };
 };
