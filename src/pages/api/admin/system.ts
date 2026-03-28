@@ -9,11 +9,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "POST") {
     const { action } = req.body ?? {};
+
+    // ── clear_rate_limits ────────────────────────────────────────────────────
     if (action === "clear_rate_limits") {
       try {
-        // Clear expired DB records
         await run(`DELETE FROM rate_limit_records WHERE reset_at < NOW()`);
-        // Also flush Redis rate limit keys
         if (isRedisAvailable() && redis) {
           try {
             const keys = await redis.keys("rl:*");
@@ -25,6 +25,130 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: err.message });
       }
     }
+
+    // ── db_optimize_preview  (dry-run: counts only, no deletes) ──────────────
+    if (action === "db_optimize_preview") {
+      try {
+        const [tokens, anonSearches, rateLimits, orphanLogs, expiredKeys, stalePending, staleUserHistory] =
+          await Promise.all([
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM password_reset_tokens WHERE expires_at < NOW()`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM search_history WHERE user_id IS NULL AND created_at < NOW() - INTERVAL '30 days'`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM rate_limit_records WHERE reset_at < NOW()`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM reminder_logs rl
+               WHERE NOT EXISTS (SELECT 1 FROM reminders r WHERE r.id = rl.reminder_id)`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM access_keys
+               WHERE expires_at IS NOT NULL AND expires_at < NOW()`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM payment_orders
+               WHERE status = 'pending' AND created_at < NOW() - INTERVAL '7 days'`,
+            ),
+            one<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM search_history
+               WHERE user_id IS NOT NULL
+                 AND value_tier = 'normal'
+                 AND created_at < NOW() - INTERVAL '10 days'`,
+            ),
+          ]);
+        return res.json({
+          ok: true,
+          preview: [
+            { op: "expired_tokens",      label: "过期密码重置令牌",        count: parseInt(tokens?.count ?? "0") },
+            { op: "anon_searches_30d",   label: "匿名查询记录 (>30天)",    count: parseInt(anonSearches?.count ?? "0") },
+            { op: "expired_rate_limits", label: "过期频率限制记录",         count: parseInt(rateLimits?.count ?? "0") },
+            { op: "orphan_logs",         label: "孤立提醒日志",            count: parseInt(orphanLogs?.count ?? "0") },
+            { op: "expired_keys",        label: "过期访问密钥",            count: parseInt(expiredKeys?.count ?? "0") },
+            { op: "stale_orders",        label: "超期未支付订单 (>7天)",    count: parseInt(stalePending?.count ?? "0") },
+            { op: "stale_user_history",  label: "用户普通查询记录 (>10天)", count: parseInt(staleUserHistory?.count ?? "0") },
+            { op: "analyze",             label: "刷新查询统计信息 (ANALYZE)", count: -1 },
+          ],
+        });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
+    // ── db_optimize  (actual cleanup) ─────────────────────────────────────────
+    if (action === "db_optimize") {
+      type OpResult = { op: string; label: string; deleted: number; status?: string; error?: string };
+      const report: OpResult[] = [];
+
+      async function safeRun(op: string, label: string, sql: string, params?: any[]) {
+        try {
+          const deleted = await run(sql, params);
+          report.push({ op, label, deleted });
+        } catch (err: any) {
+          report.push({ op, label, deleted: 0, error: err.message });
+        }
+      }
+
+      // 1. Expired password-reset tokens
+      await safeRun("expired_tokens", "过期密码重置令牌",
+        `DELETE FROM password_reset_tokens WHERE expires_at < NOW()`);
+
+      // 2. Old anonymous search records (>30 days)
+      await safeRun("anon_searches_30d", "匿名查询记录 (>30天)",
+        `DELETE FROM search_history WHERE user_id IS NULL AND created_at < NOW() - INTERVAL '30 days'`);
+
+      // 3. Expired rate-limit records
+      await safeRun("expired_rate_limits", "过期频率限制记录",
+        `DELETE FROM rate_limit_records WHERE reset_at < NOW()`);
+
+      // 4. Orphaned reminder_logs (reminder deleted but logs remain)
+      await safeRun("orphan_logs", "孤立提醒日志",
+        `DELETE FROM reminder_logs WHERE NOT EXISTS (
+           SELECT 1 FROM reminders r WHERE r.id = reminder_logs.reminder_id
+         )`);
+
+      // 5. Expired access keys
+      await safeRun("expired_keys", "过期访问密钥",
+        `DELETE FROM access_keys WHERE expires_at IS NOT NULL AND expires_at < NOW()`);
+
+      // 6. Stale pending payment orders (>7 days, never paid)
+      await safeRun("stale_orders", "超期未支付订单 (>7天)",
+        `DELETE FROM payment_orders WHERE status = 'pending' AND created_at < NOW() - INTERVAL '7 days'`);
+
+      // 7. Normal-tier logged-in user history older than retention period
+      await safeRun("stale_user_history", "用户普通查询记录 (>10天)",
+        `DELETE FROM search_history
+         WHERE user_id IS NOT NULL AND value_tier = 'normal'
+           AND created_at < NOW() - INTERVAL '10 days'`);
+
+      // 8. Also flush Redis rate-limit keys
+      if (isRedisAvailable() && redis) {
+        try {
+          const keys = await redis.keys("rl:*");
+          if (keys.length > 0) await redis.del(...keys);
+        } catch { /* ignore */ }
+      }
+
+      // 9. ANALYZE key tables to refresh query planner stats (non-blocking)
+      try {
+        const { getDbReady } = await import("@/lib/db");
+        const db = await getDbReady();
+        if (db) {
+          // Run ANALYZE asynchronously — don't await so it doesn't block the response
+          db.query(
+            `ANALYZE search_history, users, reminders, stamps, payment_orders, tld_rules`
+          ).catch(() => {});
+          report.push({ op: "analyze", label: "刷新查询统计信息 (ANALYZE)", deleted: 0, status: "triggered" });
+        }
+      } catch {
+        report.push({ op: "analyze", label: "刷新查询统计信息 (ANALYZE)", deleted: 0, status: "skipped" });
+      }
+
+      return res.json({ ok: true, report });
+    }
+
     return res.status(400).json({ error: "未知操作" });
   }
 

@@ -9,6 +9,7 @@ import {
   RiErrorWarningLine, RiFeedbackLine, RiBarChartLine,
   RiCalendarLine, RiServerLine, RiMoneyDollarCircleLine,
   RiDeleteBinLine, RiTimeLine, RiShieldLine, RiFlashlightLine,
+  RiToolsLine, RiSparklingLine,
 } from "@remixicon/react";
 
 type SystemData = {
@@ -30,6 +31,8 @@ type SystemData = {
   settings: { allow_registration: string };
 };
 
+type OptimizeItem = { op: string; label: string; count?: number; deleted?: number; status?: string; error?: string };
+
 function StatItem({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color?: string }) {
   return (
     <div className="text-center p-3">
@@ -45,6 +48,11 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = React.useState(true);
   const [triggering, setTriggering] = React.useState(false);
   const [clearingRateLimit, setClearingRateLimit] = React.useState(false);
+
+  const [optPreview, setOptPreview] = React.useState<OptimizeItem[] | null>(null);
+  const [optPreviewLoading, setOptPreviewLoading] = React.useState(false);
+  const [optimizing, setOptimizing] = React.useState(false);
+  const [optReport, setOptReport] = React.useState<OptimizeItem[] | null>(null);
 
   function load() {
     setLoading(true);
@@ -91,6 +99,53 @@ export default function AdminSystemPage() {
       toast.error("操作失败");
     } finally {
       setClearingRateLimit(false);
+    }
+  }
+
+  async function loadOptPreview() {
+    setOptPreviewLoading(true);
+    setOptReport(null);
+    try {
+      const r = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "db_optimize_preview" }),
+      });
+      const d = await r.json();
+      if (d.error) toast.error(d.error);
+      else setOptPreview(d.preview);
+    } catch {
+      toast.error("预扫描失败");
+    } finally {
+      setOptPreviewLoading(false);
+    }
+  }
+
+  async function runOptimize() {
+    if (!confirm("确认执行数据库优化？\n\n将删除所有过期/孤立数据，刷新查询统计信息。此操作不可撤销。")) return;
+    setOptimizing(true);
+    setOptPreview(null);
+    setOptReport(null);
+    try {
+      const r = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "db_optimize" }),
+      });
+      const d = await r.json();
+      if (d.error) toast.error(d.error);
+      else {
+        setOptReport(d.report);
+        const total = (d.report as OptimizeItem[])
+          .filter(x => typeof x.deleted === "number" && x.deleted > 0)
+          .reduce((s, x) => s + (x.deleted ?? 0), 0);
+        toast.success(`优化完成，共清理 ${total} 条数据`);
+        load();
+      }
+    } catch {
+      toast.error("优化失败");
+    } finally {
+      setOptimizing(false);
     }
   }
 
@@ -284,7 +339,8 @@ export default function AdminSystemPage() {
                 </div>
                 <h3 className="text-sm font-bold">管理工具</h3>
               </div>
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Trigger reminders */}
                 <div className="border border-border rounded-xl p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <RiBellLine className="w-4 h-4 text-muted-foreground" />
@@ -303,6 +359,7 @@ export default function AdminSystemPage() {
                   </Button>
                 </div>
 
+                {/* Clear rate limits */}
                 <div className="border border-border rounded-xl p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <RiTimeLine className="w-4 h-4 text-muted-foreground" />
@@ -321,6 +378,91 @@ export default function AdminSystemPage() {
                     {clearingRateLimit ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
                     {clearingRateLimit ? "清理中…" : "清理过期记录"}
                   </Button>
+                </div>
+
+                {/* DB one-click optimize */}
+                <div className="border border-border rounded-xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <RiToolsLine className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-semibold">一键优化数据库</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    清理过期令牌、孤立日志、匿名历史等垃圾数据，并刷新查询统计信息
+                  </p>
+
+                  {/* Preview list */}
+                  {optPreview && !optReport && (
+                    <div className="rounded-lg bg-muted/40 border border-border divide-y divide-border text-xs mt-1">
+                      {optPreview.map(item => (
+                        <div key={item.op} className="flex items-center justify-between px-2.5 py-1.5 gap-2">
+                          <span className="text-muted-foreground truncate flex-1">{item.label}</span>
+                          {item.count === -1 ? (
+                            <span className="text-blue-500 shrink-0">—</span>
+                          ) : item.count === 0 ? (
+                            <span className="text-muted-foreground/50 shrink-0">已整洁</span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400 font-semibold tabular-nums shrink-0">{item.count}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Report list (after run) */}
+                  {optReport && (
+                    <div className="rounded-lg bg-muted/40 border border-border divide-y divide-border text-xs mt-1">
+                      {optReport.map(item => (
+                        <div key={item.op} className="flex items-center justify-between px-2.5 py-1.5 gap-2">
+                          <span className="text-muted-foreground truncate flex-1">{item.label}</span>
+                          {item.error ? (
+                            <span className="text-red-500 shrink-0" title={item.error}>失败</span>
+                          ) : item.status === "triggered" || item.status === "skipped" ? (
+                            <span className={cn("shrink-0", item.status === "triggered" ? "text-blue-500" : "text-muted-foreground/50")}>
+                              {item.status === "triggered" ? "已触发" : "已跳过"}
+                            </span>
+                          ) : (item.deleted ?? 0) === 0 ? (
+                            <span className="text-muted-foreground/50 shrink-0">+0</span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums shrink-0">-{item.deleted}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 mt-1">
+                    {!optReport && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={loadOptPreview}
+                        disabled={optPreviewLoading || optimizing}
+                        className="flex-1 h-8 rounded-lg text-xs gap-1.5"
+                      >
+                        {optPreviewLoading
+                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                          : <RiSearchLine className="w-3.5 h-3.5" />}
+                        {optPreviewLoading ? "扫描中…" : "预扫描"}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant={optReport ? "outline" : "default"}
+                      onClick={optReport ? () => { setOptReport(null); setOptPreview(null); } : runOptimize}
+                      disabled={optimizing}
+                      className={cn(
+                        "h-8 rounded-lg text-xs gap-1.5",
+                        optReport ? "flex-1" : optPreview ? "flex-1" : "w-full"
+                      )}
+                    >
+                      {optimizing
+                        ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                        : optReport
+                        ? <RiRefreshLine className="w-3.5 h-3.5" />
+                        : <RiSparklingLine className="w-3.5 h-3.5" />}
+                      {optimizing ? "优化中…" : optReport ? "重置" : "开始优化"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
