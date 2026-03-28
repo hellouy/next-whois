@@ -311,15 +311,25 @@ export default function AdminRemindersPage() {
                       </p>
                     )}
 
-                    {reminder.phase_flags && (
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {reminder.phase_flags.split(",").map(f => f.trim()).filter(Boolean).map(f => (
-                          <span key={f} className="text-[9px] px-1 py-0.5 rounded bg-violet-100 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400">
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {reminder.phase_flags && (() => {
+                      let flags: Record<string, boolean> = {};
+                      try { flags = JSON.parse(reminder.phase_flags); } catch { return null; }
+                      const LABEL: Record<string, string> = {
+                        grace: "宽限期", redemption: "赎回期",
+                        pendingDelete: "待删除", dropSoon: "即将释放", dropped: "已释放",
+                      };
+                      const active = Object.entries(flags).filter(([, v]) => v).map(([k]) => k);
+                      if (!active.length) return null;
+                      return (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {active.map(k => (
+                            <span key={k} className="text-[9px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 font-medium">
+                              {LABEL[k] ?? k}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">

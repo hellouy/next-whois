@@ -42,7 +42,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node scripts/batch-scrape.mjs --type cc --force --concurrency 2 --delay 2500"
+args = "node scripts/batch-scrape.mjs --type iana --concurrency 2 --delay 2500"
 
 [[ports]]
 localPort = 5000

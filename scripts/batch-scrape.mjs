@@ -34,9 +34,10 @@ const args = process.argv.slice(2);
 const getArg  = n => { const i = args.indexOf(n); return i >= 0 ? args[i+1] : null; };
 const hasFlag = n => args.includes(n);
 const SINGLE_TLD   = getArg("--tld");
-const TYPE         = getArg("--type") ?? "cc";
+const TYPE         = getArg("--type") ?? "iana";   // default: all IANA TLDs
 const FORCE        = hasFlag("--force");
 const CLEAR_DEFS   = hasFlag("--clear-defaults");
+const SEED_ONLY    = hasFlag("--seed-only");         // insert defaults without AI
 const CONCURRENCY  = parseInt(getArg("--concurrency") ?? "2");
 const DELAY_MS     = parseInt(getArg("--delay") ?? "3000");
 const DRY_RUN      = hasFlag("--dry-run");
@@ -842,42 +843,116 @@ async function fetchGtldList() {
   }
 }
 
+/**
+ * Fetch ALL TLDs from the IANA root zone text file (authoritative source).
+ * Returns lowercase ASCII TLDs only (IDN punycode xn-- excluded by default).
+ * Falls back to CC_TLDS + a small gTLD seed list on network failure.
+ */
+async function fetchAllIanaTlds({ includeIdn = false } = {}) {
+  try {
+    const text = await fetchRaw("https://data.iana.org/TLD/tlds-alpha-by-domain.txt", 15000);
+    const lines = text.split(/\r?\n/).map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith("#"));
+    const result = includeIdn ? lines : lines.filter(t => !t.startsWith("xn--"));
+    console.log(`   IANA root zone: ${result.length} TLDs (${lines.length - result.length} IDN xn-- excluded)`);
+    return result;
+  } catch (e) {
+    console.warn("⚠️  IANA 根区文件获取失败，回退到内置列表:", e.message);
+    const gtlds = await fetchGtldList();
+    return [...new Set([...CC_TLDS, ...gtlds])];
+  }
+}
+
+/**
+ * Seed a single TLD into tld_rules with default lifecycle values.
+ * Only inserts if no existing record. Respects --force to overwrite.
+ */
+async function seedTldDefault(tld) {
+  if (DRY_RUN) { stats.done++; log(tld, "ok", "[DRY-RUN seed]"); return; }
+  try {
+    if (!FORCE) {
+      const existing = await dbOne(`SELECT tld FROM tld_rules WHERE tld=$1`, [tld]).catch(() => null);
+      if (existing) { stats.skip++; log(tld, "skip", "已存在，跳过"); return; }
+    }
+    await dbRun(
+      `INSERT INTO tld_rules (tld, grace_period_days, redemption_period_days, pending_delete_days, scrape_status, scraped_at)
+       VALUES ($1, 30, 30, 5, 'pending', NOW())
+       ON CONFLICT (tld) DO UPDATE SET
+         scrape_status = CASE WHEN tld_rules.scrape_status IS NULL THEN 'pending' ELSE tld_rules.scrape_status END,
+         scraped_at    = COALESCE(tld_rules.scraped_at, NOW())`,
+      [tld]
+    );
+    stats.done++;
+    log(tld, "ok", "默认值已入库 (30/30/5)");
+  } catch (err) {
+    stats.err++;
+    log(tld, "err", err.message.slice(0, 100));
+  }
+}
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+let shuttingDown = false;
+function printProgress() {
+  const done = stats.done + stats.skip + stats.err;
+  const pct  = stats.total ? Math.round(done / stats.total * 100) : 0;
+  console.log(`\n── 当前进度 ${done}/${stats.total} (${pct}%) ──`);
+  console.log(`   ✅ 完成: ${stats.done}  ⏭ 跳过: ${stats.skip}  ❌ 失败: ${stats.err}`);
+  console.log(`   ℹ️  重新运行相同命令（不带 --force）将自动从失败处继续`);
+}
+process.on("SIGTERM", () => { console.log("\n⚠️  收到 SIGTERM，正在等待当前批次完成..."); shuttingDown = true; });
+process.on("SIGINT",  () => { console.log("\n⚠️  收到 SIGINT，正在等待当前批次完成...");  shuttingDown = true; });
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════════════════╗");
-  console.log("║       TLD 生命周期批量爬取器 v2.0 (batch-scrape.mjs)        ║");
+  console.log("║       TLD 生命周期批量爬取器 v2.1 (batch-scrape.mjs)        ║");
   console.log("╚══════════════════════════════════════════════════════════════╝");
 
-  if (AI_PROVIDERS.length === 0) { console.error("❌ 至少需要一个 AI API Key"); process.exit(1); }
-  console.log(`✅ AI 提供商 (${AI_PROVIDERS.length}个): ${AI_PROVIDERS.map(p=>p.name).join(", ")}`);
-  console.log(`📋 类型:${TYPE} 强制:${FORCE} 清默认:${CLEAR_DEFS} 并发:${CONCURRENCY} 间隔:${DELAY_MS}ms DRY:${DRY_RUN}`);
-  console.log(`ℹ️  跳过策略: 仅跳过 scrape_status='ok' 的记录 (失败/默认值记录将重新尝试，无时效限制)`);
+  if (SEED_ONLY) {
+    console.log("🌱 模式: --seed-only (仅将IANA全量TLD入库，使用默认生命周期值，无需AI)");
+  } else if (AI_PROVIDERS.length === 0) {
+    console.error("❌ 未找到 AI API Key（GROQ_API_KEY / GEMINI_API_KEY / DEEPSEEK_API_KEY 等）");
+    console.error("   提示: 先运行 --seed-only 将全部TLD入库，再配置AI Key后运行AI抓取");
+    process.exit(1);
+  } else {
+    console.log(`✅ AI 提供商 (${AI_PROVIDERS.length}个): ${AI_PROVIDERS.map(p=>p.name).join(", ")}`);
+  }
+  console.log(`📋 类型:${TYPE} 强制:${FORCE} 清默认:${CLEAR_DEFS} 仅种子:${SEED_ONLY} 并发:${CONCURRENCY} 间隔:${DELAY_MS}ms DRY:${DRY_RUN}`);
+  if (!SEED_ONLY) {
+    console.log(`ℹ️  断点续传: 已成功的TLD会自动跳过，中断后重新运行即可继续`);
+  }
 
+  // ── Build TLD list ──────────────────────────────────────────────────────────
   let tldList = [];
   if (SINGLE_TLD) {
     tldList = [SINGLE_TLD.toLowerCase().replace(/^\./,"")];
-  } else if (TYPE==="cc" || TYPE==="all") {
-    tldList.push(...CC_TLDS);
-  }
-  if (TYPE==="gtld" || TYPE==="all") {
-    console.log("⏳ 获取 IANA gTLD 列表...");
-    const gtlds = await fetchGtldList();
-    tldList.push(...gtlds);
-    console.log(`   gTLD: ${gtlds.length} 个`);
+  } else if (TYPE === "iana") {
+    console.log("⏳ 从 IANA 根区文件获取全量 TLD 列表...");
+    tldList = await fetchAllIanaTlds();
+  } else {
+    if (TYPE === "cc" || TYPE === "all") tldList.push(...CC_TLDS);
+    if (TYPE === "gtld" || TYPE === "all") {
+      console.log("⏳ 获取 IANA gTLD 列表...");
+      const gtlds = await fetchGtldList();
+      tldList.push(...gtlds);
+      console.log(`   gTLD: ${gtlds.length} 个`);
+    }
   }
   tldList = [...new Set(tldList)];
   stats.total = tldList.length;
 
-  console.log(`\n🚀 开始抓取 ${tldList.length} 个 TLD (${TYPE})...\n`);
-  if (FORCE) console.log("⚠️  --force: 覆盖所有已有数据（包括手动修改）\n");
+  const modeLabel = SEED_ONLY ? "种子入库" : "AI抓取";
+  console.log(`\n🚀 开始${modeLabel} ${tldList.length} 个 TLD (${TYPE})...\n`);
+  if (FORCE)     console.log("⚠️  --force: 覆盖所有已有数据（包括手动修改）\n");
   if (CLEAR_DEFS) console.log("🔄 --clear-defaults: 仅重抓默认值 (30/30/5) 记录\n");
 
   const startTime = Date.now();
+  const worker    = SEED_ONLY ? seedTldDefault : scrapeTld;
 
   for (let i = 0; i < tldList.length; i += CONCURRENCY) {
+    if (shuttingDown) { console.log("⚠️  终止请求，停止处理新批次"); break; }
     const batch = tldList.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map(tld => scrapeTld(tld)));
-    if (i + CONCURRENCY < tldList.length) {
+    await Promise.all(batch.map(tld => worker(tld)));
+    if (i + CONCURRENCY < tldList.length && !shuttingDown) {
       await new Promise(r => setTimeout(r, DELAY_MS));
     }
   }
@@ -886,12 +961,15 @@ async function main() {
   console.log(`\n${"═".repeat(64)}`);
   console.log(`✅ 完成: ${stats.done} (含${stats.defaultOnly}个默认值)  ⏭ 跳过: ${stats.skip}  ❌ 失败: ${stats.err}`);
   console.log(`⏱  耗时: ${Math.floor(elapsed/60)}分${elapsed%60}秒 | ${tldList.length} 个 TLD`);
-  if (stats.defaultOnly > 0) {
+  if (stats.defaultOnly > 0 && !SEED_ONLY) {
     console.log(`\n⚠️  ${stats.defaultOnly} 个 TLD 使用了默认值(30/30/5)，建议手动核查！`);
-    console.log(`   重新抓取默认值记录: node scripts/batch-scrape.mjs --clear-defaults --force`);
+    console.log(`   重新抓取默认值记录: node scripts/batch-scrape.mjs --clear-defaults`);
+  }
+  if (stats.err > 0) {
+    console.log(`\n❌ ${stats.err} 个 TLD 失败。重新运行相同命令（不带 --force）将自动重试。`);
   }
 
   await pool.end();
 }
 
-main().catch(e => { console.error("Fatal:", e); pool.end(); process.exit(1); });
+main().catch(e => { console.error("Fatal:", e); printProgress(); pool.end(); process.exit(1); });
