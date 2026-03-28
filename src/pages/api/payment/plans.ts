@@ -8,6 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const plans = await getActivePlans();
+    res.setHeader("Cache-Control", "public, max-age=120, stale-while-revalidate=300");
     return res.json({ plans });
   } catch (err: any) {
     console.error("[payment/plans] error:", err.message);

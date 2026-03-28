@@ -25,6 +25,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         platform: string | null;
         created_at: string;
       }>(`SELECT * FROM sponsors ${where} ORDER BY sponsor_date DESC NULLS LAST, created_at DESC`);
+      if (visible_only === "1") {
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      } else {
+        res.setHeader("Cache-Control", "private, no-store");
+      }
       return res.json({ sponsors: rows });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });

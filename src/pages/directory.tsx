@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { useTranslation } from "@/lib/i18n";
 import { useSession } from "next-auth/react";
 import { useSiteSettings } from "@/lib/site-settings";
+import { getCached, setCached } from "@/lib/client-cache";
 
 const CLICKS_KEY = "tool_clicks";
 
@@ -50,16 +51,21 @@ export default function NavPage() {
   const settings = useSiteSettings();
   const siteLabel = settings.site_logo_text || "X.RW";
 
-  const [clicks, setClicks] = React.useState<Record<string, number>>(loadLocalClicks);
+  const [clicks, setClicks] = React.useState<Record<string, number>>(() => {
+    const cached = getCached<Record<string, number>>("tool_clicks", 60_000);
+    return mergeClicks(loadLocalClicks(), cached ?? {});
+  });
 
   const fetchedRef = React.useRef(false);
   React.useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
+    if (getCached("tool_clicks", 60_000)) return;
     fetch("/api/tools/clicks")
       .then((r) => r.json())
       .then((json) => {
         if (json.clicks) {
+          setCached("tool_clicks", json.clicks);
           setClicks((prev) => mergeClicks(prev, json.clicks));
         }
       })

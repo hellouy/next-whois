@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSiteSettings } from "@/lib/site-settings";
+import { getCached, setCached } from "@/lib/client-cache";
 import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "next/router";
 import { cn } from "@/lib/utils";
@@ -425,9 +426,16 @@ export default function SponsorPage() {
   const { data: session } = useSession();
   const siteName = settings.site_title || "X.RW · RDAP+WHOIS";
 
-  const [sponsors, setSponsors] = React.useState<Sponsor[]>([]);
-  const [sponsorLoading, setSponsorLoading] = React.useState(true);
-  const [plans, setPlans] = React.useState<Plan[]>([]);
+  const SPONSOR_TTL = 2 * 60_000;
+  const [sponsors, setSponsors] = React.useState<Sponsor[]>(
+    () => getCached<Sponsor[]>("sponsors", SPONSOR_TTL) ?? []
+  );
+  const [sponsorLoading, setSponsorLoading] = React.useState(
+    () => !getCached<Sponsor[]>("sponsors", SPONSOR_TTL)
+  );
+  const [plans, setPlans] = React.useState<Plan[]>(
+    () => getCached<Plan[]>("payment_plans", SPONSOR_TTL) ?? []
+  );
   const [showAll, setShowAll] = React.useState(false);
   const [showPostPayment, setShowPostPayment] = React.useState(false);
   const [postPaymentPlatform, setPostPaymentPlatform] = React.useState<string>("");
@@ -435,15 +443,20 @@ export default function SponsorPage() {
   const [activeQr, setActiveQr] = React.useState<"alipay" | "wechat" | null>(null);
 
   React.useEffect(() => {
-    fetch("/api/admin/sponsors?visible_only=1")
-      .then(r => r.json())
-      .then(d => { if (d.sponsors) setSponsors(d.sponsors); })
-      .catch(() => {})
-      .finally(() => setSponsorLoading(false));
-    fetch("/api/payment/plans")
-      .then(r => r.json())
-      .then(d => { if (d.plans) setPlans(d.plans); })
-      .catch(() => {});
+    if (!getCached("sponsors", SPONSOR_TTL)) {
+      fetch("/api/admin/sponsors?visible_only=1")
+        .then(r => r.json())
+        .then(d => { if (d.sponsors) { setCached("sponsors", d.sponsors); setSponsors(d.sponsors); } })
+        .catch(() => {})
+        .finally(() => setSponsorLoading(false));
+    }
+    if (!getCached("payment_plans", SPONSOR_TTL)) {
+      fetch("/api/payment/plans")
+        .then(r => r.json())
+        .then(d => { if (d.plans) { setCached("payment_plans", d.plans); setPlans(d.plans); } })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function spawnHearts() {

@@ -17,6 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     const clicks: Record<string, number> = {};
     for (const row of rows) clicks[row.url] = row.click_count;
+    res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
     return res.status(200).json({ clicks, source: "user" });
   }
 
@@ -25,5 +26,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   );
   const clicks: Record<string, number> = {};
   for (const row of rows) clicks[row.url] = row.total_clicks;
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
   return res.status(200).json({ clicks, source: "global" });
 }

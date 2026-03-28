@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import Link from "next/link";
+import { getCached, setCached } from "@/lib/client-cache";
 import { motion, AnimatePresence } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -270,8 +271,13 @@ export default function TldsPage() {
 
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<FilterType>("all");
-  const [data, setData] = React.useState<IanaTldsResponse | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const IANA_CACHE_TTL = 5 * 60_000;
+  const [data, setData] = React.useState<IanaTldsResponse | null>(
+    () => getCached<IanaTldsResponse>("iana_tlds", IANA_CACHE_TTL)
+  );
+  const [loading, setLoading] = React.useState(
+    () => !getCached<IanaTldsResponse>("iana_tlds", IANA_CACHE_TTL)
+  );
 
   const [allServers, setAllServers] = React.useState<ServerRow[]>([]);
   const [userTlds, setUserTlds] = React.useState<Set<string>>(new Set());
@@ -283,11 +289,13 @@ export default function TldsPage() {
   const BUILTIN_TLDS = new Set(["bn"]);
 
   React.useEffect(() => {
+    if (getCached("iana_tlds", IANA_CACHE_TTL)) return;
     fetch("/api/iana-tlds")
       .then((r) => r.json())
-      .then((d: IanaTldsResponse) => setData(d))
+      .then((d: IanaTldsResponse) => { setCached("iana_tlds", d); setData(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchServers = React.useCallback(async () => {
