@@ -60,6 +60,18 @@ const STATIC_ALWAYS_FALLBACK = new Set<string>([
   "bf",  // Burkina Faso — cctld server (RIPE) doesn't serve .bf domain data
   // NOTE: .bn was here previously but whois.bnnic.bn (202.152.92.245) is reachable
   //       from cloud once the hostname resolves — DNS-over-HTTPS fallback handles it.
+
+  // ── Confirmed both RDAP and WHOIS unreachable (NXDOMAIN / SERVFAIL) ───────
+  // Verified via Cloudflare DoH + direct TCP tests. Both endpoints down globally.
+  "bb",  // Barbados — whois.nic.bb NXDOMAIN, rdap.nic.bb ENOTFOUND
+  "co",  // Colombia — whois.nic.co NXDOMAIN, rdap.cctld.co SSL SNI error
+  "dj",  // Djibouti — whois.nic.dj NXDOMAIN, rdap.nic.dj ENOTFOUND
+  "iq",  // Iraq — whois.cmc.iq NXDOMAIN, rdap.nic.iq SERVFAIL
+  "jm",  // Jamaica — whois server null in cctld-whois-servers, rdap.nic.jm ENOTFOUND
+  "lc",  // Saint Lucia — whois.nic.lc NXDOMAIN, rdap.nic.lc ENOTFOUND
+  "tj",  // Tajikistan — whois.nic.tj NXDOMAIN, rdap.nic.tj ENOTFOUND
+  "tt",  // Trinidad & Tobago — whois.nic.tt NXDOMAIN, rdap.nic.tt ENOTFOUND
+  "vc",  // Saint Vincent & Grenadines — whois.nic.vc NXDOMAIN, rdap.nic.vc ENOTFOUND
 ]);
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────

@@ -136,86 +136,86 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   mk: "https://rdap.nic.mk/",
   mt: "https://rdap.nic.mt/",
   ru: "https://rdap.nic.ru/",                     // confirmed: rdap.nic.ru
-  su: "https://rdap.tcinet.ru/",                  // Soviet Union legacy TLD (same operator)
-  tj: "https://rdap.nic.tj/",
+  // su: removed — rdap.tcinet.ru ENOTFOUND (not in IANA bootstrap); WHOIS via whois.tcinet.ru still works
+  // tj: removed — rdap.nic.tj ENOTFOUND (not in IANA bootstrap)
   tm: "https://rdap.nic.tm/",
   ua: "https://rdap.hostmaster.ua/",
   uz: "https://rdap.cctld.uz/",                   // IANA: cctld.uz, not nic.uz
   // ── Other Europe ─────────────────────────────────────────────────────────
-  gl: "https://rdap.nic.gl/",
+  // gl: removed — rdap.nic.gl ENOTFOUND (not in IANA bootstrap); WHOIS via whois.nic.gl works
   im: "https://rdap.centralnic.com/im/",           // Isle of Man via CentralNIC
-  xk: "https://rdap.nic.xk/",
+  // xk: removed — rdap.nic.xk ENOTFOUND (not in IANA bootstrap; Kosovo not ICANN-delegated)
   // ── Africa ───────────────────────────────────────────────────────────────
-  ao: "https://rdap.nic.ao/",
-  bw: "https://rdap.nic.bw/",
-  cd: "https://rdap.nic.cd/",
+  // ao: removed — rdap.nic.ao ENOTFOUND; whois.dns.pt in cctld-whois-servers.json is also wrong (Portugal DNS)
+  // bw: removed — rdap.nic.bw ENOTFOUND; no known WHOIS server for Botswana
+  // cd: removed — rdap.nic.cd ENOTFOUND; WHOIS via whois.nic.cd works
   ci: "https://rdap.nic.ci/",
   cm: "https://rdap.nic.cm/",                     // IANA: nic.cm, not netcom.cm
-  dj: "https://rdap.nic.dj/",
-  et: "https://rdap.nic.et/",
-  gh: "https://rdap.nic.gh/",
+  // dj: removed — rdap.nic.dj ENOTFOUND; WHOIS whois.nic.dj also ENOTFOUND
+  // et: removed — rdap.nic.et ENOTFOUND; no known WHOIS server for Ethiopia
+  // gh: removed — rdap.nic.gh ENOTFOUND; WHOIS via whois.nic.gh works
   ke: "https://rdap.kenic.or.ke/",
   ly: "https://rdap.nic.ly/",
   mg: "https://rdap.nic.mg/",
   ml: "https://rdap.nic.ml/",
   mu: "https://rdap.identitydigital.services/rdap/", // IANA: IdentityDigital
-  mw: "https://rdap.nic.mw/",
+  // mw: removed — rdap.nic.mw ENOTFOUND; WHOIS whois.nic.mw also times out
   mz: "https://rdap.nic.mz/",
   na: "https://keetmans.omadhina.co.na/",          // IANA: Namibian ccTLD registrar
   ng: "https://rdap.nic.net.ng/",
   rw: "https://rdap.ricta.org.rw/",
-  sc: "https://rdap.nic.sc/",
+  // sc: removed — rdap.nic.sc ENOTFOUND; WHOIS now fixed to whois.nic.sc
   sd: "https://rdap.nic.sd/",
   sn: "https://rdap.nic.sn/whois43/",             // IANA: /whois43/ path required
   so: "https://rdap.nic.so/",
   ss: "https://rdap.nic.ss/",
   td: "https://rdap.nic.td/",
   tz: "https://whois.tznic.or.tz/rdap/",          // IANA: whois.tznic.or.tz/rdap/
-  ug: "https://rdap.nic.ug/",
+  // ug: removed — rdap.nic.ug ENOTFOUND; WHOIS whois.co.ug also ENOTFOUND
   za: "https://rdap.registry.net.za/",             // confirmed: registry.net.za
   zm: "https://rdap.nic.zm/",                      // IANA: nic.zm, not zicta.zm
-  zw: "https://rdap.zispa.co.zw/",
+  // zw: removed — rdap.zispa.co.zw ENOTFOUND; no known WHOIS server for Zimbabwe
   // ── Middle East ──────────────────────────────────────────────────────────
   ae: "https://rdap.aeda.net.ae/",                 // confirmed: aeda.net.ae
-  bh: "https://rdap.nic.bh/",
-  iq: "https://rdap.nic.iq/",
-  jo: "https://rdap.nic.jo/",
+  // bh: removed — rdap.nic.bh ENOTFOUND; WHOIS via whois.nic.bh works
+  // iq: removed — rdap.nic.iq SERVFAIL in DoH; whois.cmc.iq also NXDOMAIN. No working lookup for Iraq.
+  // jo: removed — rdap.nic.jo ENOTFOUND; whois.ripe.net in cctld-whois is wrong for .jo domains
   lb: "https://rdap.lbdr.org.lb/",
-  om: "https://rdap.nic.om/",
-  ps: "https://rdap.nic.ps/",
-  sy: "https://rdap.nic.sy/",
+  // om: removed — rdap.nic.om ENOTFOUND; WHOIS via whois.registry.om works
+  // ps: removed — rdap.nic.ps ENOTFOUND; WHOIS whois.pnina.ps ECONNREFUSED
+  // sy: removed — rdap.nic.sy ENOTFOUND; WHOIS via whois.tld.sy works
   ye: "https://rdap.y.net.ye/",
   // ── Asia / Pacific ───────────────────────────────────────────────────────
   af: "https://rdap.nic.af/",
-  as: "https://rdap.nic.as/",
+  as: "https://rdap.nic.as/",                      // IANA-confirmed; HTTP 403 from cloud → fail-fast to WHOIS
   au: "https://rdap.cctld.au/rdap/",
   // bn: rdap.bnnic.bn is NXDOMAIN (no RDAP service); WHOIS via whois.bnnic.bn works with DoH fallback
-  bt: "https://rdap.nic.bt/",
+  // bt: removed — rdap.nic.bt ENOTFOUND; WHOIS whois.netnames.net is wrong server
   cc: "https://tld-rdap.verisign.com/cc/v1/",
   cx: "https://rdap.nic.cx/",
   fj: "https://www.rdap.fj/",                      // IANA: www.rdap.fj
   fm: "https://rdap.centralnic.com/fm/",
   gs: "https://rdap.nic.gs/",
-  hk: "https://rdap.hkirc.hk/",
+  // hk: removed — rdap.hkirc.hk ENOTFOUND; WHOIS via whois.hkirc.hk works
   id: "https://rdap.pandi.id/rdap/",
   in: "https://rdap.nixiregistry.in/rdap/",
   io: "https://rdap.identitydigital.services/rdap/", // confirmed: IdentityDigital
-  jp: "https://rdap.jprs.jp/",
-  kh: "https://rdap.nic.kh/",
-  kr: "https://rdap.kr/",
+  jp: "https://jprs.jp/rdap/",                     // fixed: rdap.jprs.jp ENOTFOUND; jprs.jp/rdap/ works
+  // kh: removed — rdap.nic.kh ENOTFOUND; WHOIS whois.nic.kh also ENOTFOUND
+  // kr: removed — rdap.kr ENOTFOUND; WHOIS via whois.kr works
   la: "https://rdap.nic.la/",
-  mm: "https://rdap.nic.mm/",
-  mn: "https://rdap.nic.mn/",
+  // mm: removed — rdap.nic.mm ENOTFOUND; no known working WHOIS server
+  // mn: removed — rdap.nic.mn ENOTFOUND; WHOIS via whois.nic.mn works
   ms: "https://rdap.nic.ms/",
-  mv: "https://rdap.nic.mv/",
+  // mv: removed — rdap.nic.mv ENOTFOUND (Maldives, no public RDAP/WHOIS)
   my: "https://rdap.mynic.my/rdap/",               // confirmed: mynic.my/rdap/
   nf: "https://rdap.nic.nf/",
-  np: "https://rdap.nic.np/",
-  nu: "https://rdap.nic.nu/",
-  nz: "https://rdap.srs.net.nz/",
+  // np: removed — rdap.nic.np ENOTFOUND; no known WHOIS server for Nepal
+  // nu: removed — rdap.nic.nu ENOTFOUND; WHOIS whois.nic.nu also ENOTFOUND
+  // nz: removed — rdap.srs.net.nz ENOTFOUND; WHOIS via whois.srs.net.nz works
   pg: "https://rdap.nic.pg/",
-  ph: "https://rdap.dot.ph/",
-  pk: "https://rdap.pknic.net.pk/",
+  // ph: removed — rdap.dot.ph SSL/TLS error; WHOIS whois.dot.ph also times out
+  // pk: removed — rdap.pknic.net.pk ENOTFOUND; WHOIS via whois.pknic.net.pk works
   pn: "https://rdap.nominet.uk/pn/",
   pw: "https://rdap.radix.host/rdap/",
   sb: "https://rdap.nic.sb/",
@@ -225,42 +225,42 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   to: "https://rdap.tonicregistry.to/rdap/",       // IANA: tonicregistry.to
   tv: "https://rdap.nic.tv/",
   tw: "https://ccrdap.twnic.tw/tw/",
-  vu: "https://rdap.nic.vu/",
-  ws: "https://rdap.nic.ws/",
+  // vu: removed — rdap.nic.vu ENOTFOUND; WHOIS whois.dnrs.vu also ENOTFOUND
+  // ws: removed — rdap.nic.ws ENOTFOUND; WHOIS via whois.website.ws works
   // ── Americas ─────────────────────────────────────────────────────────────
-  ag: "https://rdap.nic.ag/",
+  // ag: removed — rdap.nic.ag ENOTFOUND; WHOIS via whois.nic.ag works
   ai: "https://rdap.identitydigital.services/rdap/",
-  ar: "https://rdap.nic.ar/",
-  bb: "https://rdap.nic.bb/",
+  ar: "https://rdap.nic.ar/",                      // IANA-confirmed; slow → see RDAP_TLD_TIMEOUT_MS
+  // bb: removed — rdap.nic.bb ENOTFOUND; WHOIS whois.telecoms-barbados.gov.bb also ENOTFOUND
   bm: "https://rdap.identitydigital.services/rdap/",
-  br: "https://rdap.registro.br/",
+  br: "https://rdap.registro.br/",                 // IANA-confirmed; HTTP 403 from cloud → fail-fast to WHOIS
   bz: "https://rdap.nic.bz/",
   ca: "https://rdap.ca.fury.ca/rdap/",
-  co: "https://rdap.cctld.co/",
+  // co: removed — rdap.cctld.co SSL/TLS error (unrecognized SNI); not in IANA bootstrap
   cr: "https://rdap.nic.cr/",
-  cu: "https://rdap.nic.cu/",
+  // cu: removed — rdap.nic.cu ENOTFOUND; .cu also in STATIC_ALWAYS_FALLBACK (political restriction)
   // cv: removed — rdap.nic.cv returns HTTP 404 for ALL paths (server broken/unconfigured as of 2025).
   //   Port 43 WHOIS (whois.nic.cv) also returns ECONNREFUSED.  Registry moved to ola.cv with no
   //   public machine-readable WHOIS.  Keeping cv in the override would make rdapIsDirect=true,
   //   delaying the WHOIS fallback by RDAP_DIRECT_WHOIS_SHADOW_MS for every query unnecessarily.
-  dm: "https://rdap.nic.dm/",
+  // dm: removed — rdap.nic.dm ENOTFOUND; WHOIS via whois.nic.dm works
   ec: "https://rdap.registry.ec/",
   gd: "https://rdap.centralnic.com/gd/",           // IANA: CentralNIC
   gy: "https://rdap.registry.gy/",                 // IANA: registry.gy
   hn: "https://rdap.nic.hn/",
   ht: "https://rdap.nic.ht/",
-  jm: "https://rdap.nic.jm/",
+  // jm: removed — rdap.nic.jm ENOTFOUND; no known WHOIS server for Jamaica
   kn: "https://rdap.nic.kn/",
   ky: "https://whois.kyregistry.ky/rdap/",
-  lc: "https://rdap.nic.lc/",
-  mx: "https://rdap.mx/",
-  pe: "https://rdap.nic.pe/",
+  // lc: removed — rdap.nic.lc ENOTFOUND; WHOIS whois.nic.lc also ENOTFOUND
+  // mx: removed — rdap.mx ENOTFOUND; WHOIS via whois.mx works
+  // pe: removed — rdap.nic.pe ENOTFOUND; WHOIS now fixed to whois.nic.pe
   pm: "https://rdap.nic.pm/",
   re: "https://rdap.nic.re/",
   sr: "https://whois.sr/rdap/",                    // IANA: whois.sr/rdap/
   tf: "https://rdap.nic.tf/",
-  tt: "https://rdap.nic.tt/",
-  vc: "https://rdap.nic.vc/",
+  // tt: removed — rdap.nic.tt ENOTFOUND; WHOIS whois.nic.tt also ENOTFOUND
+  // vc: removed — rdap.nic.vc ENOTFOUND; WHOIS whois.nic.vc also ENOTFOUND
   ve: "https://rdap.nic.ve/",                      // confirmed: rdap.nic.ve
   vg: "https://rdap.centralnic.com/vg/",
   vi: "https://rdap.nic.vi/",
@@ -282,15 +282,16 @@ export const RDAP_DIRECT_CCTLDS = new Set<string>(Object.keys(CCTLD_RDAP_OVERRID
  */
 const RDAP_TLD_TIMEOUT_MS: Record<string, number> = {
   // CIS / Eastern Europe — some servers have higher latency
-  ru: 7000, su: 7000, by: 6000, kz: 6000, kg: 6000,
+  ru: 7000, by: 6000, kz: 6000, kg: 6000,
   // Africa — many registries are slower from global infra
-  ng: 8000, ke: 7000, tz: 7000, gh: 6000, ug: 6000, rw: 6000,
-  zm: 6000, zw: 6000, na: 6000, za: 6000, cm: 6000, cd: 6000,
+  ng: 8000, ke: 7000, tz: 7000, rw: 6000,
+  na: 6000, za: 6000, zm: 6000,
   // Middle East
-  iq: 7000, sy: 7000, ye: 7000, ps: 6000,
+  ye: 7000,
+  // Americas — Argentina is genuinely slow from global infra
+  ar: 10000,
   // Asia / Pacific — some have higher latency
-  pk: 6000, np: 6000, mm: 6000, la: 6000, kh: 6000, bn: 6000,
-  bt: 6000, mv: 6000, pg: 6000, sb: 6000, tl: 6000,
+  la: 6000, bn: 6000, pg: 6000, sb: 6000, tl: 6000,
 };
 
 /**

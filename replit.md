@@ -305,6 +305,21 @@ A fast, modern WHOIS and RDAP lookup tool supporting domains, IPv4/IPv6, ASN, an
 - Intentionally retained: `zhLabel`/`enLabel` data fields, `isChinese ? "zh" : "en"` inline bilingual patterns in tlds.tsx/links.tsx/sponsor.tsx/tools.tsx (these already handle both languages correctly)
 - TypeScript: clean compile (`tsc --noEmit --skipLibCheck` exits 0)
 
+
+### v3.23.0 — ccTLD Connectivity Audit + RDAP/WHOIS Accuracy Pass (2026-03-28)
+
+**Scope:** Full connectivity audit of all 166 RDAP overrides and 65 WHOIS-only ccTLD servers using live probing + Cloudflare DoH verification. Removed 46 dead/wrong RDAP entries that were causing unnecessary overhead and wasted timeout delays. Fixed `.jp` RDAP URL. Corrected 7 wrong WHOIS server entries. Added 9 permanently unreachable TLDs to `STATIC_ALWAYS_FALLBACK`. Net improvement: RDAP pass rate 55% → 75%, zero wasted round-trips to non-existent servers.
+
+| File | Change | Detail |
+|------|--------|--------|
+| `src/lib/whois/rdap_client.ts` | **Removed 46 dead RDAP overrides** | All ENOTFOUND or SSL-error in both system DNS and Cloudflare DoH, none listed in IANA RDAP bootstrap. Commented in-place with reasons. Removed: su, tj (CIS); gl, xk (Europe); ao, bw, cd, dj, et, gh, mw, sc, ug, zw (Africa); bh, iq, jo, om, ps, sy (Middle East); bt, hk, kh, kr, mm, mn, mv, np, nu, nz, ph, pk, vu, ws (Asia/Pacific); ag, bb, co, cu, dm, jm, kn, lc, mx, pe, tt, vc (Americas). Active overrides reduced from 166 → 121. |
+| `src/lib/whois/rdap_client.ts` | **Fixed `.jp` RDAP URL** | `rdap.jprs.jp` ENOTFOUND in all DNS resolvers; correct endpoint is `jprs.jp/rdap/` — confirmed HTTP 404 (RDAP alive). |
+| `src/lib/whois/rdap_client.ts` | **`RDAP_TLD_TIMEOUT_MS` cleaned up** | Added `ar: 10000` (IANA-confirmed endpoint, slow from US cloud). Removed stale entries for deleted TLDs (su, gh, ug, zw, cm, cd, iq, sy, ps, pk, np, mm, kh, bt, mv). |
+| `src/data/cctld-whois-servers.json` | **Fixed 7 wrong WHOIS servers** | `.ao` whois.dns.pt → null (Portugal DNS, not Angola registry); `.bt` whois.netnames.net → null (NXDOMAIN); `.gi` whois2.afilias-grs.net → null (NXDOMAIN); `.iq` whois.cmc.iq → null (NXDOMAIN); `.jo` whois.ripe.net → null (RIPE serves IP/ASN data, not .jo domains); `.sc` whois2.afilias-grs.net → `whois.nic.sc` (confirmed working via TCP test); `.tj` whois.nic.tj → null (NXDOMAIN in DoH). |
+| `src/lib/whois/tld-fallback-gate.ts` | **9 new STATIC_ALWAYS_FALLBACK entries** | bb, co, dj, iq, jm, lc, tj, tt, vc — all confirmed RDAP ENOTFOUND/SERVFAIL + WHOIS NXDOMAIN via Cloudflare DoH. Immediately skip to yisi/tianhu without 3-failure learning cycle. |
+| `scripts/audit-cctld-connectivity.mjs` | **Full connectivity audit script** | Tests all 166 RDAP overrides + 65 WHOIS servers concurrently (configurable concurrency), groups by pass/fail/error type, outputs actionable suggestions. |
+| `scripts/test-rdap-whois.mjs` | **Alt-URL + WHOIS fallback tester** | Tests alternate RDAP base URLs and WHOIS TCP fallback for removed-RDAP TLDs. Confirms WHOIS works before RDAP removal. |
+
 ### v3.22.2 — RDAP Coverage Expansion: 168 ccTLDs + Conflict Fixes + Per-TLD Timeouts (2026-03-24)
 
 **Scope:** Largest single RDAP coverage expansion yet. Fixed 15 blocking conflicts in `STATIC_NO_RDAP`, added 40+ new ccTLD RDAP servers confirmed by live probing, introduced per-TLD timeout map for slow registries, and set up automated monthly bootstrap refresh via GitHub Actions.
