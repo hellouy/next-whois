@@ -209,10 +209,10 @@ function HistoryDrawer() {
                           {format(item.timestamp, "h:mm a")}
                         </span>
                         <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 shrink-0 touch-manipulation"
+                          className="opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-50 transition-opacity p-1.5 -mr-0.5 rounded-lg hover:bg-destructive/10 active:bg-destructive/20 shrink-0 touch-manipulation"
                           onClick={(e) => handleDelete(e, item.query)}
                         >
-                          <RiDeleteBinLine className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                          <RiDeleteBinLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-destructive [@media(hover:none)]:text-muted-foreground/70" />
                         </button>
                       </Link>
                     </DrawerClose>

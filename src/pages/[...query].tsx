@@ -131,16 +131,16 @@ const CARD_CONTAINER_VARIANTS = {
   hidden: { opacity: 1 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0 },
+    transition: { staggerChildren: 0.05, delayChildren: 0 },
   },
 };
 
 const CARD_ITEM_VARIANTS = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { opacity: 0, y: 6 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -4049,7 +4049,7 @@ function ResultSkeleton() {
           </div>
         </div>
 
-        <div className="lg:col-span-4">
+        <div className="hidden lg:block lg:col-span-4">
           <div className="glass-panel border border-border rounded-xl p-6 h-64 flex flex-col gap-3">
             <div className="h-4 w-24 rounded bg-muted/70 animate-pulse" />
             <div className="flex-1 space-y-2">
@@ -4674,7 +4674,7 @@ export default function LookupPage({
           {/* Result is always in the layout flow — skeleton overlays it as an
               absolute layer only during the very first load so there is no
               key-switch, no layout-height jump, no visible "跳一下". */}
-          <div className="relative" style={{ minHeight: loading && data.time === 0 ? 520 : undefined }}>
+          <div className={cn("relative", loading && data.time === 0 && "min-h-[380px] lg:min-h-[520px]")}>
             <AnimatePresence>
               {loading && data.time === 0 && (
                 <motion.div

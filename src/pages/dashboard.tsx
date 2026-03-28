@@ -1253,22 +1253,29 @@ export default function DashboardPage() {
 
         {/* Tab switcher */}
         <div className="flex rounded-xl bg-muted/40 border border-border/50 p-1 gap-1">
-          {TABS.map(t => (
-            <button key={t.key} type="button" onClick={() => setTab(t.key)}
+          {TABS.map(tabItem => (
+            <button key={tabItem.key} type="button" onClick={() => setTab(tabItem.key)}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-semibold transition-all",
-                tab === t.key
-                  ? "bg-background shadow-sm text-foreground border border-border/60"
-                  : "text-muted-foreground hover:text-foreground"
+                "relative flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-semibold transition-colors duration-150",
+                tab === tabItem.key ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               )}>
-              {t.icon}
-              <span className="hidden sm:inline">{t.label}</span>
-              {t.count !== undefined && (
-                <span className={cn(
-                  "text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4",
-                  tab === t.key ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-                )}>{t.count}</span>
+              {tab === tabItem.key && (
+                <motion.div
+                  layoutId="dashTabActive"
+                  className="absolute inset-0 bg-background shadow-sm border border-border/60 rounded-lg"
+                  transition={{ type: "spring", stiffness: 450, damping: 38 }}
+                />
               )}
+              <span className="relative z-10 flex items-center gap-1.5">
+                {tabItem.icon}
+                <span className="hidden sm:inline">{tabItem.label}</span>
+                {tabItem.count !== undefined && (
+                  <span className={cn(
+                    "text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4",
+                    tab === tabItem.key ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                  )}>{tabItem.count}</span>
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -1276,7 +1283,7 @@ export default function DashboardPage() {
         <AnimatePresence mode="wait">
           {/* ── Subscriptions ── */}
           {tab === "subscriptions" && (
-            <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-3">
+            <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
               {!(subscriptionAccessDB ?? (user as any).subscriptionAccess) && (
                 <div className="space-y-5 py-4">
                   <div className="flex flex-col items-center text-center space-y-3">
@@ -1703,7 +1710,7 @@ export default function DashboardPage() {
 
           {/* ── Stamps ── */}
           {tab === "stamps" && (
-            <motion.div key="stamps" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-3">
+            <motion.div key="stamps" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.stamps_section_title")}</p>
                 <button
@@ -1833,7 +1840,7 @@ export default function DashboardPage() {
               stripe: t("dashboard.provider_stripe"), xunhupay: t("dashboard.provider_xunhupay"), alipay: t("dashboard.provider_alipay"), paypal: "PayPal",
             };
             return (
-              <motion.div key="membership" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-4">
+              <motion.div key="membership" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
 
                 {/* ── 会员状态卡 ── */}
                 <div className={cn(
@@ -2184,7 +2191,7 @@ export default function DashboardPage() {
             const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
             const initial = ((user as any).name || user.email || "U").charAt(0).toUpperCase();
             return (
-            <motion.div key="account" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-4">
+            <motion.div key="account" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
 
               {/* ── Avatar card ── */}
               <div className="glass-panel border border-border rounded-2xl p-5 flex items-center gap-4">
