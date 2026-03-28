@@ -488,11 +488,15 @@ async function fetchPageText(tld, ianaUrl) {
 const AI_PROVIDERS = [
   { key: process.env.ZHIPU_API_KEY,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",              model: "glm-4-flashx",               name: "GLM-4-FlashX" },
   { key: process.env.ZHIPU_API_KEY,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",              model: "glm-4-flash",                name: "GLM-4-Flash" },
-  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "llama-3.3-70b-versatile",    name: "Llama-3.3-70B" },
+  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "qwen-qwq-32b",               name: "QwQ-32B (Groq)" },
+  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "llama-3.3-70b-versatile",    name: "Llama-3.3-70B (Groq)" },
+  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "mixtral-8x7b-32768",         name: "Mixtral-8x7B (Groq)" },
   { key: process.env.GEMINI_API_KEY,    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.0-flash",      name: "Gemini-2.0-Flash" },
   { key: process.env.DEEPSEEK_API_KEY,  endpoint: "https://api.deepseek.com/v1/chat/completions",                       model: "deepseek-chat",              name: "DeepSeek-V3" },
   { key: process.env.DASHSCOPE_API_KEY, endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-turbo",                 name: "Qwen-Turbo" },
   { key: process.env.MOONSHOT_API_KEY,  endpoint: "https://api.moonshot.cn/v1/chat/completions",                        model: "moonshot-v1-8k",             name: "Kimi-8k" },
+  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "gemma2-9b-it",               name: "Gemma2-9B (Groq)" },
+  { key: process.env.GROQ_API_KEY,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                    model: "llama-3.1-8b-instant",       name: "Llama-3.1-8B Instant (Groq)" },
 ].filter(p => p.key);
 
 async function callAI(messages, providerIndex = 0) {

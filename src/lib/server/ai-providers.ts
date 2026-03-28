@@ -182,18 +182,39 @@ function buildProviders(dbKeys: Record<string, string> = {}): AiProvider[] {
     },
     // ── Groq (international, very fast) ──────────────────────────────────
     {
-      id: "llama33-70b", name: "Llama-3.3-70B", model: "llama-3.3-70b-versatile",
+      id: "groq-qwq-32b", name: "QwQ-32B (Groq)", model: "qwen-qwq-32b",
+      provider: "Groq", env_var: "GROQ_API_KEY", db_key: AI_DB_KEY_MAP.GROQ_API_KEY,
+      configured: !!GROQ, priority: 14, source: src("GROQ_API_KEY"),
+      chat: (msgs) => openAiCompatChat(
+        "https://api.groq.com/openai/v1/chat/completions", GROQ, "qwen-qwq-32b", msgs),
+    },
+    {
+      id: "llama33-70b", name: "Llama-3.3-70B (Groq)", model: "llama-3.3-70b-versatile",
       provider: "Groq", env_var: "GROQ_API_KEY", db_key: AI_DB_KEY_MAP.GROQ_API_KEY,
       configured: !!GROQ, priority: 15, source: src("GROQ_API_KEY"),
       chat: (msgs) => openAiCompatChat(
         "https://api.groq.com/openai/v1/chat/completions", GROQ, "llama-3.3-70b-versatile", msgs),
     },
     {
-      id: "gemma2-9b", name: "Gemma2-9B", model: "gemma2-9b-it",
+      id: "groq-mixtral-8x7b", name: "Mixtral-8x7B (Groq)", model: "mixtral-8x7b-32768",
+      provider: "Groq", env_var: "GROQ_API_KEY", db_key: AI_DB_KEY_MAP.GROQ_API_KEY,
+      configured: !!GROQ, priority: 16, source: src("GROQ_API_KEY"),
+      chat: (msgs) => openAiCompatChat(
+        "https://api.groq.com/openai/v1/chat/completions", GROQ, "mixtral-8x7b-32768", msgs),
+    },
+    {
+      id: "gemma2-9b", name: "Gemma2-9B (Groq)", model: "gemma2-9b-it",
       provider: "Groq", env_var: "GROQ_API_KEY", db_key: AI_DB_KEY_MAP.GROQ_API_KEY,
       configured: !!GROQ, priority: 25, source: src("GROQ_API_KEY"),
       chat: (msgs) => openAiCompatChat(
         "https://api.groq.com/openai/v1/chat/completions", GROQ, "gemma2-9b-it", msgs),
+    },
+    {
+      id: "groq-llama31-8b", name: "Llama-3.1-8B Instant (Groq)", model: "llama-3.1-8b-instant",
+      provider: "Groq", env_var: "GROQ_API_KEY", db_key: AI_DB_KEY_MAP.GROQ_API_KEY,
+      configured: !!GROQ, priority: 26, source: src("GROQ_API_KEY"),
+      chat: (msgs) => openAiCompatChat(
+        "https://api.groq.com/openai/v1/chat/completions", GROQ, "llama-3.1-8b-instant", msgs),
     },
     // ── Google Gemini (free 1500 req/day) ────────────────────────────────
     {
