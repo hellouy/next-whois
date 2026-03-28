@@ -15,6 +15,7 @@ import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
 import { getOrigin } from "@/lib/seo";
 import type { GetServerSideProps } from "next";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { useSiteSettings } from "@/lib/site-settings";
 
 interface HomeSeo {
   title: string;
