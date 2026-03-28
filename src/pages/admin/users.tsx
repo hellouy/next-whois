@@ -15,7 +15,6 @@ import {
   RiFilterLine, RiCheckboxCircleLine, RiVipCrownLine,
   RiHistoryLine, RiStarLine, RiBellLine,
   RiDownloadLine, RiAlertLine, RiBankCardLine,
-  RiLockPasswordLine, RiEyeLine, RiEyeOffLine,
 } from "@remixicon/react";
 
 type User = {
@@ -79,29 +78,6 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
   const [subscriptionAccess, setSubscriptionAccess] = React.useState(user.subscription_access);
   const [emailVerified, setEmailVerified] = React.useState(user.email_verified);
   const [saving, setSaving] = React.useState(false);
-  const [newPwd, setNewPwd] = React.useState("");
-  const [showPwd, setShowPwd] = React.useState(false);
-  const [pwdSaving, setPwdSaving] = React.useState(false);
-
-  async function handlePasswordReset() {
-    if (newPwd.trim().length < 8) { toast.error("密码至少需要 8 位"); return; }
-    setPwdSaving(true);
-    try {
-      const res = await fetch(`/api/admin/users?id=${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ new_password: newPwd.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("密码已重置");
-      setNewPwd("");
-    } catch (e: any) {
-      toast.error(e.message || "重置失败");
-    } finally {
-      setPwdSaving(false);
-    }
-  }
 
   async function handleSave() {
     if (!email.trim()) { toast.error("邮箱不能为空"); return; }
@@ -223,43 +199,6 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
             desc="停用后用户无法登录"
             color="bg-red-500"
           />
-
-          {/* Password reset */}
-          <div className="glass-panel border border-border rounded-xl px-4 py-3 space-y-2">
-            <div className="flex items-center gap-1.5">
-              <RiLockPasswordLine className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-sm font-medium">强制重置密码</p>
-            </div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showPwd ? "text" : "password"}
-                  placeholder="输入新密码（至少 8 位）"
-                  value={newPwd}
-                  onChange={e => setNewPwd(e.target.value)}
-                  className="h-9 rounded-xl pr-9 text-sm"
-                  onKeyDown={e => e.key === "Enter" && handlePasswordReset()}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd(v => !v)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPwd ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handlePasswordReset}
-                disabled={pwdSaving || newPwd.trim().length < 8}
-                className="rounded-xl h-9 gap-1.5 shrink-0"
-              >
-                {pwdSaving ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiLockPasswordLine className="w-3.5 h-3.5" />}
-                重置
-              </Button>
-            </div>
-          </div>
         </div>
 
         <div className="flex items-center gap-3 pt-1">
