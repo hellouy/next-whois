@@ -389,6 +389,22 @@ select {
   animation-fill-mode: both;
 }
 
+/* ── Route-change progress bar ─────────────────────────────────────────────
+   np-start: fake-progress to ~85%, stalls there until route completes.
+   np-done : races to 100% then fades out.
+   Both are driven by the RouteProgressBar component in _app.tsx.        */
+@keyframes np-start {
+  from { transform: scaleX(0); opacity: 1; }
+  30%  { transform: scaleX(0.5); }
+  60%  { transform: scaleX(0.72); }
+  to   { transform: scaleX(0.85); }
+}
+@keyframes np-done {
+  from { opacity: 1; }
+  50%  { transform: scaleX(1); opacity: 1; }
+  to   { transform: scaleX(1); opacity: 0; }
+}
+
 /* Reduce all animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

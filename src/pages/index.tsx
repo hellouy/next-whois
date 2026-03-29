@@ -95,6 +95,9 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
     (query: string) => {
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
       if (cleaned) prefetchLookup(cleaned);
+      // Set loading synchronously so the search-box spinner appears in the same
+      // paint as the user action — routeChangeStart fires slightly later (next tick).
+      setLoading(true);
       router.push(toSearchURI(query));
     },
     [router],

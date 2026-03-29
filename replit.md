@@ -1,4 +1,4 @@
-# Next Whois UI — v3.24
+# Next Whois UI — v3.25
 
 ## Admin Consolidation & Cleanup (2026-03-29)
 
@@ -26,6 +26,19 @@ The admin lifecycle-feedback review UI (approve/reject/delete user-submitted per
 
 ### Tab Arrays Updated
 - `tld-fallback.tsx` and `tld-rules.tsx` — stale 8-item tab bars replaced with clean 3-item nav: TLD 管理 / TLD 规则 / 查询兜底
+
+## Page Transition Performance Fixes (v3.25)
+
+### Route Progress Bar
+Added a CSS-animated progress bar (`hsl(var(--primary))` color) that appears at the very top of the viewport the moment any navigation begins (`routeChangeStart`), completing once the new page is ready (`routeChangeComplete`). Implemented entirely in `_app.tsx` (inlined into `App` component body) using GPU-accelerated `transform: scaleX()` to avoid layout thrash. CSS keyframes (`np-start` / `np-done`) live in `globals.css`.
+
+This eliminates the "frozen page" sensation during `getServerSideProps` round-trips — users see immediate visual motion instead of a blank wait.
+
+### Faster Exit Animations
+Reduced `AnimatePresence` exit durations from 100 ms → 50 ms (both `pageVariants` and `stablePageVariants`). This halves the blank-screen gap between the outgoing page fading out and the incoming page fading in, especially noticeable on the first home→results navigation.
+
+### Synchronous Search Loading State
+`index.tsx` `handleSearch` now calls `setLoading(true)` **before** `router.push()`, guaranteeing the search-box spinner appears in the same JS microtask as the user action rather than waiting for the `routeChangeStart` event to propagate through React's event system.
 
 ## Performance & Code Quality Audit (2026-03-29)
 

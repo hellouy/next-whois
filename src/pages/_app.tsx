@@ -281,11 +281,13 @@ const pageVariants = {
   animate: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
+    transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const },
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.1, ease: "easeIn" as const },
+    // ↓ Reduced from 0.1 → 0.05 s: shorter exit means less blank-screen gap
+    //   before the new page's entry animation starts (AnimatePresence mode="wait").
+    transition: { duration: 0.05, ease: "easeIn" as const },
   },
 };
 
@@ -297,20 +299,46 @@ const stablePageVariants = {
   initial: { opacity: 0 },
   animate: {
     opacity: 1,
-    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const },
+    transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] as const },
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.1, ease: "easeIn" as const },
+    transition: { duration: 0.05, ease: "easeIn" as const },
   },
 };
-
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   const origin: string = (pageProps as any).origin || process.env.NEXT_PUBLIC_SITE_URL || "";
   const initialLocale: Locale | undefined = (pageProps as any).initialLocale;
   const router = useRouter();
   const isAdminPage = router.pathname.startsWith("/admin");
+
+  // ── Route-change progress bar ──────────────────────────────────────────────
+  // Thin top-of-page bar that starts animating the moment routeChangeStart
+  // fires, giving immediate visual feedback while getServerSideProps is running.
+  // Inlined here (not a child component) so the state lifecycle matches App
+  // and avoids SSR/hydration mismatches.  CSS keyframes: globals.css.
+  const [npStatus, setNpStatus] = React.useState<"idle" | "start" | "done">("idle");
+  const npResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    const onStart = () => {
+      if (npResetRef.current) clearTimeout(npResetRef.current);
+      setNpStatus("start");
+    };
+    const onDone = () => {
+      setNpStatus("done");
+      npResetRef.current = setTimeout(() => setNpStatus("idle"), 400);
+    };
+    router.events.on("routeChangeStart",    onStart);
+    router.events.on("routeChangeComplete", onDone);
+    router.events.on("routeChangeError",    onDone);
+    return () => {
+      router.events.off("routeChangeStart",    onStart);
+      router.events.off("routeChangeComplete", onDone);
+      router.events.off("routeChangeError",    onDone);
+      if (npResetRef.current) clearTimeout(npResetRef.current);
+    };
+  }, [router]);
 
   // Pages in STABLE_KEY_PAGES manage their own loading feedback internally
   // (skeleton screens, spinners, etc.) and don't need the global page-level
@@ -325,6 +353,27 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     <SiteSettingsProvider initialSettings={(pageProps as any).initialSiteSettings}>
       <AppHead origin={origin} />
       <Toaster />
+      {/* Route-change progress bar — only shown client-side (npStatus starts "idle") */}
+      {npStatus !== "idle" && (
+        <div
+          aria-hidden
+          style={{
+            position:        "fixed",
+            top:             0,
+            left:            0,
+            width:           "100%",
+            height:          "2px",
+            zIndex:          9999,
+            pointerEvents:   "none",
+            transformOrigin: "left center",
+            transform:       "scaleX(0)",
+            background:      "hsl(var(--primary))",
+            animation:       npStatus === "done"
+              ? "np-done 0.35s ease forwards"
+              : "np-start 8s ease-out forwards",
+          }}
+        />
+      )}
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
