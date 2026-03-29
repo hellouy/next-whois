@@ -20,7 +20,7 @@ import {
   RiExternalLinkLine, RiArrowUpSLine, RiArrowDownSLine,
   RiStopCircleLine, RiWrenchLine, RiAlertLine, RiInformationLine,
   RiCheckLine, RiDatabase2Line, RiCodeLine, RiFileLine,
-  RiDeleteBin7Line,
+  RiDeleteBin7Line, RiRobot2Line,
 } from "@remixicon/react";
 
 type MainTab = "lifecycle" | "servers" | "iana";
@@ -273,12 +273,14 @@ function LifecycleTab() {
 /* ═══════════════════════════════════════════════════════════════════════════
    TAB 2: 服务器管理 (Custom Servers + Repair Queue)
 ══════════════════════════════════════════════════════════════════════════════ */
-type Source = "builtin" | "db" | "registry" | "cctld";
+type Source = "builtin" | "manual" | "iana" | "repair" | "registry" | "cctld";
 const SOURCE_META: Record<Source, { label: string; color: string; icon: React.ReactNode; desc: string }> = {
-  builtin:  { label: "内置",      color: "text-violet-600 bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800",   icon: <RiCodeLine className="w-3 h-3" />, desc: "代码内置，最高优先级" },
-  db:       { label: "数据库",    color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800", icon: <RiDatabase2Line className="w-3 h-3" />, desc: "手动添加或修复队列保存，可编辑" },
-  registry: { label: "注册局",    color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800",               icon: <RiGlobalLine className="w-3 h-3" />, desc: "从 IANA 注册局信息抓取" },
-  cctld:    { label: "ccTLD 文件", color: "text-orange-600 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800",   icon: <RiFileLine className="w-3 h-3" />, desc: "静态文件" },
+  builtin:  { label: "内置",       color: "text-violet-600 bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800",   icon: <RiCodeLine className="w-3 h-3" />,     desc: "代码内置，最高优先级" },
+  manual:   { label: "手动配置",   color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800", icon: <RiDatabase2Line className="w-3 h-3" />, desc: "管理员手动添加，可编辑删除" },
+  repair:   { label: "AI修复",     color: "text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800",             icon: <RiRobot2Line className="w-3 h-3" />,   desc: "AI修复队列自动发现并验证" },
+  iana:     { label: "IANA自动",   color: "text-sky-600 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800",                 icon: <RiGlobalLine className="w-3 h-3" />,   desc: "查询时从 IANA 动态发现并持久化" },
+  registry: { label: "注册局",     color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800",             icon: <RiGlobalLine className="w-3 h-3" />,   desc: "从 IANA 注册局信息抓取" },
+  cctld:    { label: "ccTLD 文件", color: "text-orange-600 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800",   icon: <RiFileLine className="w-3 h-3" />,     desc: "静态文件" },
 };
 
 interface ServerRow { tld: string; server: string; rawEntry: unknown; source: Source; }
@@ -330,19 +332,22 @@ function ServersTab() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.message ?? "加载失败");
       const builtinSet = new Set<string>(d.builtinTlds ?? []);
-      const userMap: Record<string, unknown> = d.userServers ?? {};
+      const dbMap: Record<string, { entry: unknown; source: string }> = d.dbServers ?? {};
       const registryMap: Record<string, unknown> = d.registryServers ?? {};
       const allMap: Record<string, unknown> = d.servers ?? {};
       const built: ServerRow[] = Object.entries(allMap).map(([tld, raw]) => {
         let source: Source;
         if (builtinSet.has(tld))      source = "builtin";
-        else if (tld in userMap)       source = "db";
+        else if (tld in dbMap) {
+          const s = dbMap[tld].source;
+          source = (s === "iana" || s === "repair") ? s : "manual";
+        }
         else if (tld in registryMap)   source = "registry";
         else                           source = "cctld";
         return { tld, server: entryLabel(raw), rawEntry: raw, source };
       });
       built.sort((a, b) => {
-        const order: Record<Source, number> = { db: 0, builtin: 1, registry: 2, cctld: 3 };
+        const order: Record<Source, number> = { manual: 0, repair: 1, iana: 2, builtin: 3, registry: 4, cctld: 5 };
         return order[a.source] - order[b.source] || a.tld.localeCompare(b.tld);
       });
       setRows(built);
@@ -452,7 +457,7 @@ function ServersTab() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {(["db", "builtin", "cctld", "registry"] as Source[]).map(src => {
+          {(["manual", "repair", "iana", "builtin", "cctld", "registry"] as Source[]).map(src => {
             const meta = SOURCE_META[src];
             const count = counts[src] ?? 0;
             return (
@@ -493,7 +498,7 @@ function ServersTab() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["all", "db", "builtin", "cctld", "registry"] as const).map(k => {
+          {(["all", "manual", "repair", "iana", "builtin", "cctld", "registry"] as const).map(k => {
             const count = k === "all" ? rows.length : (counts[k] ?? 0);
             if (k !== "all" && count === 0) return null;
             return (
@@ -544,7 +549,7 @@ function ServersTab() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        {row.source === "db" ? (
+                        {(row.source === "manual" || row.source === "iana" || row.source === "repair") ? (
                           <button onClick={() => deleteRow(row.tld)} disabled={deletingTld === row.tld}
                             className="text-xs text-destructive hover:text-destructive/80 disabled:opacity-50">
                             {deletingTld === row.tld ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBin7Line className="w-3.5 h-3.5" />}

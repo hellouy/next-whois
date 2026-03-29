@@ -79,6 +79,23 @@ async function readDbServers(): Promise<CustomServerMap> {
   }
 }
 
+/** Returns only entries explicitly added by an admin (source = 'manual'). */
+async function readManualDbServers(): Promise<CustomServerMap> {
+  if (!(await isDbReady())) return {};
+  try {
+    const rows = await many<{ tld: string; entry: unknown }>(
+      `SELECT tld, entry FROM custom_whois_servers WHERE source = 'manual' ORDER BY tld`,
+    );
+    const map: CustomServerMap = {};
+    for (const r of rows) {
+      map[r.tld] = r.entry as CustomServerEntry;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Reads whois_server values from tld_registry_info (scraped from IANA pages).
  * This is the lowest-priority server source — any explicit custom server or
@@ -104,7 +121,7 @@ async function readRegistryInfoServers(): Promise<CustomServerMap> {
 }
 
 async function readUserManagedServers(): Promise<CustomServerMap> {
-  const fromDb = await readDbServers();
+  const fromDb = await readManualDbServers();
   if (Object.keys(fromDb).length > 0) return fromDb;
   return readFileServers();
 }
@@ -132,13 +149,38 @@ function invalidateAllServersCache() {
   _userManagedCacheAt = 0;
 }
 
-async function writeDbServer(tld: string, entry: CustomServerEntry): Promise<void> {
+async function writeDbServer(
+  tld: string,
+  entry: CustomServerEntry,
+  source: "manual" | "iana" | "repair" = "manual",
+): Promise<void> {
   if (!(await isDbReady())) return;
   await run(
-    `INSERT INTO custom_whois_servers (tld, entry, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (tld) DO UPDATE SET entry = $2::jsonb, updated_at = NOW()`,
-    [tld, JSON.stringify(entry)],
+    `INSERT INTO custom_whois_servers (tld, entry, source, updated_at)
+     VALUES ($1, $2::jsonb, $3, NOW())
+     ON CONFLICT (tld) DO UPDATE SET entry = $2::jsonb, source = $3, updated_at = NOW()`,
+    [tld, JSON.stringify(entry), source],
+  );
+}
+
+/**
+ * Writes an auto-discovered server (IANA referral or repair-queue result) only
+ * when no manual entry already exists for this TLD.  Manual entries always win;
+ * this function is purely additive and never degrades an admin override.
+ */
+async function writeAutoDiscoveredServer(
+  tld: string,
+  entry: CustomServerEntry,
+  source: "iana" | "repair",
+): Promise<void> {
+  if (!(await isDbReady())) return;
+  await run(
+    `INSERT INTO custom_whois_servers (tld, entry, source, updated_at)
+     VALUES ($1, $2::jsonb, $3, NOW())
+     ON CONFLICT (tld) DO UPDATE
+       SET entry = $2::jsonb, source = $3, updated_at = NOW()
+       WHERE custom_whois_servers.source <> 'manual'`,
+    [tld, JSON.stringify(entry), source],
   );
 }
 
@@ -153,7 +195,10 @@ export async function getAllCustomServers(): Promise<CustomServerMap> {
     return _allServersCache;
   }
   const cctld    = readCctldServers();
-  const user     = await readUserManagedServers();
+  // Include ALL DB entries (manual + iana-discovered + repair-promoted) in the hot cache.
+  // The file fallback only activates on a fresh install before any DB entries exist.
+  const allDb    = await readDbServers();
+  const user     = Object.keys(allDb).length > 0 ? allDb : await readFileServers();
   const registry = await readRegistryInfoServers();
 
   // Build the no-server set from cctld nulls (not overridden by user DB entries
@@ -202,6 +247,29 @@ export async function getUserManagedServers(): Promise<CustomServerMap> {
   return readUserManagedServers();
 }
 
+export type ServerWithSource = { entry: CustomServerEntry; source: "manual" | "iana" | "repair" };
+
+/** Returns all DB-stored servers with their source tag for admin UI display. */
+export async function getAllDbServersWithSource(): Promise<Record<string, ServerWithSource>> {
+  if (!(await isDbReady())) return {};
+  try {
+    const rows = await many<{ tld: string; entry: unknown; source: string }>(
+      `SELECT tld, entry, COALESCE(source, 'manual') AS source
+       FROM custom_whois_servers ORDER BY source, tld`,
+    );
+    const map: Record<string, ServerWithSource> = {};
+    for (const r of rows) {
+      map[r.tld] = {
+        entry: r.entry as CustomServerEntry,
+        source: (r.source as "manual" | "iana" | "repair"),
+      };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 export async function getCustomServerEntry(tld: string): Promise<CustomServerEntry | null> {
   const all = await getAllCustomServers();
   const normalized = tld.toLowerCase().replace(/^\./, "");
@@ -218,8 +286,37 @@ export async function getCustomServer(tld: string): Promise<string | null> {
 
 export async function setCustomServer(tld: string, entry: CustomServerEntry): Promise<void> {
   const normalized = tld.toLowerCase().replace(/^\./, "");
-  await writeDbServer(normalized, entry);
+  await writeDbServer(normalized, entry, "manual");
   invalidateAllServersCache();
+}
+
+/**
+ * Saves a server found by the AI repair queue.
+ * Marked as source='repair' — distinguishable from admin-added entries in the UI.
+ */
+export async function setRepairedServer(tld: string, entry: CustomServerEntry): Promise<void> {
+  const normalized = tld.toLowerCase().replace(/^\./, "");
+  await writeDbServer(normalized, entry, "repair");
+  invalidateAllServersCache();
+}
+
+/**
+ * Persists an automatically discovered WHOIS server to the DB so future cold
+ * starts skip the live IANA / whoiser discovery round-trip.  Never overwrites
+ * a manually configured (admin-managed) server.
+ */
+export async function setDiscoveredServer(
+  tld: string,
+  entry: CustomServerEntry,
+  source: "iana" | "repair",
+): Promise<void> {
+  const normalized = tld.toLowerCase().replace(/^\./, "");
+  // Fire-and-forget: don't await so we don't slow down the response path.
+  writeAutoDiscoveredServer(normalized, entry, source).catch(() => {});
+  // Warm the in-process cache immediately without waiting for DB confirmation.
+  if (_allServersCache && !(normalized in _allServersCache)) {
+    _allServersCache[normalized] = entry;
+  }
 }
 
 export async function deleteCustomServer(tld: string): Promise<boolean> {

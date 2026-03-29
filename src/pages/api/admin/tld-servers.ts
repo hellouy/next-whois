@@ -1,11 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   getAllCustomServers,
-  getUserManagedServers,
+  getAllDbServersWithSource,
   getRegistryInfoServers,
   setCustomServer,
   deleteCustomServer,
   CustomServerEntry,
+  ServerWithSource,
   BUILTIN_SERVER_TLDS,
 } from "@/lib/whois/custom-servers";
 import { requireAdmin } from "@/lib/admin";
@@ -18,7 +19,7 @@ type ResponseData = {
   success: boolean;
   message?: string;
   servers?: Record<string, CustomServerEntry>;
-  userServers?: Record<string, CustomServerEntry>;
+  dbServers?: Record<string, ServerWithSource>;
   registryServers?: Record<string, CustomServerEntry>;
   builtinTlds?: string[];
 };
@@ -31,15 +32,15 @@ export default async function handler(
   if (!session) return;
 
   if (req.method === "GET") {
-    const [servers, userServers, registryServers] = await Promise.all([
+    const [servers, dbServers, registryServers] = await Promise.all([
       getAllCustomServers(),
-      getUserManagedServers(),
+      getAllDbServersWithSource(),
       getRegistryInfoServers(),
     ]);
     return res.status(200).json({
       success: true,
       servers,
-      userServers,
+      dbServers,
       registryServers,
       builtinTlds: [...BUILTIN_SERVER_TLDS],
     });

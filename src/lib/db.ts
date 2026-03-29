@@ -124,6 +124,9 @@ const CREATE_TABLES = [
     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
+  // source: 'manual' = admin-managed, 'iana' = auto-discovered from whois.iana.org,
+  //         'repair' = promoted from repair queue AI result
+  `ALTER TABLE custom_whois_servers ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'`,
   `CREATE TABLE IF NOT EXISTS rate_limit_records (
     key        TEXT         PRIMARY KEY,
     count      INTEGER      NOT NULL DEFAULT 0,

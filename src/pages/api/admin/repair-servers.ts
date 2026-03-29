@@ -11,7 +11,7 @@ import net from "net";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, run, isDbReady } from "@/lib/db-query";
-import { setCustomServer } from "@/lib/whois/custom-servers";
+import { setRepairedServer } from "@/lib/whois/custom-servers";
 import { markTldRepaired, markTldNotFound, markTldIgnored } from "@/lib/whois/server-failure-tracker";
 import { callProviderWithFallback } from "@/lib/server/ai-providers";
 
@@ -119,7 +119,7 @@ async function repairOne(tld: string): Promise<{ ok: boolean; method: string; se
     const valid = await validateRdap(rdapUrl, tld);
     if (valid) {
       const entry = { type: "http" as const, url: `${rdapUrl.replace(/\/$/, "")}/domain/`, method: "GET" as const };
-      await setCustomServer(tld, entry);
+      await setRepairedServer(tld, entry);
       await markTldRepaired(tld, rdapUrl, "IANA RDAP bootstrap");
       return { ok: true, method: "rdap-bootstrap", server: rdapUrl };
     }
@@ -130,7 +130,7 @@ async function repairOne(tld: string): Promise<{ ok: boolean; method: string; se
   if (ianaWhois) {
     const ok = await tcpPing(ianaWhois);
     if (ok) {
-      await setCustomServer(tld, ianaWhois);
+      await setRepairedServer(tld, ianaWhois);
       await markTldRepaired(tld, ianaWhois, "IANA WHOIS TCP referral");
       return { ok: true, method: "iana-tcp", server: ianaWhois };
     }
@@ -147,7 +147,7 @@ async function repairOne(tld: string): Promise<{ ok: boolean; method: string; se
       const valid = await validateRdap(ai.server, tld);
       if (valid) {
         const entry = { type: "http" as const, url: `${ai.server.replace(/\/$/, "")}/domain/`, method: "GET" as const };
-        await setCustomServer(tld, entry);
+        await setRepairedServer(tld, entry);
         await markTldRepaired(tld, ai.server, `AI: ${ai.notes}`);
         return { ok: true, method: "ai-rdap", server: ai.server };
       }
@@ -155,7 +155,7 @@ async function repairOne(tld: string): Promise<{ ok: boolean; method: string; se
     if (ai.type === "whois" && ai.server) {
       const ok = await tcpPing(ai.server);
       if (ok) {
-        await setCustomServer(tld, ai.server);
+        await setRepairedServer(tld, ai.server);
         await markTldRepaired(tld, ai.server, `AI: ${ai.notes}`);
         return { ok: true, method: "ai-whois", server: ai.server };
       }

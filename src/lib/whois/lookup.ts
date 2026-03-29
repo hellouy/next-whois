@@ -77,6 +77,7 @@ import {
   isScraperEntry,
   getTcpHost,
   isUserManagedServer,
+  setDiscoveredServer,
   HttpServerEntry,
 } from "@/lib/whois/custom-servers";
 import { probeDomain } from "@/lib/whois/dns-check";
@@ -354,6 +355,10 @@ async function getIanaWhoisServer(tld: string): Promise<string | null> {
     const m = raw.match(/^refer:\s*(\S+)/im);
     const server = m ? m[1].trim().toLowerCase() : null;
     _ianaServerCache.set(tld, { server, expires: Date.now() + 86_400_000 });
+    // Persist newly discovered servers to DB so cold restarts skip this query.
+    if (server) {
+      setDiscoveredServer(tld, server, "iana").catch(() => {});
+    }
     return server;
   } catch {
     return null;
