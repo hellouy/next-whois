@@ -107,8 +107,29 @@ function toAnalyzeResult(r: YisiResult, domain: string): WhoisAnalyzeResult {
 }
 
 /**
+ * Persistently disable YISI.YUN when a connection failure is detected.
+ * Writes api_yisi_enabled=0 to the DB so it won't be tried again until
+ * an admin re-enables it. Fires-and-forgets; never throws.
+ */
+async function autoDisableYisi(reason: string): Promise<void> {
+  try {
+    const { run } = await import("@/lib/db-query");
+    const { invalidateApiConfig } = await import("@/lib/api-config");
+    await run(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES ('api_yisi_enabled', '0', NOW())
+       ON CONFLICT (key) DO UPDATE SET value = '0', updated_at = NOW()`,
+    );
+    invalidateApiConfig();
+    console.warn(`[yisi] 连接失败，已自动关闭: ${reason}`);
+  } catch (e) {
+    console.error("[yisi] 自动关闭写入 DB 失败:", e);
+  }
+}
+
+/**
  * Try fetching from yisi.yun. Returns a WhoisResult if data is usable,
  * or null so the caller can fall back to the DNS probe error page.
+ * On network/DNS connection failure, auto-disables the integration in DB.
  */
 export async function lookupYisi(domain: string): Promise<WhoisResult | null> {
   const { getApiConfig } = await import("@/lib/api-config");
@@ -116,25 +137,34 @@ export async function lookupYisi(domain: string): Promise<WhoisResult | null> {
   if (!cfg.yisi_enabled || !cfg.yisi_key) return null;
   const apiKey = cfg.yisi_key;
 
+  const url = `${YISI_API}?query=${encodeURIComponent(domain)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), YISI_TIMEOUT);
+
+  let res: Response;
   try {
-    const url = `${YISI_API}?query=${encodeURIComponent(domain)}`;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), YISI_TIMEOUT);
-
-    const res = await fetch(url, {
+    res = await fetch(url, {
       signal: controller.signal,
       headers: {
         Accept: "application/json",
         "x-api-key": apiKey,
       },
-    }).finally(() => clearTimeout(timer));
+    });
+  } catch (err: any) {
+    clearTimeout(timer);
+    // AbortError = our own timeout → transient, don't disable
+    if (err?.name === "AbortError") return null;
+    // Any other error (TypeError: fetch failed, ENOTFOUND, ECONNREFUSED…) = connection failure
+    void autoDisableYisi(err?.message ?? String(err));
+    return null;
+  }
+  clearTimeout(timer);
 
-    if (!res.ok) return null;
+  if (!res.ok) return null;
 
+  try {
     const json: YisiResponse = await res.json();
     if (!json.status || !json.result) return null;
-
     if (!hasUsableData(json.result)) return null;
 
     return {

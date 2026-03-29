@@ -46,6 +46,7 @@ interface TestResult {
   ok: boolean;
   details?: string;
   error?: string;
+  autoDisabled?: boolean;
 }
 
 const DEFAULT_STATE: ApiState = {
@@ -139,8 +140,15 @@ export default function AdminApiPage() {
       const r = await fetch(`/api/admin/api-keys?service=${service}`, { method: "POST" });
       const d: TestResult = await r.json();
       setTestResults((prev) => ({ ...prev, [service]: d }));
-      if (d.ok) toast.success(`${service} 连接正常`);
-      else toast.error(`${service} 测试失败：${d.error}`);
+      if (d.ok) {
+        toast.success(`${service} 连接正常`);
+      } else if (d.autoDisabled) {
+        // Connection failure — server already wrote yisi_enabled=0 to DB
+        setState((s) => ({ ...s, yisi_enabled: false }));
+        toast.error(`YISI.YUN 连接失败，已自动关闭`);
+      } else {
+        toast.error(`${service} 测试失败：${d.error}`);
+      }
     } catch (e: any) {
       setTestResults((prev) => ({ ...prev, [service]: { ok: false, error: e.message } }));
       toast.error("测试请求失败");

@@ -195,11 +195,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (!apiKey) return res.json({ ok: false, error: "未配置 API Key" });
 
-        const r = await fetch("https://yisi.yun/api/lookup?query=google.com", {
-          signal: AbortSignal.timeout(10000),
-          headers: { Accept: "application/json", "x-api-key": apiKey },
-        });
-        const j = await r.json();
+        let yisiRes: Response;
+        try {
+          yisiRes = await fetch("https://yisi.yun/api/lookup?query=google.com", {
+            signal: AbortSignal.timeout(10000),
+            headers: { Accept: "application/json", "x-api-key": apiKey },
+          });
+        } catch (connErr: any) {
+          // Connection failure (DNS / network) → auto-disable so it won't be retried
+          const errMsg = connErr?.message ?? String(connErr);
+          await run(
+            `INSERT INTO site_settings (key, value, updated_at) VALUES ('api_yisi_enabled', '0', NOW())
+             ON CONFLICT (key) DO UPDATE SET value = '0', updated_at = NOW()`,
+          );
+          const { invalidateApiConfig } = await import("@/lib/api-config");
+          invalidateApiConfig();
+          return res.json({ ok: false, error: `连接失败，已自动关闭: ${errMsg}`, autoDisabled: true });
+        }
+
+        const j = await yisiRes.json();
         if (!j.status) return res.json({ ok: false, error: j.error || "请求失败" });
         return res.json({
           ok: true,
