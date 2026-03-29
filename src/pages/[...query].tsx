@@ -1371,17 +1371,6 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     return { redirect: { destination: "/", permanent: false } };
   }
 
-  // ── require_login: redirect unauthenticated users to /login ─────────────────
-  // Check this setting once with a 30 s in-process cache so SSR overhead is minimal.
-  const requireLogin = await getSettingServer("require_login");
-  if (requireLogin === "1") {
-    const session = await getServerSession(context.req, context.res, authOptions);
-    if (!session?.user?.email) {
-      const callbackUrl = `/${target}`;
-      return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}&msg=require_login`, permanent: false } };
-    }
-  }
-
   // ── CN Reserved SLD early-return (before cleanDomain rewrites the query) ──
   // Some .cn functional SLDs (gov.cn, edu.cn, etc.) are mapped by the WHOIS
   // lib to their www.* equivalents so the lookup works.  We must intercept
@@ -1428,12 +1417,28 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
+  // ── Parallel: require_login check + cache lookup ────────────────────────────
+  // Both are independently fetchable: settings has a 30s in-process cache;
+  // the WHOIS cache check is a quick Postgres read.  Firing them together
+  // removes the sequential gap (~20-60ms) on every page request.
+  const requireLoginPromise = getSettingServer("require_login");
+  const ssrCachePromise = lookupWhoisWithCache(target, { cacheOnly: true }).catch(() => null);
+
+  const requireLogin = await requireLoginPromise;
+  if (requireLogin === "1") {
+    const session = await getServerSession(context.req, context.res, authOptions);
+    if (!session?.user?.email) {
+      const callbackUrl = `/${target}`;
+      return { redirect: { destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}&msg=require_login`, permanent: false } };
+    }
+  }
+
   // Try to serve cached WHOIS data for SSR (gives search engines rich content).
   // cacheOnly=true means we only check Redis/L1 — if there's no cache hit we
   // return data:null immediately (no live lookup, no latency added).
   let ssrData: WhoisResult | null = null;
   try {
-    const cached = await lookupWhoisWithCache(target, { cacheOnly: true });
+    const cached = await ssrCachePromise;
     if (cached?.cached === true && cached.status) {
       ssrData = cached;
     }
@@ -4553,6 +4558,9 @@ export default function LookupPage({
   return (
     <>
       <Head>
+        <link rel="preconnect" href="https://www.nazhumi.com" />
+        <link rel="preconnect" href="https://api.frankfurter.dev" />
+        <link rel="dns-prefetch" href="https://www.miqingju.com" />
         {(() => {
           const r = result;
           const isRegistered = status && r;
@@ -4677,7 +4685,7 @@ export default function LookupPage({
               )}
             </AnimatePresence>
             <motion.div
-              animate={{ opacity: loading && data.time === 0 ? 0 : (loading ? 0.45 : 1) }}
+              animate={{ opacity: loading && data.time === 0 ? 0 : (loading ? 0.82 : 1) }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               style={{ pointerEvents: loading ? "none" : undefined }}
             >

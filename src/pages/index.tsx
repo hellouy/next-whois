@@ -78,6 +78,10 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
 
   useEffect(() => {
     router.prefetch("/github.com");
+    router.prefetch("/dns");
+    router.prefetch("/ip");
+    router.prefetch("/ssl");
+    router.prefetch("/icp");
     const handleStart = (url: string) => { if (isSearchRoute(url)) setLoading(true); };
     const handleComplete = () => setLoading(false);
     router.events.on("routeChangeStart", handleStart);
