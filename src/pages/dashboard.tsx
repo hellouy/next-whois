@@ -102,8 +102,8 @@ const PHASE_LABEL: Record<string, { color: string }> = {
   dropped: { color: "text-muted-foreground" },
 };
 
-function fmt(d: Date) {
-  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+function fmt(d: Date, locale?: string) {
+  return d.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 /* ── Tag style definitions — mirrored from admin stamps.tsx ──────────────── */
@@ -1567,7 +1567,7 @@ export default function DashboardPage() {
                         <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
                           <RiTimeLine className="w-3 h-3 shrink-0" />
                           {sub.expiration_date
-                            ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date)) })
+                            ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date), locale) })
                             : t("dashboard.expiry_not_set")}
                         </p>
                       </div>
@@ -1628,7 +1628,7 @@ export default function DashboardPage() {
                             <RiCalendarLine className="w-3 h-3 text-muted-foreground shrink-0" />
                             <span className="text-[11px] text-muted-foreground truncate">
                               {nextReminderIsUpcoming
-                                ? <>{t("dashboard.next_reminder")} <span className="font-medium text-foreground">{fmt(nextReminderDate!)}</span></>
+                                ? <>{t("dashboard.next_reminder")} <span className="font-medium text-foreground">{fmt(nextReminderDate!, locale)}</span></>
                                 : phase === "dropped"
                                   ? t("dashboard.no_pending_reminder")
                                   : t("dashboard.no_reminder")
@@ -1684,19 +1684,19 @@ export default function DashboardPage() {
                         <div className="text-center">
                           <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.grace_end")}</p>
                           <p className={cn("text-[11px] font-semibold tabular-nums", phase === "grace" ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
-                            {sub.grace_end ? fmt(new Date(sub.grace_end)) : "—"}
+                            {sub.grace_end ? fmt(new Date(sub.grace_end), locale) : "—"}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.redemption_end")}</p>
                           <p className={cn("text-[11px] font-semibold tabular-nums", phase === "redemption" ? "text-orange-600 dark:text-orange-400" : "text-foreground")}>
-                            {sub.redemption_end ? fmt(new Date(sub.redemption_end)) : "—"}
+                            {sub.redemption_end ? fmt(new Date(sub.redemption_end), locale) : "—"}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.estimated_drop")}</p>
                           <p className={cn("text-[11px] font-semibold tabular-nums", phase === "pendingDelete" || isDropSoon ? "text-purple-600 dark:text-purple-400" : "text-foreground")}>
-                            {fmt(new Date(sub.drop_date))}
+                            {fmt(new Date(sub.drop_date), locale)}
                           </p>
                         </div>
                       </div>

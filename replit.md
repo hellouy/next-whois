@@ -1,3 +1,20 @@
+# Next Whois UI — v3.28
+
+## i18n & UX Fixes (2026-03-29, v3.28)
+
+### 1. Dashboard Date Locale Fix (`src/pages/dashboard.tsx`)
+- **`fmt()` function was hardcoded to `zh-CN`**: Changed signature to `fmt(d: Date, locale?: string)` and updated all 5 callsites to pass `locale` from `useTranslation()`. Non-Chinese users now see dates formatted in their selected language instead of always showing Chinese-format dates.
+
+### 2. WHOIS Lookup Page Meta Tags i18n (`src/pages/[...query].tsx`)
+- **Title, description, keywords, og:locale, og:title, twitter:title and JSON-LD were all hardcoded in Chinese**. All meta strings are now locale-aware using `isZhMeta = locale.startsWith("zh")`:
+  - `<title>`: `"google.com WHOIS Lookup · Registration · Expiry"` in English, `"google.com WHOIS 查询 · 注册信息 · 到期时间"` in Chinese
+  - Description parts (Registered/注册, Registrar/注册商, Created/注册, Expires/到期, days old/域龄) toggle per locale
+  - Keywords use English terms for non-Chinese locales
+  - `og:locale` maps to correct BCP-47 locale codes (`en_US`, `zh_CN`, `zh_TW`, `ja_JP`, `ko_KR`, `de_DE`, `fr_FR`, `ru_RU`)
+  - JSON-LD `inLanguage`, breadcrumb labels ("Home"/"首页", "Domain Lookup"/"域名查询") and dataset names are locale-aware
+
+---
+
 # Next Whois UI — v3.27
 
 ## Comprehensive Code Audit & Hardening (2026-03-29, v3.27)

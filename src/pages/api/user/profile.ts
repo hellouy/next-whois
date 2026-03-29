@@ -36,6 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { name, avatar_color, email, emailChangeCode } = req.body;
     const updates: string[] = [];
     const params: (string | null)[] = [];
+    let emailChangeCodeKey: string | null = null;
 
     if (name !== undefined) {
       const trimmed = String(name).trim().slice(0, 50);
@@ -71,8 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (existing) return res.status(409).json({ error: "该邮箱已被使用" });
         updates.push(`email = $${params.length + 1}`);
         params.push(newEmail);
-        // Consume the code
-        await deleteRedisValue(storeKey).catch(() => {});
+        // Track key for deletion AFTER successful DB update
+        emailChangeCodeKey = storeKey;
       }
     }
 
@@ -89,6 +90,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (err: any) {
       console.error("[profile] PATCH error:", err.message);
       return res.status(500).json({ error: "更新失败" });
+    }
+
+    // Consume the email change code only after the DB update succeeds
+    if (emailChangeCodeKey) {
+      await deleteRedisValue(emailChangeCodeKey).catch(() => {});
     }
 
     const updatedUser = await one<{ id: string; name: string | null; email: string; avatar_color: string | null }>(

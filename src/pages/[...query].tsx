@@ -4535,21 +4535,30 @@ export default function LookupPage({
             : r?.status?.some(s => s.status?.toLowerCase().includes("reserved")) ? "reserved"
             : r ? "registered" : "unknown";
 
-          const descParts: string[] = [`${displayTarget} 的 WHOIS / RDAP 查询结果`];
-          if (regStatus === "registered") descParts.push("已注册");
-          if (registrar) descParts.push(`注册商：${registrar}`);
-          if (creation) descParts.push(`注册：${creation.slice(0, 10)}`);
-          if (expiry) descParts.push(`到期：${expiry.slice(0, 10)}`);
-          if (domainAge) descParts.push(`域龄 ${domainAge} 天`);
-          if (ns) descParts.push(`NS：${ns.toLowerCase()}`);
+          const isZhMeta = locale.startsWith("zh");
+          const ogLocale = locale === "zh-tw" ? "zh_TW" : isZhMeta ? "zh_CN" : locale === "ja" ? "ja_JP" : locale === "ko" ? "ko_KR" : locale === "de" ? "de_DE" : locale === "fr" ? "fr_FR" : locale === "ru" ? "ru_RU" : "en_US";
+          const metaLang = locale === "zh-tw" ? "zh-TW" : isZhMeta ? "zh-CN" : locale;
+
+          const descParts: string[] = [isZhMeta
+            ? `${displayTarget} 的 WHOIS / RDAP 查询结果`
+            : `WHOIS / RDAP lookup result for ${displayTarget}`];
+          if (regStatus === "registered") descParts.push(isZhMeta ? "已注册" : "Registered");
+          if (registrar) descParts.push(isZhMeta ? `注册商：${registrar}` : `Registrar: ${registrar}`);
+          if (creation) descParts.push(isZhMeta ? `注册：${creation.slice(0, 10)}` : `Created: ${creation.slice(0, 10)}`);
+          if (expiry) descParts.push(isZhMeta ? `到期：${expiry.slice(0, 10)}` : `Expires: ${expiry.slice(0, 10)}`);
+          if (domainAge) descParts.push(isZhMeta ? `域龄 ${domainAge} 天` : `${domainAge} days old`);
+          if (ns) descParts.push(`NS: ${ns.toLowerCase()}`);
           const description = descParts.join(" · ");
 
-          const keywords = [
-            displayTarget, `${displayTarget} whois`, `${displayTarget} 域名查询`,
-            `${displayTarget} 注册信息`, `${displayTarget} 到期时间`,
-            ...(registrar ? [`${registrar} 域名`] : []),
-            "域名查询", "whois查询", "rdap", "域名信息",
-          ].join(", ");
+          const keywords = isZhMeta
+            ? [displayTarget, `${displayTarget} whois`, `${displayTarget} 域名查询`,
+               `${displayTarget} 注册信息`, `${displayTarget} 到期时间`,
+               ...(registrar ? [`${registrar} 域名`] : []),
+               "域名查询", "whois查询", "rdap", "域名信息"].join(", ")
+            : [displayTarget, `${displayTarget} whois`, `${displayTarget} domain lookup`,
+               `${displayTarget} registration`, `${displayTarget} expiry`,
+               ...(registrar ? [`${registrar} domain`] : []),
+               "domain lookup", "whois lookup", "rdap", "domain info"].join(", ");
 
           const canonicalUrl = `${origin}/${target}`;
           const ogImage = `${origin}/api/og?query=${encodeURIComponent(target)}&theme=dark`;
@@ -4557,16 +4566,18 @@ export default function LookupPage({
           const jsonLd = JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebPage",
-            "name": `${displayTarget} WHOIS 查询`,
+            "name": isZhMeta ? `${displayTarget} WHOIS 查询` : `${displayTarget} WHOIS Lookup`,
             "description": description,
             "url": canonicalUrl,
-            "inLanguage": "zh-CN",
-            "isPartOf": { "@type": "WebSite", "url": origin, "name": "RDAP+WHOIS 域名查询" },
+            "inLanguage": metaLang,
+            "isPartOf": { "@type": "WebSite", "url": origin, "name": isZhMeta ? "RDAP+WHOIS 域名查询" : "RDAP+WHOIS Domain Lookup" },
             "about": {
               "@type": "Dataset",
-              "name": `${displayTarget} 域名注册信息`,
+              "name": isZhMeta ? `${displayTarget} 域名注册信息` : `${displayTarget} Domain Registration Info`,
               "description": description,
-              "keywords": `${displayTarget}, whois, rdap, 域名注册, 域名查询`,
+              "keywords": isZhMeta
+                ? `${displayTarget}, whois, rdap, 域名注册, 域名查询`
+                : `${displayTarget}, whois, rdap, domain registration, domain lookup`,
               ...(isRegistered && r ? {
                 "temporalCoverage": creation && expiry ? `${creation.slice(0,10)}/${expiry.slice(0,10)}` : undefined,
               } : {}),
@@ -4574,16 +4585,26 @@ export default function LookupPage({
             "breadcrumb": {
               "@type": "BreadcrumbList",
               "itemListElement": [
-                { "@type": "ListItem", "position": 1, "name": "首页", "item": origin },
-                { "@type": "ListItem", "position": 2, "name": "域名查询", "item": `${origin}/` },
+                { "@type": "ListItem", "position": 1, "name": isZhMeta ? "首页" : "Home", "item": origin },
+                { "@type": "ListItem", "position": 2, "name": isZhMeta ? "域名查询" : "Domain Lookup", "item": `${origin}/` },
                 { "@type": "ListItem", "position": 3, "name": displayTarget, "item": canonicalUrl },
               ],
             },
           });
 
+          const metaTitle = isZhMeta
+            ? `${displayTarget} WHOIS 查询 · 注册信息 · 到期时间`
+            : `${displayTarget} WHOIS Lookup · Registration · Expiry`;
+          const ogTitle = isZhMeta
+            ? `${displayTarget} WHOIS 查询 · 注册信息`
+            : `${displayTarget} WHOIS Lookup · Registration`;
+          const twTitle = isZhMeta
+            ? `${displayTarget} WHOIS 查询`
+            : `${displayTarget} WHOIS Lookup`;
+
           return (
             <>
-              <title key="title">{`${displayTarget} WHOIS 查询 · 注册信息 · 到期时间`}</title>
+              <title key="title">{metaTitle}</title>
               <meta name="description" content={description} />
               <meta name="keywords" content={keywords} />
               <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
@@ -4591,15 +4612,15 @@ export default function LookupPage({
 
               <meta property="og:type" content="website" />
               <meta property="og:url" content={canonicalUrl} />
-              <meta property="og:title" content={`${displayTarget} WHOIS 查询 · 注册信息`} />
+              <meta property="og:title" content={ogTitle} />
               <meta property="og:description" content={description} />
               <meta property="og:image" content={ogImage} />
               <meta property="og:image:width" content="1200" />
               <meta property="og:image:height" content="630" />
-              <meta property="og:locale" content="zh_CN" />
+              <meta property="og:locale" content={ogLocale} />
 
               <meta name="twitter:card" content="summary_large_image" />
-              <meta name="twitter:title" content={`${displayTarget} WHOIS 查询`} />
+              <meta name="twitter:title" content={twTitle} />
               <meta name="twitter:description" content={description} />
               <meta name="twitter:image" content={ogImage} />
 
@@ -4689,7 +4710,34 @@ export default function LookupPage({
             </div>
           )}
 
-          {!status && (() => {
+          {loading && !status && (
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-4">
+                <div className="glass-panel rounded-xl p-8 sm:p-10">
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-muted/40 animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 w-36 rounded bg-muted/40 animate-pulse" />
+                        <div className="h-3.5 w-24 rounded bg-muted/30 animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-2">
+                      <div className="h-3.5 w-full rounded bg-muted/30 animate-pulse" />
+                      <div className="h-3.5 w-5/6 rounded bg-muted/30 animate-pulse" />
+                      <div className="h-3.5 w-4/6 rounded bg-muted/30 animate-pulse" />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <div className="h-7 w-20 rounded-md bg-muted/40 animate-pulse" />
+                      <div className="h-7 w-20 rounded-md bg-muted/30 animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!loading && !status && (() => {
             const hasErrorRaw = !!(result && (result.rawWhoisContent || result.rawRdapContent));
             return (
             <div
