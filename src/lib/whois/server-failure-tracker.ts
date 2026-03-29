@@ -49,6 +49,9 @@ export async function recordTldServerFailure(
 /**
  * Mark a TLD repair as complete (called by the repair script after saving
  * the discovered server to custom_whois_servers).
+ *
+ * Also resets tld_fallback_stats so the next lookup tries the native server
+ * immediately instead of continuing to route through the external fallback.
  */
 export async function markTldRepaired(
   tld: string,
@@ -66,6 +69,14 @@ export async function markTldRepaired(
      WHERE tld = $1`,
     [normalized, foundServer, notes ?? null],
   );
+  // Reset fallback gate so the next query goes to the native server,
+  // not the external fallback (yisi/tianhu).
+  await run(
+    `UPDATE tld_fallback_stats
+     SET fail_count = 0, use_fallback = false
+     WHERE tld = $1`,
+    [normalized],
+  ).catch(() => {}); // non-critical — row may not exist
 }
 
 /**

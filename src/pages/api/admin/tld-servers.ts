@@ -2,9 +2,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import {
   getAllCustomServers,
   getUserManagedServers,
+  getRegistryInfoServers,
   setCustomServer,
   deleteCustomServer,
   CustomServerEntry,
+  BUILTIN_SERVER_TLDS,
 } from "@/lib/whois/custom-servers";
 import { requireAdmin } from "@/lib/admin";
 
@@ -17,6 +19,8 @@ type ResponseData = {
   message?: string;
   servers?: Record<string, CustomServerEntry>;
   userServers?: Record<string, CustomServerEntry>;
+  registryServers?: Record<string, CustomServerEntry>;
+  builtinTlds?: string[];
 };
 
 export default async function handler(
@@ -27,22 +31,38 @@ export default async function handler(
   if (!session) return;
 
   if (req.method === "GET") {
-    const servers = await getAllCustomServers();
-    const userServers = await getUserManagedServers();
-    return res.status(200).json({ success: true, servers, userServers });
+    const [servers, userServers, registryServers] = await Promise.all([
+      getAllCustomServers(),
+      getUserManagedServers(),
+      getRegistryInfoServers(),
+    ]);
+    return res.status(200).json({
+      success: true,
+      servers,
+      userServers,
+      registryServers,
+      builtinTlds: [...BUILTIN_SERVER_TLDS],
+    });
   }
 
   if (req.method === "POST") {
-    const { tld, server } = req.body as { tld?: string; server?: string };
-    if (!tld || !server) {
-      return res
-        .status(400)
-        .json({ success: false, message: "tld and server are required" });
+    const { tld, server, entry } = req.body as {
+      tld?: string;
+      server?: string;
+      entry?: CustomServerEntry;
+    };
+    if (!tld) {
+      return res.status(400).json({ success: false, message: "tld is required" });
     }
-    await setCustomServer(tld, server);
+    const value: CustomServerEntry | undefined = entry ?? server;
+    if (!value) {
+      return res.status(400).json({ success: false, message: "server or entry is required" });
+    }
+    await setCustomServer(tld, value);
+    const label = typeof value === "string" ? value : JSON.stringify(value);
     return res
       .status(200)
-      .json({ success: true, message: `Added: .${tld.replace(/^\./, "")} → ${server}` });
+      .json({ success: true, message: `Added: .${tld.replace(/^\./, "")} → ${label}` });
   }
 
   if (req.method === "DELETE") {

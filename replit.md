@@ -4427,3 +4427,78 @@ Redesigned available/premium domain card:
 - `src/pages/login.tsx`: Password visibility toggle button has `aria-label={showPwd ? "Hide password" : "Show password"}`
 - `src/pages/register.tsx`: Same password visibility toggle aria-label
 - `src/components/navbar.tsx`: Key nav buttons retain `aria-label` using i18n keys
+
+## System Integration Audit & Fixes (2026-03-29)
+
+### 7 Data-Flow Disconnects Fixed
+
+A system-wide audit identified 7 disconnects where data was collected but never consumed, or admin tools existed without corresponding UIs. All have been resolved:
+
+#### 1. `tld_registry_info.whois_server` now used in lookups
+**File:** `src/lib/whois/custom-servers.ts`
+- Added `readRegistryInfoServers()` that queries `tld_registry_info WHERE whois_server IS NOT NULL`
+- Added as the lowest-priority layer in `getAllCustomServers()` — fills gaps for TLDs not in static files
+- Server priority (highest wins): DB (`custom_whois_servers`) > BUILTIN > `cctld-whois-servers.json` > `tld_registry_info`
+- Previously: admin scraped IANA registry info but the `whois_server` field was never used by the lookup engine
+
+#### 2. Repair success now resets `tld_fallback_stats`
+**File:** `src/lib/whois/server-failure-tracker.ts`
+- `markTldRepaired()` now also runs `UPDATE tld_fallback_stats SET fail_count=0, use_fallback=false WHERE tld=$1`
+- Previously: repair queue saved a working server but the TLD remained in "use_fallback" mode → next query still went to yisi/tianhu instead of the newly discovered native server
+
+#### 3. Custom WHOIS Servers admin page created
+**File:** `src/pages/admin/custom-servers.tsx`
+- Shows all WHOIS servers with source badges: 数据库 / 内置 / ccTLD文件 / 注册局信息
+- DB-managed entries can be added and deleted; other sources are read-only
+- Stats cards filterable by source; search + filter bar
+- Previously: `/api/admin/tld-servers.ts` existed but had no corresponding admin page
+
+#### 4. TLD Probe now saves results to custom servers
+**File:** `src/pages/admin/tld-probe.tsx`
+- Per-row "保存" button for rdap/whois probe results → calls `/api/admin/tld-servers` POST
+- "保存所有成功结果" batch button saves all rdap+whois results at once
+- Previously: probe results were displayed but discarded; next lookup didn't benefit
+
+#### 5. Admin API enhanced for source tracking
+**File:** `src/pages/api/admin/tld-servers.ts`
+- GET now returns `registryServers` (from `tld_registry_info`) + `builtinTlds` (BUILTIN_SERVERS keys)
+- POST now accepts full `CustomServerEntry` objects (not just plain strings)
+- Exported `BUILTIN_SERVER_TLDS` and `getRegistryInfoServers()` from `custom-servers.ts`
+
+#### 6. Unified TLD tab navigation across all 7 admin pages
+**Files:** `tld-fallback.tsx`, `tld-lifecycle.tsx`, `tld-rules.tsx`, `tld-lifecycle-feedback.tsx`, `repair-queue.tsx`, `tld-probe.tsx`, `tld-registry.tsx`
+- All pages now share 8 tabs: 生命周期 / TLD规则 / 查询兜底 / 纠错反馈 / 服务器修复 / **自定义服务器** / TLD探测 / 注册局信息
+- `tld-probe.tsx` and `tld-registry.tsx` had no tab navigation before; now unified
+
+#### 7. Admin home page updated
+**File:** `src/pages/admin/index.tsx`
+- Added "自定义服务器" and "注册局数据库" to the admin navigation grid
+- Both pages were previously inaccessible from the admin home
+
+#### Bonus: Registry info → Custom servers one-click save
+**File:** `src/pages/admin/tld-registry.tsx`
+- Hover over any WHOIS server value in the registry table → shows "保存到自定义服务器" button
+- Promotes scraped registry data to explicit DB entry (overrides the auto-derived registry layer)
+
+### Data Flow After Integration
+
+```
+Lookup request
+  → getCustomServerEntry(tld)
+  → getAllCustomServers()
+       1. readRegistryInfoServers()     ← tld_registry_info (NEW)
+       2. BUILTIN_SERVERS              ← hard-coded
+       3. cctld-whois-servers.json     ← static file
+       4. custom_whois_servers DB      ← user/repair-queue managed (highest)
+
+Repair queue finds server
+  → setCustomServer(tld, server)       ← saves to custom_whois_servers
+  → markTldRepaired(tld, server)
+       → UPDATE tld_server_failures SET repair_status='found'
+       → UPDATE tld_fallback_stats SET fail_count=0, use_fallback=false (NEW)
+  → invalidateAllServersCache()        ← next lookup uses new server immediately
+
+Admin: tld-probe → probe TLDs → [Save] → setCustomServer → next lookup uses it
+Admin: tld-registry → see whois_server → [hover Save] → setCustomServer
+Admin: custom-servers → view all sources → [Add/Delete] → DB entries
+```

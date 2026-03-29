@@ -41,6 +41,9 @@ function readCctldServers(): Record<string, string | null> {
   }
 }
 
+/** Exported so admin pages can identify which TLDs are handled by built-in logic. */
+export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba"]);
+
 const BUILTIN_SERVERS: CustomServerMap = {
   bn: "whois.bnnic.bn",
   ba:      { type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
@@ -69,6 +72,30 @@ async function readDbServers(): Promise<CustomServerMap> {
     const map: CustomServerMap = {};
     for (const r of rows) {
       map[r.tld] = r.entry as CustomServerEntry;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Reads whois_server values from tld_registry_info (scraped from IANA pages).
+ * This is the lowest-priority server source — any explicit custom server or
+ * cctld-whois-servers.json entry overrides it.  Gives a useful fallback for
+ * TLDs not in our curated files.
+ */
+async function readRegistryInfoServers(): Promise<CustomServerMap> {
+  if (!(await isDbReady())) return {};
+  try {
+    const rows = await many<{ tld: string; whois_server: string }>(
+      `SELECT tld, whois_server FROM tld_registry_info
+       WHERE whois_server IS NOT NULL AND whois_server <> ''
+       ORDER BY tld`,
+    );
+    const map: CustomServerMap = {};
+    for (const r of rows) {
+      map[r.tld.toLowerCase().replace(/^\./, "")] = r.whois_server.trim();
     }
     return map;
   } catch {
@@ -125,20 +152,29 @@ export async function getAllCustomServers(): Promise<CustomServerMap> {
   if (_allServersCache && now - _allServersCacheAt < ALL_SERVERS_TTL_MS) {
     return _allServersCache;
   }
-  const cctld = readCctldServers();
-  const user  = await readUserManagedServers();
+  const cctld    = readCctldServers();
+  const user     = await readUserManagedServers();
+  const registry = await readRegistryInfoServers();
 
-  // Build the no-server set from cctld nulls (not overridden by user DB entries)
+  // Build the no-server set from cctld nulls (not overridden by user DB entries
+  // or registry info servers — if we discovered a server via registry scrape,
+  // it's no longer "no server").
   _knownNoServerCache = new Set(
     Object.entries(cctld)
-      .filter(([tld, v]) => v === null && !(tld in user))
+      .filter(([tld, v]) => v === null && !(tld in user) && !(tld in registry))
       .map(([tld]) => tld),
   );
 
   const cctldFiltered = Object.fromEntries(
     Object.entries(cctld).filter(([, v]) => v !== null),
   ) as CustomServerMap;
-  _allServersCache = { ...BUILTIN_SERVERS, ...cctldFiltered, ...user };
+
+  // Priority (highest wins, later entries override earlier ones):
+  //   1. registry (tld_registry_info.whois_server) — lowest, fills gaps
+  //   2. BUILTIN_SERVERS — hard-coded in source
+  //   3. cctld-whois-servers.json — curated static file
+  //   4. custom_whois_servers DB — highest, user / repair-queue managed
+  _allServersCache = { ...registry, ...BUILTIN_SERVERS, ...cctldFiltered, ...user };
   _allServersCacheAt = now;
   return _allServersCache;
 }
@@ -152,6 +188,14 @@ export async function isTldKnownNoServer(tld: string): Promise<boolean> {
   await getAllCustomServers(); // populates _knownNoServerCache
   const t = tld.toLowerCase().replace(/^\./, "");
   return _knownNoServerCache?.has(t) ?? false;
+}
+
+/**
+ * Returns WHOIS servers scraped from tld_registry_info.
+ * Used by the admin page to show the registry source separately.
+ */
+export async function getRegistryInfoServers(): Promise<CustomServerMap> {
+  return readRegistryInfoServers();
 }
 
 export async function getUserManagedServers(): Promise<CustomServerMap> {

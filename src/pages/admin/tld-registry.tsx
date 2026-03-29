@@ -4,13 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { PageTabs } from "@/components/page-tabs";
 import {
   RiGlobalLine, RiLoader4Line, RiStopCircleLine, RiRefreshLine,
   RiSearchLine, RiExternalLinkLine, RiDeleteBin7Line, RiCheckboxCircleLine,
   RiCloseCircleLine, RiQuestionLine, RiArrowDownSLine, RiArrowUpSLine,
   RiDatabase2Line, RiWifiLine, RiTimeLine, RiShieldCheckLine,
-  RiAlertLine, RiDownloadLine,
+  RiAlertLine, RiDownloadLine, RiSave3Line,
 } from "@remixicon/react";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+  { href: "/admin/repair-queue",           label: "服务器修复" },
+  { href: "/admin/custom-servers",         label: "自定义服务器" },
+  { href: "/admin/tld-probe",              label: "TLD 探测" },
+  { href: "/admin/tld-registry",           label: "注册局信息" },
+];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TldRecord {
@@ -110,6 +122,23 @@ export default function TldRegistryPage() {
   const [records, setRecords] = React.useState<TldRecord[]>([]);
   const [dbStats, setDbStats] = React.useState<DbStats | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [savedWhois, setSavedWhois] = React.useState<Set<string>>(new Set());
+
+  async function saveWhoisServer(tld: string, server: string) {
+    try {
+      const r = await fetch("/api/admin/tld-servers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, server }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message ?? "保存失败");
+      toast.success(`.${tld} WHOIS 服务器已推送到自定义列表`);
+      setSavedWhois(prev => new Set(prev).add(tld));
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   // Scan state
   const [scanning, setScanning] = React.useState(false);
@@ -304,6 +333,7 @@ export default function TldRegistryPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
+        <PageTabs tabs={TLD_TABS} />
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -312,7 +342,7 @@ export default function TldRegistryPage() {
               TLD 注册局数据库
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              从 IANA 根域名数据库自动抓取各 TLD 的注册局官网、WHOIS 服务器、所属机构等元数据。支持流式抓取，实时更新，永久存储。
+              从 IANA 根域名数据库自动抓取各 TLD 的注册局官网、WHOIS 服务器、所属机构等元数据。支持流式抓取，实时更新，永久存储。WHOIS 服务器字段可直接推送至自定义服务器列表。
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -556,7 +586,22 @@ export default function TldRegistryPage() {
                               }
                             </td>
                             <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground font-mono">
-                              {row.whois_server || <span className="opacity-40">—</span>}
+                              {row.whois_server ? (
+                                <div className="flex items-center gap-1.5 group">
+                                  <span>{row.whois_server}</span>
+                                  {savedWhois.has(row.tld) ? (
+                                    <span title="已保存"><RiCheckboxCircleLine className="w-3 h-3 text-emerald-500 shrink-0" /></span>
+                                  ) : (
+                                    <button
+                                      onClick={() => saveWhoisServer(row.tld, row.whois_server!)}
+                                      title="保存到自定义服务器"
+                                      className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0"
+                                    >
+                                      <RiSave3Line className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : <span className="opacity-40">—</span>}
                             </td>
                             <td className="px-3 py-2.5 hidden xl:table-cell text-xs text-muted-foreground">
                               {row.country || "—"}

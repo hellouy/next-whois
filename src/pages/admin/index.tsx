@@ -12,6 +12,7 @@ import {
   RiCodeBoxLine, RiWrenchLine, RiMoneyDollarCircleLine,
   RiPaletteLine, RiErrorWarningLine, RiGithubLine,
   RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine, RiRadarFill,
+  RiDatabase2Line, RiGlobalLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -120,6 +121,8 @@ export default function AdminIndexPage() {
     { href: "/admin/tld-lifecycle",     label: "TLD 爬取",    desc: "AI 批量爬取 TLD 生命周期",    icon: RiRobot2Line,     color: "text-purple-500" },
     { href: "/admin/tld-fallback",      label: "TLD 兜底",    desc: "第三方备用查询源管理",        icon: RiRadarLine,      color: "text-sky-500" },
     { href: "/admin/repair-queue",      label: "服务器修复",  desc: "AI 自动发现缺失 WHOIS/RDAP 服务器", icon: RiWrenchLine, color: "text-violet-500" },
+    { href: "/admin/custom-servers",    label: "自定义服务器", desc: "查看和管理 WHOIS 服务器列表", icon: RiDatabase2Line,  color: "text-emerald-600" },
+    { href: "/admin/tld-registry",      label: "注册局数据库", desc: "IANA 注册局信息抓取与查看",   icon: RiGlobalLine,     color: "text-blue-600" },
     { href: "/admin/tld-rules",         label: "TLD 规则",    desc: "自定义解析规则配置",          icon: RiCodeBoxLine,    color: "text-teal-500" },
     { href: "/admin/invite-codes",      label: "邀请码",      desc: "生成/管理注册邀请码",         icon: RiKeyLine,        color: "text-lime-600" },
     { href: "/admin/activation-codes",  label: "激活码",      desc: "付费激活码批量管理",          icon: RiGiftLine,       color: "text-pink-500" },

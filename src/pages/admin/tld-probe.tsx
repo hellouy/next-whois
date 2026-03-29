@@ -4,11 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageTabs } from "@/components/page-tabs";
 import {
   RiLoader4Line, RiRadarFill, RiCheckboxCircleLine,
   RiCloseCircleLine, RiQuestionLine, RiShieldCheckLine,
-  RiSearchLine, RiRefreshLine,
+  RiSearchLine, RiRefreshLine, RiSave3Line,
 } from "@remixicon/react";
+
+const TLD_TABS = [
+  { href: "/admin/tld-lifecycle",          label: "生命周期" },
+  { href: "/admin/tld-rules",              label: "TLD 规则" },
+  { href: "/admin/tld-fallback",           label: "查询兜底" },
+  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
+  { href: "/admin/repair-queue",           label: "服务器修复" },
+  { href: "/admin/custom-servers",         label: "自定义服务器" },
+  { href: "/admin/tld-probe",              label: "TLD 探测" },
+  { href: "/admin/tld-registry",           label: "注册局信息" },
+];
 
 type ProbeResult = {
   tld: string;
@@ -40,6 +52,45 @@ export default function TldProbePage() {
   const [running, setRunning] = React.useState(false);
   const [filterResult, setFilterResult] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
+  const [saving, setSaving] = React.useState<Set<string>>(new Set());
+  const [saved, setSaved] = React.useState<Set<string>>(new Set());
+
+  async function saveToCustomServers(row: ProbeResult) {
+    if (!row.method) return;
+    setSaving(prev => new Set(prev).add(row.tld));
+    try {
+      const r = await fetch("/api/admin/tld-servers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld: row.tld, server: row.method }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message ?? "保存失败");
+      toast.success(`.${row.tld} 已保存到自定义服务器`);
+      setSaved(prev => new Set(prev).add(row.tld));
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(prev => { const s = new Set(prev); s.delete(row.tld); return s; });
+    }
+  }
+
+  async function saveAllSuccessful() {
+    const successful = results.filter(r => (r.result === "rdap" || r.result === "whois") && r.method && !saved.has(r.tld));
+    if (successful.length === 0) { toast.info("没有新的成功结果可保存"); return; }
+    let ok = 0;
+    for (const row of successful) {
+      try {
+        const r = await fetch("/api/admin/tld-servers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tld: row.tld, server: row.method }),
+        });
+        if (r.ok) { ok++; setSaved(prev => new Set(prev).add(row.tld)); }
+      } catch { /* continue */ }
+    }
+    toast.success(`已保存 ${ok} / ${successful.length} 个服务器`);
+  }
 
   React.useEffect(() => {
     fetch("/api/admin/tld-probe")
@@ -89,13 +140,14 @@ export default function TldProbePage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
+        <PageTabs tabs={TLD_TABS} />
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <RiRadarFill className="w-5 h-5 text-primary" />
             TLD 探测工具
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            探测各 TLD 是否支持原生 WHOIS TCP 或 RDAP 查询，辅助判断是否需要降级至 yisi/tianhu 备用方案。
+            探测各 TLD 是否支持原生 WHOIS TCP 或 RDAP 查询，辅助判断是否需要降级至 yisi/tianhu 备用方案。探测到可用服务器后可直接保存至自定义服务器列表。
           </p>
         </div>
 
@@ -172,10 +224,18 @@ export default function TldProbePage() {
                   </button>
                 );
               })}
-              <div className="ml-auto flex items-center gap-1.5 border border-input rounded-lg px-2 h-7 bg-background">
-                <RiSearchLine className="w-3 h-3 text-muted-foreground" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索 TLD / 服务器"
-                  className="text-xs bg-transparent outline-none w-32 text-foreground placeholder:text-muted-foreground" />
+              <div className="flex items-center gap-2 ml-auto">
+                {((counts["rdap"] ?? 0) + (counts["whois"] ?? 0)) > 0 && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={saveAllSuccessful}>
+                    <RiSave3Line className="w-3 h-3" />
+                    保存所有成功结果
+                  </Button>
+                )}
+                <div className="flex items-center gap-1.5 border border-input rounded-lg px-2 h-7 bg-background">
+                  <RiSearchLine className="w-3 h-3 text-muted-foreground" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索 TLD / 服务器"
+                    className="text-xs bg-transparent outline-none w-32 text-foreground placeholder:text-muted-foreground" />
+                </div>
               </div>
             </div>
 
@@ -190,11 +250,15 @@ export default function TldProbePage() {
                       <th className="text-left px-3 py-2 font-medium">结果</th>
                       <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">服务器 / 方法</th>
                       <th className="text-right px-3 py-2 font-medium w-20">延迟</th>
+                      <th className="text-right px-3 py-2 font-medium w-20">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filtered.map(row => {
                       const meta = RESULT_META[row.result];
+                      const canSave = (row.result === "rdap" || row.result === "whois") && !!row.method;
+                      const isSaved = saved.has(row.tld);
+                      const isSaving = saving.has(row.tld);
                       return (
                         <tr key={row.tld} className="hover:bg-muted/20 transition-colors">
                           <td className="px-3 py-2.5 font-mono font-semibold">.{row.tld}</td>
@@ -212,6 +276,24 @@ export default function TldProbePage() {
                             {row.result === "static_fallback" ? (
                               <span className="text-violet-500 font-medium">本地</span>
                             ) : row.latencyMs > 0 ? `${row.latencyMs}ms` : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            {canSave ? (
+                              isSaved ? (
+                                <span className="text-xs text-emerald-600 font-medium flex items-center justify-end gap-1">
+                                  <RiCheckboxCircleLine className="w-3 h-3" />已保存
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => saveToCustomServers(row)}
+                                  disabled={isSaving}
+                                  className="text-xs text-primary hover:underline flex items-center justify-end gap-1 disabled:opacity-50"
+                                >
+                                  {isSaving ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiSave3Line className="w-3 h-3" />}
+                                  保存
+                                </button>
+                              )
+                            ) : null}
                           </td>
                         </tr>
                       );
