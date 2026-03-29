@@ -322,7 +322,12 @@ export default function AdminTldFallbackPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || "保存失败");
-      toast.success(`已保存 .${tld} 服务器配置`);
+      const purged: number = data.purged ?? 0;
+      toast.success(
+        purged > 0
+          ? `已保存 .${tld} 服务器配置，并清除 ${purged} 条旧缓存`
+          : `已保存 .${tld} 服务器配置`,
+      );
       setDbServers(prev => ({ ...prev, [tld]: { entry, source: "manual" } }));
       setServerDialogTld(null);
     } catch (e: any) {
@@ -343,7 +348,12 @@ export default function AdminTldFallbackPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || "删除失败");
-      toast.success(`已删除 .${tld} 服务器配置`);
+      const purged: number = data.purged ?? 0;
+      toast.success(
+        purged > 0
+          ? `已删除 .${tld} 服务器配置，并清除 ${purged} 条旧缓存`
+          : `已删除 .${tld} 服务器配置`,
+      );
       setDbServers(prev => {
         const n = { ...prev };
         delete n[tld];

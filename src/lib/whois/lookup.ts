@@ -30,6 +30,26 @@ function l1Set(key: string, value: WhoisResult) {
   }
   _memCache.set(key, { value, expiresAt: Date.now() + L1_TTL_MS });
 }
+
+/**
+ * Evicts all L1 in-memory lookup results whose domain ends with `.{tld}`.
+ * Called by the admin server-save/delete flow so the next query hits the
+ * freshly configured server rather than returning a stale cached result.
+ * Returns the number of entries evicted.
+ */
+export function invalidateLookupCacheForTld(tld: string): number {
+  const suffix = `.${tld.toLowerCase().replace(/^\./, "")}`;
+  let count = 0;
+  for (const key of [..._memCache.keys()]) {
+    // key format is "whois:{domain}" — strip the prefix and check suffix
+    const domain = key.startsWith("whois:") ? key.slice(6) : key;
+    if (domain === tld || domain.endsWith(suffix)) {
+      _memCache.delete(key);
+      count++;
+    }
+  }
+  return count;
+}
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
 import { lookupRdap, convertRdapToWhoisResult, RDAP_DIRECT_CCTLDS } from "@/lib/whois/rdap_client";

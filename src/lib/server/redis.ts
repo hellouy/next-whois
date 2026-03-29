@@ -128,6 +128,29 @@ export async function deleteRedisValue(key: string): Promise<boolean> {
 }
 
 /**
+ * Deletes all Redis keys matching a glob pattern using SCAN (non-blocking).
+ * Returns the number of keys deleted.
+ */
+export async function deleteRedisKeysByPattern(pattern: string): Promise<number> {
+  if (!redis || !_available) return 0;
+  try {
+    let cursor = "0";
+    const toDelete: string[] = [];
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+      cursor = nextCursor;
+      toDelete.push(...keys);
+    } while (cursor !== "0");
+    if (toDelete.length === 0) return 0;
+    await redis.del(...toDelete);
+    return toDelete.length;
+  } catch (err) {
+    console.error(`[Redis] SCAN/DEL error for pattern ${pattern}:`, (err as Error).message);
+    return 0;
+  }
+}
+
+/**
  * Atomically increments a counter key and sets its TTL on first increment.
  * Returns the new count, or null if Redis is unavailable.
  * Safe from race conditions: uses Redis INCR (single atomic operation).

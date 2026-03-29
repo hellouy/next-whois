@@ -162,6 +162,18 @@ export async function recordTldNativeSuccess(domain: string): Promise<void> {
 }
 
 /**
+ * Resets the in-memory fallback gate for a TLD to "closed" (fail_count=0,
+ * use_fallback=false) WITHOUT touching the DB.  Called by the admin when a
+ * server entry is saved/deleted so native WHOIS is retried immediately instead
+ * of being skipped because the gate was open from a previous failure streak.
+ */
+export function resetTldFallbackGateInMemory(tld: string): void {
+  const normalized = tld.toLowerCase().replace(/^\./, "");
+  _failCount.set(normalized, 0);
+  _enabled.delete(normalized);
+}
+
+/**
  * Immediately open the fallback gate for a TLD regardless of fail_count.
  * Called when the progressive fallback won the race, meaning native WHOIS / RDAP
  * was too slow — we want yisi/tianhu to race from the very start next time.
