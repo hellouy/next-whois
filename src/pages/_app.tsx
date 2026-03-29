@@ -271,6 +271,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 // They share a stable animation key so intra-page result updates don't
 // trigger the global page-level enter/exit animation.
 const STABLE_KEY_PAGES = new Set([
+  "/",            // homepage — relies on search-box spinner + progress bar for feedback
   "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback",
   "/[...query]",  // domain WHOIS results — skeleton handles loading feedback
 ]);

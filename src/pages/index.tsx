@@ -9,8 +9,6 @@ import {
   KeyboardShortcut,
   SearchHotkeysText,
 } from "@/components/search_shortcuts";
-import { useTranslation } from "@/lib/i18n";
-import { motion } from "framer-motion";
 import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
 import { getOrigin } from "@/lib/seo";
 import type { GetServerSideProps } from "next";
@@ -71,7 +69,6 @@ function fmt(n: number): string {
 }
 
 export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo }) {
-  const { t } = useTranslation();
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
   const stats = usePublicStats(seo.showStats);
@@ -182,59 +179,18 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
           </div>
         )}
 
-        {/* Mobile: centered brand display */}
-        {!loading && (
-          <div className="sm:hidden flex items-center justify-center" style={{ height: "calc(100vh - 19rem)" }}>
-            <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
-          </div>
-        )}
-
-        {loading && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            className="space-y-6 mt-2"
-          >
-            <div className="text-center py-4">
-              <span className="text-shimmer text-base font-semibold tracking-wide select-none">
-                {t("loading_text")}
-              </span>
-            </div>
-            <div className="glass-panel border border-border rounded-xl p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div className="space-y-3 flex-1">
-                  <div className="h-4 w-14 rounded-md bg-muted animate-pulse" />
-                  <div className="h-8 w-40 rounded-md bg-muted animate-pulse" />
-                  <div className="h-3 w-52 rounded-md bg-muted/70 animate-pulse" />
-                </div>
-                <div className="flex flex-col items-start sm:items-end gap-2">
-                  <div className="h-6 w-20 rounded-full bg-muted animate-pulse" />
-                  <div className="h-3 w-24 rounded-md bg-muted/60 animate-pulse" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mt-8 pt-8 border-t border-border/50">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="h-3 w-16 rounded bg-muted/60 animate-pulse" />
-                    <div className="h-4 w-24 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-12 rounded bg-muted/50 animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="glass-panel border border-border rounded-xl p-6">
-              <div className="h-4 w-20 rounded bg-muted/70 animate-pulse mb-4" />
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-muted animate-pulse shrink-0" />
-                    <div className="h-4 w-36 rounded bg-muted animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {/* Mobile: centered brand display — stays visible while loading, just dims */}
+        <div
+          className="sm:hidden flex items-center justify-center"
+          style={{
+            height: "calc(100vh - 19rem)",
+            opacity: loading ? 0 : 1,
+            transition: "opacity 0.12s ease",
+            pointerEvents: loading ? "none" : undefined,
+          }}
+        >
+          <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
+        </div>
       </main>
     </ScrollArea>
     </>
