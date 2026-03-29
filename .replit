@@ -21,6 +21,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Batch Scrape TLDs"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Keep Alive"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -43,6 +47,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node scripts/batch-scrape.mjs --type iana --concurrency 4 --delay 1500"
+
+[[workflows.workflow]]
+name = "Keep Alive"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/keep-alive.mjs"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
