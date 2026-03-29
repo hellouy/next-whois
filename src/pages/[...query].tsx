@@ -3980,27 +3980,14 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
   );
 }
 
-function QueryingDots() {
-  const [dots, setDots] = React.useState(".");
-  React.useEffect(() => {
-    const id = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 500);
-    return () => clearInterval(id);
-  }, []);
-  return <span className="inline-block w-5 text-left">{dots}</span>;
-}
-
 function ResultSkeleton() {
   const { t } = useTranslation();
   return (
     <div className="space-y-6 mt-6">
-      <div className="text-center py-6 space-y-2">
+      <div className="text-center py-6">
         <span className="text-shimmer text-base font-semibold tracking-wide select-none">
           {t("loading_text")}
         </span>
-        <p className="text-[13px] text-muted-foreground font-mono flex items-center justify-center gap-0.5 select-none">
-          <span>{t("loading_querying")}</span>
-          <QueryingDots />
-        </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
