@@ -935,9 +935,11 @@ function IanaTab() {
   const scanningRef = React.useRef(false);
   const [scanType, setScanType] = React.useState("cc");
   const [scanForce, setScanForce] = React.useState(false);
+  const [syncServers, setSyncServers] = React.useState(true);
   const [concur, setConcur] = React.useState(15);
   const [customTlds, setCustomTlds] = React.useState("");
   const [progress, setProgress] = React.useState({ done: 0, total: 0, errors: 0 });
+  const [serverSyncStats, setServerSyncStats] = React.useState({ added: 0, updated: 0, conflict: 0 });
   const [scanLog, setScanLog] = React.useState<string[]>([]);
   const esRef = React.useRef<EventSource | null>(null);
   const [search, setSearch] = React.useState("");
@@ -974,24 +976,42 @@ function IanaTab() {
     scanningRef.current = true;
     setScanning(true);
     setProgress({ done: 0, total: 0, errors: 0 });
+    setServerSyncStats({ added: 0, updated: 0, conflict: 0 });
     setScanLog([]);
-    const params = new URLSearchParams({ stream: "1", type: scanType, force: scanForce ? "1" : "0", concur: String(concur) });
+    const params = new URLSearchParams({
+      stream: "1", type: scanType, force: scanForce ? "1" : "0",
+      concur: String(concur), syncServers: syncServers ? "1" : "0",
+    });
     if (scanType === "custom" && customTlds.trim()) params.set("tlds", customTlds.trim());
     const es = new EventSource(`/api/admin/tld-registry?${params}`);
     esRef.current = es;
-    es.addEventListener("start", (e) => { const d = JSON.parse(e.data); setProgress(p => ({ ...p, total: d.total })); setScanLog(l => [...l, `▶ 开始扫描 ${d.total} 个 TLD`]); });
+    es.addEventListener("start", (e) => {
+      const d = JSON.parse(e.data);
+      setProgress(p => ({ ...p, total: d.total }));
+      setScanLog(l => [...l, `▶ 开始扫描 ${d.total} 个 TLD${d.syncServers ? "（含服务器同步）" : ""}`]);
+    });
     es.addEventListener("result", (e) => {
       const d: TldRecord = JSON.parse(e.data);
       setProgress({ done: d.done ?? 0, total: d.total ?? 0, errors: d.errors ?? 0 });
       setRecords(prev => { const idx = prev.findIndex(r => r.tld === d.tld); if (idx >= 0) { const next = [...prev]; next[idx] = d; return next; } return [...prev, d]; });
-      if (d.scan_error) setScanLog(l => [...l.slice(-99), `  ❌ .${d.tld}  ${d.scan_error}`]);
-      else if (d.registry_url) setScanLog(l => [...l.slice(-99), `  ✅ .${d.tld}  ${d.tld_type || "?"}  ${d.registry_url}`]);
-      else setScanLog(l => [...l.slice(-99), `  ⚠️  .${d.tld}  无注册局 URL`]);
+      if (d.scan_error) setScanLog(l => [...l.slice(-199), `  ❌ .${d.tld}  ${d.scan_error}`]);
+      else if (d.registry_url) setScanLog(l => [...l.slice(-199), `  ✅ .${d.tld}  ${d.tld_type || "?"}  ${d.registry_url}`]);
+      else setScanLog(l => [...l.slice(-199), `  ⚠️  .${d.tld}  无注册局 URL`]);
+    });
+    es.addEventListener("server_sync", (e) => {
+      const d = JSON.parse(e.data);
+      setServerSyncStats({ added: d.serverAdded ?? 0, updated: d.serverUpdated ?? 0, conflict: d.serverConflict ?? 0 });
+      if (d.action === "added")    setScanLog(l => [...l.slice(-199), `  ➕ 服务器 .${d.tld}  新增 ${d.ianaServer}`]);
+      if (d.action === "updated")  setScanLog(l => [...l.slice(-199), `  🔄 服务器 .${d.tld}  更新 ${d.ianaServer}`]);
+      if (d.action === "conflict") setScanLog(l => [...l.slice(-199), `  ⚠️  服务器 .${d.tld}  冲突：手动=${typeof d.existingEntry === "string" ? d.existingEntry : JSON.stringify(d.existingEntry)}  IANA=${d.ianaServer}`]);
     });
     es.addEventListener("done", (e) => {
       const d = JSON.parse(e.data);
       setProgress({ done: d.done, total: d.total, errors: d.errors });
-      setScanLog(l => [...l, `✅ 扫描完成：${d.done} 个，${d.errors} 个失败`]);
+      const serverMsg = syncServers
+        ? `  服务器同步：新增 ${d.serverAdded ?? 0}  更新 ${d.serverUpdated ?? 0}  冲突 ${d.serverConflict ?? 0}`
+        : "";
+      setScanLog(l => [...l, `✅ 扫描完成：${d.done} 个，${d.errors} 个失败${serverMsg ? "\n" + serverMsg : ""}`]);
       scanningRef.current = false; setScanning(false); esRef.current?.close(); esRef.current = null;
       loadRecords();
     });
@@ -1089,9 +1109,13 @@ function IanaTab() {
               onChange={e => setConcur(Math.min(30, Math.max(1, parseInt(e.target.value) || 10)))}
               className="h-8 w-20 text-sm" />
           </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
             <input type="checkbox" checked={scanForce} onChange={e => setScanForce(e.target.checked)} className="w-3.5 h-3.5" />
             强制重新扫描
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-sky-700 dark:text-sky-400 font-medium" title="将 IANA 发现的 WHOIS 服务器自动同步到服务器管理列表，手动配置的不会被覆盖">
+            <input type="checkbox" checked={syncServers} onChange={e => setSyncServers(e.target.checked)} className="w-3.5 h-3.5 accent-sky-600" />
+            同步 WHOIS 服务器
           </label>
           <Button onClick={scanning ? stopScan : startScan} size="sm" variant={scanning ? "destructive" : "default"} className="h-8 text-xs">
             {scanning ? <><RiStopCircleLine className="w-3.5 h-3.5 mr-1" />停止</> : <><RiGlobalLine className="w-3.5 h-3.5 mr-1" />开始扫描</>}
@@ -1107,17 +1131,37 @@ function IanaTab() {
         {(scanning || progress.total > 0) && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{scanning ? <><RiLoader4Line className="inline w-3 h-3 animate-spin mr-1" />扫描中…</> : "已完成"} {progress.done}/{progress.total}（{pct}%）{progress.errors > 0 && <span className="text-destructive ml-1">{progress.errors} 个错误</span>}</span>
+              <span>
+                {scanning ? <><RiLoader4Line className="inline w-3 h-3 animate-spin mr-1" />扫描中…</> : "已完成"}
+                {" "}{progress.done}/{progress.total}（{pct}%）
+                {progress.errors > 0 && <span className="text-destructive ml-1">{progress.errors} 个错误</span>}
+              </span>
               <span>{pct}%</span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${pct}%` }} />
             </div>
+            {syncServers && (serverSyncStats.added + serverSyncStats.updated + serverSyncStats.conflict > 0) && (
+              <div className="flex gap-3 text-[11px] flex-wrap">
+                {serverSyncStats.added   > 0 && <span className="text-green-600 dark:text-green-400">➕ 新增 {serverSyncStats.added} 个服务器</span>}
+                {serverSyncStats.updated > 0 && <span className="text-sky-600 dark:text-sky-400">🔄 更新 {serverSyncStats.updated} 个服务器</span>}
+                {serverSyncStats.conflict > 0 && <span className="text-amber-600 dark:text-amber-400">⚠️ {serverSyncStats.conflict} 个冲突（手动配置保留）</span>}
+              </div>
+            )}
           </div>
         )}
         {scanLog.length > 0 && (
-          <div className="rounded-lg bg-muted/30 border border-border p-2 max-h-32 overflow-y-auto font-mono text-[11px] text-muted-foreground space-y-0.5">
-            {scanLog.map((l, i) => <div key={i}>{l}</div>)}
+          <div className="rounded-lg bg-muted/30 border border-border p-2 max-h-40 overflow-y-auto font-mono text-[11px] space-y-0.5">
+            {scanLog.map((l, i) => (
+              <div key={i} className={
+                l.startsWith("  ➕") ? "text-green-600 dark:text-green-400" :
+                l.startsWith("  🔄") ? "text-sky-600 dark:text-sky-400" :
+                l.startsWith("  ⚠️  服务器") ? "text-amber-600 dark:text-amber-400" :
+                l.startsWith("  ❌") ? "text-destructive" :
+                l.startsWith("✅") ? "text-green-700 dark:text-green-300 font-medium" :
+                "text-muted-foreground"
+              }>{l}</div>
+            ))}
           </div>
         )}
       </div>

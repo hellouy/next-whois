@@ -45,7 +45,7 @@ type FallbackRow = {
 
 type ServerWithSource = {
   entry: CustomServerEntry;
-  source: "manual" | "iana" | "repair";
+  source: "manual" | "iana" | "repair" | "registry";
 };
 
 type ServerType = "whois-tcp" | "rdap-http" | "http-whois";
@@ -86,9 +86,19 @@ function entryType(entry: CustomServerEntry): string {
 }
 
 function sourceColor(source: string) {
-  if (source === "manual") return "bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400";
-  if (source === "repair") return "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400";
+  if (source === "manual")   return "bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400";
+  if (source === "repair")   return "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400";
+  if (source === "iana")     return "bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400";
+  if (source === "registry") return "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400";
   return "bg-muted text-muted-foreground";
+}
+
+function sourceLabel(source: string) {
+  if (source === "manual")   return "手动";
+  if (source === "repair")   return "自动修复";
+  if (source === "iana")     return "IANA自动";
+  if (source === "registry") return "注册局";
+  return source;
 }
 
 function parseEntryForEdit(entry: CustomServerEntry): {
@@ -784,7 +794,7 @@ export default function AdminTldFallbackPage() {
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-semibold", sourceColor(srv.source))}>
-                          {srv.source === "manual" ? "手动" : srv.source === "repair" ? "自动修复" : srv.source}
+                          {sourceLabel(srv.source)}
                         </span>
                       </td>
                       <td className="px-4 py-3">

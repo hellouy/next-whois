@@ -152,7 +152,7 @@ function invalidateAllServersCache() {
 async function writeDbServer(
   tld: string,
   entry: CustomServerEntry,
-  source: "manual" | "iana" | "repair" = "manual",
+  source: "manual" | "iana" | "repair" | "registry" = "manual",
 ): Promise<void> {
   if (!(await isDbReady())) return;
   await run(
@@ -171,7 +171,7 @@ async function writeDbServer(
 async function writeAutoDiscoveredServer(
   tld: string,
   entry: CustomServerEntry,
-  source: "iana" | "repair",
+  source: "iana" | "repair" | "registry",
 ): Promise<void> {
   if (!(await isDbReady())) return;
   await run(
@@ -247,7 +247,7 @@ export async function getUserManagedServers(): Promise<CustomServerMap> {
   return readUserManagedServers();
 }
 
-export type ServerWithSource = { entry: CustomServerEntry; source: "manual" | "iana" | "repair" };
+export type ServerWithSource = { entry: CustomServerEntry; source: "manual" | "iana" | "repair" | "registry" };
 
 /** Returns all DB-stored servers with their source tag for admin UI display. */
 export async function getAllDbServersWithSource(): Promise<Record<string, ServerWithSource>> {
@@ -359,4 +359,72 @@ export function getTcpHost(entry: CustomServerEntry): string | null {
   if (typeof entry === "string") return entry;
   if (typeof entry === "object" && entry.type === "tcp") return entry.host;
   return null;
+}
+
+// ── Registry sync helper ──────────────────────────────────────────────────────
+
+export type RegistrySyncAction = "added" | "updated" | "conflict" | "unchanged" | "skipped";
+
+export type RegistrySyncResult = {
+  action: RegistrySyncAction;
+  /** The IANA-discovered server */
+  ianaServer: string;
+  /** The pre-existing custom entry (if any) */
+  existingEntry?: CustomServerEntry;
+  existingSource?: string;
+};
+
+/**
+ * Syncs a WHOIS server discovered from an IANA page into custom_whois_servers.
+ *
+ * Rules:
+ *   - No entry   → INSERT with source='registry'
+ *   - registry/iana/repair entry → UPDATE if server differs, keep otherwise
+ *   - manual entry → do NOT overwrite; return 'conflict' with both values
+ */
+export async function syncRegistryServer(
+  tld: string,
+  ianaServer: string,
+): Promise<RegistrySyncResult> {
+  if (!(await isDbReady())) return { action: "skipped", ianaServer };
+
+  const normalized = tld.toLowerCase().replace(/^\./, "");
+  const server = ianaServer.trim().toLowerCase();
+  if (!server) return { action: "skipped", ianaServer };
+
+  // Read existing DB entry
+  const rows = await many<{ tld: string; entry: unknown; source: string }>(
+    `SELECT tld, entry, COALESCE(source,'manual') AS source FROM custom_whois_servers WHERE tld=$1`,
+    [normalized],
+  );
+  const existing = rows[0];
+
+  if (!existing) {
+    // No entry at all → add
+    await writeAutoDiscoveredServer(normalized, server, "registry");
+    invalidateAllServersCache();
+    return { action: "added", ianaServer: server };
+  }
+
+  const existingEntry = existing.entry as CustomServerEntry;
+  const existingSource = existing.source;
+
+  // Derive host string from existing entry for comparison
+  let existingHost = "";
+  if (typeof existingEntry === "string") existingHost = existingEntry.toLowerCase().trim();
+  else if (typeof existingEntry === "object" && existingEntry.type === "tcp") existingHost = existingEntry.host.toLowerCase().trim();
+
+  if (existingSource === "manual") {
+    // Manual takes priority — report conflict but don't overwrite
+    return { action: "conflict", ianaServer: server, existingEntry, existingSource };
+  }
+
+  if (existingHost === server) {
+    return { action: "unchanged", ianaServer: server, existingEntry, existingSource };
+  }
+
+  // Non-manual, different → update
+  await writeAutoDiscoveredServer(normalized, server, "registry");
+  invalidateAllServersCache();
+  return { action: "updated", ianaServer: server, existingEntry, existingSource };
 }

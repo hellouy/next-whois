@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import { getDbReady } from "@/lib/db";
 import * as cheerio from "cheerio";
+import { syncRegistryServer } from "@/lib/whois/custom-servers";
 
 export const config = { maxDuration: 300 };
 
@@ -282,10 +283,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // ── GET stream: SSE scan ──────────────────────────────────────────────────
   if (req.method === "GET" && req.query.stream) {
-    const type   = (req.query.type as string) || "cc";
-    const force  = req.query.force === "1";
-    const concur = Math.min(parseInt((req.query.concur as string) || "15", 10), 30);
-    const customRaw = (req.query.tlds as string) || "";
+    const type       = (req.query.type as string) || "cc";
+    const force      = req.query.force === "1";
+    const concur     = Math.min(parseInt((req.query.concur as string) || "15", 10), 30);
+    const syncServers = req.query.syncServers === "1";
+    const customRaw  = (req.query.tlds as string) || "";
 
     // Build TLD list
     let tldList: string[] = [];
@@ -349,9 +351,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try { res.write(": heartbeat\n\n"); (res as any).flush?.(); } catch {}
     }, 8_000);
 
-    send("start", { total, type, force });
+    send("start", { total, type, force, syncServers });
 
     let done = 0, errors = 0;
+    let serverAdded = 0, serverUpdated = 0, serverConflict = 0;
 
     try {
       await processBatch(tldList, concur, async (info, _i, _total) => {
@@ -359,6 +362,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
           await upsertInfo(db, info);
         } catch {}
+
+        // Sync WHOIS server to custom_whois_servers if requested
+        if (syncServers && info.whois_server && !info.scan_error) {
+          try {
+            const syncResult = await syncRegistryServer(info.tld, info.whois_server);
+            if (syncResult.action === "added")    { serverAdded++;    send("server_sync", { tld: info.tld, ...syncResult, serverAdded, serverUpdated, serverConflict }); }
+            if (syncResult.action === "updated")  { serverUpdated++;  send("server_sync", { tld: info.tld, ...syncResult, serverAdded, serverUpdated, serverConflict }); }
+            if (syncResult.action === "conflict") { serverConflict++; send("server_sync", { tld: info.tld, ...syncResult, serverAdded, serverUpdated, serverConflict }); }
+            // unchanged/skipped → silent
+          } catch {}
+        }
 
         done++;
         if (info.scan_error) errors++;
@@ -375,7 +389,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     clearInterval(hb);
-    send("done", { done, total, errors });
+    send("done", { done, total, errors, serverAdded, serverUpdated, serverConflict });
     res.end();
     return;
   }
