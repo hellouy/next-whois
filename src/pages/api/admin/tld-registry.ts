@@ -339,7 +339,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
+    // Track whether the client closed the connection so we can stop early
+    let clientClosed = false;
+    req.on("close", () => { clientClosed = true; });
+
     const send = (event: string, data: object) => {
+      if (clientClosed) return;
       try {
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         (res as any).flush?.();
@@ -348,6 +353,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Heartbeat to keep connection alive
     const hb = setInterval(() => {
+      if (clientClosed) { clearInterval(hb); return; }
       try { res.write(": heartbeat\n\n"); (res as any).flush?.(); } catch {}
     }, 8_000);
 
@@ -358,6 +364,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       await processBatch(tldList, concur, async (info, _i, _total) => {
+        // Stop processing if the browser tab was closed
+        if (clientClosed) return;
+
         // Upsert into DB
         try {
           await upsertInfo(db, info);
@@ -389,8 +398,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     clearInterval(hb);
-    send("done", { done, total, errors, serverAdded, serverUpdated, serverConflict });
-    res.end();
+    if (!clientClosed) {
+      send("done", { done, total, errors, serverAdded, serverUpdated, serverConflict });
+      res.end();
+    }
     return;
   }
 

@@ -102,13 +102,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const keys = (Object.keys(DEFAULT_SETTINGS) as (keyof SiteSettings)[]).filter(k => k in body);
       if (keys.length > 0) {
-        await Promise.all(keys.map(key =>
-          run(
-            `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-             ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-            [key, String(body[key] ?? "")]
-          )
-        ));
+        // Single multi-row batch upsert — far cheaper than N individual round-trips.
+        const placeholders = keys.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, NOW())`).join(", ");
+        const values = keys.flatMap(key => [key, String(body[key] ?? "")]);
+        await run(
+          `INSERT INTO site_settings (key, value, updated_at)
+           VALUES ${placeholders}
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
+          values,
+        );
       }
       invalidateCache();
       return res.json({ ok: true, updated: keys.length });

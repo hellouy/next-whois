@@ -122,6 +122,9 @@ class ScraperRequiredError extends Error {
   }
 }
 
+// Patterns that indicate the WHOIS server responded but the domain is not found
+// or the query is invalid.  A match causes getLookupWhois to throw, which is
+// caught by the outer racer and triggers the fallback gate + yisi/tianhu path.
 const WHOIS_ERROR_PATTERNS = [
   /no match/i,
   /not found/i,
@@ -130,7 +133,7 @@ const WHOIS_ERROR_PATTERNS = [
   /no object found/i,
   /nothing found/i,
   /invalid query/i,
-  /error:/i,
+  /^error:/im,           // line-start only — avoids matching "Query error: rate limit exceeded"
   /malformed/i,
   /object does not exist/i,
   /domain not found/i,
@@ -140,6 +143,24 @@ const WHOIS_ERROR_PATTERNS = [
   /no whois information/i,
   /tld is not supported/i,
 ];
+
+// Patterns that mean the WHOIS server is temporarily refusing our query due to
+// rate-limiting or access controls — NOT a permanent native failure.  When
+// matched we skip recordTldNativeFailure so the fallback gate stays closed.
+const WHOIS_RATE_LIMIT_PATTERNS = [
+  /rate.?limit/i,
+  /too many (?:requests|queries)/i,
+  /query.?rate.*exceeded/i,
+  /exceeded.*query.?limit/i,
+  /access denied/i,
+  /connection refused/i,
+  /temporarily.?blocked/i,
+  /please.{0,20}try again later/i,
+];
+
+function isWhoisRateLimited(raw: string): boolean {
+  return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(raw));
+}
 
 const WHOIS_NOT_REGISTERED_PATTERNS = [
   /no match/i,
@@ -366,15 +387,22 @@ async function queryWhoisHttp(
 // when whoiser's auto-discovery fails.  Results cached 24 h (server assignments
 // rarely change).  Uses queryWhoisTcp so DoH DNS fallback is automatic.
 const _ianaServerCache = new Map<string, { server: string | null; expires: number }>();
+const IANA_CACHE_MAX = 2000; // ~1500 IANA TLDs — hard cap against unbounded growth
 
 async function getIanaWhoisServer(tld: string): Promise<string | null> {
+  const now = Date.now();
   const cached = _ianaServerCache.get(tld);
-  if (cached && cached.expires > Date.now()) return cached.server;
+  if (cached && cached.expires > now) return cached.server;
   try {
     const raw = await queryWhoisTcp("whois.iana.org", 43, tld, 5_000);
     const m = raw.match(/^refer:\s*(\S+)/im);
     const server = m ? m[1].trim().toLowerCase() : null;
-    _ianaServerCache.set(tld, { server, expires: Date.now() + 86_400_000 });
+    // Evict oldest entry when cache is full before inserting new one
+    if (_ianaServerCache.size >= IANA_CACHE_MAX && !_ianaServerCache.has(tld)) {
+      const oldest = _ianaServerCache.keys().next().value;
+      if (oldest !== undefined) _ianaServerCache.delete(oldest);
+    }
+    _ianaServerCache.set(tld, { server, expires: now + 86_400_000 });
     // Persist newly discovered servers to DB so cold restarts skip this query.
     if (server) {
       setDiscoveredServer(tld, server, "iana").catch(() => {});
@@ -1276,6 +1304,14 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
         recordTldServerFailure(tldSuffix, "iana_fallback").catch(() => {});
       }
       return tryYisiOrFail("No WHOIS/RDAP server available for this TLD");
+    }
+
+    // Rate-limit: server responded but is throttling us — do NOT count as a
+    // native failure (the endpoint is reachable; no gate increment, no paid API).
+    if (isWhoisRateLimited(whoisRawData)) {
+      return failWithDns(
+        "WHOIS 服务器临时限制了本次查询速率，请稍后再试",
+      );
     }
 
     try {

@@ -203,6 +203,9 @@ export default function AdminTldFallbackPage() {
   type TestResult = { ok: boolean; method: string; output?: string; statusCode?: number; error?: string; elapsedMs: number };
   const [testResult, setTestResult] = React.useState<TestResult | null>(null);
 
+  // ── Fallback-table client-side search ──────────────────────────────────────
+  const [fallbackSearch, setFallbackSearch] = React.useState("");
+
   // ── Built-in server state ──────────────────────────────────────────────────
   const [builtinData, setBuiltinData] = React.useState<BuiltinServers | null>(null);
   const [builtinLoading, setBuiltinLoading] = React.useState(false);
@@ -484,6 +487,12 @@ export default function AdminTldFallbackPage() {
   const dbServerEntries = Object.entries(dbServers).sort(([a], [b]) => a.localeCompare(b));
   const manualCount = dbServerEntries.filter(([, v]) => v.source === "manual").length;
 
+  // Client-side filtered rows for the fallback stats table
+  const fallbackQ = fallbackSearch.trim().toLowerCase().replace(/^\./, "");
+  const filteredRows = fallbackQ
+    ? rows.filter(r => r.tld.includes(fallbackQ))
+    : rows;
+
   return (
     <AdminLayout title="TLD 管理">
       <div className="space-y-5">
@@ -599,6 +608,20 @@ export default function AdminTldFallbackPage() {
           </div>
         ) : (
           <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+            {/* Search bar above the table */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
+              <Input
+                value={fallbackSearch}
+                onChange={e => setFallbackSearch(e.target.value)}
+                placeholder="搜索 TLD…"
+                className="h-7 text-xs w-40 font-mono"
+              />
+              <span className="text-xs text-muted-foreground ml-auto">
+                {fallbackQ
+                  ? `${filteredRows.length} / ${rows.length} 条`
+                  : `共 ${rows.length} 条记录`}
+              </span>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
@@ -611,7 +634,14 @@ export default function AdminTldFallbackPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {rows.map(row => {
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                      未找到匹配的 TLD
+                    </td>
+                  </tr>
+                ) : null}
+                {filteredRows.map(row => {
                   const isEditingThis = editingTld === row.tld;
                   const srvEntry = dbServers[row.tld];
                   return (

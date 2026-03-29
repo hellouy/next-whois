@@ -1,4 +1,34 @@
-# Next Whois UI — v3.26
+# Next Whois UI — v3.27
+
+## Comprehensive Code Audit & Hardening (2026-03-29, v3.27)
+
+### 1. WHOIS Error Pattern Hardening (`src/lib/whois/lookup.ts`)
+- **Rate-limit false-positive fix**: Replaced broad `/error:/i` with `/^error:/im` (line-start only). The old pattern matched strings like `"Query error: rate limit exceeded"` and incorrectly triggered the fallback gate, burning paid API quota for a transient server throttle.
+- **New `WHOIS_RATE_LIMIT_PATTERNS` + `isWhoisRateLimited()`**: Seven patterns covering `rate limit`, `too many requests`, `access denied`, `temporarily blocked`, `please try again later`, etc. When matched BEFORE the error-pattern check, the lookup returns a user-visible rate-limit message and skips `recordTldNativeFailure` — the gate stays closed, native WHOIS is tried again next request, no paid API is called.
+- **`_ianaServerCache` size cap**: Added `IANA_CACHE_MAX = 2000` with FIFO eviction to prevent unbounded memory growth from repeated IANA referral lookups (previously uncapped across the full 1500+ TLD set).
+
+### 2. Fallback Gate API Improvements (`src/pages/api/admin/tld-fallback.ts`)
+- **Row limit 200 → 2000**: The batch scraper processes 1285+ TLDs; the old LIMIT 200 silently truncated the admin view. Now up to 2000 rows returned, covering the full working set.
+- **Optional `?q=` search param**: Added SQL `WHERE tld LIKE $1` filter for server-side prefix search when the param is provided.
+- **Response now includes `total`** field alongside `rows`.
+- **PATCH syncs in-memory gate**: When admin manually sets `use_fallback=false` or lowers fail_count below threshold via the admin UI, `resetTldFallbackGateInMemory()` is now called immediately so native WHOIS is retried in the next request (previously only the DB row was updated).
+
+### 3. SSE Disconnect Cleanup (`src/pages/api/admin/tld-registry.ts`)
+- Added `let clientClosed = false` + `req.on('close', ...)` handler. The batch-scan loop and heartbeat interval check `clientClosed` before every write and at each item iteration. Prevents orphaned server-side RDAP scan processing continuing after the browser tab is closed or navigated away.
+
+### 4. Custom WHOIS Servers GET Auth (`src/pages/api/whois-servers.ts`)
+- GET was previously public, exposing the full list of custom WHOIS/RDAP servers (including internal infrastructure details). Now requires admin authentication for all methods.
+
+### 5. Settings Batch Upsert (`src/pages/api/admin/settings.ts`)
+- The PUT handler previously fired N independent `INSERT … ON CONFLICT UPDATE` queries in `Promise.all`. Replaced with a single multi-row `VALUES (…),(…),…` batch upsert — one DB round-trip regardless of how many settings keys are being saved.
+
+### 6. Admin Fallback Table UX (`src/pages/admin/tld-fallback.tsx`)
+- Added client-side search input above the fallback stats table. Instant filtering across all loaded rows (no API round-trip per keystroke).
+- Shows row count: `"共 N 条记录"` normally, `"M / N 条"` when filtered.
+- Empty-state row rendered when search yields no matches.
+- `filteredRows` computed from `rows` based on `fallbackSearch` state; original `rows` remains unmodified for stat cards.
+
+
 
 ## Performance / UX Fixes (2026-03-29, v3.26)
 

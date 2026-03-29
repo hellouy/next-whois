@@ -23,15 +23,14 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>,
 ) {
+  // All methods require admin — server list may contain internal infrastructure details
+  const adminErr = await requireAdmin(req, res);
+  if (adminErr) return;
+
   if (req.method === "GET") {
     const servers = await getAllCustomServers();
     const userServers = await getUserManagedServers();
     return res.status(200).json({ success: true, servers, userServers });
-  }
-
-  if (req.method === "POST" || req.method === "DELETE") {
-    const adminErr = await requireAdmin(req, res);
-    if (adminErr) return;
   }
 
   if (req.method === "POST") {

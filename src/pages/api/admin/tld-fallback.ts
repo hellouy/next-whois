@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, run, isDbReady } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
+import { resetTldFallbackGateInMemory } from "@/lib/whois/tld-fallback-gate";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -12,18 +13,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     try {
+      // Optional TLD search filter — strips leading dot, case-insensitive prefix match
+      const q = typeof req.query.q === "string" ? req.query.q.toLowerCase().replace(/^\./, "").trim() : "";
       const rows = await many<{
         tld: string;
         fail_count: number;
         use_fallback: boolean;
         last_fail_at: string | null;
       }>(
-        `SELECT tld, fail_count, use_fallback, last_fail_at
-         FROM tld_fallback_stats
-         ORDER BY use_fallback DESC, fail_count DESC, last_fail_at DESC
-         LIMIT 200`,
+        q
+          ? `SELECT tld, fail_count, use_fallback, last_fail_at
+             FROM tld_fallback_stats
+             WHERE tld LIKE $1
+             ORDER BY use_fallback DESC, fail_count DESC, last_fail_at DESC
+             LIMIT 2000`
+          : `SELECT tld, fail_count, use_fallback, last_fail_at
+             FROM tld_fallback_stats
+             ORDER BY use_fallback DESC, fail_count DESC, last_fail_at DESC
+             LIMIT 2000`,
+        q ? [`${q}%`] : [],
       );
-      return res.json({ rows });
+      return res.json({ rows, total: rows.length });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
@@ -82,6 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fail_count?: number;
     };
     if (!tld) return res.status(400).json({ error: "缺少 tld 参数" });
+    const normalized = tld.toLowerCase().replace(/^\./, "");
     try {
       if (typeof fail_count === "number") {
         const fc = Math.max(0, Math.floor(fail_count));
@@ -89,13 +100,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const uf = typeof use_fallback === "boolean" ? use_fallback : fc >= 3;
         await run(
           `UPDATE tld_fallback_stats SET fail_count = $2, use_fallback = $3 WHERE tld = $1`,
-          [tld, fc, uf],
+          [normalized, fc, uf],
         );
+        // Sync in-memory gate: if admin lowers fail_count below threshold, re-enable native WHOIS
+        if (!uf) resetTldFallbackGateInMemory(normalized);
       } else if (typeof use_fallback === "boolean") {
         await run(
           `UPDATE tld_fallback_stats SET use_fallback = $2 WHERE tld = $1`,
-          [tld, use_fallback],
+          [normalized, use_fallback],
         );
+        // Closing the gate in-memory lets native WHOIS be tried again immediately
+        if (!use_fallback) resetTldFallbackGateInMemory(normalized);
       } else {
         return res.status(400).json({ error: "缺少 use_fallback 或 fail_count 参数" });
       }
