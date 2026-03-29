@@ -80,50 +80,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ── db_optimize  (actual cleanup) ─────────────────────────────────────────
     if (action === "db_optimize") {
       type OpResult = { op: string; label: string; deleted: number; status?: string; error?: string };
-      const report: OpResult[] = [];
 
-      async function safeRun(op: string, label: string, sql: string, params?: any[]) {
+      async function safeRun(op: string, label: string, sql: string, params?: any[]): Promise<OpResult> {
         try {
           const deleted = await run(sql, params);
-          report.push({ op, label, deleted });
+          return { op, label, deleted };
         } catch (err: any) {
-          report.push({ op, label, deleted: 0, error: err.message });
+          return { op, label, deleted: 0, error: err.message };
         }
       }
 
-      // 1. Expired password-reset tokens
-      await safeRun("expired_tokens", "过期密码重置令牌",
-        `DELETE FROM password_reset_tokens WHERE expires_at < NOW()`);
+      // Run all independent DELETE operations in parallel (each targets a different table)
+      const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
+        safeRun("expired_tokens",      "过期密码重置令牌",
+          `DELETE FROM password_reset_tokens WHERE expires_at < NOW()`),
+        safeRun("anon_searches_30d",   "匿名查询记录 (>30天)",
+          `DELETE FROM search_history WHERE user_id IS NULL AND created_at < NOW() - INTERVAL '30 days'`),
+        safeRun("expired_rate_limits", "过期频率限制记录",
+          `DELETE FROM rate_limit_records WHERE reset_at < NOW()`),
+        safeRun("orphan_logs",         "孤立提醒日志",
+          `DELETE FROM reminder_logs WHERE NOT EXISTS (
+             SELECT 1 FROM reminders r WHERE r.id = reminder_logs.reminder_id
+           )`),
+        safeRun("expired_keys",        "过期访问密钥",
+          `DELETE FROM access_keys WHERE expires_at IS NOT NULL AND expires_at < NOW()`),
+        safeRun("stale_orders",        "超期未支付订单 (>7天)",
+          `DELETE FROM payment_orders WHERE status = 'pending' AND created_at < NOW() - INTERVAL '7 days'`),
+        safeRun("stale_user_history",  "用户普通查询记录 (>10天)",
+          `DELETE FROM search_history WHERE user_id IS NOT NULL AND value_tier = 'normal'
+           AND created_at < NOW() - INTERVAL '10 days'`),
+      ]);
+      const report: OpResult[] = [r1, r2, r3, r4, r5, r6, r7];
 
-      // 2. Old anonymous search records (>30 days)
-      await safeRun("anon_searches_30d", "匿名查询记录 (>30天)",
-        `DELETE FROM search_history WHERE user_id IS NULL AND created_at < NOW() - INTERVAL '30 days'`);
-
-      // 3. Expired rate-limit records
-      await safeRun("expired_rate_limits", "过期频率限制记录",
-        `DELETE FROM rate_limit_records WHERE reset_at < NOW()`);
-
-      // 4. Orphaned reminder_logs (reminder deleted but logs remain)
-      await safeRun("orphan_logs", "孤立提醒日志",
-        `DELETE FROM reminder_logs WHERE NOT EXISTS (
-           SELECT 1 FROM reminders r WHERE r.id = reminder_logs.reminder_id
-         )`);
-
-      // 5. Expired access keys
-      await safeRun("expired_keys", "过期访问密钥",
-        `DELETE FROM access_keys WHERE expires_at IS NOT NULL AND expires_at < NOW()`);
-
-      // 6. Stale pending payment orders (>7 days, never paid)
-      await safeRun("stale_orders", "超期未支付订单 (>7天)",
-        `DELETE FROM payment_orders WHERE status = 'pending' AND created_at < NOW() - INTERVAL '7 days'`);
-
-      // 7. Normal-tier logged-in user history older than retention period
-      await safeRun("stale_user_history", "用户普通查询记录 (>10天)",
-        `DELETE FROM search_history
-         WHERE user_id IS NOT NULL AND value_tier = 'normal'
-           AND created_at < NOW() - INTERVAL '10 days'`);
-
-      // 8. Also flush Redis rate-limit keys
+      // Flush Redis rate-limit keys
       if (isRedisAvailable() && redis) {
         try {
           const keys = await redis.keys("rl:*");
@@ -131,12 +120,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } catch { /* ignore */ }
       }
 
-      // 9. ANALYZE key tables to refresh query planner stats (non-blocking)
+      // ANALYZE key tables to refresh query planner stats (non-blocking fire-and-forget)
       try {
         const { getDbReady } = await import("@/lib/db");
         const db = await getDbReady();
         if (db) {
-          // Run ANALYZE asynchronously — don't await so it doesn't block the response
           db.query(
             `ANALYZE search_history, users, reminders, stamps, payment_orders, tld_rules`
           ).catch(() => {});
@@ -160,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const [
       users, stamps, reminders, searches, feedback, settings,
-      orders, rateLimits, adminEmail,
+      orders, rateLimits, adminEmail, recentSearches, dailySearches,
     ] = await Promise.all([
       one<{ total: string; disabled: string; subscribed: string }>(
         `SELECT COUNT(*) AS total,
@@ -194,19 +182,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `SELECT COUNT(*) AS count FROM rate_limit_records WHERE reset_at > NOW()`
       ),
       getAdminEmail(),
+      many<{ query: string; query_type: string; count: string }>(
+        `SELECT query, query_type, COUNT(*) AS count FROM search_history
+         WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY query, query_type ORDER BY count DESC LIMIT 10`
+      ),
+      many<{ day: string; count: string }>(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS count
+         FROM search_history WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY day ORDER BY day ASC`
+      ),
     ]);
-
-    const recentSearches = await many<{ query: string; query_type: string; count: string }>(
-      `SELECT query, query_type, COUNT(*) AS count FROM search_history
-       WHERE created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY query, query_type ORDER BY count DESC LIMIT 10`
-    );
-
-    const dailySearches = await many<{ day: string; count: string }>(
-      `SELECT DATE(created_at) AS day, COUNT(*) AS count
-       FROM search_history WHERE created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY day ORDER BY day ASC`
-    );
 
     const dbOk = !!users;
 

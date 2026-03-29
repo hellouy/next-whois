@@ -39,22 +39,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
       params.push(limit, offset);
-
-      const users = await many(q, params);
-
       const countParams = params.slice(0, params.length - 2);
-      const countRow = await one<{ count: string }>(
-        `SELECT COUNT(*) AS count FROM users u${where}`,
-        countParams.length ? countParams : undefined
-      );
-      const total = parseInt(countRow?.count ?? "0");
 
-      const [disabledRow, activeRow, subscribedRow, verifiedRow] = await Promise.all([
+      const [users, countRow, disabledRow, activeRow, subscribedRow, verifiedRow] = await Promise.all([
+        many(q, params),
+        one<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM users u${where}`,
+          countParams.length ? countParams : undefined
+        ),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE disabled = true"),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE disabled = false"),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE subscription_access = true"),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE email_verified = true"),
       ]);
+      const total = parseInt(countRow?.count ?? "0");
 
       return res.json({
         users,

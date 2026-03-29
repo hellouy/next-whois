@@ -51,17 +51,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     const creatorId = adminUser?.id ?? null;
 
-    const created: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const code = genActivationCode();
-      await run(
+    const created = Array.from({ length: count }, () => genActivationCode());
+    await Promise.all(created.map(code =>
+      run(
         `INSERT INTO activation_codes
            (code, plan_name, duration_days, grants_subscription, balance_grant_cents, note, created_by, expires_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [code, planName, durationDays, grantsSubscription, balanceGrantCents, note, creatorId, expiresAt]
-      );
-      created.push(code);
-    }
+      )
+    ));
     return res.json({ created });
   }
 

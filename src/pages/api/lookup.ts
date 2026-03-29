@@ -74,17 +74,15 @@ export default async function handler(
     return res.status(400).json({ time: -1, status: false, error: "Invalid characters in query" });
   }
 
-  // Fetch session once — used for require_login check and search record tracking
-  let userId: string | null = null;
-  let userEmail: string | null = null;
-  try {
-    const session = await getServerSession(req, res, authOptions);
-    userId    = (session?.user as any)?.id    ?? null;
-    userEmail = session?.user?.email ?? null;
-  } catch {}
+  // Fetch session + require_login setting in parallel — both are independent
+  const [session, requireLogin] = await Promise.all([
+    getServerSession(req, res, authOptions).catch(() => null),
+    getSetting("require_login"),
+  ]);
+  const userId    = (session?.user as any)?.id    ?? null;
+  const userEmail = session?.user?.email           ?? null;
 
   // require_login: if enabled, deny anonymous lookups
-  const requireLogin = await getSetting("require_login");
   if (requireLogin === "1" && !userEmail) {
     return res.status(401).json({ time: -1, status: false, error: "请先登录后再进行查询" });
   }

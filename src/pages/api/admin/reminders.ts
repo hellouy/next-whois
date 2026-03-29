@@ -41,16 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                  ORDER BY r.created_at DESC
                  LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
-      const reminders = await many(q, params);
-
       const countParams = params.slice(0, params.length - 2);
-      const countRow = await one<{ count: string }>(
-        `SELECT COUNT(*) AS count FROM reminders r LEFT JOIN tld_rules tr ON tr.tld = LOWER(REVERSE(SPLIT_PART(REVERSE(r.domain), '.', 1)))${where}`,
-        countParams.length ? countParams : undefined
-      );
-      const total = parseInt(countRow?.count ?? "0");
 
-      const [activeCount, inactiveCount, reviewCount] = await Promise.all([
+      const [reminders, countRow, activeCount, inactiveCount, reviewCount] = await Promise.all([
+        many(q, params),
+        one<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM reminders r LEFT JOIN tld_rules tr ON tr.tld = LOWER(REVERSE(SPLIT_PART(REVERSE(r.domain), '.', 1)))${where}`,
+          countParams.length ? countParams : undefined
+        ),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM reminders WHERE active = true"),
         one<{ count: string }>("SELECT COUNT(*) AS count FROM reminders WHERE active = false"),
         one<{ count: string }>(
@@ -60,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               OR tr.scrape_status IN ('pending','failed','warn_defaults','no_data')`
         ),
       ]);
+      const total = parseInt(countRow?.count ?? "0");
 
       return res.json({
         reminders, total,

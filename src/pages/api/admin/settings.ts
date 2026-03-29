@@ -94,19 +94,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const body = req.body as Partial<SiteSettings>;
     try {
-      const allowed = Object.keys(DEFAULT_SETTINGS) as (keyof SiteSettings)[];
-      let updated = 0;
-      for (const key of allowed) {
-        if (!(key in body)) continue;
-        await run(
-          `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-           ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-          [key, String(body[key] ?? "")]
-        );
-        updated++;
+      const keys = (Object.keys(DEFAULT_SETTINGS) as (keyof SiteSettings)[]).filter(k => k in body);
+      if (keys.length > 0) {
+        await Promise.all(keys.map(key =>
+          run(
+            `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+            [key, String(body[key] ?? "")]
+          )
+        ));
       }
       invalidateCache();
-      return res.json({ ok: true, updated });
+      return res.json({ ok: true, updated: keys.length });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

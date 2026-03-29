@@ -188,12 +188,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ),
     ]);
 
-    // ── Stats: all counts on raw table (or DISTINCT ON for anon/logged) ───────
+    // ── Stats + chart data — all queries run in parallel ─────────────────────
     const [
       allCount, todayCount, availableCount, expiringCount,
       highValueCount, registeredCount, totalEventsCount,
-      uniqueUsersCount,
-      anonCount, loggedCount,
+      uniqueUsersCount, anonCount, loggedCount,
+      dailyStats, topQueries, topByType, topUsers,
     ] = await Promise.all([
       one<{ count: string }>("SELECT COUNT(DISTINCT LOWER(query)) AS count FROM search_history"),
       one<{ count: string }>("SELECT COUNT(DISTINCT LOWER(query)) AS count FROM search_history WHERE created_at >= NOW() - INTERVAL '1 day'"),
@@ -203,49 +203,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ count: string }>("SELECT COUNT(DISTINCT LOWER(query)) AS count FROM search_history WHERE query_type = 'domain' AND reg_status = 'registered'"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history"),
       one<{ count: string }>("SELECT COUNT(DISTINCT user_id) AS count FROM search_history WHERE user_id IS NOT NULL"),
-      // anon/logged: total raw event counts (not distinct domains)
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE user_id IS NULL"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE user_id IS NOT NULL"),
+      many<{ day: string; count: string; available: string; registered: string; anon: string; logged: string }>(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS count,
+           COUNT(*) FILTER (WHERE reg_status = 'unregistered') AS available,
+           COUNT(*) FILTER (WHERE reg_status = 'registered')   AS registered,
+           COUNT(*) FILTER (WHERE user_id IS NULL)             AS anon,
+           COUNT(*) FILTER (WHERE user_id IS NOT NULL)         AS logged
+         FROM search_history
+         WHERE created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY day ORDER BY day ASC`,
+      ),
+      many<{ query: string; query_type: string; count: string }>(
+        `SELECT query, query_type, COUNT(*) AS count
+         FROM search_history
+         WHERE created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY query, query_type ORDER BY count DESC LIMIT 10`,
+      ),
+      many<{ query_type: string; count: string }>(
+        `SELECT query_type, COUNT(DISTINCT LOWER(query)) AS count
+         FROM search_history GROUP BY query_type ORDER BY count DESC`,
+      ),
+      many<{ user_email: string; user_name: string | null; count: string }>(
+        `SELECT u.email AS user_email, u.name AS user_name, COUNT(*) AS count
+         FROM search_history sh
+         JOIN users u ON sh.user_id = u.id
+         WHERE sh.created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY u.email, u.name ORDER BY count DESC LIMIT 10`,
+      ),
     ]);
-
-    // ── Daily stats (30 days) ─────────────────────────────────────────────────
-    const dailyStats = await many<{
-      day: string; count: string; available: string; registered: string; anon: string; logged: string;
-    }>(
-      `SELECT
-         DATE(created_at) AS day,
-         COUNT(*) AS count,
-         COUNT(*) FILTER (WHERE reg_status = 'unregistered') AS available,
-         COUNT(*) FILTER (WHERE reg_status = 'registered')   AS registered,
-         COUNT(*) FILTER (WHERE user_id IS NULL)             AS anon,
-         COUNT(*) FILTER (WHERE user_id IS NOT NULL)         AS logged
-       FROM search_history
-       WHERE created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY day ORDER BY day ASC`,
-    );
-
-    // ── Top queries (30 days, by total search count) ──────────────────────────
-    const topQueries = await many<{ query: string; query_type: string; count: string }>(
-      `SELECT query, query_type, COUNT(*) AS count
-       FROM search_history
-       WHERE created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY query, query_type ORDER BY count DESC LIMIT 10`,
-    );
-
-    // ── Top query types ───────────────────────────────────────────────────────
-    const topByType = await many<{ query_type: string; count: string }>(
-      `SELECT query_type, COUNT(DISTINCT LOWER(query)) AS count
-       FROM search_history GROUP BY query_type ORDER BY count DESC`,
-    );
-
-    // ── Most active users (30 days) ───────────────────────────────────────────
-    const topUsers = await many<{ user_email: string; user_name: string | null; count: string }>(
-      `SELECT u.email AS user_email, u.name AS user_name, COUNT(*) AS count
-       FROM search_history sh
-       JOIN users u ON sh.user_id = u.id
-       WHERE sh.created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY u.email, u.name ORDER BY count DESC LIMIT 10`,
-    );
 
     const records = rows.map(r => ({
       query:            r.query as string,

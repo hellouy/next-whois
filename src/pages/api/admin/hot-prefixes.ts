@@ -156,18 +156,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Seed action
     if (action === "seed") {
-      let seeded = 0;
-      for (const p of SEED_PREFIXES) {
-        try {
-          await run(
+      const results = await Promise.allSettled(
+        SEED_PREFIXES.map(p =>
+          run(
             `INSERT INTO hot_prefixes (prefix, category, weight, source, sale_examples, notes)
              VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (prefix) DO NOTHING`,
             [p.prefix, p.category, p.weight, p.source, p.sale_examples ?? null, p.notes ?? null],
-          );
-          seeded++;
-        } catch { /* ignore duplicate */ }
-      }
+          )
+        )
+      );
+      const seeded = results.filter(r => r.status === "fulfilled").length;
       await invalidateCache();
       return res.status(200).json({ ok: true, seeded });
     }
@@ -191,11 +190,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     sql += ` ORDER BY weight DESC, prefix ASC`;
 
-    const rows = await many(sql, params);
-    const total = await one<{ count: string }>(`SELECT COUNT(*) AS count FROM hot_prefixes`, []);
-    const categories = await many<{ category: string; cnt: string }>(
-      `SELECT category, COUNT(*) AS cnt FROM hot_prefixes GROUP BY category ORDER BY cnt DESC`, []
-    );
+    const [rows, total, categories] = await Promise.all([
+      many(sql, params),
+      one<{ count: string }>(`SELECT COUNT(*) AS count FROM hot_prefixes`, []),
+      many<{ category: string; cnt: string }>(
+        `SELECT category, COUNT(*) AS cnt FROM hot_prefixes GROUP BY category ORDER BY cnt DESC`, []
+      ),
+    ]);
     return res.status(200).json({ prefixes: rows, total: parseInt(total?.count ?? "0"), categories });
   }
 

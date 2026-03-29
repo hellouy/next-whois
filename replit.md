@@ -1,5 +1,31 @@
 # Next Whois UI — v3.23
 
+## Performance & Code Quality Audit (2026-03-29)
+
+### Parallelized DB Queries (Sequential → `Promise.all`)
+Every admin and user-facing API that previously fired DB queries one-by-one was updated to run all independent queries concurrently:
+
+| File | Before | After |
+|---|---|---|
+| `api/lookup.ts` | `getServerSession` then `getSetting` | Both in `Promise.all` |
+| `api/admin/settings.ts` PUT | `for` loop (1 query/key) | `Promise.all` (all keys) |
+| `api/admin/invite-codes.ts` POST | `for` loop (1 insert/code) | `Promise.all` (all codes) |
+| `api/admin/activation-codes.ts` POST | `for` loop (1 insert/code) | `Promise.all` (all codes) |
+| `api/admin/system.ts` GET | 9 `Promise.all` + 2 sequential | All 11 in one `Promise.all` |
+| `api/admin/system.ts` db_optimize | 7 sequential DELETEs | 7 parallel DELETEs |
+| `api/admin/db-export.ts` | Sequential per-table COUNT + SELECT | `Promise.all` for all tables |
+| `api/admin/hot-prefixes.ts` GET | 3 sequential queries | `Promise.all` |
+| `api/admin/hot-prefixes.ts` seed | `for` loop | `Promise.allSettled` |
+| `api/admin/search-records.ts` | 4 sequential queries after `Promise.all` | All merged into one `Promise.all` |
+| `api/admin/reminders.ts` GET | list + count + 3 filter counts sequential | All 5 in `Promise.all` |
+| `api/admin/users.ts` GET | list + count + 4 filter counts sequential | All 6 in `Promise.all` |
+
+### Cache Headers Added
+- `api/dns/records.ts` — changed `no-store` → `public, s-maxage=30, stale-while-revalidate=60` (DNS results are domain-scoped, not user-scoped)
+- `api/dns/txt.ts` — same improvement
+
+### TypeScript: 0 errors throughout (verified after all changes)
+
 ## Replit Environment Setup (2026-03-27)
 
 ### Secrets Configured

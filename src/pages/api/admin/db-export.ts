@@ -36,16 +36,16 @@ const TABLES: { name: string; label: string; ephemeral?: boolean }[] = [
 
 export async function getTableStats(db: Awaited<ReturnType<typeof getDbReady>>) {
   if (!db) return [];
-  const stats: { name: string; label: string; count: number; ephemeral?: boolean }[] = [];
-  for (const t of TABLES) {
-    try {
-      const r = await db.query(`SELECT COUNT(*)::int AS n FROM ${t.name}`);
-      stats.push({ name: t.name, label: t.label, count: r.rows[0]?.n ?? 0, ephemeral: t.ephemeral });
-    } catch {
-      stats.push({ name: t.name, label: t.label, count: -1, ephemeral: t.ephemeral });
-    }
-  }
-  return stats;
+  return Promise.all(
+    TABLES.map(async (t) => {
+      try {
+        const r = await db.query(`SELECT COUNT(*)::int AS n FROM ${t.name}`);
+        return { name: t.name, label: t.label, count: r.rows[0]?.n ?? 0, ephemeral: t.ephemeral };
+      } catch {
+        return { name: t.name, label: t.label, count: -1, ephemeral: t.ephemeral };
+      }
+    })
+  );
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -69,16 +69,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const meta: Record<string, { count: number; error?: string }> = {};
   const exportTables = skipEphemeral ? TABLES.filter(t => !t.ephemeral) : TABLES;
 
-  for (const t of exportTables) {
+  await Promise.all(exportTables.map(async (t) => {
     try {
       const r = await db.query(`SELECT * FROM ${t.name} ORDER BY 1`);
       exportData[t.name] = r.rows;
       meta[t.name] = { count: r.rows.length };
     } catch (e: any) {
       exportData[t.name] = [];
-      meta[t.name] = { count: 0, error: e.message };
+      meta[t.name] = { count: 0, error: (e as Error).message };
     }
-  }
+  }));
 
   const payload = {
     exported_at: new Date().toISOString(),

@@ -44,17 +44,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expires_at = parseExpiresAt(req.body.expires_in);
     const adminUser = await one<{ id: string }>("SELECT id FROM users WHERE email = $1", [(session.user as any).email]);
     const creatorId = adminUser?.id ?? null;
-    const created: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const id = randomBytes(8).toString("hex");
-      const code = genCode();
-      await run(
+    const records = Array.from({ length: count }, () => ({
+      id: randomBytes(8).toString("hex"),
+      code: genCode(),
+    }));
+    await Promise.all(records.map(({ id, code }) =>
+      run(
         "INSERT INTO invite_codes (id, code, description, max_uses, created_by, expires_at) VALUES ($1, $2, $3, $4, $5, $6)",
         [id, code, description, max_uses, creatorId, expires_at]
-      );
-      created.push(code);
-    }
-    return res.json({ created });
+      )
+    ));
+    return res.json({ created: records.map(r => r.code) });
   }
 
   if (req.method === "PATCH") {

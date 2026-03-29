@@ -142,7 +142,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     allFlat.splice(0, allFlat.length, ...paired.map(p => p.f));
   }
 
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
   return res.status(200).json({
     name, type,
     found: allFlat.length > 0,

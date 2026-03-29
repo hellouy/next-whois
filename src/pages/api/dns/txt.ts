@@ -110,7 +110,7 @@ export default async function handler(
 
   const found = allFlat.length > 0;
 
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
   return res.status(200).json({
     name, found, records: allRecords, flat: allFlat, resolvers, latencyMs: Date.now() - t0,
   });
