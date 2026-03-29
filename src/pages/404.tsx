@@ -318,14 +318,26 @@ export default function NotFoundPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ delay: 0.3, duration: 0.3 }}
-                  className="mt-5 px-3 py-2 rounded-lg bg-violet-500/8 border border-violet-500/20 flex items-center gap-2"
+                  className="mt-5 rounded-xl border border-emerald-500/25 bg-emerald-500/6 overflow-hidden"
                 >
-                  <span className="text-[11px] text-violet-500 dark:text-violet-400 font-medium">
-                    {t("not_found.domain_hint")}
-                  </span>
-                  <code className="text-[11px] font-mono text-violet-600 dark:text-violet-300 bg-violet-500/10 px-1.5 py-0.5 rounded">
-                    {rawPath}
-                  </code>
+                  <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <RiGlobalLine className="w-4 h-4 text-emerald-500/70 shrink-0" />
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {t("not_found.domain_hint")}
+                      </span>
+                      <code className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
+                        {rawPath}
+                      </code>
+                    </div>
+                    <Link
+                      href={`/${encodeURIComponent(rawPath)}`}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shrink-0"
+                    >
+                      <RiSearchLine className="w-3.5 h-3.5" />
+                      {t("not_found.search_btn")} {rawPath}
+                    </Link>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

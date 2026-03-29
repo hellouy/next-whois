@@ -1,6 +1,6 @@
 import { run, many, isDbReady } from "@/lib/db-query";
 
-const FALLBACK_THRESHOLD = 3;
+const FALLBACK_THRESHOLD = 2;
 
 function extractTld(domain: string): string {
   const parts = domain.toLowerCase().split(".");

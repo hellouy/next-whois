@@ -3952,9 +3952,38 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground/50 text-center py-5">
-            {isZh ? "暂无价格数据" : "No pricing data available"}
-          </p>
+          <div className="px-4 sm:px-5 pb-4 pt-1">
+            <p className="text-[10px] text-muted-foreground/40 mb-3 text-center">
+              {isZh ? "暂无聚合价格数据，可直接前往以下注册商查询" : "No aggregated price data — search directly on these registrars"}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Namecheap", color: "#de3723", logo: "namecheap.com", url: `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}` },
+                { name: "GoDaddy",   color: "#1bdbdb", logo: "godaddy.com",   url: `https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(domain)}` },
+                { name: "Porkbun",   color: "#f76b8a", logo: "porkbun.com",   url: `https://porkbun.com/checkout/search?q=${encodeURIComponent(domain)}` },
+                { name: "Dynadot",   color: "#4e2998", logo: "dynadot.com",   url: `https://www.dynadot.com/domain/search.html?domain=${encodeURIComponent(domain)}` },
+                { name: "Cloudflare",color: "#f48120", logo: "cloudflare.com",url: `https://www.cloudflare.com/products/registrar/` },
+                { name: "Name.com",  color: "#0066cc", logo: "name.com",      url: `https://www.name.com/domain/search?search=${encodeURIComponent(domain)}` },
+              ].map(reg => (
+                <a
+                  key={reg.name}
+                  href={reg.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-border/50 hover:border-primary/30 hover:bg-muted/40 transition-all group"
+                >
+                  <DomainFavicon
+                    domain={reg.logo}
+                    size={16}
+                    className="w-4 h-4 rounded-sm shrink-0"
+                    fallback={<RiGlobalLine className="w-4 h-4 text-muted-foreground/50 shrink-0" />}
+                  />
+                  <span className="text-xs font-medium text-foreground/80 group-hover:text-foreground transition-colors truncate flex-1">{reg.name}</span>
+                  <RiExternalLinkLine className="w-3 h-3 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
+                </a>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Renewal prices */}

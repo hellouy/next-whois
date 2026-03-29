@@ -779,9 +779,9 @@ const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 2_500);
 
 // How long to wait for native lookups before starting third-party fallbacks
 // in parallel.  Set shorter than WHOIS_TIMEOUT so that slow WHOIS servers
-// don't block the response: fallbacks start racing at t=500 ms while WHOIS
+// don't block the response: fallbacks start racing at t=300 ms while WHOIS
 // TCP is still open, whichever responds first wins.
-const FALLBACK_START_MS = intEnv("FALLBACK_START_MS", 500);
+const FALLBACK_START_MS = intEnv("FALLBACK_START_MS", 300);
 
 // For rdapIsDirect ccTLDs: WHOIS is normally skipped from the race entirely
 // so a fast RDAP response costs zero extra TCP connections.  But on cold starts

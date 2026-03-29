@@ -424,23 +424,38 @@ async function findLifecyclePage(registryUrl) {
     }
   }
 
-  // ── Strategy C: Probe common paths ──────────────────────────────────────
-  for (const path of PROBE_PATHS) {
-    const url = origin + path;
-    try {
-      const html = await fetchRaw(url, 10000);
-      const text = extractText(html);
-      if (hasLifecycleInfo(text)) return { url, text };
-    } catch { /**/ }
+  // ── Strategy C: Probe common paths (parallel batches) ──────────────────
+  const BATCH_C = 6;
+  for (let i = 0; i < PROBE_PATHS.length; i += BATCH_C) {
+    const batch = PROBE_PATHS.slice(i, i + BATCH_C);
+    const results = await Promise.allSettled(
+      batch.map(async (path) => {
+        const url = origin + path;
+        const html = await fetchRaw(url, 5000);
+        const text = extractText(html);
+        if (!hasLifecycleInfo(text)) throw new Error("no lifecycle info");
+        return { url, text };
+      })
+    );
+    const hit = results.find(r => r.status === "fulfilled");
+    if (hit) return hit.value;
   }
 
-  // ── Strategy D: Probe via Jina ───────────────────────────────────────────
-  for (const path of PROBE_PATHS.slice(0, 20)) {
-    const url = origin + path;
-    try {
-      const text = await fetchViaJina(url, 20000);
-      if (hasLifecycleInfo(text)) return { url, text: text.slice(0, 12000) };
-    } catch { /**/ }
+  // ── Strategy D: Probe via Jina (parallel batches) ────────────────────────
+  const BATCH_D = 4;
+  const jina_paths = PROBE_PATHS.slice(0, 20);
+  for (let i = 0; i < jina_paths.length; i += BATCH_D) {
+    const batch = jina_paths.slice(i, i + BATCH_D);
+    const results = await Promise.allSettled(
+      batch.map(async (path) => {
+        const url = origin + path;
+        const text = await fetchViaJina(url, 12000);
+        if (!hasLifecycleInfo(text)) throw new Error("no lifecycle info");
+        return { url, text: text.slice(0, 12000) };
+      })
+    );
+    const hit = results.find(r => r.status === "fulfilled");
+    if (hit) return hit.value;
   }
 
   return null;
