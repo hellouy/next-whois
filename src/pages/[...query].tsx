@@ -4014,80 +4014,6 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
   );
 }
 
-function ResultSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-6 mt-6">
-      <div className="text-center py-6">
-        <span className="text-shimmer text-base font-semibold tracking-wide select-none">
-          {t("loading_text")}
-        </span>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-6">
-          <div className="glass-panel border border-border rounded-xl p-6 sm:p-8 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="space-y-3 flex-1">
-                <div className="h-5 w-16 rounded-md bg-muted animate-pulse" />
-                <div className="h-9 w-48 rounded-md bg-muted animate-pulse" />
-                <div className="h-4 w-64 rounded-md bg-muted/70 animate-pulse" />
-              </div>
-              <div className="flex flex-col items-start sm:items-end gap-2">
-                <div className="h-6 w-20 rounded-full bg-muted animate-pulse" />
-                <div className="h-3 w-24 rounded-md bg-muted/60 animate-pulse" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mt-8 pt-8 border-t border-border/50">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="space-y-1.5">
-                  <div className="h-3 w-20 rounded bg-muted/60 animate-pulse" />
-                  <div className="h-4 w-28 rounded bg-muted animate-pulse" />
-                  <div className="h-3 w-16 rounded bg-muted/50 animate-pulse" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="glass-panel border border-border rounded-xl p-6">
-            <div className="h-4 w-24 rounded bg-muted/70 animate-pulse mb-4" />
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-muted animate-pulse shrink-0" />
-                  <div className="h-4 w-40 rounded bg-muted animate-pulse" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="glass-panel border border-border rounded-xl p-6">
-            <div className="h-4 w-28 rounded bg-muted/70 animate-pulse mb-4" />
-            <div className="space-y-2">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-4 w-52 rounded bg-muted animate-pulse" />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="hidden lg:block lg:col-span-4">
-          <div className="glass-panel border border-border rounded-xl p-6 h-64 flex flex-col gap-3">
-            <div className="h-4 w-24 rounded bg-muted/70 animate-pulse" />
-            <div className="flex-1 space-y-2">
-              {[85, 72, 90, 65, 80, 70].map((w, i) => (
-                <div
-                  key={i}
-                  className="h-3 rounded bg-muted/50 animate-pulse"
-                  style={{ width: `${w}%` }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const _EMPTY_WHOIS_RESULT: WhoisResult = {
   status: false,
@@ -4701,27 +4627,10 @@ export default function LookupPage({
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
 
-          {/* Result is always in the layout flow — skeleton overlays it as an
-              absolute layer only during the very first load so there is no
-              key-switch, no layout-height jump, no visible "跳一下". */}
-          <div className={cn("relative", loading && data.time === 0 && "min-h-[520px]")}>
-            <AnimatePresence>
-              {loading && data.time === 0 && (
-                <motion.div
-                  key="skeleton"
-                  className="absolute inset-x-0 top-0 z-10"
-                  initial={{ opacity: 1 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                >
-                  <ResultSkeleton />
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <div className="relative">
             <motion.div
-              animate={{ opacity: loading && data.time === 0 ? 0 : (loading ? 0.82 : 1) }}
-              transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              animate={{ opacity: loading ? 0.82 : 1 }}
+              transition={{ duration: 0.12, ease: [0.22, 1, 0.36, 1] }}
               style={{ pointerEvents: loading ? "none" : undefined, willChange: "opacity" }}
             >
 
