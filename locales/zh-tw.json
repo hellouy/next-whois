@@ -1086,7 +1086,10 @@
     "no": "否",
     "footer": "歸屬地由 ip-api.com 提供；RDAP 資料來自 ARIN/RIPE/APNIC 官方介面。代理偵測僅供參考。",
     "feedback": "意見回饋",
-    "copy": "複製"
+    "copy": "複製",
+    "cidr": "網路前綴 (CIDR)",
+    "abuse_section": "濫用聯絡人",
+    "abuse_email": "濫用舉報郵箱"
   },
   "ssl": {
     "title": "SSL 憑證查詢",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "直連偵測，資料不快取",
     "footer_tech": "Node.js TLS · 無第三方依賴",
     "feedback": "意見回饋",
-    "copy": "複製"
+    "copy": "複製",
+    "key_info": "公鑰演算法",
+    "cipher": "加密套件",
+    "ct_logs": "憑證透明度"
   },
   "dns": {
     "title": "DNS 查詢",
-    "subtitle": "4×DoH 並行 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH 並行 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "查詢",
     "shortcuts": "快捷：",
     "record_types": "記錄類型：",
@@ -1140,8 +1146,8 @@
     "preset_ns": "網域名稱服務器",
     "preset_caa": "憑證授權",
     "loading": "4×DoH 並行查詢中…",
-    "empty_title": "輸入網域，查詢任意 DNS 記錄",
-    "empty_subtitle": "支援 A · AAAA · MX · NS · CNAME · TXT · SOA · CAA",
+    "empty_title": "輸入域名或 IP，查詢任意 DNS 記錄",
+    "empty_subtitle": "支援 A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXT 自動識別 SPF / DMARC / DKIM / BIMI",
     "err_empty": "請輸入網域",
     "err_failed": "查詢失敗",
@@ -1177,7 +1183,8 @@
     "soa_retry": "重試間隔",
     "soa_expire": "過期時間",
     "has_record": "{{n}} 條 · {{ms}}ms",
-    "copy": "複製"
+    "copy": "複製",
+    "preset_ptr": "PTR 反向解析"
   },
   "payment": {
     "checkout_title": "購買方案",

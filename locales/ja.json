@@ -1086,7 +1086,10 @@
     "no": "いいえ",
     "footer": "ロケーション提供: ip-api.com · RDAP: ARIN/RIPE/APNIC · プロキシ検出は参考情報です。",
     "feedback": "フィードバック",
-    "copy": "コピー"
+    "copy": "コピー",
+    "cidr": "ネットワークプレフィックス (CIDR)",
+    "abuse_section": "不正使用連絡先",
+    "abuse_email": "不正使用報告メール"
   },
   "ssl": {
     "title": "SSL証明書確認",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "ライブ確認、データはキャッシュされません",
     "footer_tech": "Node.js TLS · サードパーティ依存なし",
     "feedback": "フィードバック",
-    "copy": "コピー"
+    "copy": "コピー",
+    "key_info": "公開鍵",
+    "cipher": "暗号スイート",
+    "ct_logs": "CT ログ"
   },
   "dns": {
     "title": "DNS検索",
-    "subtitle": "4×DoH並列 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH 並列 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "検索",
     "shortcuts": "ショートカット：",
     "record_types": "レコードタイプ：",
@@ -1140,8 +1146,8 @@
     "preset_ns": "ネームサーバー",
     "preset_caa": "証明書認証",
     "loading": "4×DoH並列クエリ中…",
-    "empty_title": "ドメインを入力してDNSレコードを照会",
-    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA に対応",
+    "empty_title": "ドメインまたはIPを入力してDNSレコードを照会",
+    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXTはSPF / DMARC / DKIM / BIMIを自動検出",
     "err_empty": "ドメインを入力してください",
     "err_failed": "クエリに失敗しました",
@@ -1177,7 +1183,8 @@
     "soa_retry": "再試行間隔",
     "soa_expire": "期限切れ時間",
     "has_record": "{{n}} 件 · {{ms}}ms",
-    "copy": "コピー"
+    "copy": "コピー",
+    "preset_ptr": "PTR 逆引き"
   },
   "payment": {
     "checkout_title": "プランをアップグレード",

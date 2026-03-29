@@ -46,6 +46,17 @@ type IpResult = {
   error?: string;
 };
 
+function AbuseTag({ email }: { email: string }) {
+  return (
+    <a
+      href={`mailto:${email}`}
+      className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:underline break-all"
+    >
+      {email}
+    </a>
+  );
+}
+
 function CopyButton({ text, copyLabel }: { text: string; copyLabel: string }) {
   const [copied, setCopied] = React.useState(false);
   return (
@@ -325,8 +336,24 @@ export default function IpPage() {
                         <InfoRow label="ASN" value={result!.as} mono copyLabel={copyLabel} />
                         <InfoRow label={t("ip.asn_name")} value={result!.asname} copyLabel={copyLabel} />
                         <InfoRow label={t("ip.reverse_dns")} value={result!.reverse} mono copyLabel={copyLabel} />
+                        {result!.rdap?.cidr && (
+                          <InfoRow label={t("ip.cidr")} value={result!.rdap.cidr} mono copyLabel={copyLabel} />
+                        )}
                       </div>
                     </div>
+
+                    {result!.rdap?.abuse_email && (
+                      <div className="glass-panel border border-red-200 dark:border-red-900/60 rounded-2xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-red-200/60 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 flex items-center gap-2">
+                          <RiShieldLine className="w-3.5 h-3.5 text-red-500" />
+                          <h3 className="text-sm font-bold text-red-700 dark:text-red-400">{t("ip.abuse_section")}</h3>
+                        </div>
+                        <div className="px-5 py-3 flex items-start gap-3">
+                          <span className="text-xs text-muted-foreground w-24 shrink-0 pt-0.5">{t("ip.abuse_email")}</span>
+                          <AbuseTag email={result!.rdap.abuse_email} />
+                        </div>
+                      </div>
+                    )}
 
                     {result!.timezone && (
                       <div className="glass-panel border border-border rounded-2xl overflow-hidden">

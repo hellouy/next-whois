@@ -1086,7 +1086,10 @@
     "no": "Non",
     "footer": "Localisation par ip-api.com · RDAP par ARIN/RIPE/APNIC · La détection de proxy est indicative.",
     "feedback": "Commentaires",
-    "copy": "Copier"
+    "copy": "Copier",
+    "cidr": "Préfixe réseau (CIDR)",
+    "abuse_section": "Contact Abus",
+    "abuse_email": "E-mail Abus"
   },
   "ssl": {
     "title": "Vérification certificat SSL",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "Vérification en direct, données non mises en cache",
     "footer_tech": "Node.js TLS · Aucune dépendance tierce",
     "feedback": "Commentaires",
-    "copy": "Copier"
+    "copy": "Copier",
+    "key_info": "Clé publique",
+    "cipher": "Suite de chiffrement",
+    "ct_logs": "Journaux CT"
   },
   "dns": {
     "title": "Recherche DNS",
-    "subtitle": "4×DoH en parallèle · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH Parallèle · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "Rechercher",
     "shortcuts": "Raccourcis :",
     "record_types": "Types d'enregistrements :",
@@ -1140,8 +1146,8 @@
     "preset_ns": "Serveurs de noms",
     "preset_caa": "Autorisation cert.",
     "loading": "Requête parallèle 4×DoH en cours…",
-    "empty_title": "Entrez un domaine pour interroger les enregistrements DNS",
-    "empty_subtitle": "Supporte A · AAAA · MX · NS · CNAME · TXT · SOA · CAA",
+    "empty_title": "Saisissez un domaine ou IP",
+    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXT détecte automatiquement SPF / DMARC / DKIM / BIMI",
     "err_empty": "Veuillez entrer un domaine",
     "err_failed": "Recherche échouée",
@@ -1177,7 +1183,8 @@
     "soa_retry": "Intervalle de retry",
     "soa_expire": "Temps d'expiration",
     "has_record": "{{n}} enregistrements · {{ms}}ms",
-    "copy": "Copier"
+    "copy": "Copier",
+    "preset_ptr": "PTR Inverse"
   },
   "payment": {
     "checkout_title": "Mettre à niveau",

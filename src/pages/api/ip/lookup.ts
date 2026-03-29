@@ -11,7 +11,6 @@ const IPV6_RE = /^[0-9a-fA-F:]+:[0-9a-fA-F:]+$/;
 const ASN_RE = /^as?(\d+)$/i;
 
 async function resolveHostname(host: string): Promise<string | null> {
-  // Use DoH to avoid UDP port 53 blocks in serverless environments
   const url = `https://dns.google/resolve?name=${encodeURIComponent(host)}&type=A`;
   try {
     const r = await fetch(url, {
@@ -22,7 +21,6 @@ async function resolveHostname(host: string): Promise<string | null> {
     const data = await r.json();
     const answer = (data.Answer as any[] | undefined)?.find((a: any) => a.type === 1);
     if (answer?.data) return answer.data as string;
-    // fallback: try AAAA
     const url6 = `https://dns.google/resolve?name=${encodeURIComponent(host)}&type=AAAA`;
     const r6 = await fetch(url6, { headers: { Accept: "application/dns-json" }, signal: AbortSignal.timeout(4000) });
     if (!r6.ok) return null;
@@ -50,6 +48,8 @@ async function fetchRdapIp(ip: string): Promise<any> {
     `https://rdap.arin.net/registry/ip/${ip}`,
     `https://rdap.db.ripe.net/ip/${ip}`,
     `https://rdap.apnic.net/ip/${ip}`,
+    `https://rdap.lacnic.net/rdap/ip/${ip}`,
+    `https://rdap.afrinic.net/rdap/ip/${ip}`,
   ];
   for (const url of endpoints) {
     try {
@@ -83,31 +83,61 @@ async function fetchRdapAsn(asn: number): Promise<any> {
   return null;
 }
 
+function extractVcard(vcardArray: any[]): { name?: string; org?: string; email?: string } {
+  const result: { name?: string; org?: string; email?: string } = {};
+  const items: any[] = vcardArray?.[1] ?? [];
+  for (const item of items) {
+    if (item[0] === "fn"  && !result.name)  result.name  = item[3];
+    if (item[0] === "org" && !result.org)   result.org   = typeof item[3] === "string" ? item[3] : item[3]?.[0];
+    if (item[0] === "email" && !result.email) result.email = item[3];
+  }
+  return result;
+}
+
 function extractRdapInfo(rdap: any): Record<string, string> {
   if (!rdap) return {};
   const info: Record<string, string> = {};
-  if (rdap.name) info.name = rdap.name;
-  if (rdap.handle) info.handle = rdap.handle;
-  if (rdap.type) info.type = rdap.type;
-  if (rdap.startAutnum) info.startAutnum = String(rdap.startAutnum);
-  if (rdap.endAutnum) info.endAutnum = String(rdap.endAutnum);
+
+  if (rdap.name)         info.name         = rdap.name;
+  if (rdap.handle)       info.handle       = rdap.handle;
+  if (rdap.type)         info.type         = rdap.type;
+  if (rdap.startAutnum)  info.startAutnum  = String(rdap.startAutnum);
+  if (rdap.endAutnum)    info.endAutnum    = String(rdap.endAutnum);
   if (rdap.startAddress) info.startAddress = rdap.startAddress;
-  if (rdap.endAddress) info.endAddress = rdap.endAddress;
-  if (rdap.ipVersion) info.ipVersion = rdap.ipVersion;
+  if (rdap.endAddress)   info.endAddress   = rdap.endAddress;
+  if (rdap.ipVersion)    info.ipVersion    = rdap.ipVersion;
+
+  // CIDR prefix from cidr0_cidrs extension (RFC 8045)
+  const cidrs: any[] = rdap.cidr0_cidrs ?? [];
+  if (cidrs.length > 0) {
+    const c = cidrs[0];
+    if (c.v4prefix) info.cidr = `${c.v4prefix}/${c.length}`;
+    else if (c.v6prefix) info.cidr = `${c.v6prefix}/${c.length}`;
+  }
+
   const entities: any[] = rdap.entities || [];
   for (const e of entities) {
-    if (e.roles?.includes("registrant") || e.roles?.includes("administrative")) {
-      const vcard = e.vcardArray?.[1] || [];
-      for (const item of vcard) {
-        if (item[0] === "fn") info.contact_name = item[3];
-        if (item[0] === "org") info.contact_org = item[3];
-        if (item[0] === "email") info.contact_email = item[3];
-      }
+    const roles: string[] = e.roles ?? [];
+
+    if (roles.includes("registrant") || roles.includes("administrative")) {
+      const vc = extractVcard(e.vcardArray);
+      if (vc.name && !info.contact_name)  info.contact_name  = vc.name;
+      if (vc.org  && !info.contact_org)   info.contact_org   = vc.org;
+      if (vc.email && !info.contact_email) info.contact_email = vc.email;
+    }
+
+    if (roles.includes("abuse")) {
+      const vc = extractVcard(e.vcardArray);
+      if (vc.email && !info.abuse_email) info.abuse_email = vc.email;
+      if (vc.name  && !info.abuse_name)  info.abuse_name  = vc.name;
     }
   }
+
   const remarks: any[] = rdap.remarks || [];
   for (const r of remarks) {
-    if (r.description) info.description = Array.isArray(r.description) ? r.description.join(" ") : r.description;
+    if (r.description) {
+      info.description = Array.isArray(r.description) ? r.description.join(" ") : r.description;
+    }
   }
   return info;
 }

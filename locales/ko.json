@@ -1086,7 +1086,10 @@
     "no": "아니오",
     "footer": "위치 제공: ip-api.com · RDAP: ARIN/RIPE/APNIC · 프록시 감지는 참고용입니다.",
     "feedback": "피드백",
-    "copy": "복사"
+    "copy": "복사",
+    "cidr": "네트워크 접두사 (CIDR)",
+    "abuse_section": "남용 연락처",
+    "abuse_email": "남용 신고 이메일"
   },
   "ssl": {
     "title": "SSL 인증서 확인",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "실시간 확인, 데이터 캐시 없음",
     "footer_tech": "Node.js TLS · 서드파티 의존성 없음",
     "feedback": "피드백",
-    "copy": "복사"
+    "copy": "복사",
+    "key_info": "공개 키",
+    "cipher": "암호화 스위트",
+    "ct_logs": "CT 로그"
   },
   "dns": {
     "title": "DNS 조회",
-    "subtitle": "4×DoH 병렬 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH 병렬 · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "조회",
     "shortcuts": "단축:",
     "record_types": "레코드 유형:",
@@ -1140,8 +1146,8 @@
     "preset_ns": "네임서버",
     "preset_caa": "인증서 인증",
     "loading": "4×DoH 병렬 쿼리 중…",
-    "empty_title": "도메인을 입력하여 DNS 레코드 조회",
-    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA 지원",
+    "empty_title": "도메인 또는 IP를 입력하여 DNS 레코드 조회",
+    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXT는 SPF / DMARC / DKIM / BIMI를 자동 감지",
     "err_empty": "도메인을 입력해 주세요",
     "err_failed": "조회 실패",
@@ -1177,7 +1183,8 @@
     "soa_retry": "재시도 간격",
     "soa_expire": "만료 시간",
     "has_record": "{{n}}개 · {{ms}}ms",
-    "copy": "복사"
+    "copy": "복사",
+    "preset_ptr": "PTR 역방향"
   },
   "payment": {
     "checkout_title": "플랜 업그레이드",

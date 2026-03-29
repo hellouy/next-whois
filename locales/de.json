@@ -1086,7 +1086,10 @@
     "no": "Nein",
     "footer": "Standort von ip-api.com · RDAP von ARIN/RIPE/APNIC · Proxy-Erkennung dient nur als Hinweis.",
     "feedback": "Feedback",
-    "copy": "Kopieren"
+    "copy": "Kopieren",
+    "cidr": "Netzwerkpräfix (CIDR)",
+    "abuse_section": "Abuse-Kontakt",
+    "abuse_email": "Abuse-E-Mail"
   },
   "ssl": {
     "title": "SSL-Zertifikat prüfen",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "Live-Check, Daten werden nicht zwischengespeichert",
     "footer_tech": "Node.js TLS · Keine Drittanbieter-Abhängigkeiten",
     "feedback": "Feedback",
-    "copy": "Kopieren"
+    "copy": "Kopieren",
+    "key_info": "Öffentlicher Schlüssel",
+    "cipher": "Cipher-Suite",
+    "ct_logs": "CT-Protokolle"
   },
   "dns": {
     "title": "DNS-Suche",
-    "subtitle": "4×DoH parallel · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH Parallel · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "Suchen",
     "shortcuts": "Schnellauswahl:",
     "record_types": "Eintragstypen:",
@@ -1140,8 +1146,8 @@
     "preset_ns": "Nameserver",
     "preset_caa": "Zertifizierung",
     "loading": "4×DoH-Parallelabfrage läuft…",
-    "empty_title": "Domain eingeben, um beliebige DNS-Einträge abzufragen",
-    "empty_subtitle": "Unterstützt A · AAAA · MX · NS · CNAME · TXT · SOA · CAA",
+    "empty_title": "Domain oder IP eingeben",
+    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXT erkennt automatisch SPF / DMARC / DKIM / BIMI",
     "err_empty": "Bitte eine Domain eingeben",
     "err_failed": "Suche fehlgeschlagen",
@@ -1177,7 +1183,8 @@
     "soa_retry": "Wiederholungsintervall",
     "soa_expire": "Ablaufzeit",
     "has_record": "{{n}} Einträge · {{ms}}ms",
-    "copy": "Kopieren"
+    "copy": "Kopieren",
+    "preset_ptr": "PTR Reverse"
   },
   "payment": {
     "checkout_title": "Plan upgraden",

@@ -14,7 +14,7 @@ import {
   RiArrowLeftSLine, RiSearchLine, RiLoader4Line,
   RiLockLine, RiLockUnlockLine, RiShieldCheckLine, RiShieldLine,
   RiCalendarLine, RiFileCopyLine, RiCheckLine, RiAlertLine,
-  RiTimeLine, RiLinkM, RiServerLine, RiRefreshLine,
+  RiTimeLine, RiLinkM, RiServerLine, RiRefreshLine, RiExternalLinkLine,
 } from "@remixicon/react";
 
 type SanEntry = { type: string; value: string };
@@ -28,6 +28,7 @@ type SslResult = {
   authError: string | null;
   protocol: string | null;
   cipher: string | null;
+  cipherBits: number | null;
   subject: Record<string, string>;
   issuer: Record<string, string>;
   valid_from: string;
@@ -38,6 +39,8 @@ type SslResult = {
   fingerprint: string;
   fingerprint256: string;
   serialNumber: string;
+  keyAlgorithm: string | null;
+  keyBits: number | null;
   sans: SanEntry[];
   chain: CertChain[];
   latencyMs: number;
@@ -284,6 +287,14 @@ export default function SslPage() {
                       <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
                         <RiLinkM className="w-3.5 h-3.5 text-muted-foreground" />
                         <h3 className="text-sm font-bold">{t("ssl.cert_section")}</h3>
+                        <a
+                          href={`https://crt.sh/?q=${encodeURIComponent(result!.hostname)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-auto flex items-center gap-1 text-[10px] text-primary hover:underline"
+                        >
+                          {t("ssl.ct_logs")} <RiExternalLinkLine className="w-2.5 h-2.5" />
+                        </a>
                       </div>
                       <div className="px-5">
                         <InfoRow label={t("ssl.issued_to_cn")} value={result!.subject?.CN || ""} copyLabel={copyLabel} />
@@ -295,6 +306,22 @@ export default function SslPage() {
                         <InfoRow label={t("ssl.valid_to")} value={result!.valid_to} copyLabel={copyLabel} />
                         <InfoRow label={t("ssl.serial")} value={result!.serialNumber} mono copyLabel={copyLabel} />
                         <InfoRow label={t("ssl.fingerprint")} value={result!.fingerprint256} mono copyLabel={copyLabel} />
+                        {(result!.keyAlgorithm || result!.keyBits) && (
+                          <InfoRow
+                            label={t("ssl.key_info")}
+                            value={[result!.keyAlgorithm, result!.keyBits ? `${result!.keyBits} bits` : null].filter(Boolean).join(" · ")}
+                            mono
+                            copyLabel={copyLabel}
+                          />
+                        )}
+                        {result!.cipher && (
+                          <InfoRow
+                            label={t("ssl.cipher")}
+                            value={result!.cipherBits ? `${result!.cipher} (${result!.cipherBits} bits)` : result!.cipher}
+                            mono
+                            copyLabel={copyLabel}
+                          />
+                        )}
                       </div>
                     </div>
 

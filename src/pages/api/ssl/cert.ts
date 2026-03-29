@@ -24,6 +24,7 @@ type CertResult = {
   authError: string | null;
   protocol: string | null;
   cipher: string | null;
+  cipherBits: number | null;
   subject: Record<string, string>;
   issuer: Record<string, string>;
   valid_from: string;
@@ -34,6 +35,8 @@ type CertResult = {
   fingerprint: string;
   fingerprint256: string;
   serialNumber: string;
+  keyAlgorithm: string | null;
+  keyBits: number | null;
   sans: SanEntry[];
   chain: CertChainEntry[];
   latencyMs: number;
@@ -70,6 +73,18 @@ function buildChain(cert: any, maxDepth = 6): CertChainEntry[] {
   return chain;
 }
 
+function getKeyInfo(cert: any): { keyAlgorithm: string | null; keyBits: number | null } {
+  const curve = (cert as any).nistCurve || (cert as any).asn1Curve;
+  if (curve) {
+    return { keyAlgorithm: `EC (${curve})`, keyBits: null };
+  }
+  const bits = (cert as any).bits;
+  if (bits) {
+    return { keyAlgorithm: "RSA", keyBits: bits };
+  }
+  return { keyAlgorithm: null, keyBits: null };
+}
+
 async function fetchCert(hostname: string, port: number): Promise<CertResult> {
   return new Promise((resolve, reject) => {
     const t0 = Date.now();
@@ -103,6 +118,7 @@ async function fetchCert(hostname: string, port: number): Promise<CertResult> {
         const now = new Date();
         const msRemaining = validTo.getTime() - now.getTime();
         const daysRemaining = Math.floor(msRemaining / 86400000);
+        const { keyAlgorithm, keyBits } = getKeyInfo(cert);
 
         const result: CertResult = {
           hostname,
@@ -111,6 +127,7 @@ async function fetchCert(hostname: string, port: number): Promise<CertResult> {
           authError,
           protocol,
           cipher: cipherInfo?.name ?? null,
+          cipherBits: (cipherInfo as any)?.secretKeyLength ?? null,
           subject: (cert.subject || {}) as Record<string, string>,
           issuer: (cert.issuer || {}) as Record<string, string>,
           valid_from: cert.valid_from || "",
@@ -121,6 +138,8 @@ async function fetchCert(hostname: string, port: number): Promise<CertResult> {
           fingerprint: cert.fingerprint || "",
           fingerprint256: cert.fingerprint256 || "",
           serialNumber: cert.serialNumber || "",
+          keyAlgorithm,
+          keyBits,
           sans: parseSans(cert.subjectaltname || ""),
           chain: buildChain(cert),
           latencyMs: Date.now() - t0,

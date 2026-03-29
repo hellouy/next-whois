@@ -17,7 +17,7 @@ import {
   RiKeyLine, RiSpeedUpLine,
 } from "@remixicon/react";
 
-type RecordType = "A" | "AAAA" | "MX" | "NS" | "CNAME" | "TXT" | "SOA" | "CAA";
+type RecordType = "A" | "AAAA" | "MX" | "NS" | "CNAME" | "TXT" | "SOA" | "CAA" | "PTR" | "SRV" | "HTTPS";
 
 const RECORD_TYPES: { type: RecordType; color: string; bg: string }[] = [
   { type: "A",     color: "text-blue-600 dark:text-blue-400",     bg: "bg-blue-500/8 border-blue-500/30" },
@@ -28,6 +28,9 @@ const RECORD_TYPES: { type: RecordType; color: string; bg: string }[] = [
   { type: "TXT",   color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/8 border-orange-500/30" },
   { type: "SOA",   color: "text-rose-600 dark:text-rose-400",     bg: "bg-rose-500/8 border-rose-500/30" },
   { type: "CAA",   color: "text-teal-600 dark:text-teal-400",     bg: "bg-teal-500/8 border-teal-500/30" },
+  { type: "PTR",   color: "text-cyan-600 dark:text-cyan-400",     bg: "bg-cyan-500/8 border-cyan-500/30" },
+  { type: "SRV",   color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/8 border-purple-500/30" },
+  { type: "HTTPS", color: "text-pink-600 dark:text-pink-400",     bg: "bg-pink-500/8 border-pink-500/30" },
 ];
 
 type ResolverResult = {
@@ -37,7 +40,7 @@ type ResolverResult = {
 
 type DnsResult = {
   name: string; type: RecordType; found: boolean;
-  records: any[]; flat: string[]; resolvers: ResolverResult[]; latencyMs: number; error?: string;
+  records: any[]; flat: string[]; ttls?: number[]; resolvers: ResolverResult[]; latencyMs: number; error?: string;
   _label?: string;
 };
 
@@ -105,6 +108,26 @@ function MxRow({ flat }: { flat: string }) {
   );
 }
 
+function SrvRow({ flat }: { flat: string }) {
+  const match = flat.match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/);
+  if (!match) return <span className="text-sm font-mono break-all flex-1 leading-relaxed">{flat}</span>;
+  const [, priority, weight, port, target] = match;
+  return (
+    <div className="flex items-center gap-2 flex-1 min-w-0">
+      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 shrink-0">
+        {priority}/{weight} :{port}
+      </span>
+      <span className="text-sm font-mono break-all flex-1 leading-relaxed">{target}</span>
+    </div>
+  );
+}
+
+function TtlBadge({ ttl }: { ttl: number | undefined }) {
+  if (ttl === undefined || ttl === null) return null;
+  const label = ttl >= 86400 ? `${Math.floor(ttl / 86400)}d` : ttl >= 3600 ? `${Math.floor(ttl / 3600)}h` : ttl >= 60 ? `${Math.floor(ttl / 60)}m` : `${ttl}s`;
+  return <span className="text-[10px] text-muted-foreground/40 shrink-0 font-mono">TTL {label}</span>;
+}
+
 function SoaRow({ records, labels }: {
   records: any[];
   labels: { primaryNs: string; adminEmail: string; serial: string; refresh: string; retry: string; expire: string };
@@ -131,9 +154,9 @@ function SoaRow({ records, labels }: {
 }
 
 function ResultCard({
-  result, index, noRecordLabel, hasRecordTemplate, copyLabel, soaLabels,
+  result, noRecordLabel, hasRecordTemplate, copyLabel, soaLabels,
 }: {
-  result: DnsResult; index?: number;
+  result: DnsResult;
   noRecordLabel: string;
   hasRecordTemplate: string;
   copyLabel: string;
@@ -180,9 +203,11 @@ function ResultCard({
       ) : (
         <div className="divide-y divide-border/30">
           {result.flat.map((flat, i) => {
-            const isTxt = result.type === "TXT";
-            const isMx  = result.type === "MX";
+            const isTxt   = result.type === "TXT";
+            const isMx    = result.type === "MX";
+            const isSrv   = result.type === "SRV";
             const cls = isTxt ? classifyTxt(flat) : null;
+            const ttl = result.ttls?.[i];
             return (
               <div key={i} className="flex items-start gap-2.5 px-4 py-2.5 group hover:bg-muted/10 transition-colors">
                 {isTxt && cls && (
@@ -190,9 +215,10 @@ function ResultCard({
                     {cls.label}
                   </span>
                 )}
-                {isMx ? <MxRow flat={flat} /> : (
-                  <span className="text-sm font-mono break-all flex-1 leading-relaxed">{flat}</span>
-                )}
+                {isMx  ? <MxRow flat={flat} />  :
+                 isSrv ? <SrvRow flat={flat} /> :
+                 <span className="text-sm font-mono break-all flex-1 leading-relaxed">{flat}</span>}
+                <TtlBadge ttl={ttl} />
                 <CopyButton text={flat} copyLabel={copyLabel} />
               </div>
             );
@@ -201,6 +227,20 @@ function ResultCard({
       )}
     </motion.div>
   );
+}
+
+function ipToPtrArpa(input: string): string {
+  // IPv4: 8.8.8.8 → 8.8.8.8.in-addr.arpa
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(input)) {
+    return input.split(".").reverse().join(".") + ".in-addr.arpa";
+  }
+  // Already looks like arpa
+  if (input.endsWith(".arpa")) return input;
+  return input;
+}
+
+function toPtrName(nameOrIp: string, type: RecordType): string {
+  return type === "PTR" ? ipToPtrArpa(nameOrIp) : nameOrIp;
 }
 
 async function fetchDns(name: string, type: RecordType, label?: string): Promise<DnsResult> {
@@ -259,7 +299,7 @@ export default function DnsPage() {
 
     const t0 = Date.now();
     try {
-      const jobs: Promise<DnsResult>[] = qTypes.map(type => fetchDns(name, type));
+      const jobs: Promise<DnsResult>[] = qTypes.map(type => fetchDns(toPtrName(name, type), type));
       if (isEmail) jobs.push(fetchDns(`_dmarc.${name}`, "TXT", `_dmarc.${name}`));
 
       const settled = await Promise.allSettled(jobs);
@@ -365,6 +405,7 @@ export default function DnsPage() {
     { label: t("dns.preset_email"), icon: RiMailLine,   types: ["MX", "TXT"] as RecordType[], email: true },
     { label: t("dns.preset_ns"),    icon: RiServerLine, types: ["NS", "SOA"] as RecordType[] },
     { label: t("dns.preset_caa"),   icon: RiShieldCheckLine, types: ["CAA"] as RecordType[] },
+    { label: t("dns.preset_ptr"),   icon: RiKeyLine,    types: ["PTR"] as RecordType[] },
   ];
 
   return (
@@ -496,7 +537,7 @@ export default function DnsPage() {
                 )}
 
                 {mainResults.map((r, i) => (
-                  <ResultCard key={r.type + r.name} result={r} index={i} {...resultCardProps} />
+                  <ResultCard key={r.type + r.name} result={r} {...resultCardProps} />
                 ))}
 
                 {subResults.length > 0 && (
@@ -505,7 +546,7 @@ export default function DnsPage() {
                       <RiShieldCheckLine className="w-3.5 h-3.5" />{t("dns.sub_query")}
                     </p>
                     {subResults.map((r, i) => (
-                      <ResultCard key={r._label} result={r} index={i} {...resultCardProps} />
+                      <ResultCard key={r._label} result={r} {...resultCardProps} />
                     ))}
                   </div>
                 )}

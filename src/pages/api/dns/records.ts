@@ -6,10 +6,13 @@ export const config = { maxDuration: 20 };
 const RL_LIMIT  = 60;
 const RL_WINDOW = 60_000;
 
-const RECORD_TYPES = ["A", "AAAA", "MX", "NS", "CNAME", "TXT", "SOA", "CAA"] as const;
+const RECORD_TYPES = ["A", "AAAA", "MX", "NS", "CNAME", "TXT", "SOA", "CAA", "PTR", "SRV", "HTTPS"] as const;
 type RecordType = typeof RECORD_TYPES[number];
 
-const TYPE_NUM: Record<RecordType, number> = { A: 1, AAAA: 28, MX: 15, NS: 2, CNAME: 5, TXT: 16, SOA: 6, CAA: 257 };
+const TYPE_NUM: Record<RecordType, number> = {
+  A: 1, AAAA: 28, MX: 15, NS: 2, CNAME: 5, TXT: 16, SOA: 6, CAA: 257,
+  PTR: 12, SRV: 33, HTTPS: 65,
+};
 
 const DOH_RESOLVERS = [
   { name: "Google DoH",     url: "https://dns.google/resolve",                        kind: "doh" as const },
@@ -26,11 +29,22 @@ function parseDoHData(data: string, type: RecordType): any {
       return d;
     case "NS":
     case "CNAME":
+    case "PTR":
       return d.replace(/\.$/, "");
     case "MX": {
       const sp = d.indexOf(" ");
       if (sp < 0) return { priority: 10, exchange: d.replace(/\.$/, "") };
       return { priority: parseInt(d.slice(0, sp)), exchange: d.slice(sp + 1).replace(/\.$/, "") };
+    }
+    case "SRV": {
+      const parts = d.split(/\s+/);
+      if (parts.length < 4) return d;
+      return {
+        priority: parseInt(parts[0]),
+        weight:   parseInt(parts[1]),
+        port:     parseInt(parts[2]),
+        target:   parts[3].replace(/\.$/, ""),
+      };
     }
     case "TXT":
       return d.replace(/^"/, "").replace(/"$/, "").replace(/""/g, "");
@@ -47,11 +61,14 @@ function parseDoHData(data: string, type: RecordType): any {
       };
     }
     case "CAA":
+    case "HTTPS":
       return d;
   }
 }
 
-async function resolveDoH(url: string, name: string, type: RecordType): Promise<any[]> {
+type DoHEntry = { data: any; ttl: number };
+
+async function resolveDoH(url: string, name: string, type: RecordType): Promise<DoHEntry[]> {
   const typeNum = TYPE_NUM[type];
   const endpoint = `${url}?name=${encodeURIComponent(name)}&type=${typeNum}`;
   const headers: Record<string, string> = { Accept: "application/dns-json" };
@@ -69,12 +86,13 @@ async function resolveDoH(url: string, name: string, type: RecordType): Promise<
   const answers: any[] = json.Answer ?? [];
   return answers
     .filter((a: any) => a.type === typeNum)
-    .map((a: any) => parseDoHData(a.data, type));
+    .map((a: any) => ({ data: parseDoHData(a.data, type), ttl: a.TTL ?? 0 }));
 }
 
 function normalizeToString(type: RecordType, raw: any): string {
   if (typeof raw === "string") return raw;
   if (type === "MX")  return `${raw.priority} ${raw.exchange}`;
+  if (type === "SRV") return `${raw.priority} ${raw.weight} ${raw.port} ${raw.target}`;
   if (type === "SOA") return `${raw.nsname} ${raw.hostmaster} ${raw.serial} refresh=${raw.refresh} retry=${raw.retry} expire=${raw.expire} minttl=${raw.minttl}`;
   return JSON.stringify(raw);
 }
@@ -95,34 +113,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   type ResolverResult = {
     name: string; kind: "doh";
-    records: any[]; flat: string[]; latencyMs: number; error?: string;
+    records: any[]; flat: string[]; ttls: number[]; latencyMs: number; error?: string;
   };
 
   const dohJobs = DOH_RESOLVERS.map(async (r): Promise<ResolverResult> => {
     const rt0 = Date.now();
     try {
-      const records = await resolveDoH(r.url, name, type);
+      const entries = await resolveDoH(r.url, name, type);
+      const records = entries.map(e => e.data);
       const flat = records.map(rec => normalizeToString(type, rec));
-      return { name: r.name, kind: r.kind, records, flat, latencyMs: Date.now() - rt0 };
+      const ttls = entries.map(e => e.ttl);
+      return { name: r.name, kind: r.kind, records, flat, ttls, latencyMs: Date.now() - rt0 };
     } catch (e: any) {
       const code = e?.code ?? "";
       const error =
-        e?.name === "TimeoutError"                       ? "timeout" :
+        e?.name === "TimeoutError"                        ? "timeout" :
         code === "ENOTFOUND" || e?.message === "NXDOMAIN" ? "no_record" :
         (e?.message || "unknown");
-      return { name: r.name, kind: r.kind, records: [], flat: [], latencyMs: Date.now() - rt0, error };
+      return { name: r.name, kind: r.kind, records: [], flat: [], ttls: [], latencyMs: Date.now() - rt0, error };
     }
   });
 
   const results = await Promise.allSettled(dohJobs);
   const resolvers: ResolverResult[] = results.map((s, i) => {
     if (s.status === "fulfilled") return s.value;
-    return { name: DOH_RESOLVERS[i].name, kind: "doh" as const, records: [], flat: [], latencyMs: 0, error: "rejected" };
+    return { name: DOH_RESOLVERS[i].name, kind: "doh" as const, records: [], flat: [], ttls: [], latencyMs: 0, error: "rejected" };
   });
 
   const seenFlat = new Set<string>();
   const allFlat: string[] = [];
   const allRaw: any[] = [];
+  const allTtls: number[] = [];
 
   for (const r of resolvers) {
     for (let i = 0; i < r.flat.length; i++) {
@@ -131,15 +152,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         seenFlat.add(f);
         allFlat.push(f);
         allRaw.push(r.records[i]);
+        allTtls.push(r.ttls[i] ?? 0);
       }
     }
   }
 
   if (type === "MX") {
-    const paired = allRaw.map((r, i) => ({ r, f: allFlat[i] }));
+    const paired = allRaw.map((r, i) => ({ r, f: allFlat[i], t: allTtls[i] }));
     paired.sort((a, b) => (a.r?.priority ?? 0) - (b.r?.priority ?? 0));
     allRaw.splice(0, allRaw.length, ...paired.map(p => p.r));
     allFlat.splice(0, allFlat.length, ...paired.map(p => p.f));
+    allTtls.splice(0, allTtls.length, ...paired.map(p => p.t));
+  }
+
+  if (type === "SRV") {
+    const paired = allRaw.map((r, i) => ({ r, f: allFlat[i], t: allTtls[i] }));
+    paired.sort((a, b) => (a.r?.priority ?? 0) - (b.r?.priority ?? 0) || (a.r?.weight ?? 0) - (b.r?.weight ?? 0));
+    allRaw.splice(0, allRaw.length, ...paired.map(p => p.r));
+    allFlat.splice(0, allFlat.length, ...paired.map(p => p.f));
+    allTtls.splice(0, allTtls.length, ...paired.map(p => p.t));
   }
 
   res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
@@ -148,6 +179,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     found: allFlat.length > 0,
     records: allRaw,
     flat: allFlat,
+    ttls: allTtls,
     resolvers,
     latencyMs: Date.now() - t0,
   });

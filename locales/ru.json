@@ -1086,7 +1086,10 @@
     "no": "Нет",
     "footer": "Геолокация от ip-api.com · RDAP от ARIN/RIPE/APNIC · Обнаружение прокси носит справочный характер.",
     "feedback": "Обратная связь",
-    "copy": "Копировать"
+    "copy": "Копировать",
+    "cidr": "Сетевой префикс (CIDR)",
+    "abuse_section": "Контакт для жалоб",
+    "abuse_email": "Email для жалоб"
   },
   "ssl": {
     "title": "Проверка SSL-сертификата",
@@ -1127,11 +1130,14 @@
     "footer_realtime": "Проверка в реальном времени, данные не кешируются",
     "footer_tech": "Node.js TLS · Без сторонних зависимостей",
     "feedback": "Обратная связь",
-    "copy": "Копировать"
+    "copy": "Копировать",
+    "key_info": "Открытый ключ",
+    "cipher": "Набор шифров",
+    "ct_logs": "Журналы CT"
   },
   "dns": {
     "title": "Поиск DNS",
-    "subtitle": "4×DoH параллельно · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA · SPF/DMARC/DKIM",
+    "subtitle": "4×DoH Параллельно · A/AAAA/MX/NS/CNAME/TXT/SOA/CAA/PTR/SRV · SPF/DMARC/DKIM",
     "search": "Найти",
     "shortcuts": "Быстрый выбор:",
     "record_types": "Типы записей:",
@@ -1140,8 +1146,8 @@
     "preset_ns": "Серверы имён",
     "preset_caa": "Авторизация сертификатов",
     "loading": "4×DoH параллельный запрос выполняется…",
-    "empty_title": "Введите домен для запроса DNS-записей",
-    "empty_subtitle": "Поддерживает A · AAAA · MX · NS · CNAME · TXT · SOA · CAA",
+    "empty_title": "Введите домен или IP для запроса DNS-записей",
+    "empty_subtitle": "A · AAAA · MX · NS · CNAME · TXT · SOA · CAA · PTR · SRV · HTTPS",
     "empty_subtitle2": "TXT автоматически распознаёт SPF / DMARC / DKIM / BIMI",
     "err_empty": "Пожалуйста, введите домен",
     "err_failed": "Запрос не выполнен",
@@ -1177,7 +1183,8 @@
     "soa_retry": "Интервал повтора",
     "soa_expire": "Время истечения",
     "has_record": "{{n}} записей · {{ms}}ms",
-    "copy": "Копировать"
+    "copy": "Копировать",
+    "preset_ptr": "PTR Обратный"
   },
   "payment": {
     "checkout_title": "Обновить план",
