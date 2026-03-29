@@ -4124,6 +4124,7 @@ export default function LookupPage({
   // On first load, if SSR already provided data, do a silent background refresh
   // (keep showing SSR data while fresh data loads) instead of flashing a skeleton.
   const firstLoadDone = React.useRef(false);
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleStart = (url: string) => {
@@ -4156,6 +4157,11 @@ export default function LookupPage({
 
     if (!silentRefresh) {
       setLoading(true);
+      // Scroll back to top when navigating to a new domain
+      if (scrollAreaRef.current) {
+        const vp = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
+        if (vp) vp.scrollTop = 0;
+      }
       // Do NOT reset data to _EMPTY_WHOIS_RESULT here.
       // Keeping the previous result visible prevents the layout from
       // collapsing then re-expanding (the "jump") while the new lookup loads.
@@ -4650,7 +4656,7 @@ export default function LookupPage({
           );
         })()}
       </Head>
-      <ScrollArea className="w-full h-[calc(100vh-4rem)]">
+      <ScrollArea ref={scrollAreaRef} className="w-full h-[calc(100vh-4rem)]">
         <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 min-h-[calc(100vh-4rem)]">
           <div className="mb-6 relative z-10">
             <div className="relative group">
@@ -4686,13 +4692,13 @@ export default function LookupPage({
             </AnimatePresence>
             <motion.div
               animate={{ opacity: loading && data.time === 0 ? 0 : (loading ? 0.82 : 1) }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              style={{ pointerEvents: loading ? "none" : undefined }}
+              transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              style={{ pointerEvents: loading ? "none" : undefined, willChange: "opacity" }}
             >
 
           {result && (
             <div
-              className="flex items-center flex-wrap gap-2 mb-4 sm:mb-6"
+              className="hidden sm:flex items-center flex-wrap gap-2 mb-6"
             >
               {result.registerPrice &&
                 result.registerPrice.new !== -1 &&
