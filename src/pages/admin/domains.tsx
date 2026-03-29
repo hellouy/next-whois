@@ -520,6 +520,19 @@ function ServersTab() {
   const [repairing, setRepairing] = React.useState(false);
   const [actionId, setActionId] = React.useState<string | null>(null);
 
+  // ── AI Finder state ──────────────────────────────────────────────────────
+  type AiProbeItem = { cluster: string; host: string; handles: boolean; score: number; snippet: string; elapsedMs: number; error?: string };
+  type AiFinderResult = { ok: boolean; method: string; server: string | null; notes?: string };
+  type ClusterInfo = { name: string; host: string; desc: string };
+  const [aiFindTld, setAiFindTld] = React.useState("");
+  const [aiFindMode, setAiFindMode] = React.useState<"full" | "clusters-only">("full");
+  const [aiFinding, setAiFinding] = React.useState(false);
+  const [aiPhase, setAiPhase] = React.useState<string>("");
+  const [aiProbes, setAiProbes] = React.useState<AiProbeItem[]>([]);
+  const [aiResult, setAiResult] = React.useState<AiFinderResult | null>(null);
+  const [aiLog, setAiLog] = React.useState<string[]>([]);
+  const [aiClusters, setAiClusters] = React.useState<ClusterInfo[]>([]);
+
   async function loadServers() {
     setLoading(true);
     try {
@@ -560,7 +573,15 @@ function ServersTab() {
       .finally(() => setRepairLoading(false));
   }
 
-  React.useEffect(() => { loadServers(); loadRepair(); }, []);
+  React.useEffect(() => {
+    loadServers();
+    loadRepair();
+    fetch("/api/admin/ai-find-server")
+      .then(r => r.json())
+      .then((d: { clusters?: ClusterInfo[] }) => setAiClusters(d.clusters ?? []))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function addServer_() {
     const tld = addTld.trim().toLowerCase().replace(/^\./, "");
@@ -623,6 +644,76 @@ function ServersTab() {
       toast.success(`.${tld} 已忽略`);
       loadRepair();
     } finally { setActionId(null); }
+  }
+
+  function runAiFind() {
+    const tld = aiFindTld.trim().toLowerCase().replace(/^\./, "");
+    if (!tld) { toast.error("请输入 TLD"); return; }
+    setAiFinding(true);
+    setAiPhase("");
+    setAiProbes([]);
+    setAiResult(null);
+    setAiLog([`🔍 开始查找 .${tld}…`]);
+    fetch("/api/admin/ai-find-server", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tld, mode: aiFindMode, save: true }),
+    }).then(async res => {
+      if (!res.ok || !res.body) { toast.error("请求失败"); setAiFinding(false); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let curEvt = "message";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) { curEvt = line.slice(7).trim(); }
+          else if (line.startsWith("data: ")) {
+            try {
+              const d = JSON.parse(line.slice(6)) as Record<string, unknown>;
+              if (curEvt === "phase") {
+                const phaseMap: Record<string, string> = {
+                  clusters: `⚡ 并发探测 ${d.total ?? ""} 个共享注册商集群…`,
+                  rdap: "🌐 检查 IANA RDAP Bootstrap…",
+                  "iana-tcp": "📡 查询 IANA WHOIS TCP 转介…",
+                  ai: "🤖 调用 AI 模型查找…",
+                };
+                setAiPhase(String(d.phase ?? ""));
+                setAiLog(p => [...p, phaseMap[String(d.phase)] ?? `📋 ${String(d.phase)}`]);
+              } else if (curEvt === "probe") {
+                const item = { cluster: String(d.cluster ?? ""), host: String(d.host ?? ""), handles: Boolean(d.handles), score: Number(d.score ?? 0), snippet: String(d.snippet ?? ""), elapsedMs: Number(d.elapsedMs ?? 0), error: d.error ? String(d.error) : undefined };
+                setAiProbes(p => {
+                  const idx = p.findIndex(x => x.host === item.host);
+                  if (idx >= 0) { const n = [...p]; n[idx] = item; return n; }
+                  return [...p, item];
+                });
+              } else if (curEvt === "found") {
+                setAiResult({ ok: true, method: String(d.method ?? ""), server: String(d.server ?? "") });
+                setAiLog(p => [...p, `✅ 找到！[${String(d.method)}] → ${String(d.server)}`]);
+                loadServers();
+              } else if (curEvt === "ai_result") {
+                setAiLog(p => [...p, `🤖 AI 建议：类型=${String(d.type)} 服务器=${String(d.server ?? "无")}${d.notes ? ` (${String(d.notes)})` : ""}`]);
+              } else if (curEvt === "done") {
+                if (!d.ok) {
+                  setAiResult({ ok: false, method: String(d.method ?? "exhausted"), server: null });
+                  setAiLog(p => [...p, "❌ 所有策略均未找到服务器"]);
+                }
+                setAiFinding(false);
+              } else if (curEvt === "error") {
+                setAiLog(p => [...p, `⚠️ 错误：${String(d.message)}`]);
+                setAiFinding(false);
+              }
+              curEvt = "message";
+            } catch {}
+          }
+        }
+      }
+      setAiFinding(false);
+    }).catch(e => { if ((e as Error).name !== "AbortError") toast.error((e as Error).message); setAiFinding(false); });
   }
 
   const counts = rows.reduce((acc, r) => { acc[r.source] = (acc[r.source] ?? 0) + 1; return acc; }, {} as Record<string, number>);
@@ -830,6 +921,163 @@ function ServersTab() {
           </div>
         )}
       </div>
+
+      {/* ── AI 智能查找服务器 ── */}
+      <div className="space-y-4 pt-2 border-t border-border">
+        <div>
+          <h2 className="text-sm font-bold flex items-center gap-1.5">
+            <RiRobot2Line className="w-4 h-4 text-violet-500" />AI 智能查找 WHOIS 服务器
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            对未知 TLD 依次探测共享注册商集群 → IANA RDAP → IANA TCP → AI 模型，找到后自动保存
+          </p>
+        </div>
+
+        {/* Input row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input
+            value={aiFindTld}
+            onChange={e => setAiFindTld(e.target.value)}
+            placeholder="输入 TLD，如 vc、io、uk.com"
+            className="h-8 rounded-xl text-xs font-mono w-40"
+            onKeyDown={e => { if (e.key === "Enter") runAiFind(); }}
+          />
+          <select
+            value={aiFindMode}
+            onChange={e => setAiFindMode(e.target.value as "full" | "clusters-only")}
+            className="h-8 rounded-xl border border-border bg-background text-xs px-2 text-foreground"
+          >
+            <option value="full">完整模式（集群+IANA+AI）</option>
+            <option value="clusters-only">仅探测集群</option>
+          </select>
+          <Button
+            size="sm"
+            onClick={runAiFind}
+            disabled={aiFinding}
+            className="h-8 rounded-xl text-xs"
+          >
+            {aiFinding
+              ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1 animate-spin" />查找中…</>
+              : <><RiSearchLine className="w-3.5 h-3.5 mr-1" />开始查找</>}
+          </Button>
+          {aiResult && (
+            <span className={cn(
+              "inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border",
+              aiResult.ok
+                ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400"
+                : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/30 dark:text-rose-400"
+            )}>
+              {aiResult.ok ? <RiCheckLine className="w-3 h-3" /> : <RiCloseLine className="w-3 h-3" />}
+              {aiResult.ok ? `已找到：${aiResult.server}` : "未找到服务器"}
+            </span>
+          )}
+        </div>
+
+        {/* Results layout: probes table + log */}
+        {(aiProbes.length > 0 || aiLog.length > 0) && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* Cluster probe table */}
+            <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border bg-muted/20">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">共享注册商集群探测</span>
+                {aiPhase === "clusters" && <span className="ml-2 text-[10px] text-amber-500 animate-pulse">探测中…</span>}
+              </div>
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-muted/10">
+                      {["集群", "主机", "分值", "耗时", "状态"].map(h => (
+                        <th key={h} className="text-left text-[10px] font-semibold text-muted-foreground px-3 py-2 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aiProbes.map((p, i) => (
+                      <tr key={p.host} className={cn("border-t border-border/30 hover:bg-muted/10 transition-colors", i % 2 === 0 ? "" : "bg-muted/5")}>
+                        <td className="px-3 py-2 font-medium max-w-[110px] truncate" title={p.cluster}>{p.cluster}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground max-w-[160px] truncate" title={p.host}>{p.host}</td>
+                        <td className="px-3 py-2 tabular-nums text-center">
+                          {p.score > 0 ? (
+                            <span className={cn("font-bold", p.handles ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>{p.score}</span>
+                          ) : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                        <td className="px-3 py-2 tabular-nums text-muted-foreground text-[10px]">{p.elapsedMs > 0 ? `${p.elapsedMs}ms` : "—"}</td>
+                        <td className="px-3 py-2">
+                          {p.error ? (
+                            <span className="text-[10px] text-rose-500/70 truncate max-w-[80px]" title={p.error}>超时</span>
+                          ) : p.handles ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <RiCheckLine className="w-3 h-3" />可用
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/50">不管理</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Snippet of best match */}
+              {aiProbes.find(p => p.handles && p.snippet) && (
+                <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-1">最佳命中响应片段：</p>
+                  <pre className="text-[10px] text-foreground/70 whitespace-pre-wrap break-all font-mono leading-relaxed max-h-24 overflow-y-auto">
+                    {aiProbes.filter(p => p.handles && p.snippet).sort((a, b) => b.score - a.score)[0]?.snippet}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            {/* Log stream */}
+            <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border bg-muted/20">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">查找日志</span>
+                {aiFinding && <span className="ml-2 text-[10px] text-violet-500 animate-pulse">运行中…</span>}
+              </div>
+              <div className="p-3 max-h-80 overflow-y-auto">
+                <div className="space-y-1">
+                  {aiLog.map((line, i) => (
+                    <div key={i} className={cn(
+                      "text-[11px] font-mono leading-relaxed",
+                      line.startsWith("✅") ? "text-emerald-600 dark:text-emerald-400 font-semibold" :
+                      line.startsWith("❌") ? "text-rose-500" :
+                      line.startsWith("⚠️") ? "text-amber-500" :
+                      line.startsWith("🤖") ? "text-violet-500" :
+                      line.startsWith("⚡") ? "text-amber-600 dark:text-amber-400" :
+                      "text-muted-foreground"
+                    )}>{line}</div>
+                  ))}
+                  {aiFinding && <div className="text-[11px] font-mono text-muted-foreground/50 animate-pulse">▋</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Known clusters reference */}
+        {aiClusters.length > 0 && (
+          <details className="group">
+            <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none list-none flex items-center gap-1">
+              <RiInformationLine className="w-3.5 h-3.5" />
+              <span>查看全部 {aiClusters.length} 个已知共享注册商集群</span>
+            </summary>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+              {aiClusters.map((c) => (
+                <div key={c.host} className="flex items-start gap-2 glass-panel border border-border rounded-xl p-2.5">
+                  <RiServerLine className="w-3.5 h-3.5 text-primary/60 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold">{c.name}</div>
+                    <div className="text-[10px] font-mono text-muted-foreground">{c.host}</div>
+                    <div className="text-[10px] text-muted-foreground/70 mt-0.5">{c.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+
     </div>
   );
 }
