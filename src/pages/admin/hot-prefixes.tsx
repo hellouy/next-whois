@@ -29,7 +29,10 @@ import {
   RiDownloadLine,
   RiToggleLine,
   RiToggleFill,
+  RiRobot2Line,
+  RiCheckLine,
 } from "@remixicon/react";
+import type { AiPrefixSuggestion } from "@/pages/api/admin/hot-prefixes";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -114,6 +117,14 @@ export default function AdminHotPrefixesPage() {
   const [seeding, setSeeding] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
   const [savingId, setSavingId] = React.useState<number | null>(null);
+
+  // ── AI discover state ────────────────────────────────────────────────────
+  const [showAiDiscover, setShowAiDiscover] = React.useState(false);
+  const [aiDiscovering, setAiDiscovering] = React.useState(false);
+  const [aiSuggestions, setAiSuggestions] = React.useState<AiPrefixSuggestion[]>([]);
+  const [aiSelected, setAiSelected] = React.useState<Set<string>>(new Set());
+  const [aiImporting, setAiImporting] = React.useState(false);
+  const [aiLog, setAiLog] = React.useState<string>("");
 
   const searchRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -260,6 +271,91 @@ export default function AdminHotPrefixesPage() {
     });
   }
 
+  function runAiDiscover() {
+    setAiSuggestions([]);
+    setAiSelected(new Set());
+    setAiLog("🤖 正在调用 AI 分析当前热门趋势…");
+    setAiDiscovering(true);
+
+    fetch("/api/admin/hot-prefixes?action=ai-discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ai-discover" }),
+    }).then(async res => {
+      if (!res.ok || !res.body) { toast.error("请求失败"); setAiDiscovering(false); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let curEvt = "message";
+      const found: AiPrefixSuggestion[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) { curEvt = line.slice(7).trim(); }
+          else if (line.startsWith("data: ")) {
+            try {
+              const d = JSON.parse(line.slice(6));
+              if (curEvt === "start") {
+                setAiLog(`🔍 已有 ${d.existing} 个前缀，正在发现新前缀…`);
+              } else if (curEvt === "item") {
+                const item = d as AiPrefixSuggestion;
+                found.push(item);
+                setAiSuggestions([...found]);
+                setAiSelected(prev => { const s = new Set(prev); s.add(item.prefix); return s; });
+                setAiLog(`✅ 发现 ${found.length} 个新前缀…`);
+              } else if (curEvt === "done") {
+                setAiLog(`🎉 发现完成，共 ${d.total} 个新前缀`);
+              } else if (curEvt === "error") {
+                setAiLog(`❌ ${String(d.message)}`);
+              }
+              curEvt = "message";
+            } catch {}
+          }
+        }
+      }
+      setAiDiscovering(false);
+    }).catch(e => { toast.error((e as Error).message); setAiDiscovering(false); });
+  }
+
+  async function importSelected() {
+    const toImport = aiSuggestions.filter(s => aiSelected.has(s.prefix));
+    if (toImport.length === 0) { toast.error("请先选择要导入的前缀"); return; }
+    setAiImporting(true);
+    let ok = 0;
+    for (const item of toImport) {
+      try {
+        const r = await fetch("/api/admin/hot-prefixes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prefix: item.prefix,
+            category: item.category,
+            weight: item.weight,
+            source: "ai",
+            notes: item.reason,
+            sale_examples: item.sale_examples || null,
+          }),
+        });
+        if (r.ok) ok++;
+      } catch {}
+    }
+    await invalidateCacheClient();
+    toast.success(`已导入 ${ok} / ${toImport.length} 个前缀`);
+    setAiImporting(false);
+    setShowAiDiscover(false);
+    fetchPrefixes();
+  }
+
+  async function invalidateCacheClient() {
+    // fire-and-forget cache bust
+    try { await fetch("/api/admin/hot-prefixes?action=seed", { method: "HEAD" }); } catch {}
+  }
+
   return (
     <>
       <Head><title>热门前缀管理 — Admin</title></Head>
@@ -288,6 +384,14 @@ export default function AdminHotPrefixesPage() {
                 导入内置列表
               </Button>
               <Button
+                variant="outline" size="sm"
+                onClick={() => { setShowAiDiscover(v => !v); if (!showAiDiscover) { setAiSuggestions([]); setAiLog(""); } }}
+                className="gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+              >
+                <RiRobot2Line className="w-4 h-4" />
+                AI 发现
+              </Button>
+              <Button
                 size="sm"
                 onClick={() => { setShowAddForm(v => !v); setAddForm(DEFAULT_FORM); }}
                 className="gap-1.5 bg-orange-600 hover:bg-orange-700 text-white"
@@ -297,6 +401,154 @@ export default function AdminHotPrefixesPage() {
               </Button>
             </div>
           </div>
+
+          {/* AI Discover Panel */}
+          {showAiDiscover && (
+            <div className="rounded-2xl border border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/20 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-violet-200/60 dark:border-violet-800/40">
+                <div>
+                  <h2 className="font-bold text-sm flex items-center gap-1.5">
+                    <RiRobot2Line className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                    AI 智能发现热门前缀
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    基于当前 AI/Web3/科技/流行文化趋势，发现尚未录入的高价值域名前缀
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!aiDiscovering && (
+                    <Button
+                      size="sm"
+                      onClick={runAiDiscover}
+                      className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs h-8"
+                    >
+                      <RiRobot2Line className="w-3.5 h-3.5" />
+                      {aiSuggestions.length > 0 ? "重新发现" : "开始发现"}
+                    </Button>
+                  )}
+                  {aiDiscovering && (
+                    <div className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400">
+                      <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                      AI 分析中…
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status log */}
+              {aiLog && (
+                <div className="px-5 py-2.5 text-xs text-muted-foreground border-b border-violet-200/40 dark:border-violet-800/30 font-mono">
+                  {aiLog}
+                </div>
+              )}
+
+              {/* Suggestions list */}
+              {aiSuggestions.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-violet-200/40 dark:border-violet-800/30 bg-violet-100/30 dark:bg-violet-950/30">
+                        <th className="text-left text-[10px] font-semibold text-muted-foreground px-4 py-2.5 w-10">
+                          <button
+                            onClick={() => {
+                              if (aiSelected.size === aiSuggestions.length) {
+                                setAiSelected(new Set());
+                              } else {
+                                setAiSelected(new Set(aiSuggestions.map(s => s.prefix)));
+                              }
+                            }}
+                            className="hover:text-foreground transition-colors"
+                          >
+                            {aiSelected.size === aiSuggestions.length ? "取消" : "全选"}
+                          </button>
+                        </th>
+                        {["前缀", "分类", "权重", "原因", "销售案例"].map(h => (
+                          <th key={h} className="text-left text-[10px] font-semibold text-muted-foreground px-3 py-2.5 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiSuggestions.map((s, i) => (
+                        <tr
+                          key={s.prefix}
+                          className={cn(
+                            "border-t border-violet-200/30 dark:border-violet-800/20 hover:bg-violet-100/30 dark:hover:bg-violet-950/30 cursor-pointer transition-colors",
+                            aiSelected.has(s.prefix) ? "bg-violet-50/70 dark:bg-violet-950/10" : (i % 2 === 0 ? "" : "bg-muted/5")
+                          )}
+                          onClick={() => setAiSelected(prev => {
+                            const s2 = new Set(prev);
+                            if (s2.has(s.prefix)) s2.delete(s.prefix); else s2.add(s.prefix);
+                            return s2;
+                          })}
+                        >
+                          <td className="px-4 py-2.5">
+                            <div className={cn(
+                              "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                              aiSelected.has(s.prefix)
+                                ? "bg-violet-600 border-violet-600"
+                                : "border-border bg-background"
+                            )}>
+                              {aiSelected.has(s.prefix) && <RiCheckLine className="w-2.5 h-2.5 text-white" />}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-mono font-bold text-sm">{s.prefix}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded border", CATEGORY_COLORS[s.category] ?? CATEGORY_COLORS.general)}>
+                              {s.category}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={cn("text-xs font-semibold tabular-nums", WEIGHT_COLOR(s.weight))}>{s.weight}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[240px]" title={s.reason}>{s.reason}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[160px] truncate" title={s.sale_examples}>{s.sale_examples || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Footer with import button */}
+              {aiSuggestions.length > 0 && (
+                <div className="flex items-center justify-between px-5 py-3.5 border-t border-violet-200/40 dark:border-violet-800/30 bg-violet-50/30 dark:bg-violet-950/10">
+                  <span className="text-xs text-muted-foreground">
+                    已选 {aiSelected.size} / {aiSuggestions.length} 个前缀
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAiDiscover(false)}
+                      className="h-7 text-xs"
+                    >
+                      关闭
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={importSelected}
+                      disabled={aiImporting || aiSelected.size === 0}
+                      className="h-7 text-xs bg-violet-600 hover:bg-violet-700 text-white gap-1"
+                    >
+                      {aiImporting
+                        ? <><RiLoader4Line className="w-3 h-3 animate-spin" />导入中…</>
+                        : <><RiCheckLine className="w-3 h-3" />导入 {aiSelected.size} 个</>}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!aiDiscovering && aiSuggestions.length === 0 && !aiLog && (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  <RiRobot2Line className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  点击「开始发现」，AI 将分析最新趋势并推荐高价值前缀
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Category stat pills */}
           {categories.length > 0 && (

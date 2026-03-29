@@ -16,6 +16,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { redis, isRedisAvailable } from "@/lib/server/redis";
+import { callProviderWithFallback } from "@/lib/server/ai-providers";
+
+export const config = { maxDuration: 60 };
 
 export const HOT_PREFIX_CACHE_KEY = "hot_prefixes_v1";
 export const HOT_PREFIX_CACHE_TTL = 300; // 5 minutes
@@ -140,6 +143,14 @@ async function invalidateCache() {
   } catch { /* ignore */ }
 }
 
+export interface AiPrefixSuggestion {
+  prefix: string;
+  category: "ai" | "web3" | "finance" | "saas" | "short" | "cn" | "general";
+  weight: number;
+  reason: string;
+  sale_examples: string;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
   if (!session) return;
@@ -148,6 +159,115 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await ensureSchema();
   } catch (e: any) {
     return res.status(500).json({ error: `DB schema error: ${e.message}` });
+  }
+
+  // ── AI Discover: SSE stream of trending prefix suggestions ────────────────
+  if (req.method === "POST" && (req.query.action === "ai-discover" || req.body?.action === "ai-discover")) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    const send = (event: string, data: unknown) => {
+      try {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        (res as any).flush?.();
+      } catch {}
+    };
+
+    const hb = setInterval(() => { try { res.write(": heartbeat\n\n"); (res as any).flush?.(); } catch {} }, 8000);
+
+    try {
+      // Load existing prefixes to avoid duplicates
+      const existing = await many<{ prefix: string }>(`SELECT prefix FROM hot_prefixes`, []);
+      const existingSet = new Set(existing.map(r => r.prefix.toLowerCase()));
+      const knownSeedSet = new Set(SEED_PREFIXES.map(p => p.prefix.toLowerCase()));
+      const alreadyKnown = [...new Set([...existingSet, ...knownSeedSet])].slice(0, 150).join(", ");
+
+      send("start", { existing: existingSet.size });
+
+      const today = new Date().toISOString().split("T")[0];
+      const { content } = await callProviderWithFallback([
+        {
+          role: "system",
+          content: `You are a domain name investment expert with deep knowledge of current internet trends, startup culture, and domain aftermarket values. Today's date is ${today}. Respond ONLY with a valid JSON array, no markdown, no explanations.`,
+        },
+        {
+          role: "user",
+          content: `Identify 25–35 domain name prefixes (SLDs) that are CURRENTLY TRENDING and likely to have high demand in the domain aftermarket right now.
+
+Focus on genuinely NEW or EMERGING trends (don't repeat established classics). Think about:
+- Newly released AI products, models, and tools (e.g. new model codenames, AI agent frameworks)
+- Viral social media terms and cultural moments from the last 6 months
+- Emerging crypto/DeFi protocols and narratives
+- New programming frameworks, dev tools, infrastructure buzzwords
+- Trending startup verticals or business categories
+- Short memorable words that startups are actively registering
+
+Already known prefixes (do NOT suggest these): ${alreadyKnown}
+
+Return a JSON array where each item has EXACTLY these fields:
+{
+  "prefix": "keyword",
+  "category": "ai"|"web3"|"finance"|"saas"|"short"|"cn"|"general",
+  "weight": 10-30,
+  "reason": "why this is hot right now (1 sentence)",
+  "sale_examples": "any known sales, or empty string"
+}
+
+Rules:
+- prefix must be lowercase letters, numbers, or hyphens only, 2-25 chars
+- weight 25-30 = viral/extremely hot, 18-24 = trending strongly, 10-17 = emerging
+- DO NOT suggest prefixes already in the "already known" list
+- Focus on the NEWEST trends, not established classics
+- Include some Chinese market specific terms if relevant`,
+        },
+      ]);
+
+      // Parse AI response
+      let suggestions: AiPrefixSuggestion[] = [];
+      try {
+        const cleaned = content.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) {
+          suggestions = parsed
+            .filter((item): item is AiPrefixSuggestion =>
+              typeof item === "object" && item !== null &&
+              typeof item.prefix === "string" && item.prefix.length > 0 &&
+              typeof item.category === "string" &&
+              typeof item.weight === "number"
+            )
+            .map(item => ({
+              prefix: item.prefix.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 30),
+              category: (["ai","web3","finance","saas","short","cn","general"].includes(item.category)
+                ? item.category : "general") as AiPrefixSuggestion["category"],
+              weight: Math.min(30, Math.max(10, Math.round(item.weight))),
+              reason: String(item.reason ?? "").slice(0, 200),
+              sale_examples: String(item.sale_examples ?? "").slice(0, 200),
+            }))
+            .filter(item => item.prefix.length >= 2 && !existingSet.has(item.prefix));
+        }
+      } catch {
+        send("error", { message: "AI 响应解析失败，请重试" });
+        clearInterval(hb);
+        res.end();
+        return;
+      }
+
+      // Stream each item
+      for (const item of suggestions) {
+        send("item", item);
+      }
+
+      send("done", { total: suggestions.length, filtered: existingSet.size });
+    } catch (e: any) {
+      send("error", { message: e.message ?? "AI 查询失败" });
+    }
+
+    clearInterval(hb);
+    res.end();
+    return;
   }
 
   // ── GET: list all prefixes ────────────────────────────────────────────────
