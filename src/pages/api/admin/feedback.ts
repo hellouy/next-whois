@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-      const q = `SELECT id, query, query_type, issue_types, description, email, created_at FROM feedback${where} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      const q = `SELECT id, query, query_type, issue_types, description, email, created_at, handled, handled_at FROM feedback${where} ORDER BY handled ASC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
       const rows = await many(q, params);
@@ -65,6 +65,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  if (req.method === "PATCH") {
+    const { id } = req.query;
+    if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
+    const { handled } = req.body as { handled?: boolean };
+    if (typeof handled !== "boolean") return res.status(400).json({ error: "handled 必须是 boolean" });
+    try {
+      await run(
+        "UPDATE feedback SET handled = $1, handled_at = $2 WHERE id = $3",
+        [handled, handled ? new Date().toISOString() : null, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   if (req.method === "DELETE") {
     const { id } = req.query;
     if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
@@ -76,6 +92,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  res.setHeader("Allow", "GET, DELETE");
+  res.setHeader("Allow", "GET, PATCH, DELETE");
   res.status(405).json({ error: "Method not allowed" });
 }

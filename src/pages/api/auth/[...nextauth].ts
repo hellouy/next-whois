@@ -90,6 +90,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "text" },
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -152,6 +153,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name ?? null,
           subscriptionAccess,
+          rememberMe: credentials.rememberMe !== "0",
         };
       },
     }),
@@ -164,6 +166,12 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.subscriptionAccess = (user as any).subscriptionAccess ?? false;
+        const rememberMe = (user as any).rememberMe !== false;
+        if (!rememberMe) {
+          // Session-only: expire in 24h
+          token.exp = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+        }
+        // Default NextAuth maxAge (30 days) applies when rememberMe=true
       }
 
       if (trigger === "update") {

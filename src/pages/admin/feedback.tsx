@@ -9,6 +9,7 @@ import {
   RiFeedbackLine, RiMailLine, RiCalendarLine,
   RiFilterLine, RiReplyLine, RiAlertLine, RiCloseLine,
   RiFileCopyLine, RiExternalLinkLine,
+  RiCheckboxCircleLine, RiCheckboxBlankCircleLine,
 } from "@remixicon/react";
 
 type FeedbackItem = {
@@ -19,6 +20,8 @@ type FeedbackItem = {
   description: string | null;
   email: string | null;
   created_at: string;
+  handled: boolean;
+  handled_at: string | null;
 };
 
 const ISSUE_META: Record<string, { label: string; color: string; dot: string }> = {
@@ -121,6 +124,30 @@ export default function AdminFeedbackPage() {
       toast.error(e.message || "删除失败");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  const [togglingHandled, setTogglingHandled] = React.useState<string | null>(null);
+
+  async function toggleHandled(item: FeedbackItem) {
+    setTogglingHandled(item.id);
+    try {
+      const newHandled = !item.handled;
+      const res = await fetch(`/api/admin/feedback?id=${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handled: newHandled }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setItems(prev => prev.map(f => f.id === item.id
+        ? { ...f, handled: newHandled, handled_at: newHandled ? new Date().toISOString() : null }
+        : f
+      ));
+      toast.success(newHandled ? "已标记为已处理" : "已取消处理标记");
+    } catch (e: any) {
+      toast.error(e.message || "操作失败");
+    } finally {
+      setTogglingHandled(null);
     }
   }
 
@@ -279,6 +306,24 @@ export default function AdminFeedbackPage() {
                       className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={e => e.stopPropagation()}
                     >
+                      <button
+                        onClick={() => toggleHandled(item)}
+                        disabled={togglingHandled === item.id}
+                        className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          item.handled
+                            ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                            : "text-muted-foreground hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-500"
+                        )}
+                        title={item.handled ? "取消已处理标记" : "标记为已处理"}
+                      >
+                        {togglingHandled === item.id
+                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                          : item.handled
+                            ? <RiCheckboxCircleLine className="w-3.5 h-3.5" />
+                            : <RiCheckboxBlankCircleLine className="w-3.5 h-3.5" />
+                        }
+                      </button>
                       {item.email && (
                         <a
                           href={buildMailtoReply(item)}

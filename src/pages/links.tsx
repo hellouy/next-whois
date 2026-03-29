@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import {
   RiArrowLeftSLine,
   RiLinksLine,
@@ -21,6 +22,7 @@ interface FriendlyLink {
   description: string | null;
   category: string | null;
   sort_order: number;
+  logo_url: string | null;
 }
 
 const card = {
@@ -151,8 +153,20 @@ export default function LinksPage() {
                           whileTap={{ scale: 0.96 }}
                           className="group glass-panel border border-border rounded-xl p-3 flex items-start gap-3 hover:border-primary/30 hover:bg-muted/40 transition-all cursor-pointer"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center shrink-0 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                            <RiGlobalLine className="w-4 h-4" />
+                          <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center shrink-0 overflow-hidden text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                            {item.logo_url ? (
+                              <img
+                                src={item.logo_url}
+                                alt={item.name}
+                                className="w-full h-full object-cover rounded-lg"
+                                onError={e => {
+                                  const t = e.currentTarget;
+                                  t.style.display = "none";
+                                  t.nextElementSibling?.classList.remove("hidden");
+                                }}
+                              />
+                            ) : null}
+                            <RiGlobalLine className={cn("w-4 h-4", item.logo_url ? "hidden" : "")} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">

@@ -332,6 +332,9 @@ const ALTER_COLUMNS = [
   `ALTER TABLE search_history DROP CONSTRAINT IF EXISTS search_history_user_id_fkey`,
   `ALTER TABLE search_history ADD CONSTRAINT  search_history_user_id_fkey
      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`,
+  `ALTER TABLE friendly_links ADD COLUMN IF NOT EXISTS logo_url TEXT`,
+  `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled  BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled_at TIMESTAMPTZ`,
 ];
 
 const CREATE_INDEXES = [

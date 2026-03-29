@@ -9,34 +9,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "GET") {
     const links = await many<{
       id: number; name: string; url: string; description: string | null;
-      category: string | null; sort_order: number; active: boolean; created_at: string;
-    }>("SELECT id, name, url, description, category, sort_order, active, created_at FROM friendly_links ORDER BY sort_order ASC, created_at DESC");
+      category: string | null; sort_order: number; active: boolean;
+      logo_url: string | null; created_at: string;
+    }>("SELECT id, name, url, description, category, sort_order, active, logo_url, created_at FROM friendly_links ORDER BY sort_order ASC, created_at DESC");
     return res.json({ links });
   }
 
   if (req.method === "POST") {
-    const { name, url, description, category, sort_order } = req.body;
+    const { name, url, description, category, sort_order, logo_url } = req.body;
     if (!name?.trim() || !url?.trim()) return res.status(400).json({ error: "名称和链接不能为空" });
     try { new URL(url.trim()); } catch { return res.status(400).json({ error: "URL 格式不正确" }); }
     const link = await one<{ id: number }>(
-      "INSERT INTO friendly_links (name, url, description, category, sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING id",
-      [name.trim(), url.trim(), description?.trim() || null, category?.trim() || null, Number(sort_order) || 0]
+      "INSERT INTO friendly_links (name, url, description, category, sort_order, logo_url) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
+      [name.trim(), url.trim(), description?.trim() || null, category?.trim() || null, Number(sort_order) || 0, logo_url?.trim() || null]
     );
     return res.status(201).json({ id: link?.id });
   }
 
   if (req.method === "PUT") {
-    const { id, name, url, description, category, sort_order, active } = req.body;
+    const { id, name, url, description, category, sort_order, active, logo_url } = req.body;
     if (!id) return res.status(400).json({ error: "缺少 id" });
     if (name !== undefined || url !== undefined) {
       if (!name?.trim() || !url?.trim()) return res.status(400).json({ error: "名称和链接不能为空" });
       try { new URL(url.trim()); } catch { return res.status(400).json({ error: "URL 格式不正确" }); }
       await run(
-        "UPDATE friendly_links SET name=$1, url=$2, description=$3, category=$4, sort_order=$5, active=$6 WHERE id=$7",
-        [name.trim(), url.trim(), description?.trim() || null, category?.trim() || null, Number(sort_order) || 0, active !== false, id]
+        "UPDATE friendly_links SET name=$1, url=$2, description=$3, category=$4, sort_order=$5, active=$6, logo_url=$7 WHERE id=$8",
+        [name.trim(), url.trim(), description?.trim() || null, category?.trim() || null, Number(sort_order) || 0, active !== false, logo_url?.trim() || null, id]
       );
     } else if (active !== undefined) {
       await run("UPDATE friendly_links SET active=$1 WHERE id=$2", [Boolean(active), id]);
+    } else if (logo_url !== undefined) {
+      await run("UPDATE friendly_links SET logo_url=$1 WHERE id=$2", [logo_url?.trim() || null, id]);
     }
     return res.json({ ok: true });
   }

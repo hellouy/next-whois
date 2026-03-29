@@ -10,7 +10,7 @@ import {
   RiLinksLine, RiAddLine, RiDeleteBinLine, RiEditLine,
   RiLoader4Line, RiCloseLine, RiCheckLine, RiExternalLinkLine,
   RiToggleLine, RiToggleFill, RiGlobalLine, RiFilterLine,
-  RiEyeLine, RiEyeOffLine,
+  RiEyeLine, RiEyeOffLine, RiImageLine, RiRefreshLine,
 } from "@remixicon/react";
 
 type FriendlyLink = {
@@ -21,10 +21,11 @@ type FriendlyLink = {
   category: string | null;
   sort_order: number;
   active: boolean;
+  logo_url: string | null;
   created_at: string;
 };
 
-const EMPTY_FORM = { name: "", url: "", description: "", category: "", sort_order: "0" };
+const EMPTY_FORM = { name: "", url: "", description: "", category: "", sort_order: "0", logo_url: "" };
 
 export default function AdminLinksPage() {
   const [links, setLinks] = React.useState<FriendlyLink[]>([]);
@@ -36,6 +37,7 @@ export default function AdminLinksPage() {
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = React.useState<string>("__all__");
   const [showHidden, setShowHidden] = React.useState(true);
+  const [fetchingFavicon, setFetchingFavicon] = React.useState(false);
 
   async function load() {
     setLoading(true);
@@ -67,6 +69,7 @@ export default function AdminLinksPage() {
       description: link.description || "",
       category: link.category || "",
       sort_order: String(link.sort_order),
+      logo_url: link.logo_url || "",
     });
   }
 
@@ -91,6 +94,7 @@ export default function AdminLinksPage() {
         description: form.description.trim() || null,
         category: form.category.trim() || null,
         sort_order: Number(form.sort_order) || 0,
+        logo_url: form.logo_url.trim() || null,
         active: true,
       };
       const res = await fetch("/api/admin/links", {
@@ -139,6 +143,20 @@ export default function AdminLinksPage() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  async function autoFetchFavicon() {
+    const urlStr = form.url.trim();
+    if (!urlStr) { toast.error("请先填写链接地址"); return; }
+    let rawUrl = urlStr;
+    if (!/^https?:\/\//i.test(rawUrl)) rawUrl = `https://${rawUrl}`;
+    let domain = "";
+    try { domain = new URL(rawUrl).hostname; } catch { toast.error("URL 格式不正确"); return; }
+    setFetchingFavicon(true);
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    setForm(f => ({ ...f, logo_url: faviconUrl }));
+    toast.success("已使用 Google Favicon 服务获取图标");
+    setFetchingFavicon(false);
   }
 
   const categories = Array.from(new Set(links.map(l => l.category).filter(Boolean))) as string[];
@@ -316,6 +334,41 @@ export default function AdminLinksPage() {
                     />
                   </div>
                 </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5">
+                    <RiImageLine className="w-3 h-3" />Logo / 图标 URL
+                    <span className="text-muted-foreground font-normal">（可选）</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      {form.logo_url && (
+                        <img
+                          src={form.logo_url}
+                          alt="logo preview"
+                          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      )}
+                      <Input
+                        value={form.logo_url}
+                        onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))}
+                        placeholder="https://example.com/logo.png（留空自动显示域名首字母）"
+                        className={cn("h-9 rounded-xl text-sm font-mono", form.logo_url && "pl-9")}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={autoFetchFavicon}
+                      disabled={fetchingFavicon}
+                      className="h-9 px-3 rounded-xl border border-border text-xs font-medium flex items-center gap-1.5 hover:bg-muted transition-colors whitespace-nowrap shrink-0"
+                      title="自动获取网站 Favicon"
+                    >
+                      <RiRefreshLine className={cn("w-3.5 h-3.5", fetchingFavicon && "animate-spin")} />
+                      自动获取
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">支持任意图片 URL，或点击"自动获取"使用 Google Favicon 服务</p>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSave} disabled={saving} className="h-9 rounded-xl gap-2 font-semibold">
@@ -367,8 +420,20 @@ export default function AdminLinksPage() {
                     editId === link.id && "bg-primary/5"
                   )}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
-                    <RiGlobalLine className="w-4 h-4 text-muted-foreground" />
+                  <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center shrink-0 overflow-hidden">
+                    {link.logo_url ? (
+                      <img
+                        src={link.logo_url}
+                        alt={link.name}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={e => {
+                          const t = e.currentTarget;
+                          t.style.display = "none";
+                          t.nextElementSibling?.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <RiGlobalLine className={cn("w-4 h-4 text-muted-foreground", link.logo_url && "hidden")} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

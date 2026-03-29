@@ -7,8 +7,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const links = await many<{
       id: number; name: string; url: string; description: string | null;
-      category: string | null; sort_order: number;
-    }>("SELECT id, name, url, description, category, sort_order FROM friendly_links WHERE active = true ORDER BY sort_order ASC, id ASC");
+      category: string | null; sort_order: number; logo_url: string | null;
+    }>("SELECT id, name, url, description, category, sort_order, logo_url FROM friendly_links WHERE active = true ORDER BY sort_order ASC, id ASC");
     return res.json({ links });
   } catch {
     return res.json({ links: [] });

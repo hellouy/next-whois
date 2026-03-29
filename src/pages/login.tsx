@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [rememberMe, setRememberMe] = React.useState(true);
 
   React.useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -50,6 +51,7 @@ export default function LoginPage() {
         redirect: false,
         email: email.trim().toLowerCase(),
         password,
+        rememberMe: rememberMe ? "1" : "0",
       });
       if (res?.error) {
         setError(t("auth.login_err_invalid"));
@@ -161,6 +163,27 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                <div
+                  onClick={() => setRememberMe(v => !v)}
+                  className={cn(
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                    rememberMe
+                      ? "bg-primary border-primary"
+                      : "border-border bg-background group-hover:border-primary/50"
+                  )}
+                >
+                  {rememberMe && <RiCheckLine className="w-2.5 h-2.5 text-primary-foreground" />}
+                </div>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="sr-only"
+                />
+                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">记住我（30天免重新登录）</span>
+              </label>
 
               <AnimatePresence>
                 {error && (

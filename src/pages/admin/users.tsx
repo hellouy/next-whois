@@ -16,6 +16,7 @@ import {
   RiHistoryLine, RiStarLine, RiBellLine,
   RiDownloadLine, RiAlertLine, RiBankCardLine,
   RiTimeLine, RiCoinLine, RiAddCircleLine, RiSubtractLine,
+  RiSendPlaneLine, RiLockPasswordLine,
 } from "@remixicon/react";
 
 type User = {
@@ -99,6 +100,27 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
       setTxHistory(d.transactions ?? []);
     } catch { setTxHistory([]); }
     finally { setTxLoading(false); }
+  }
+
+  const [sendingReset, setSendingReset] = React.useState(false);
+
+  async function sendPasswordReset() {
+    if (!window.confirm(`确认向 ${user.email} 发送密码重置邮件？`)) return;
+    setSendingReset(true);
+    try {
+      const res = await fetch("/api/admin/send-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(`密码重置邮件已发送至 ${data.email}`);
+    } catch (e: any) {
+      toast.error(e.message || "发送失败");
+    } finally {
+      setSendingReset(false);
+    }
   }
 
   async function handleSave() {
@@ -310,9 +332,20 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
           />
         </div>
 
-        <div className="flex items-center gap-3 pt-1">
-          <Button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl h-10 gap-2">
+        <div className="flex items-center gap-3 pt-1 flex-wrap">
+          <Button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl h-10 gap-2 min-w-[120px]">
             {saving ? <><RiLoader4Line className="w-4 h-4 animate-spin" />保存中…</> : <><RiSaveLine className="w-4 h-4" />保存更改</>}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={sendPasswordReset}
+            disabled={saving || sendingReset}
+            className="rounded-xl h-10 gap-1.5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+            title="向该用户邮箱发送密码重置链接"
+          >
+            {sendingReset
+              ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />发送中</>
+              : <><RiLockPasswordLine className="w-3.5 h-3.5" />重置密码</>}
           </Button>
           <Button
             variant="outline"
