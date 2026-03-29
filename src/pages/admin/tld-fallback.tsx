@@ -12,14 +12,9 @@ import {
 } from "@remixicon/react";
 
 const TLD_TABS = [
-  { href: "/admin/tld-lifecycle",          label: "生命周期" },
-  { href: "/admin/tld-rules",              label: "TLD 规则" },
-  { href: "/admin/tld-fallback",           label: "查询兜底" },
-  { href: "/admin/tld-lifecycle-feedback", label: "纠错反馈" },
-  { href: "/admin/repair-queue",           label: "服务器修复" },
-  { href: "/admin/custom-servers",         label: "自定义服务器" },
-  { href: "/admin/tld-probe",              label: "TLD 探测" },
-  { href: "/admin/tld-registry",           label: "注册局信息" },
+  { href: "/admin/domains",      label: "TLD 管理" },
+  { href: "/admin/tld-rules",   label: "TLD 规则" },
+  { href: "/admin/tld-fallback", label: "查询兜底" },
 ];
 
 type FallbackRow = {

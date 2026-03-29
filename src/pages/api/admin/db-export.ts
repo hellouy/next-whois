@@ -32,7 +32,6 @@ const TABLES: { name: string; label: string; ephemeral?: boolean }[] = [
   { name: "tld_registry_info",       label: "注册局数据库" },
   { name: "tld_server_failures",     label: "TLD 服务器修复队列" },
   { name: "whois_cache",             label: "WHOIS 缓存", ephemeral: true },
-  { name: "cctld_rdap_servers",      label: "ccTLD RDAP 服务器" },
   { name: "password_reset_tokens",   label: "密码重置令牌", ephemeral: true },
   { name: "rate_limit_records",      label: "频率限制记录", ephemeral: true },
 ];

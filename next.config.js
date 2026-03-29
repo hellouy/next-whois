@@ -16,6 +16,20 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   optimizeFonts: true,
+  async redirects() {
+    return [
+      // Consolidated admin pages → unified pages
+      { source: "/admin/access-keys",             destination: "/admin/access-control",          permanent: true },
+      { source: "/admin/invite-codes",             destination: "/admin/access-control?tab=invite",      permanent: true },
+      { source: "/admin/activation-codes",         destination: "/admin/access-control?tab=activation",  permanent: true },
+      { source: "/admin/custom-servers",           destination: "/admin/domains?tab=servers",     permanent: true },
+      { source: "/admin/repair-queue",             destination: "/admin/domains?tab=servers",     permanent: true },
+      { source: "/admin/tld-lifecycle",            destination: "/admin/domains",                 permanent: true },
+      { source: "/admin/tld-lifecycle-feedback",   destination: "/admin/domains",                 permanent: true },
+      { source: "/admin/tld-probe",                destination: "/admin/domains?tab=servers",     permanent: true },
+      { source: "/admin/tld-registry",             destination: "/admin/domains?tab=iana",        permanent: true },
+    ];
+  },
   // Allow Replit's proxied dev domain to load _next/* resources without warnings
   allowedDevOrigins: ["*.replit.dev", "*.kirk.replit.dev", "*.worf.replit.dev", "*.repl.co"],
   images: {

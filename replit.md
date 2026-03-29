@@ -1,4 +1,31 @@
-# Next Whois UI — v3.23
+# Next Whois UI — v3.24
+
+## Admin Consolidation & Cleanup (2026-03-29)
+
+### Old Admin Pages Deleted (9 files)
+All consolidated into two unified tabbed pages. Old URLs 301-redirect to new locations via `next.config.js`:
+
+| Old URL | New Location |
+|---|---|
+| `/admin/access-keys` | `/admin/access-control` |
+| `/admin/invite-codes` | `/admin/access-control?tab=invite` |
+| `/admin/activation-codes` | `/admin/access-control?tab=activation` |
+| `/admin/custom-servers` | `/admin/domains?tab=servers` |
+| `/admin/repair-queue` | `/admin/domains?tab=servers` |
+| `/admin/tld-lifecycle` | `/admin/domains` |
+| `/admin/tld-lifecycle-feedback` | `/admin/domains` |
+| `/admin/tld-probe` | `/admin/domains?tab=servers` |
+| `/admin/tld-registry` | `/admin/domains?tab=iana` |
+
+### Lifecycle Feedback Ported to domains.tsx
+The admin lifecycle-feedback review UI (approve/reject/delete user-submitted period corrections) was ported as an inline section at the bottom of the 生命周期 tab in `/admin/domains`. The admin API `tld-lifecycle-feedback.ts` is retained.
+
+### Orphaned Files Removed
+- `src/pages/api/admin/tld-probe.ts` — deleted (only called by old tld-probe.tsx; probe results went to orphaned `cctld_rdap_servers` table)
+- `cctld_rdap_servers` table — removed from `db.ts` schema (replaced with `DROP TABLE IF EXISTS`), removed from `db-export.ts`. Table was never read by the live query engine (real ccTLD RDAP routing uses `CCTLD_RDAP_OVERRIDES` in `rdap_client.ts`).
+
+### Tab Arrays Updated
+- `tld-fallback.tsx` and `tld-rules.tsx` — stale 8-item tab bars replaced with clean 3-item nav: TLD 管理 / TLD 规则 / 查询兜底
 
 ## Performance & Code Quality Audit (2026-03-29)
 

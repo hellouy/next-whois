@@ -424,16 +424,9 @@ const CREATE_INDEXES = [
     expires_at TIMESTAMPTZ  NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_whois_cache_expires ON whois_cache (expires_at)`,
-  `CREATE TABLE IF NOT EXISTS cctld_rdap_servers (
-    tld        TEXT         PRIMARY KEY,
-    url        TEXT         NOT NULL,
-    source     TEXT         NOT NULL DEFAULT 'manual',
-    notes      TEXT,
-    probe_ok   BOOLEAN,
-    probed_at  TIMESTAMPTZ,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-  )`,
+  // cctld_rdap_servers was an orphaned table — probe results were stored here but
+  // never read by the live query engine. Dropped in favour of tld_fallback_stats.rdap_skip.
+  `DROP TABLE IF EXISTS cctld_rdap_servers`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {
