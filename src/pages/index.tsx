@@ -77,6 +77,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
   const stats = usePublicStats(seo.showStats);
 
   useEffect(() => {
+    router.prefetch("/github.com");
     const handleStart = (url: string) => { if (isSearchRoute(url)) setLoading(true); };
     const handleComplete = () => setLoading(false);
     router.events.on("routeChangeStart", handleStart);

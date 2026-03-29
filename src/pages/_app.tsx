@@ -295,11 +295,13 @@ const pageVariants = {
 // feedback internally.  Adding a y-offset to the page-level transition compounds
 // with the skeleton's own opacity-in, producing a visible "jump" on mobile.
 // Pure opacity is the safest transition for these pages.
+// Start at 0.85 opacity so the dimmer "查询中…" text is immediately visible
+// alongside the bright shimmer text — eliminates the perceptual "1→2" jump.
 const stablePageVariants = {
-  initial: { opacity: 0 },
+  initial: { opacity: 0.85 },
   animate: {
     opacity: 1,
-    transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] as const },
+    transition: { duration: 0.08, ease: [0.22, 1, 0.36, 1] as const },
   },
   exit: {
     opacity: 0,

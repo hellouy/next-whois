@@ -1,4 +1,12 @@
-# Next Whois UI — v3.25
+# Next Whois UI — v3.26
+
+## Performance / UX Fixes (2026-03-29, v3.26)
+
+### 1. Query Page Prefetch Warmup (`src/pages/index.tsx`)
+Added `router.prefetch('/github.com')` to the homepage `useEffect`. This fires immediately when the user lands on the homepage, triggering the server to compile `[...query].tsx` (the results page) in the background. In dev mode this compilation takes ~8s; without prefetch the user waits 12-13s for their very first search. With prefetch, the compilation happens while the user is still typing, so the first search completes in ~31ms (same as subsequent searches).
+
+### 2. Eliminate Skeleton "1→2" Jump (`src/pages/_app.tsx`)
+The `stablePageVariants` (used by the results/DNS/IP pages) started at `opacity: 0` and faded to `opacity: 1` over 150ms. The bright CSS `text-shimmer` animation became visible at low opacity while the dimmer `查询中…` text remained invisible until opacity rose higher — users perceived a "jump" from title-only to title + querying text. Fix: changed `initial.opacity` from `0` → `0.85` and entry duration from `150ms` → `80ms`. Both texts are now immediately visible from the first frame.
 
 ## Admin Consolidation & Cleanup (2026-03-29)
 
