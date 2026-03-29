@@ -26,6 +26,7 @@ import {
   RiToggleLine, RiAlertLine, RiCheckLine, RiServerLine,
   RiAddLine, RiPencilLine, RiCloseLine, RiSaveLine,
   RiSettings3Line, RiGlobalLine, RiWifiLine,
+  RiFlaskLine, RiCheckboxCircleLine, RiCloseCircleLine, RiTimeLine,
 } from "@remixicon/react";
 import type { CustomServerEntry, TcpServerEntry, HttpServerEntry } from "@/lib/whois/custom-servers";
 
@@ -178,6 +179,10 @@ export default function AdminTldFallbackPage() {
   const [serverSaving, setServerSaving] = React.useState(false);
   // For the standalone "新增服务器" dialog (not linked to a fallback row)
   const [serverDialogNewTld, setServerDialogNewTld] = React.useState("");
+  // ── Server test state ─────────────────────────────────────────────────────
+  const [testing, setTesting] = React.useState(false);
+  type TestResult = { ok: boolean; method: string; output?: string; statusCode?: number; error?: string; elapsedMs: number };
+  const [testResult, setTestResult] = React.useState<TestResult | null>(null);
 
   function load() {
     setLoading(true);
@@ -206,6 +211,7 @@ export default function AdminTldFallbackPage() {
   React.useEffect(() => { load(); loadServers(); }, []);
 
   function openServerDialog(tld: string, existing?: ServerWithSource) {
+    setTestResult(null);
     setServerDialogTld(tld);
     setServerDialogIsNew(!existing);
     setServerDialogNewTld(tld);
@@ -228,6 +234,7 @@ export default function AdminTldFallbackPage() {
   }
 
   function openNewServerDialog() {
+    setTestResult(null);
     setServerDialogTld("__new__");
     setServerDialogIsNew(true);
     setServerDialogNewTld("");
@@ -237,6 +244,30 @@ export default function AdminTldFallbackPage() {
     setRdapUrl("");
     setHttpUrl("");
     setHttpMethod("GET");
+  }
+
+  async function testServer() {
+    const rawTld = serverDialogTld === "__new__" ? serverDialogNewTld : serverDialogTld;
+    const tld = (rawTld ?? "").trim().toLowerCase().replace(/^\./, "");
+    if (!tld) { toast.error("请先输入 TLD"); return; }
+    const entry = buildEntry(serverType, whoisHost, whoisPort, rdapUrl, httpUrl, httpMethod);
+    if (!entry) { toast.error("请填写完整的服务器信息"); return; }
+
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/test-server", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, entry }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (e: any) {
+      setTestResult({ ok: false, method: "?", error: e?.message || "请求失败", elapsedMs: 0 });
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function saveServer() {
@@ -914,13 +945,62 @@ export default function AdminTldFallbackPage() {
             )}
           </div>
 
+          {/* ── Test result panel ──────────────────────────────────────────── */}
+          {testResult && (
+            <div className={cn(
+              "rounded-lg border text-[12px] overflow-hidden",
+              testResult.ok ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30" : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
+            )}>
+              {/* header */}
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 border-b font-medium",
+                testResult.ok ? "border-green-200 text-green-800 dark:border-green-900 dark:text-green-300" : "border-red-200 text-red-800 dark:border-red-900 dark:text-red-300",
+              )}>
+                {testResult.ok
+                  ? <RiCheckboxCircleLine className="w-4 h-4 flex-shrink-0" />
+                  : <RiCloseCircleLine className="w-4 h-4 flex-shrink-0" />}
+                <span>{testResult.ok ? "连接成功" : "连接失败"}</span>
+                <span className="text-muted-foreground font-normal ml-auto flex items-center gap-1">
+                  <RiTimeLine className="w-3 h-3" />{testResult.elapsedMs}ms
+                </span>
+                {testResult.statusCode && (
+                  <span className={cn("font-mono px-1.5 py-0.5 rounded text-[11px]",
+                    testResult.ok ? "bg-green-200/60 dark:bg-green-900/40" : "bg-red-200/60 dark:bg-red-900/40",
+                  )}>HTTP {testResult.statusCode}</span>
+                )}
+              </div>
+              {/* body */}
+              <div className="px-3 py-2">
+                {testResult.error && !testResult.ok && (
+                  <p className="text-red-700 dark:text-red-400 mb-1">{testResult.error}</p>
+                )}
+                {testResult.output && (
+                  <pre className="font-mono text-[11px] whitespace-pre-wrap break-all text-foreground/80 max-h-40 overflow-y-auto leading-relaxed">{testResult.output}</pre>
+                )}
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setServerDialogTld(null)}>取消</Button>
-            <Button onClick={saveServer} disabled={serverSaving} className="gap-1.5">
+            <Button
+              variant="outline"
+              onClick={testServer}
+              disabled={testing || serverSaving}
+              className={cn("gap-1.5", testResult?.ok && "border-green-500 text-green-700 dark:text-green-400")}
+            >
+              {testing
+                ? <RiLoader4Line className="w-4 h-4 animate-spin" />
+                : testResult?.ok
+                  ? <RiCheckboxCircleLine className="w-4 h-4" />
+                  : <RiFlaskLine className="w-4 h-4" />}
+              {testing ? "测试中…" : testResult?.ok ? "测试通过" : "测试连接"}
+            </Button>
+            <Button onClick={saveServer} disabled={serverSaving || testing} className="gap-1.5">
               {serverSaving
                 ? <RiLoader4Line className="w-4 h-4 animate-spin" />
                 : <RiSaveLine className="w-4 h-4" />}
-              保存
+              确认保存
             </Button>
           </DialogFooter>
         </DialogContent>
