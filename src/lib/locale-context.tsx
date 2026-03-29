@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect } from "react";
 
 export const LOCALES = ["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -36,6 +36,14 @@ function detectClientLocale(): Locale {
   return "en";
 }
 
+// useLayoutEffect fires synchronously after React's DOM mutations but BEFORE
+// the browser paints.  Using it for locale sync means any English→target-language
+// switch resolves before the first pixel is drawn — eliminating the flash.
+// On the server useLayoutEffect doesn't run, so fall back to useEffect to avoid
+// the "useLayoutEffect does nothing on the server" warning.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 interface LocaleProviderProps {
   children: React.ReactNode;
   /**
@@ -50,10 +58,11 @@ export function LocaleProvider({ children, initialLocale }: LocaleProviderProps)
   // Use server-detected locale (if available) so the first render is correct.
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
 
-  useEffect(() => {
-    // Always sync with client-side detection after hydration.
-    // This picks up cookie changes made by the language switcher between SSR
-    // and hydration, while still using initialLocale as the starting point.
+  useIsomorphicLayoutEffect(() => {
+    // Sync with client-side detection BEFORE first paint.
+    // Picks up NEXT_LOCALE cookie changes between SSR and hydration.
+    // Using useLayoutEffect (not useEffect) means any English→Chinese switch
+    // happens before the browser draws, so the user never sees a language flash.
     const clientLocale = detectClientLocale();
     if (clientLocale !== locale) {
       setLocaleState(clientLocale);

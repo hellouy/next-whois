@@ -292,17 +292,12 @@ const pageVariants = {
 };
 
 // Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
-// feedback internally.  Adding a y-offset to the page-level transition compounds
-// with the skeleton's own opacity-in, producing a visible "jump" on mobile.
-// Pure opacity is the safest transition for these pages.
-// Start at 0.85 opacity so the dimmer "查询中…" text is immediately visible
-// alongside the bright shimmer text — eliminates the perceptual "1→2" jump.
+// feedback internally.  No entry animation — the page appears at full opacity
+// instantly so every element (shimmer title AND the dimmer "查询中…" text) is
+// visible from the very first frame, eliminating the perceptual "1→2" jump.
 const stablePageVariants = {
-  initial: { opacity: 0.85 },
-  animate: {
-    opacity: 1,
-    transition: { duration: 0.08, ease: [0.22, 1, 0.36, 1] as const },
-  },
+  initial: { opacity: 1 },
+  animate: { opacity: 1, transition: { duration: 0 } },
   exit: {
     opacity: 0,
     transition: { duration: 0.05, ease: "easeIn" as const },
