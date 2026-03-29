@@ -1588,6 +1588,8 @@
     "nav_invite_codes": "Invite Codes",
     "nav_activation_codes": "Activation Codes",
     "nav_access_keys": "Access Keys",
+    "nav_access_control": "Access Control",
+    "nav_domains": "Domain Data",
     "nav_links": "Links",
     "nav_tld_lifecycle": "TLD Rules",
     "nav_tld_rules": "AI Fetch",

@@ -41,28 +41,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const { label, scope, expires_at } = req.body as {
+    const { label, scope, expires_at, count } = req.body as {
       label?: string;
       scope?: string;
       expires_at?: string;
+      count?: number;
     };
 
+    const batchCount = Math.min(Math.max(1, parseInt(String(count)) || 1), 50);
+
     try {
-      const id = generateId();
-      const key = generateKey();
-      await run(
-        `INSERT INTO access_keys (id, key, label, scope, is_active, expires_at)
-         VALUES ($1, $2, $3, $4, true, $5)`,
-        [
-          id,
-          key,
-          label?.trim() || null,
-          scope || "api",
-          expires_at || null,
-        ],
-      );
-      const created = await one("SELECT * FROM access_keys WHERE id = $1", [id]);
-      return res.status(201).json({ ok: true, key: created });
+      const created = [];
+      for (let i = 0; i < batchCount; i++) {
+        const id = generateId();
+        const key = generateKey();
+        await run(
+          `INSERT INTO access_keys (id, key, label, scope, is_active, expires_at)
+           VALUES ($1, $2, $3, $4, true, $5)`,
+          [id, key, label?.trim() || null, scope || "api", expires_at || null],
+        );
+        const row = await one("SELECT * FROM access_keys WHERE id = $1", [id]);
+        if (row) created.push(row);
+      }
+      return res.status(201).json({ ok: true, key: created[0], keys: created, count: created.length });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

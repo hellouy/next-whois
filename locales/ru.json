@@ -1588,6 +1588,8 @@
     "nav_invite_codes": "Инвайт-коды",
     "nav_activation_codes": "Коды активации",
     "nav_access_keys": "Ключи доступа",
+    "nav_access_control": "Ключи доступа",
+    "nav_domains": "Domain Data",
     "nav_links": "Ссылки",
     "nav_tld_lifecycle": "Правила TLD",
     "nav_tld_rules": "ИИ-парсинг",

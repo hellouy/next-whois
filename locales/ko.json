@@ -1588,6 +1588,8 @@
     "nav_invite_codes": "초대 코드",
     "nav_activation_codes": "활성화 코드",
     "nav_access_keys": "액세스 키",
+    "nav_access_control": "액세스 키",
+    "nav_domains": "Domain Data",
     "nav_links": "링크",
     "nav_tld_lifecycle": "TLD 규칙",
     "nav_tld_rules": "AI 가져오기",

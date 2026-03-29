@@ -1588,6 +1588,8 @@
     "nav_invite_codes": "招待コード",
     "nav_activation_codes": "アクティベーションコード",
     "nav_access_keys": "アクセスキー",
+    "nav_access_control": "アクセスキー",
+    "nav_domains": "Domain Data",
     "nav_links": "リンク",
     "nav_tld_lifecycle": "TLDルール",
     "nav_hot_prefixes": "Hot Prefixes",

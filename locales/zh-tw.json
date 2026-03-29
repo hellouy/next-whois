@@ -1588,6 +1588,8 @@
     "nav_invite_codes": "邀請碼",
     "nav_activation_codes": "激活碼",
     "nav_access_keys": "密鑰",
+    "nav_access_control": "密鑰",
+    "nav_domains": "Domain Data",
     "nav_links": "連結",
     "nav_tld_lifecycle": "TLD規則",
     "nav_tld_rules": "AI抓取",
