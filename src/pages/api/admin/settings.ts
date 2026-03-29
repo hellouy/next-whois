@@ -20,6 +20,12 @@ const SERVER_ONLY_KEYS = new Set([
   "captcha_hcaptcha_secret_key",
   "captcha_mtcaptcha_secret_key",
   "smtp_pass",
+  "resend_api_key",
+  "payment_stripe_sk",
+  "payment_stripe_webhook_secret",
+  "payment_xunhupay_secret",
+  "payment_alipay_private_key",
+  "payment_paypal_client_secret",
 ]);
 
 let _rowsCache: { rows: { key: string; value: string }[]; ts: number } | null = null;

@@ -770,13 +770,28 @@ async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: 
 }
 
 async function sendViaResend(to: string, subject: string, html: string) {
-  const resendKey = process.env.RESEND_API_KEY;
+  // DB-first with env var fallback
+  let resendKey = "";
+  let configuredFrom = "";
+  try {
+    const rows = await import("@/lib/db-query").then(m =>
+      m.many<{ key: string; value: string }>(
+        `SELECT key, value FROM site_settings WHERE key IN ('resend_api_key','resend_from_email')`
+      )
+    );
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.key] = r.value;
+    resendKey = map.resend_api_key || process.env.RESEND_API_KEY || "";
+    configuredFrom = map.resend_from_email || process.env.RESEND_FROM_EMAIL || "";
+  } catch {
+    resendKey = process.env.RESEND_API_KEY || "";
+    configuredFrom = process.env.RESEND_FROM_EMAIL || "";
+  }
   if (!resendKey) {
-    console.warn("[sendEmail] RESEND_API_KEY not set — email skipped");
+    console.warn("[sendEmail] resend_api_key not configured — email skipped");
     return;
   }
   const siteLabel = await getSiteLabel();
-  const configuredFrom = process.env.RESEND_FROM_EMAIL || "";
   const fromAddresses = configuredFrom
     ? [withSenderName(configuredFrom, siteLabel), RESEND_FALLBACK_FROM]
     : [RESEND_FALLBACK_FROM];

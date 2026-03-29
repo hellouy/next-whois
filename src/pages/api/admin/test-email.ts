@@ -22,16 +22,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   for (const r of rows) cfg[r.key] = r.value;
 
   const smtpActive = !!(cfg.smtp_enabled && cfg.smtp_host && cfg.smtp_user);
-  const resendKey = process.env.RESEND_API_KEY;
+  const resendRows = await many<{ key: string; value: string }>(
+    `SELECT key, value FROM site_settings WHERE key IN ('resend_api_key','resend_from_email')`
+  ).catch(() => [] as { key: string; value: string }[]);
+  const rcfg: Record<string, string> = {};
+  for (const r of resendRows) rcfg[r.key] = r.value;
+  const resendKey = rcfg.resend_api_key || process.env.RESEND_API_KEY || "";
 
   if (!smtpActive && !resendKey) {
-    return res.status(503).json({ error: "未配置邮件发送渠道（SMTP 或 RESEND_API_KEY）" });
+    return res.status(503).json({ error: "未配置邮件发送渠道（SMTP 或 Resend API Key）" });
   }
 
   const provider = smtpActive ? "SMTP" : "Resend";
   const fromDisplay = smtpActive
     ? (cfg.smtp_from || cfg.smtp_user)
-    : (process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev");
+    : (rcfg.resend_from_email || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev");
 
   try {
     await sendEmail({

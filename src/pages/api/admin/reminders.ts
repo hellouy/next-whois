@@ -76,8 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === "send-email") {
       if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
 
-      const resendKey = process.env.RESEND_API_KEY;
-      if (!resendKey) return res.status(503).json({ error: "RESEND_API_KEY 未配置，无法发送邮件" });
+      const { getSetting: getS } = await import("@/lib/server/site-settings-server");
+      const resendKey = (await getS("resend_api_key")) || process.env.RESEND_API_KEY || "";
+      const smtpEnabled = await getS("smtp_enabled");
+      if (!resendKey && !smtpEnabled) return res.status(503).json({ error: "邮件未配置（SMTP 或 Resend），无法发送邮件" });
 
       try {
         const reminder = await one<{

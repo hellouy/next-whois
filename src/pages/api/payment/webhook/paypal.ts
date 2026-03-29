@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, paypalGetToken } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
+import { getSetting } from "@/lib/server/site-settings-server";
 
 export const config = { api: { bodyParser: true } };
 
@@ -36,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).end();
   if (!(await isDbReady())) return res.status(503).end();
 
-  const webhookId = process.env.PAYPAL_WEBHOOK_ID ?? "";
+  const webhookId = (await getSetting("payment_paypal_webhook_id")) || process.env.PAYPAL_WEBHOOK_ID || "";
   const body = req.body;
 
   if (webhookId) {

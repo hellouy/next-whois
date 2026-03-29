@@ -280,14 +280,38 @@ export function verifyStripeWebhookSignature(
 
 // ── PayPal REST API helpers ────────────────────────────────────────────────
 
-const PAYPAL_BASE = process.env.PAYPAL_ENV === "sandbox"
-  ? "https://api-m.sandbox.paypal.com"
-  : "https://api-m.paypal.com";
+async function getPaypalBase(): Promise<string> {
+  try {
+    const row = await one<{ value: string }>(
+      `SELECT value FROM site_settings WHERE key = 'payment_paypal_env'`
+    );
+    const env = row?.value || process.env.PAYPAL_ENV || "live";
+    return env === "sandbox" ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+  } catch {
+    return process.env.PAYPAL_ENV === "sandbox"
+      ? "https://api-m.sandbox.paypal.com"
+      : "https://api-m.paypal.com";
+  }
+}
 
 export async function paypalGetToken(): Promise<string> {
-  const clientId = process.env.PAYPAL_CLIENT_ID ?? "";
-  const secret = process.env.PAYPAL_CLIENT_SECRET ?? "";
+  // DB-first with env var fallback
+  let clientId = "";
+  let secret = "";
+  try {
+    const rows = await many<{ key: string; value: string }>(
+      `SELECT key, value FROM site_settings WHERE key IN ('payment_paypal_client_id','payment_paypal_client_secret')`
+    );
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.key] = r.value;
+    clientId = map.payment_paypal_client_id || process.env.PAYPAL_CLIENT_ID || "";
+    secret = map.payment_paypal_client_secret || process.env.PAYPAL_CLIENT_SECRET || "";
+  } catch {
+    clientId = process.env.PAYPAL_CLIENT_ID || "";
+    secret = process.env.PAYPAL_CLIENT_SECRET || "";
+  }
   if (!clientId || !secret) throw new Error("PayPal 未配置 Client ID / Secret");
+  const PAYPAL_BASE = await getPaypalBase();
   const basic = Buffer.from(`${clientId}:${secret}`).toString("base64");
   const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: "POST",
@@ -304,6 +328,7 @@ export async function paypalCreateOrder(params: {
   description: string; returnUrl: string; cancelUrl: string;
 }): Promise<{ id: string; approveUrl: string }> {
   const token = await paypalGetToken();
+  const PAYPAL_BASE = await getPaypalBase();
   const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -334,6 +359,7 @@ export async function paypalCreateOrder(params: {
 
 export async function paypalCaptureOrder(paypalOrderId: string): Promise<{ status: string; captureId: string }> {
   const token = await paypalGetToken();
+  const PAYPAL_BASE = await getPaypalBase();
   const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${paypalOrderId}/capture`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

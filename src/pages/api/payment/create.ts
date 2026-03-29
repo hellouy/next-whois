@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseUrl = `${proto}://${host}`;
 
     if (provider === "stripe") {
-      const stripeKey = process.env.STRIPE_SECRET_KEY ?? await getSetting("payment_stripe_sk_enc");
+      const stripeKey = (await getSetting("payment_stripe_sk")) || process.env.STRIPE_SECRET_KEY || "";
       if (!stripeKey) return res.status(500).json({ error: "Stripe 未配置私钥" });
 
       const stripe = new Stripe(stripeKey, { apiVersion: "2026-02-25.clover" });
@@ -120,8 +120,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (provider === "alipay") {
       const appId = await getSetting("payment_alipay_appid");
-      const privateKey = process.env.ALIPAY_PRIVATE_KEY ?? "";
-      const alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY ?? "";
+      const privateKey = (await getSetting("payment_alipay_private_key")) || process.env.ALIPAY_PRIVATE_KEY || "";
+      const alipayPublicKey = (await getSetting("payment_alipay_public_key")) || process.env.ALIPAY_PUBLIC_KEY || "";
       if (!appId || !privateKey) return res.status(500).json({ error: "支付宝未配置" });
 
       const notifyUrl = await getSetting("payment_alipay_notify_url") ||

@@ -24,10 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rawBody = await getRawBody(req);
   const sig = req.headers["stripe-signature"] as string;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+  const webhookSecret = (await getSetting("payment_stripe_webhook_secret")) || process.env.STRIPE_WEBHOOK_SECRET || "";
 
   if (!webhookSecret) {
-    console.warn("[stripe webhook] STRIPE_WEBHOOK_SECRET not set");
+    console.warn("[stripe webhook] payment_stripe_webhook_secret not configured");
     return res.status(500).json({ error: "Webhook secret not configured" });
   }
 

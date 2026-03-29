@@ -1004,21 +1004,36 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
 
-                  {/* Resend fallback info */}
+                  {/* Resend fallback config */}
                   <div className="glass-panel border border-border rounded-2xl overflow-hidden">
                     <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/30">
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
                         <RiShieldLine className="w-3.5 h-3.5" />
                       </div>
-                      <h3 className="text-sm font-bold">Resend（备用 / 兜底）</h3>
+                      <h3 className="text-sm font-bold">Resend（备用 / 兜底邮件服务）</h3>
                     </div>
                     <div className="p-5 space-y-3">
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        当 SMTP 未启用时，系统自动回退到 Resend 发送邮件。配置方式：在 Secrets 中设置以下环境变量。
+                        当 SMTP 未启用时，系统自动回退到 Resend 发送邮件。密钥存储在数据库中，换服务器无需重新配置。
                       </p>
-                      <div className="p-3 rounded-xl bg-muted/40 border border-border/60 text-[11px] text-muted-foreground space-y-1">
-                        <p><code className="font-mono">RESEND_API_KEY</code> — Resend API 密钥（必填）</p>
-                        <p><code className="font-mono">RESEND_FROM_EMAIL</code> — 发件人地址（如 noreply@yourdomain.com）</p>
+                      <div>
+                        <Label className="text-xs mb-1 block">Resend API Key（必填）</Label>
+                        <Input
+                          type="password"
+                          value={form.resend_api_key ?? ""}
+                          onChange={e => set("resend_api_key", e.target.value)}
+                          placeholder="re_xxxxxxxxxxxxxxxxxxxx"
+                          className="h-8 text-sm font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">发件人地址（可选）</Label>
+                        <Input
+                          value={form.resend_from_email ?? ""}
+                          onChange={e => set("resend_from_email", e.target.value)}
+                          placeholder="noreply@yourdomain.com"
+                          className="h-8 text-sm"
+                        />
                       </div>
                       <p className="text-[11px] text-amber-600 dark:text-amber-400">
                         注意：Resend 免费版每月限 3,000 封，建议配置 SMTP 作为主要发送渠道。
@@ -1046,7 +1061,7 @@ export default function AdminSettingsPage() {
                       )}
                       {emailOk === false && (
                         <p className="text-xs text-destructive flex items-center gap-1">
-                          <RiAlertLine className="w-3.5 h-3.5" />发送失败，请检查 SMTP 配置或 RESEND_API_KEY
+                          <RiAlertLine className="w-3.5 h-3.5" />发送失败，请检查 SMTP 配置或 Resend API Key
                         </p>
                       )}
                       <Button
@@ -1182,8 +1197,7 @@ export default function AdminSettingsPage() {
                       <RiBankCardLine className="w-4 h-4 text-violet-500" />支付网关配置
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      配置支付渠道。敏感 Key（私钥/Secret）务必通过环境变量设置，不要填入此处。
-                      <br />公开 Key（Publishable Key / App ID）可在此配置，保存即生效。
+                      所有配置（包括密钥）均存储在数据库，换服务器只需对接同一个数据库即可自动恢复。
                     </p>
                   </div>
 
@@ -1202,10 +1216,18 @@ export default function AdminSettingsPage() {
                         <Input value={form.payment_stripe_pk} onChange={e => setForm(f => ({ ...f, payment_stripe_pk: e.target.value }))}
                           placeholder="pk_live_..." className="h-8 text-sm font-mono" />
                       </div>
-                      <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200/50 dark:border-amber-700/30">
-                        私钥（Secret Key）请设置环境变量：<code className="font-mono">STRIPE_SECRET_KEY</code>
-                        <br />Webhook 签名密钥：<code className="font-mono">STRIPE_WEBHOOK_SECRET</code>
-                        <br />Webhook URL：<code className="font-mono">/api/payment/webhook/stripe</code>
+                      <div>
+                        <Label className="text-xs mb-1 block">Secret Key（私钥，以 sk_ 开头）</Label>
+                        <Input type="password" value={form.payment_stripe_sk ?? ""} onChange={e => setForm(f => ({ ...f, payment_stripe_sk: e.target.value }))}
+                          placeholder="sk_live_..." className="h-8 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">Webhook 签名密钥（以 whsec_ 开头）</Label>
+                        <Input type="password" value={form.payment_stripe_webhook_secret ?? ""} onChange={e => setForm(f => ({ ...f, payment_stripe_webhook_secret: e.target.value }))}
+                          placeholder="whsec_..." className="h-8 text-sm font-mono" />
+                      </div>
+                      <div className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/60">
+                        Webhook URL：<code className="font-mono">/api/payment/webhook/stripe</code>
                       </div>
                     </div>
 
@@ -1223,9 +1245,13 @@ export default function AdminSettingsPage() {
                         <Input value={form.payment_xunhupay_appid} onChange={e => setForm(f => ({ ...f, payment_xunhupay_appid: e.target.value }))}
                           placeholder="虎皮椒应用 ID" className="h-8 text-sm font-mono" />
                       </div>
-                      <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200/50 dark:border-amber-700/30">
-                        App Secret 请设置环境变量：<code className="font-mono">XUNHUPAY_APP_SECRET</code>
-                        <br />Webhook URL：<code className="font-mono">/api/payment/webhook/xunhupay</code>
+                      <div>
+                        <Label className="text-xs mb-1 block">App Secret</Label>
+                        <Input type="password" value={form.payment_xunhupay_secret ?? ""} onChange={e => setForm(f => ({ ...f, payment_xunhupay_secret: e.target.value }))}
+                          placeholder="虎皮椒 App Secret" className="h-8 text-sm font-mono" />
+                      </div>
+                      <div className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/60">
+                        Webhook URL：<code className="font-mono">/api/payment/webhook/xunhupay</code>
                       </div>
                     </div>
 
@@ -1248,9 +1274,15 @@ export default function AdminSettingsPage() {
                         <Input value={form.payment_alipay_notify_url} onChange={e => setForm(f => ({ ...f, payment_alipay_notify_url: e.target.value }))}
                           placeholder="https://yourdomain.com/api/payment/webhook/alipay" className="h-8 text-sm font-mono" />
                       </div>
-                      <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200/50 dark:border-amber-700/30">
-                        应用私钥（RSA2）：环境变量 <code className="font-mono">ALIPAY_PRIVATE_KEY</code>
-                        <br />支付宝公钥：<code className="font-mono">ALIPAY_PUBLIC_KEY</code>（用于回调验签）
+                      <div>
+                        <Label className="text-xs mb-1 block">应用私钥（RSA2，用于签名请求）</Label>
+                        <Input type="password" value={form.payment_alipay_private_key ?? ""} onChange={e => setForm(f => ({ ...f, payment_alipay_private_key: e.target.value }))}
+                          placeholder="MIIEow..." className="h-8 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">支付宝公钥（用于回调验签）</Label>
+                        <Input type="password" value={form.payment_alipay_public_key ?? ""} onChange={e => setForm(f => ({ ...f, payment_alipay_public_key: e.target.value }))}
+                          placeholder="MIIBIjAN..." className="h-8 text-sm font-mono" />
                       </div>
                     </div>
 
@@ -1264,15 +1296,31 @@ export default function AdminSettingsPage() {
                         </label>
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Client ID（前端公钥）</Label>
+                        <Label className="text-xs mb-1 block">Client ID（公钥）</Label>
                         <Input value={form.payment_paypal_client_id} onChange={e => setForm(f => ({ ...f, payment_paypal_client_id: e.target.value }))}
                           placeholder="PayPal Client ID（以 A 开头）" className="h-8 text-sm font-mono" />
                       </div>
-                      <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200/50 dark:border-amber-700/30">
-                        Client Secret：环境变量 <code className="font-mono">PAYPAL_CLIENT_SECRET</code>
-                        <br />沙盒测试：设置 <code className="font-mono">PAYPAL_ENV=sandbox</code>
-                        <br />Webhook URL：<code className="font-mono">/api/payment/webhook/paypal</code>（可选，用于加强可靠性）
-                        <br />Webhook ID（可选）：<code className="font-mono">PAYPAL_WEBHOOK_ID</code>
+                      <div>
+                        <Label className="text-xs mb-1 block">Client Secret（私钥）</Label>
+                        <Input type="password" value={form.payment_paypal_client_secret ?? ""} onChange={e => setForm(f => ({ ...f, payment_paypal_client_secret: e.target.value }))}
+                          placeholder="PayPal Client Secret" className="h-8 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">Webhook ID（可选，用于验证回调签名）</Label>
+                        <Input value={form.payment_paypal_webhook_id ?? ""} onChange={e => setForm(f => ({ ...f, payment_paypal_webhook_id: e.target.value }))}
+                          placeholder="PayPal Webhook ID" className="h-8 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">环境</Label>
+                        <select value={form.payment_paypal_env ?? "live"}
+                          onChange={e => setForm(f => ({ ...f, payment_paypal_env: e.target.value }))}
+                          className="w-full h-8 text-sm rounded-md border border-input bg-background px-2 focus:outline-none">
+                          <option value="live">正式环境（Live）</option>
+                          <option value="sandbox">沙盒测试（Sandbox）</option>
+                        </select>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/60">
+                        Webhook URL：<code className="font-mono">/api/payment/webhook/paypal</code>（可选，用于加强可靠性）
                         <br />注意：CNY 不支持 PayPal，会自动转换为 USD 收款
                       </div>
                     </div>

@@ -12,10 +12,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!(await isDbReady())) return res.status(503).end();
 
   const body = req.body as Record<string, string>;
-  const appSecret = process.env.XUNHUPAY_APP_SECRET ?? "";
+  const appSecret = (await getSetting("payment_xunhupay_secret")) || process.env.XUNHUPAY_APP_SECRET || "";
 
   if (!appSecret) {
-    console.warn("[xunhupay webhook] XUNHUPAY_APP_SECRET not set");
+    console.warn("[xunhupay webhook] payment_xunhupay_secret not configured");
     return res.status(500).end();
   }
 

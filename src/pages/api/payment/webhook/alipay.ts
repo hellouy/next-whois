@@ -12,10 +12,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!(await isDbReady())) return res.status(503).end();
 
   const body = req.body as Record<string, string>;
-  const alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY ?? "";
+  const alipayPublicKey = (await getSetting("payment_alipay_public_key")) || process.env.ALIPAY_PUBLIC_KEY || "";
 
   if (!alipayPublicKey) {
-    console.warn("[alipay webhook] ALIPAY_PUBLIC_KEY not set");
+    console.warn("[alipay webhook] payment_alipay_public_key not configured");
     return res.status(200).send("fail");
   }
 

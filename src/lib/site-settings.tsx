@@ -109,15 +109,26 @@ export interface SiteSettings {
   // Payment gateway config
   payment_stripe_enabled: string;
   payment_stripe_pk: string;
+  payment_stripe_sk: string;
+  payment_stripe_webhook_secret: string;
   payment_xunhupay_enabled: string;
   payment_xunhupay_appid: string;
+  payment_xunhupay_secret: string;
   payment_alipay_enabled: string;
   payment_alipay_appid: string;
   payment_alipay_notify_url: string;
+  payment_alipay_public_key: string;
+  payment_alipay_private_key: string;
   payment_paypal_enabled: string;
   payment_paypal_client_id: string;
+  payment_paypal_client_secret: string;
+  payment_paypal_webhook_id: string;
+  payment_paypal_env: string;
   payment_currency: string;
   payment_success_url: string;
+  // Email / Resend config
+  resend_api_key: string;
+  resend_from_email: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -212,15 +223,25 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   smtp_secure: "ssl",
   payment_stripe_enabled: "",
   payment_stripe_pk: "",
+  payment_stripe_sk: "",
+  payment_stripe_webhook_secret: "",
   payment_xunhupay_enabled: "",
   payment_xunhupay_appid: "",
+  payment_xunhupay_secret: "",
   payment_alipay_enabled: "",
   payment_alipay_appid: "",
   payment_alipay_notify_url: "",
+  payment_alipay_public_key: "",
+  payment_alipay_private_key: "",
   payment_paypal_enabled: "",
   payment_paypal_client_id: "",
+  payment_paypal_client_secret: "",
+  payment_paypal_webhook_id: "",
+  payment_paypal_env: "live",
   payment_currency: "CNY",
   payment_success_url: "",
+  resend_api_key: "",
+  resend_from_email: "",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";
