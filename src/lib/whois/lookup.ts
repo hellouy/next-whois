@@ -1220,6 +1220,9 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
         // Already launched — just await the settled promise
         const earlyResult = await yisiEarlyPromise.catch(() => null);
         if (earlyResult) return earlyResult;
+        // Early fallback also failed — still record so the gate stays open
+        // and the failure count keeps climbing for visibility in the admin UI.
+        recordTldNativeFailure(domain).catch(() => {});
       } else {
         const useFallback = await isTldFallbackEnabled(domain);
         if (useFallback) {
@@ -1229,6 +1232,8 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
           ]);
           if (tianhuResult) return tianhuResult;
           if (yisiResult) return yisiResult;
+          // Both native and fallback failed — record so admin can see repeat failures
+          recordTldNativeFailure(domain).catch(() => {});
         } else if (permanentBlock) {
           // Permanently blocked (e.g. scraper CAPTCHA) — open gate immediately
           // so the next query races yisi/tianhu from the start without needing

@@ -1221,3 +1221,8 @@ export function getGtldRdapServer(tld: string): string | undefined {
 
 /** Total number of TLDs in the local RDAP bootstrap. */
 export const GTLD_RDAP_COUNT = 1198;
+
+/** Returns the full RDAP bootstrap map (TLD → server URL). Admin use only. */
+export function getAllGtldRdapServers(): Record<string, string> {
+  return { ...GTLD_RDAP_BOOTSTRAP };
+}

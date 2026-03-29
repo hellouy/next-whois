@@ -276,6 +276,14 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
 export const RDAP_DIRECT_CCTLDS = new Set<string>(Object.keys(CCTLD_RDAP_OVERRIDES));
 
 /**
+ * Returns the hand-curated ccTLD RDAP override map (168 entries).
+ * Used by the admin built-in server viewer.
+ */
+export function getCctldRdapOverrides(): Record<string, string> {
+  return { ...CCTLD_RDAP_OVERRIDES };
+}
+
+/**
  * Per-TLD RDAP timeout overrides (milliseconds).
  * Used for registries that are consistently slow to respond.
  * Default timeout is 4000ms; entries here extend that for specific TLDs.

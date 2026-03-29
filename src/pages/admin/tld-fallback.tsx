@@ -27,8 +27,17 @@ import {
   RiAddLine, RiPencilLine, RiCloseLine, RiSaveLine,
   RiSettings3Line, RiGlobalLine, RiWifiLine,
   RiFlaskLine, RiCheckboxCircleLine, RiCloseCircleLine, RiTimeLine,
+  RiDatabase2Line, RiArrowDownSLine, RiArrowUpSLine,
 } from "@remixicon/react";
 import type { CustomServerEntry, TcpServerEntry, HttpServerEntry } from "@/lib/whois/custom-servers";
+
+type BuiltinRdapEntry = { url: string; source: "cctld-override" | "gtld-bootstrap" };
+type BuiltinServers = {
+  rdap: Record<string, BuiltinRdapEntry>;
+  whois: Record<string, string | null>;
+  rdapTotal: number;
+  whoisTotal: number;
+};
 
 const TLD_TABS = [
   { href: "/admin/domains",      label: "TLD 管理" },
@@ -193,6 +202,22 @@ export default function AdminTldFallbackPage() {
   const [testing, setTesting] = React.useState(false);
   type TestResult = { ok: boolean; method: string; output?: string; statusCode?: number; error?: string; elapsedMs: number };
   const [testResult, setTestResult] = React.useState<TestResult | null>(null);
+
+  // ── Built-in server state ──────────────────────────────────────────────────
+  const [builtinData, setBuiltinData] = React.useState<BuiltinServers | null>(null);
+  const [builtinLoading, setBuiltinLoading] = React.useState(false);
+  const [builtinOpen, setBuiltinOpen] = React.useState<"rdap" | "whois" | null>(null);
+  const [rdapSearch, setRdapSearch] = React.useState("");
+  const [whoisSearch, setWhoisSearch] = React.useState("");
+
+  function loadBuiltin() {
+    setBuiltinLoading(true);
+    fetch("/api/admin/builtin-servers")
+      .then(r => r.json())
+      .then(data => setBuiltinData(data))
+      .catch(() => toast.error("加载内置服务器列表失败"))
+      .finally(() => setBuiltinLoading(false));
+  }
 
   function load() {
     setLoading(true);
@@ -822,6 +847,190 @@ export default function AdminTldFallbackPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════
+            Built-in Server Lists (RDAP + WHOIS)
+        ══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <RiDatabase2Line className="w-5 h-5 text-sky-500" />
+                内置服务器列表
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                程序内置的 RDAP / WHOIS 服务器表（只读参考，自定义配置优先级更高）
+              </p>
+            </div>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => { if (!builtinData) loadBuiltin(); setBuiltinOpen(builtinOpen ? null : "rdap"); }}
+              disabled={builtinLoading}
+              className="gap-1.5"
+            >
+              {builtinLoading
+                ? <RiLoader4Line className="w-4 h-4 animate-spin" />
+                : builtinOpen
+                  ? <RiArrowUpSLine className="w-4 h-4" />
+                  : <RiArrowDownSLine className="w-4 h-4" />}
+              {builtinOpen ? "收起" : "展开查看"}
+            </Button>
+          </div>
+
+          {builtinOpen && builtinData && (
+            <div className="space-y-4">
+              {/* Sub-tabs */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setBuiltinOpen("rdap")}
+                  className={cn(
+                    "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
+                    builtinOpen === "rdap"
+                      ? "bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  RDAP 服务器
+                  <span className="ml-1.5 text-xs font-normal opacity-70">({builtinData.rdapTotal})</span>
+                </button>
+                <button
+                  onClick={() => setBuiltinOpen("whois")}
+                  className={cn(
+                    "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
+                    builtinOpen === "whois"
+                      ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  WHOIS 服务器
+                  <span className="ml-1.5 text-xs font-normal opacity-70">({builtinData.whoisTotal})</span>
+                </button>
+              </div>
+
+              {/* ── RDAP tab ── */}
+              {builtinOpen === "rdap" && (() => {
+                const entries = Object.entries(builtinData.rdap)
+                  .filter(([tld, e]) =>
+                    !rdapSearch ||
+                    tld.includes(rdapSearch.toLowerCase().replace(/^\./, "")) ||
+                    e.url.toLowerCase().includes(rdapSearch.toLowerCase()),
+                  )
+                  .sort(([a], [b]) => a.localeCompare(b));
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={rdapSearch}
+                        onChange={e => setRdapSearch(e.target.value)}
+                        placeholder="搜索 TLD 或 URL…"
+                        className="h-8 text-sm max-w-xs"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        共 {entries.length} 条
+                      </span>
+                    </div>
+                    <div className="glass-panel border border-border rounded-2xl overflow-hidden max-h-[480px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-background border-b border-border">
+                          <tr className="bg-muted/30">
+                            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">TLD</th>
+                            <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">来源</th>
+                            <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">RDAP 服务器</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-xs">覆盖</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {entries.map(([tld, e]) => (
+                            <tr key={tld} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-4 py-2 font-mono font-semibold text-sm">.{tld}</td>
+                              <td className="px-3 py-2">
+                                <span className={cn(
+                                  "text-[10px] px-1.5 py-0.5 rounded font-semibold",
+                                  e.source === "cctld-override"
+                                    ? "bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400"
+                                    : "bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400",
+                                )}>
+                                  {e.source === "cctld-override" ? "ccTLD手工" : "IANA自动"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 font-mono text-xs text-muted-foreground max-w-[300px] truncate">
+                                {e.url}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                {dbServers[tld] ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-semibold">
+                                    已覆盖
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── WHOIS tab ── */}
+              {builtinOpen === "whois" && (() => {
+                const entries = Object.entries(builtinData.whois)
+                  .filter(([tld, srv]) =>
+                    !whoisSearch ||
+                    tld.includes(whoisSearch.toLowerCase().replace(/^\./, "")) ||
+                    (srv && srv.toLowerCase().includes(whoisSearch.toLowerCase())),
+                  )
+                  .sort(([a], [b]) => a.localeCompare(b));
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={whoisSearch}
+                        onChange={e => setWhoisSearch(e.target.value)}
+                        placeholder="搜索 TLD 或服务器…"
+                        className="h-8 text-sm max-w-xs"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        共 {entries.length} 条
+                        · 无服务器 <span className="text-amber-500">{entries.filter(([, v]) => !v).length}</span>
+                      </span>
+                    </div>
+                    <div className="glass-panel border border-border rounded-2xl overflow-hidden max-h-[480px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-background border-b border-border">
+                          <tr className="bg-muted/30">
+                            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">TLD</th>
+                            <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">WHOIS 服务器</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-xs">覆盖</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {entries.map(([tld, srv]) => (
+                            <tr key={tld} className={cn("hover:bg-muted/20 transition-colors", !srv && "opacity-60")}>
+                              <td className="px-4 py-2 font-mono font-semibold text-sm">.{tld}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                                {srv ?? (
+                                  <span className="text-amber-500/80 text-[11px]">— 无服务器</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                {dbServers[tld] ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-semibold">
+                                    已覆盖
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
