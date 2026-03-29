@@ -415,6 +415,22 @@ const CREATE_INDEXES = [
     ai_notes       TEXT,
     repaired_at    TIMESTAMPTZ
   )`,
+  `CREATE TABLE IF NOT EXISTS whois_cache (
+    key        TEXT         PRIMARY KEY,
+    value      TEXT         NOT NULL,
+    expires_at TIMESTAMPTZ  NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_whois_cache_expires ON whois_cache (expires_at)`,
+  `CREATE TABLE IF NOT EXISTS cctld_rdap_servers (
+    tld        TEXT         PRIMARY KEY,
+    url        TEXT         NOT NULL,
+    source     TEXT         NOT NULL DEFAULT 'manual',
+    notes      TEXT,
+    probe_ok   BOOLEAN,
+    probed_at  TIMESTAMPTZ,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {
