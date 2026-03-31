@@ -501,6 +501,9 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
           );
         }
       } else {
+        if (isUserServer && isWhoisRateLimited(raw)) {
+          throw new Error(`Custom WHOIS server ${customEntry.url} is rate-limiting requests — please try again later`);
+        }
         return { raw, structured: {}, server: customEntry.url };
       }
     } else {
@@ -519,6 +522,9 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
               ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
               : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
           if (raw && raw.trim().length > 0) {
+            if (isUserServer && isWhoisRateLimited(raw)) {
+              throw new Error(`Custom WHOIS server ${tcpHost} is rate-limiting requests — please try again later`);
+            }
             return { raw, structured: {}, server: tcpHost };
           }
           if (isUserServer) {
