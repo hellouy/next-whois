@@ -1,4 +1,4 @@
-import { MAX_WHOIS_FOLLOW } from "@/lib/env";
+import { MAX_WHOIS_FOLLOW, LOOKUP_TIMEOUT } from "@/lib/env";
 import { WhoisResult, WhoisRawResult } from "@/lib/whois/types";
 import {
   getJsonRedisValueWithTtl,
@@ -217,7 +217,8 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
-  // Step 1: Custom server (DB) — takes absolute priority
+  // Step 1: Custom server (DB) — takes absolute priority.
+  // If it succeeds, skip RDAP/generic WHOIS and parse the raw text directly.
   let customResult: WhoisRawResult | null = null;
   let customError: unknown = null;
   try {
@@ -227,28 +228,54 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     const registryUrl = customError instanceof ScraperRequiredError ? customError.registryUrl : undefined;
     return failWithDns(customError instanceof Error ? customError.message : "Custom server error", registryUrl);
   }
-
-  // Step 2: RDAP
-  let rdapData: RdapResponse | null = null;
-  try {
-    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as RdapResult;
-    if (rdap && !("errorCode" in rdap)) rdapData = rdap;
-  } catch {}
-
-  // Step 3: Generic WHOIS — skip when custom server already returned data,
-  // or for ccTLDs with a direct RDAP endpoint when RDAP succeeded.
-  let whoisData: WhoisRawResult | null = customResult;
-  let whoisError: unknown = null;
-  const skipGenericWhois =
-    customResult !== null ||
-    (rdapData !== null && RDAP_DIRECT_CCTLDS.has(tldSuffix));
-  if (!skipGenericWhois) {
+  if (customResult) {
+    const raw = customResult.raw;
+    if (isIanaFallback(raw)) return failWithDns("No WHOIS/RDAP server available for this TLD");
+    if (isWhoisRateLimited(raw)) return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
     try {
-      whoisData = await withTimeout(
-        tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-        WHOIS_TIMEOUT,
-      );
-    } catch (e) { whoisError = e; }
+      const result = await analyzeWhois(raw);
+      const detectedError = detectWhoisError(raw);
+      if (detectedError || isEmptyResult(result)) {
+        if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
+          return {
+            time: elapsed(), status: false, cached: false, error: detectedError,
+            dnsProbe: {
+              domain, registrationStatus: "unregistered", confidence: "high",
+              signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
+            },
+          };
+        }
+        return failWithDns(detectedError || "Empty WHOIS response");
+      }
+      result.whoisServer = pickStr(result.whoisServer, customResult.server || "");
+      return { time: elapsed(), status: true, cached: false, source: "whois", result };
+    } catch (e: unknown) {
+      return failWithDns(e instanceof Error ? e.message : "Failed to parse custom server response");
+    }
+  }
+
+  // Step 2: RDAP (parallel-friendly — start now, await below)
+  let rdapData: RdapResponse | null = null;
+  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT)
+    .then((r) => { if (r && !("errorCode" in (r as RdapResult))) rdapData = r as RdapResponse; })
+    .catch(() => {});
+
+  // Step 3: Generic WHOIS — skip for ccTLDs with direct RDAP when RDAP is available
+  let whoisData: WhoisRawResult | null = null;
+  let whoisError: unknown = null;
+  try {
+    whoisData = await withTimeout(
+      tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+      WHOIS_TIMEOUT,
+    );
+  } catch (e) { whoisError = e; }
+
+  // Wait for RDAP if still in flight
+  await rdapPromise;
+
+  // Optimisation: skip RDAP enrichment for ccTLDs with direct RDAP when generic WHOIS succeeded
+  if (rdapData && RDAP_DIRECT_CCTLDS.has(tldSuffix) && whoisData?.raw) {
+    rdapData = null;
   }
 
   // Step 4: Build result — prefer RDAP, enrich with WHOIS, fall back to WHOIS-only

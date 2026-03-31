@@ -1,3 +1,4 @@
+import { LOOKUP_TIMEOUT } from "@/lib/env";
 import { WhoisRawResult, WhoisAnalyzeResult } from "@/lib/whois/types";
 import { queryWhoisTcp } from "@/lib/whois/whois-transport";
 import { setDiscoveredServer, isTldKnownNoServer } from "@/lib/whois/custom-servers";
