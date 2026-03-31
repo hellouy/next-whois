@@ -174,11 +174,9 @@ function intEnv(name: string, def: number): number {
   return isNaN(n) ? def : n;
 }
 
-// ── Core lookup: custom server (DB) → RDAP + WHOIS (concurrent) → merge ──────
-// RDAP_TIMEOUT: caps the RDAP leg independently (3.5 s default).
-// WHOIS_TIMEOUT: wall-clock budget for generic TCP/HTTP WHOIS (8 s default).
-//   8 s accommodates slow ccTLD servers (e.g. .cn, .de) without regressing the
-//   common case where RDAP completes first. Override via WHOIS_TIMEOUT_MS env var.
+// ── Core lookup: custom server → RDAP → generic WHOIS → merge/error ──────────
+// Timeouts: RDAP_TIMEOUT_MS (default 3.5 s), WHOIS_TIMEOUT_MS (default 8 s).
+// 8 s WHOIS budget accommodates slow ccTLD servers (e.g. .cn, .de).
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
 const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
@@ -258,35 +256,29 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     }
   }
 
-  // Step 2 + 3: RDAP and generic WHOIS run concurrently.
-  // RDAP is deliberately fired in background; generic WHOIS is awaited.
-  // We collect both results and decide how to merge them below.
-  // This is intentional: WHOIS_TIMEOUT (≤8 s) is the wall-clock budget,
-  // and RDAP_TIMEOUT (3.5 s) caps the RDAP leg independently.
+  // Step 2: RDAP — try registry RDAP first.
   let rdapData: RdapResponse | null = null;
-  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT)
-    .then((r) => { if (r && !("errorCode" in (r as RdapResult))) rdapData = r as RdapResponse; })
-    .catch(() => {});
+  try {
+    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as RdapResult;
+    if (rdap && !("errorCode" in rdap)) rdapData = rdap;
+  } catch {}
 
+  // Step 3: Generic WHOIS — only if RDAP produced no usable data,
+  // or if this is a ccTLD with a direct RDAP endpoint (WHOIS is more complete).
+  const skipWhois = rdapData !== null && !RDAP_DIRECT_CCTLDS.has(tldSuffix);
   let whoisData: WhoisRawResult | null = null;
   let whoisError: unknown = null;
-  try {
-    whoisData = await withTimeout(
-      tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-      WHOIS_TIMEOUT,
-    );
-  } catch (e) { whoisError = e; }
-
-  // Ensure RDAP has finished before we merge
-  await rdapPromise;
-
-  // Skip RDAP enrichment for ccTLDs that have a direct RDAP endpoint when
-  // generic WHOIS already succeeded — WHOIS data is more complete there.
-  if (rdapData && RDAP_DIRECT_CCTLDS.has(tldSuffix) && whoisData?.raw) {
-    rdapData = null;
+  if (!skipWhois) {
+    try {
+      whoisData = await withTimeout(
+        tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+        WHOIS_TIMEOUT,
+      );
+    } catch (e) { whoisError = e; }
   }
 
-  // Step 4: Build result — prefer RDAP, enrich with WHOIS, fall back to WHOIS-only
+  // Step 4: Build result — prefer RDAP, optionally enrich with WHOIS raw text,
+  // then fall back to WHOIS-only; if neither succeeded, return error.
   const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
   const whoisRawStr = whoisData?.raw || null;
 
