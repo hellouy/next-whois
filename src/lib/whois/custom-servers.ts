@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { many, run, isDbReady } from "@/lib/db-query";
+import { WhoisRawResult } from "@/lib/whois/types";
+import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
+import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
+import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 
 export type TcpServerEntry = {
   type: "tcp";
@@ -447,11 +451,6 @@ export class ScraperRequiredError extends Error {
 // Returns null if no custom server is configured, or if a non-user-managed
 // (auto-discovered) server produced no data (caller falls through to RDAP/WHOIS).
 // Throws for user-managed server failures and for scraper-required errors.
-
-import { WhoisRawResult } from "@/lib/whois/types";
-import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
-import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
-import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 
 let _whoiserPromiseCustom: Promise<typeof import("whoiser")> | null = null;
 const getWhoiserCustom = () => {

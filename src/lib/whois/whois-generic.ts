@@ -41,13 +41,11 @@ export async function lookupIpOrAsn(query: string): Promise<WhoisRawResult> {
       /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(query)) {
     const ip = query.replace(/\/\d{1,3}$/, "");
     const { whoisIp } = await getWhoiser();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await whoisIp(ip, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
     return { raw: (data.__raw as string) || "", structured: data, server: "ip-whois" };
   }
   const asNum = parseInt(query.replace(/^AS/i, ""));
   const { whoisAsn } = await getWhoiser();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await whoisAsn(asNum, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
   return { raw: (data.__raw as string) || "", structured: data, server: "asn-whois" };
 }
