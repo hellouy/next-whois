@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAdminSession } from "@/lib/admin-shared";
+import { requireAdmin } from "@/lib/admin";
 import { getCctldRdapOverrides } from "@/lib/whois/rdap_client";
 import { getAllGtldRdapServers } from "@/lib/whois/rdap_gtld_bootstrap";
 import cctldWhois from "@/data/cctld-whois-servers.json";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const denied = await requireAdminSession(req, res);
-  if (denied) return;
+  const session = await requireAdmin(req, res);
+  if (!session) return;
   if (req.method !== "GET") return res.status(405).end();
 
   // ── RDAP: merge gtld bootstrap + ccTLD overrides ──────────────────────────
