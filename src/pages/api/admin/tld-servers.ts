@@ -11,23 +11,12 @@ import {
 } from "@/lib/whois/custom-servers";
 import { invalidateLookupCacheForTld } from "@/lib/whois/lookup";
 import { deleteRedisKeysByPattern } from "@/lib/server/redis";
-import { resetTldFallbackGateInMemory } from "@/lib/whois/tld-fallback-gate";
 import { requireAdmin } from "@/lib/admin";
 
-/**
- * Purge all cached lookup results for a given TLD from L1 (in-process)
- * and L2 (Redis), and reset the in-memory fallback gate so native WHOIS/RDAP
- * is retried immediately with the newly configured server.
- * Returns total cache eviction count.
- */
 async function purgeTldCache(tld: string): Promise<number> {
   const normalized = tld.toLowerCase().replace(/^\./, "");
-  // 1. Clear in-memory lookup result cache
   const l1Count = invalidateLookupCacheForTld(normalized);
-  // 2. Clear Redis lookup result cache
   const l2Count = await deleteRedisKeysByPattern(`whois:*.${normalized}`);
-  // 3. Reset fallback gate so native WHOIS is tried again (not skipped)
-  resetTldFallbackGateInMemory(normalized);
   return l1Count + l2Count;
 }
 
