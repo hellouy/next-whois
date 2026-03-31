@@ -715,239 +715,79 @@ export async function lookupWhoisWithCache(
   return { ...result, cached: false };
 }
 
-const WHOIS_MERGE_WAIT_MS = 200;
-const RDAP_MERGE_WAIT_MS = 400;
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 2_500);
-const RDAP_DIRECT_WHOIS_SHADOW_MS = intEnv("RDAP_DIRECT_WHOIS_SHADOW_MS", 1_500);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
 
 export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const startTime = performance.now();
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
-
   const tldSuffix = domain.split(".").pop()?.toLowerCase() ?? "";
-
-  // For ccTLDs with a known direct RDAP endpoint, RDAP is the primary protocol.
-  // WHOIS only starts as a delayed shadow to cap worst-case latency.
-  const rdapIsDirect = isDomainQuery && RDAP_DIRECT_CCTLDS.has(tldSuffix);
-
-  const rdapPromise: Promise<any> = withTimeout(lookupRdap(domain), RDAP_TIMEOUT);
-
-  const whoisPromise = rdapIsDirect
-    ? Promise.resolve<{ raw: string; structured: Record<string, unknown>; server?: string }>({ raw: "", structured: {} })
-    : withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT);
-
-  // Shadow WHOIS for rdapIsDirect TLDs: starts after RDAP_DIRECT_WHOIS_SHADOW_MS
-  // if RDAP hasn't resolved yet, capping worst-case latency.
-  type WhoisRaw = { raw: string; structured: Record<string, unknown>; server?: string };
-  let _shadowCancelled = false;
-  let _shadowTimerId: ReturnType<typeof setTimeout> | null = null;
-  const shadowWhoisPromise: Promise<WhoisRaw | null> = rdapIsDirect
-    ? new Promise<WhoisRaw | null>(resolve => {
-        let shadowStarted = false;
-
-        async function runShadowWhois() {
-          if (shadowStarted || _shadowCancelled) return;
-          shadowStarted = true;
-          if (_shadowTimerId !== null) { clearTimeout(_shadowTimerId); _shadowTimerId = null; }
-          try {
-            const r = await withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT);
-            resolve(_shadowCancelled ? null : r);
-          } catch {
-            resolve(null);
-          }
-        }
-
-        _shadowTimerId = setTimeout(runShadowWhois, RDAP_DIRECT_WHOIS_SHADOW_MS);
-
-        rdapPromise.then(
-          (v: any) => { if (v && v.errorCode) runShadowWhois(); },
-          (err: unknown) => {
-            const msg = (err as Error)?.message?.toLowerCase() ?? "";
-            const isTimeout = msg.includes("timeout") || msg.includes("timed out") || msg.includes("abort");
-            if (!isTimeout) runShadowWhois();
-          },
-        );
-      })
-    : Promise.resolve(null);
-  void _shadowTimerId;
-
-  type Tagged =
-    | { tag: "rdap"; value: any }
-    | { tag: "whois"; value: Awaited<ReturnType<typeof getLookupWhois>> };
-
-  function firstNonNull<T>(promises: Promise<T | null>[]): Promise<T | null> {
-    return new Promise(resolve => {
-      let remaining = promises.length;
-      if (remaining === 0) { resolve(null); return; }
-      for (const p of promises) {
-        p.then(v => { if (v !== null) resolve(v); })
-         .catch(() => {})
-         .finally(() => { if (--remaining === 0) resolve(null); });
-      }
-    });
-  }
-
-  const taggedRacers: Promise<Tagged | null>[] = [
-    rdapPromise.then(
-      v => (v && !v.errorCode ? { tag: "rdap" as const, value: v } : null),
-      () => null,
-    ),
-    ...(rdapIsDirect ? [] : [
-      whoisPromise.then(
-        v => ({ tag: "whois" as const, value: v }),
-        () => null,
-      ),
-    ]),
-    ...(rdapIsDirect ? [
-      shadowWhoisPromise.then(
-        v => (v ? { tag: "whois" as const, value: v } : null),
-        () => null,
-      ),
-    ] : []),
-  ];
-
-  const first = await firstNonNull(taggedRacers);
-
-  let rdapSettled: PromiseSettledResult<Awaited<ReturnType<typeof lookupRdap>>>;
-  let whoisSettled: PromiseSettledResult<Awaited<ReturnType<typeof getLookupWhois>>>;
-
-  if (first?.tag === "rdap") {
-    rdapSettled = { status: "fulfilled", value: first.value };
-    if (rdapIsDirect) {
-      _shadowCancelled = true;
-      if (_shadowTimerId !== null) clearTimeout(_shadowTimerId);
-      whoisSettled = { status: "rejected", reason: new Error("WHOIS skipped (RDAP-direct ccTLD)") };
-    } else {
-      const whoisWithDeadline = await Promise.race([
-        whoisPromise.then(v => v, () => null),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), WHOIS_MERGE_WAIT_MS)),
-      ]);
-      whoisSettled = whoisWithDeadline !== null
-        ? { status: "fulfilled", value: whoisWithDeadline }
-        : { status: "rejected", reason: new Error("WHOIS merge deadline") };
-    }
-  } else if (first?.tag === "whois") {
-    whoisSettled = { status: "fulfilled", value: first.value };
-    if (rdapIsDirect) {
-      // Shadow WHOIS won for a rdapIsDirect TLD — give RDAP a bit more time
-      const rdapWithDeadline = await Promise.race([
-        rdapPromise.then(v => v, () => null),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), RDAP_MERGE_WAIT_MS)),
-      ]);
-      rdapSettled = rdapWithDeadline !== null
-        ? { status: "fulfilled", value: rdapWithDeadline }
-        : { status: "rejected", reason: new Error("RDAP merge deadline") };
-    } else {
-      const rdapWithDeadline = await Promise.race([
-        rdapPromise.then(v => v, () => null),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), RDAP_MERGE_WAIT_MS)),
-      ]);
-      rdapSettled = rdapWithDeadline !== null
-        ? { status: "fulfilled", value: rdapWithDeadline }
-        : { status: "rejected", reason: new Error("RDAP merge deadline") };
-    }
-  } else {
-    // All native lookups failed
-    if (rdapIsDirect) {
-      rdapSettled = await rdapPromise.then(
-        v => ({ status: "fulfilled" as const, value: v }),
-        e => ({ status: "rejected" as const, reason: e }),
-      );
-      const shadowResult = await shadowWhoisPromise.catch(() => null);
-      if (shadowResult !== null) {
-        whoisSettled = { status: "fulfilled" as const, value: shadowResult };
-      } else {
-        whoisSettled = await withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT).then(
-          v => ({ status: "fulfilled" as const, value: v }),
-          e => ({ status: "rejected" as const, reason: e }),
-        );
-      }
-    } else {
-      [rdapSettled, whoisSettled] = await Promise.allSettled([rdapPromise, whoisPromise]);
-    }
-  }
-
-  const rdapResult = rdapSettled.status === "fulfilled" ? rdapSettled.value : null;
-  const rdapData = rdapResult && !rdapResult.errorCode ? rdapResult : null;
-  const whoisData = whoisSettled.status === "fulfilled" ? whoisSettled.value : null;
-  const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
-  const whoisRawData = whoisData?.raw || null;
-  const whoisReturnedEmpty =
-    whoisSettled.status === "fulfilled" &&
-    whoisData !== null &&
-    (!whoisData.raw || whoisData.raw.trim().length === 0);
 
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
     const dnsProbe = isDomainQuery
       ? await probeDomain(domain).catch(() => undefined)
       : undefined;
-    return {
-      time: elapsed(),
-      status: false,
-      cached: false,
-      error,
-      dnsProbe,
-      registryUrl,
-    };
+    return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
+
+  // Step 1: Try RDAP
+  let rdapData: any = null;
+  try {
+    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT);
+    if (rdap && !rdap.errorCode) rdapData = rdap;
+  } catch {}
+
+  // Step 2: Try WHOIS (custom server → bootstrap → whoiser → IANA)
+  // Skip for ccTLDs that have a known direct RDAP endpoint and RDAP succeeded.
+  const skipWhois = rdapData !== null && isDomainQuery && RDAP_DIRECT_CCTLDS.has(tldSuffix);
+  let whoisData: WhoisRawResult | null = null;
+  let whoisError: unknown = null;
+  if (!skipWhois) {
+    try {
+      whoisData = await withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT);
+    } catch (e) {
+      whoisError = e;
+    }
+  }
+
+  // Step 3: Build result — prefer RDAP, merge WHOIS if available, fall back to WHOIS-only
+  const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
+  const whoisRawStr = whoisData?.raw || null;
 
   if (rdapData) {
     try {
       let result = await convertRdapToWhoisResult(rdapData, domain);
-
-      if (whoisRawData) {
-        if (!isIanaFallback(whoisRawData)) {
-          try {
-            const whoisParsed = await analyzeWhois(whoisRawData);
-            result = mergeResults(result, whoisParsed);
-          } catch {}
-        }
-        result.rawWhoisContent = whoisRawData;
+      if (whoisRawStr && !isIanaFallback(whoisRawStr)) {
+        try {
+          const whoisParsed = await analyzeWhois(whoisRawStr);
+          result = mergeResults(result, whoisParsed);
+        } catch {}
+        result.rawWhoisContent = whoisRawStr;
       }
-      if (whoisData?.server) {
-        result.whoisServer = pickStr(result.whoisServer, whoisData.server);
-      }
+      if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       result.rawRdapContent = rdapRaw!;
-
-      return {
-        time: elapsed(),
-        status: true,
-        cached: false,
-        source: "rdap",
-        result,
-      };
+      return { time: elapsed(), status: true, cached: false, source: "rdap", result };
     } catch {}
   }
 
-  const whoisError =
-    whoisSettled.status === "rejected" ? whoisSettled.reason : null;
-  const scraperRegistryUrl =
-    whoisError instanceof ScraperRequiredError
-      ? whoisError.registryUrl
-      : undefined;
-
-  if (whoisRawData) {
-    if (isIanaFallback(whoisRawData)) {
+  if (whoisRawStr) {
+    if (isIanaFallback(whoisRawStr)) {
       return failWithDns("No WHOIS/RDAP server available for this TLD");
     }
-
-    if (isWhoisRateLimited(whoisRawData)) {
+    if (isWhoisRateLimited(whoisRawStr)) {
       return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
     }
-
     try {
-      const result = await analyzeWhois(whoisRawData);
-
-      const detectedWhoisError = detectWhoisError(whoisRawData);
-      if (detectedWhoisError || isEmptyResult(result)) {
-        if (detectedWhoisError && isNotRegisteredWhoisResponse(detectedWhoisError)) {
+      const result = await analyzeWhois(whoisRawStr);
+      const detectedError = detectWhoisError(whoisRawStr);
+      if (detectedError || isEmptyResult(result)) {
+        if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
           return {
             time: elapsed(),
             status: false,
             cached: false,
-            error: detectedWhoisError,
+            error: detectedError,
             dnsProbe: {
               domain,
               registrationStatus: "unregistered",
@@ -961,45 +801,28 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
             },
           };
         }
-        return failWithDns(detectedWhoisError || "Empty WHOIS response");
+        return failWithDns(detectedError || "Empty WHOIS response");
       }
-
-      if (whoisData?.server) {
-        result.whoisServer = pickStr(result.whoisServer, whoisData.server);
-      }
+      if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       if (rdapRaw) result.rawRdapContent = rdapRaw;
-
-      return {
-        time: elapsed(),
-        status: true,
-        cached: false,
-        source: "whois",
-        result,
-      };
+      return { time: elapsed(), status: true, cached: false, source: "whois", result };
     } catch (parseError: unknown) {
       return failWithDns(
-        parseError instanceof Error
-          ? parseError.message
-          : "Failed to parse WHOIS response",
+        parseError instanceof Error ? parseError.message : "Failed to parse WHOIS response",
       );
     }
   }
 
-  const rdapError = rdapSettled.status === "rejected" ? rdapSettled.reason : null;
-  const whoisMsg = whoisError?.message || "";
-  const rdapMsg = rdapError?.message || "";
-  const isTldUnsupported = /not supported/i.test(whoisMsg);
-  const isInternalError =
-    /cannot read properties/i.test(whoisMsg) ||
-    /cannot read properties/i.test(rdapMsg);
-  const isWhoisServerEmpty =
-    whoisReturnedEmpty && whoisData?.server && whoisData.server !== "ip-whois";
-  const errMsg = isTldUnsupported
+  const scraperRegistryUrl =
+    whoisError instanceof ScraperRequiredError ? whoisError.registryUrl : undefined;
+  const whoisMsg = whoisError instanceof Error ? whoisError.message : "";
+  const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
+  const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
-    : isInternalError
-      ? "No WHOIS/RDAP data found for this query"
-      : isWhoisServerEmpty
-        ? `WHOIS server (${whoisData!.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
-        : whoisMsg || rdapMsg || "Unknown error occurred";
+    : /cannot read properties/i.test(whoisMsg)
+    ? "No WHOIS/RDAP data found for this query"
+    : whoisReturnedEmpty && whoisData?.server
+    ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
+    : whoisMsg || "Unknown error occurred";
   return failWithDns(errMsg, scraperRegistryUrl);
 }
