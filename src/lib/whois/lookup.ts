@@ -174,7 +174,11 @@ function intEnv(name: string, def: number): number {
   return isNaN(n) ? def : n;
 }
 
-// ── Core lookup: custom server (DB) → RDAP → generic WHOIS → merge/error ─────
+// ── Core lookup: custom server (DB) → RDAP + WHOIS (concurrent) → merge ──────
+// RDAP_TIMEOUT: caps the RDAP leg independently (3.5 s default).
+// WHOIS_TIMEOUT: wall-clock budget for generic TCP/HTTP WHOIS (8 s default).
+//   8 s accommodates slow ccTLD servers (e.g. .cn, .de) without regressing the
+//   common case where RDAP completes first. Override via WHOIS_TIMEOUT_MS env var.
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
 const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
@@ -254,13 +258,16 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     }
   }
 
-  // Step 2: RDAP (parallel-friendly — start now, await below)
+  // Step 2 + 3: RDAP and generic WHOIS run concurrently.
+  // RDAP is deliberately fired in background; generic WHOIS is awaited.
+  // We collect both results and decide how to merge them below.
+  // This is intentional: WHOIS_TIMEOUT (≤8 s) is the wall-clock budget,
+  // and RDAP_TIMEOUT (3.5 s) caps the RDAP leg independently.
   let rdapData: RdapResponse | null = null;
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT)
     .then((r) => { if (r && !("errorCode" in (r as RdapResult))) rdapData = r as RdapResponse; })
     .catch(() => {});
 
-  // Step 3: Generic WHOIS — skip for ccTLDs with direct RDAP when RDAP is available
   let whoisData: WhoisRawResult | null = null;
   let whoisError: unknown = null;
   try {
@@ -270,10 +277,11 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     );
   } catch (e) { whoisError = e; }
 
-  // Wait for RDAP if still in flight
+  // Ensure RDAP has finished before we merge
   await rdapPromise;
 
-  // Optimisation: skip RDAP enrichment for ccTLDs with direct RDAP when generic WHOIS succeeded
+  // Skip RDAP enrichment for ccTLDs that have a direct RDAP endpoint when
+  // generic WHOIS already succeeded — WHOIS data is more complete there.
   if (rdapData && RDAP_DIRECT_CCTLDS.has(tldSuffix) && whoisData?.raw) {
     rdapData = null;
   }
