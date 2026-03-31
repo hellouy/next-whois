@@ -18,7 +18,7 @@ import {
   RiEditLine, RiDeleteBinLine, RiLoader4Line, RiRefreshLine, RiSearchLine,
   RiAddLine, RiCloseLine, RiSave3Line, RiCheckboxCircleLine,
   RiExternalLinkLine, RiArrowUpSLine, RiArrowDownSLine,
-  RiStopCircleLine, RiWrenchLine, RiAlertLine, RiInformationLine,
+  RiStopCircleLine, RiInformationLine,
   RiCheckLine, RiDatabase2Line, RiCodeLine, RiFileLine,
   RiDeleteBin7Line, RiRobot2Line,
 } from "@remixicon/react";
@@ -480,17 +480,6 @@ const SOURCE_META: Record<Source, { label: string; color: string; icon: React.Re
 
 interface ServerRow { tld: string; server: string; rawEntry: unknown; source: Source; }
 
-type RepairRow = {
-  tld: string; fail_count: number; error_type: string; last_failed_at: string | null;
-  repair_status: string; found_server: string | null; ai_notes: string | null; repaired_at: string | null;
-};
-const REPAIR_STYLES: Record<string, string> = {
-  pending:   "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-300/50",
-  found:     "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-300/50",
-  not_found: "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border-rose-300/50",
-  ignored:   "bg-muted/50 text-muted-foreground border-border/50",
-};
-const REPAIR_LABELS: Record<string, string> = { pending: "待修复", found: "已修复", not_found: "未找到", ignored: "已忽略" };
 
 function entryLabel(raw: unknown): string {
   if (typeof raw === "string") return raw;
@@ -514,24 +503,6 @@ function ServersTab() {
   const [adding, setAdding] = React.useState(false);
   const [deletingTld, setDeletingTld] = React.useState<string | null>(null);
 
-  const [repairRows, setRepairRows] = React.useState<RepairRow[]>([]);
-  const [repairSummary, setRepairSummary] = React.useState<{ repair_status: string; count: number }[]>([]);
-  const [repairLoading, setRepairLoading] = React.useState(false);
-  const [repairing, setRepairing] = React.useState(false);
-  const [actionId, setActionId] = React.useState<string | null>(null);
-
-  // ── AI Finder state ──────────────────────────────────────────────────────
-  type AiProbeItem = { cluster: string; host: string; handles: boolean; score: number; snippet: string; elapsedMs: number; error?: string };
-  type AiFinderResult = { ok: boolean; method: string; server: string | null; notes?: string };
-  type ClusterInfo = { name: string; host: string; desc: string };
-  const [aiFindTld, setAiFindTld] = React.useState("");
-  const [aiFindMode, setAiFindMode] = React.useState<"full" | "clusters-only">("full");
-  const [aiFinding, setAiFinding] = React.useState(false);
-  const [aiPhase, setAiPhase] = React.useState<string>("");
-  const [aiProbes, setAiProbes] = React.useState<AiProbeItem[]>([]);
-  const [aiResult, setAiResult] = React.useState<AiFinderResult | null>(null);
-  const [aiLog, setAiLog] = React.useState<string[]>([]);
-  const [aiClusters, setAiClusters] = React.useState<ClusterInfo[]>([]);
 
   async function loadServers() {
     setLoading(true);
@@ -564,22 +535,8 @@ function ServersTab() {
     } finally { setLoading(false); }
   }
 
-  async function loadRepair() {
-    setRepairLoading(true);
-    fetch("/api/admin/repair-servers")
-      .then(r => r.json())
-      .then(d => { setRepairRows(d.rows ?? []); setRepairSummary(d.summary ?? []); })
-      .catch(e => toast.error(e.message))
-      .finally(() => setRepairLoading(false));
-  }
-
   React.useEffect(() => {
     loadServers();
-    loadRepair();
-    fetch("/api/admin/ai-find-server")
-      .then(r => r.json())
-      .then((d: { clusters?: ClusterInfo[] }) => setAiClusters(d.clusters ?? []))
-      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -615,118 +572,12 @@ function ServersTab() {
     } finally { setDeletingTld(null); }
   }
 
-  async function runRepair() {
-    setRepairing(true);
-    try {
-      const r = await fetch("/api/admin/repair-servers?limit=20", { method: "POST" });
-      const d = await r.json();
-      const ok = (d.results ?? []).filter((x: unknown) => (x as { ok: boolean }).ok).length;
-      const bad = (d.results ?? []).filter((x: unknown) => !(x as { ok: boolean }).ok).length;
-      toast.success(`修复完成：${ok} 成功，${bad} 未找到`);
-      loadRepair();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "修复失败");
-    } finally { setRepairing(false); }
-  }
-
-  async function resetNotFound() {
-    try {
-      await fetch("/api/admin/repair-servers?reset=1", { method: "POST" });
-      toast.success("已将 not_found 重置为 pending");
-      loadRepair();
-    } catch { toast.error("操作失败"); }
-  }
-
-  async function ignoreTld(tld: string) {
-    setActionId(tld);
-    try {
-      await fetch(`/api/admin/repair-servers?tld=${encodeURIComponent(tld)}`, { method: "DELETE" });
-      toast.success(`.${tld} 已忽略`);
-      loadRepair();
-    } finally { setActionId(null); }
-  }
-
-  function runAiFind() {
-    const tld = aiFindTld.trim().toLowerCase().replace(/^\./, "");
-    if (!tld) { toast.error("请输入 TLD"); return; }
-    setAiFinding(true);
-    setAiPhase("");
-    setAiProbes([]);
-    setAiResult(null);
-    setAiLog([`🔍 开始查找 .${tld}…`]);
-    fetch("/api/admin/ai-find-server", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tld, mode: aiFindMode, save: true }),
-    }).then(async res => {
-      if (!res.ok || !res.body) { toast.error("请求失败"); setAiFinding(false); return; }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      let curEvt = "message";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) { curEvt = line.slice(7).trim(); }
-          else if (line.startsWith("data: ")) {
-            try {
-              const d = JSON.parse(line.slice(6)) as Record<string, unknown>;
-              if (curEvt === "phase") {
-                const phaseMap: Record<string, string> = {
-                  clusters: `⚡ 并发探测 ${d.total ?? ""} 个共享注册商集群…`,
-                  rdap: "🌐 检查 IANA RDAP Bootstrap…",
-                  "iana-tcp": "📡 查询 IANA WHOIS TCP 转介…",
-                  ai: "🤖 调用 AI 模型查找…",
-                };
-                setAiPhase(String(d.phase ?? ""));
-                setAiLog(p => [...p, phaseMap[String(d.phase)] ?? `📋 ${String(d.phase)}`]);
-              } else if (curEvt === "probe") {
-                const item = { cluster: String(d.cluster ?? ""), host: String(d.host ?? ""), handles: Boolean(d.handles), score: Number(d.score ?? 0), snippet: String(d.snippet ?? ""), elapsedMs: Number(d.elapsedMs ?? 0), error: d.error ? String(d.error) : undefined };
-                setAiProbes(p => {
-                  const idx = p.findIndex(x => x.host === item.host);
-                  if (idx >= 0) { const n = [...p]; n[idx] = item; return n; }
-                  return [...p, item];
-                });
-              } else if (curEvt === "found") {
-                setAiResult({ ok: true, method: String(d.method ?? ""), server: String(d.server ?? "") });
-                setAiLog(p => [...p, `✅ 找到！[${String(d.method)}] → ${String(d.server)}`]);
-                loadServers();
-              } else if (curEvt === "ai_result") {
-                setAiLog(p => [...p, `🤖 AI 建议：类型=${String(d.type)} 服务器=${String(d.server ?? "无")}${d.notes ? ` (${String(d.notes)})` : ""}`]);
-              } else if (curEvt === "done") {
-                if (!d.ok) {
-                  setAiResult({ ok: false, method: String(d.method ?? "exhausted"), server: null });
-                  setAiLog(p => [...p, "❌ 所有策略均未找到服务器"]);
-                }
-                setAiFinding(false);
-              } else if (curEvt === "error") {
-                setAiLog(p => [...p, `⚠️ 错误：${String(d.message)}`]);
-                setAiFinding(false);
-              }
-              curEvt = "message";
-            } catch {}
-          }
-        }
-      }
-      setAiFinding(false);
-    }).catch(e => { if ((e as Error).name !== "AbortError") toast.error((e as Error).message); setAiFinding(false); });
-  }
-
   const counts = rows.reduce((acc, r) => { acc[r.source] = (acc[r.source] ?? 0) + 1; return acc; }, {} as Record<string, number>);
   const filtered = rows.filter(r => {
     if (sourceFilter !== "all" && r.source !== sourceFilter) return false;
     if (search) { const q = search.toLowerCase(); return r.tld.includes(q) || r.server.toLowerCase().includes(q); }
     return true;
   });
-
-  const pending   = repairRows.filter(r => r.repair_status === "pending");
-  const repaired  = repairRows.filter(r => r.repair_status === "found");
-  const notFound  = repairRows.filter(r => r.repair_status === "not_found");
-  const ignored   = repairRows.filter(r => r.repair_status === "ignored");
 
   return (
     <div className="space-y-6">
@@ -856,287 +707,11 @@ function ServersTab() {
         </div>
       </div>
 
-      {/* Repair Queue Section */}
-      <div className="space-y-4 pt-2 border-t border-border">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h2 className="text-sm font-bold flex items-center gap-1.5"><RiWrenchLine className="w-4 h-4 text-amber-500" />服务器修复队列</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">记录每次返回 IANA 兜底页的 TLD，通过 RDAP bootstrap → IANA → AI 三级策略自动发现正确服务器</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={loadRepair} disabled={repairLoading} className="h-8 rounded-xl text-xs">
-              <RiRefreshLine className={cn("w-3.5 h-3.5 mr-1", repairLoading && "animate-spin")} />刷新
-            </Button>
-            <Button variant="outline" size="sm" onClick={resetNotFound} className="h-8 rounded-xl text-xs">
-              <RiCloseLine className="w-3.5 h-3.5 mr-1" />重置 not_found
-            </Button>
-            <Button size="sm" onClick={runRepair} disabled={repairing || pending.length === 0} className="h-8 rounded-xl text-xs gap-1.5">
-              {repairing ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiWrenchLine className="w-3.5 h-3.5" />}
-              运行修复 ({pending.length})
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { key: "pending",   label: "待修复", color: "text-amber-500",          icon: <RiAlertLine className="w-3.5 h-3.5" /> },
-            { key: "found",     label: "已修复", color: "text-emerald-500",        icon: <RiCheckLine className="w-3.5 h-3.5" /> },
-            { key: "not_found", label: "未找到", color: "text-rose-500",           icon: <RiCloseLine className="w-3.5 h-3.5" /> },
-            { key: "ignored",   label: "已忽略", color: "text-muted-foreground",   icon: <RiInformationLine className="w-3.5 h-3.5" /> },
-          ].map(({ key, label, color, icon }) => {
-            const count = repairSummary.find(s => s.repair_status === key)?.count ?? 0;
-            return (
-              <div key={key} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-card text-xs">
-                <span className={color}>{icon}</span>
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-bold tabular-nums">{count}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex items-start gap-2 rounded-xl border border-blue-200/50 bg-blue-50/30 dark:bg-blue-950/20 px-4 py-3">
-          <RiInformationLine className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            批量修复脚本：<code className="mx-1 font-mono text-foreground">node scripts/repair-servers.mjs --min-failures 2 --limit 50</code>
-            支持 <code className="font-mono">--dry-run</code>、<code className="font-mono">--tld xx</code>、<code className="font-mono">--reset-not-found</code> 参数。
-          </p>
-        </div>
-
-        {repairLoading ? (
-          <div className="flex justify-center py-8"><RiLoader4Line className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-        ) : repairRows.length === 0 ? (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            <RiServerLine className="w-10 h-10 mx-auto mb-3 opacity-25" />
-            暂无记录。当查询某 TLD 收到 IANA 兜底页时，系统自动将其加入队列。
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {[{ rows: pending, title: "待修复", color: "text-amber-500" },
-              { rows: notFound, title: "未找到", color: "text-rose-500" },
-              { rows: repaired, title: "已修复", color: "text-emerald-500" },
-              { rows: ignored,  title: "已忽略", color: "text-muted-foreground" }].filter(g => g.rows.length > 0).map(group => (
-              <RepairSection key={group.title} title={group.title} color={group.color} rows={group.rows} onIgnore={ignoreTld} actionId={actionId} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── AI 智能查找服务器 ── */}
-      <div className="space-y-4 pt-2 border-t border-border">
-        <div>
-          <h2 className="text-sm font-bold flex items-center gap-1.5">
-            <RiRobot2Line className="w-4 h-4 text-violet-500" />AI 智能查找 WHOIS 服务器
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            对未知 TLD 依次探测共享注册商集群 → IANA RDAP → IANA TCP → AI 模型，找到后自动保存
-          </p>
-        </div>
-
-        {/* Input row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Input
-            value={aiFindTld}
-            onChange={e => setAiFindTld(e.target.value)}
-            placeholder="输入 TLD，如 vc、io、uk.com"
-            className="h-8 rounded-xl text-xs font-mono w-40"
-            onKeyDown={e => { if (e.key === "Enter") runAiFind(); }}
-          />
-          <select
-            value={aiFindMode}
-            onChange={e => setAiFindMode(e.target.value as "full" | "clusters-only")}
-            className="h-8 rounded-xl border border-border bg-background text-xs px-2 text-foreground"
-          >
-            <option value="full">完整模式（集群+IANA+AI）</option>
-            <option value="clusters-only">仅探测集群</option>
-          </select>
-          <Button
-            size="sm"
-            onClick={runAiFind}
-            disabled={aiFinding}
-            className="h-8 rounded-xl text-xs"
-          >
-            {aiFinding
-              ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1 animate-spin" />查找中…</>
-              : <><RiSearchLine className="w-3.5 h-3.5 mr-1" />开始查找</>}
-          </Button>
-          {aiResult && (
-            <span className={cn(
-              "inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border",
-              aiResult.ok
-                ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400"
-                : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/30 dark:text-rose-400"
-            )}>
-              {aiResult.ok ? <RiCheckLine className="w-3 h-3" /> : <RiCloseLine className="w-3 h-3" />}
-              {aiResult.ok ? `已找到：${aiResult.server}` : "未找到服务器"}
-            </span>
-          )}
-        </div>
-
-        {/* Results layout: probes table + log */}
-        {(aiProbes.length > 0 || aiLog.length > 0) && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {/* Cluster probe table */}
-            <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border bg-muted/20">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">共享注册商集群探测</span>
-                {aiPhase === "clusters" && <span className="ml-2 text-[10px] text-amber-500 animate-pulse">探测中…</span>}
-              </div>
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border/60 bg-muted/10">
-                      {["集群", "主机", "分值", "耗时", "状态"].map(h => (
-                        <th key={h} className="text-left text-[10px] font-semibold text-muted-foreground px-3 py-2 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {aiProbes.map((p, i) => (
-                      <tr key={p.host} className={cn("border-t border-border/30 hover:bg-muted/10 transition-colors", i % 2 === 0 ? "" : "bg-muted/5")}>
-                        <td className="px-3 py-2 font-medium max-w-[110px] truncate" title={p.cluster}>{p.cluster}</td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground max-w-[160px] truncate" title={p.host}>{p.host}</td>
-                        <td className="px-3 py-2 tabular-nums text-center">
-                          {p.score > 0 ? (
-                            <span className={cn("font-bold", p.handles ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>{p.score}</span>
-                          ) : <span className="text-muted-foreground/40">—</span>}
-                        </td>
-                        <td className="px-3 py-2 tabular-nums text-muted-foreground text-[10px]">{p.elapsedMs > 0 ? `${p.elapsedMs}ms` : "—"}</td>
-                        <td className="px-3 py-2">
-                          {p.error ? (
-                            <span className="text-[10px] text-rose-500/70 truncate max-w-[80px]" title={p.error}>超时</span>
-                          ) : p.handles ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              <RiCheckLine className="w-3 h-3" />可用
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground/50">不管理</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {/* Snippet of best match */}
-              {aiProbes.find(p => p.handles && p.snippet) && (
-                <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10">
-                  <p className="text-[10px] font-semibold text-muted-foreground mb-1">最佳命中响应片段：</p>
-                  <pre className="text-[10px] text-foreground/70 whitespace-pre-wrap break-all font-mono leading-relaxed max-h-24 overflow-y-auto">
-                    {aiProbes.filter(p => p.handles && p.snippet).sort((a, b) => b.score - a.score)[0]?.snippet}
-                  </pre>
-                </div>
-              )}
-            </div>
-
-            {/* Log stream */}
-            <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border bg-muted/20">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">查找日志</span>
-                {aiFinding && <span className="ml-2 text-[10px] text-violet-500 animate-pulse">运行中…</span>}
-              </div>
-              <div className="p-3 max-h-80 overflow-y-auto">
-                <div className="space-y-1">
-                  {aiLog.map((line, i) => (
-                    <div key={i} className={cn(
-                      "text-[11px] font-mono leading-relaxed",
-                      line.startsWith("✅") ? "text-emerald-600 dark:text-emerald-400 font-semibold" :
-                      line.startsWith("❌") ? "text-rose-500" :
-                      line.startsWith("⚠️") ? "text-amber-500" :
-                      line.startsWith("🤖") ? "text-violet-500" :
-                      line.startsWith("⚡") ? "text-amber-600 dark:text-amber-400" :
-                      "text-muted-foreground"
-                    )}>{line}</div>
-                  ))}
-                  {aiFinding && <div className="text-[11px] font-mono text-muted-foreground/50 animate-pulse">▋</div>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Known clusters reference */}
-        {aiClusters.length > 0 && (
-          <details className="group">
-            <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none list-none flex items-center gap-1">
-              <RiInformationLine className="w-3.5 h-3.5" />
-              <span>查看全部 {aiClusters.length} 个已知共享注册商集群</span>
-            </summary>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-              {aiClusters.map((c) => (
-                <div key={c.host} className="flex items-start gap-2 glass-panel border border-border rounded-xl p-2.5">
-                  <RiServerLine className="w-3.5 h-3.5 text-primary/60 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold">{c.name}</div>
-                    <div className="text-[10px] font-mono text-muted-foreground">{c.host}</div>
-                    <div className="text-[10px] text-muted-foreground/70 mt-0.5">{c.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-      </div>
 
     </div>
   );
 }
 
-function RepairSection({ title, color, rows, onIgnore, actionId }: {
-  title: string; color: string; rows: RepairRow[]; onIgnore: (tld: string) => void; actionId: string | null;
-}) {
-  const [open, setOpen] = React.useState(true);
-  return (
-    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-      <button onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
-        <span className="font-semibold text-sm flex items-center gap-2">
-          <span className={color}>{title}</span>
-          <Badge variant="outline" className="text-[10px] font-mono">{rows.length}</Badge>
-        </span>
-        <span className="text-muted-foreground text-xs">{open ? "▲" : "▼"}</span>
-      </button>
-      {open && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-t border-border/60 bg-muted/20">
-                {["TLD", "失败", "错误类型", "最后失败", "状态", "发现服务器", "AI 备注", "操作"].map(h => (
-                  <th key={h} className="text-left text-[11px] font-semibold text-muted-foreground px-4 py-2.5 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.tld} className={cn("border-t border-border/40 hover:bg-muted/15 transition-colors", i % 2 === 0 ? "" : "bg-muted/5")}>
-                  <td className="px-4 py-2.5 font-mono font-semibold">.{row.tld}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-center">{row.fail_count}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground font-mono text-[11px]">{row.error_type}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-[11px] whitespace-nowrap">{fmtRel(row.last_failed_at)}</td>
-                  <td className="px-4 py-2.5">
-                    <Badge variant="outline" className={cn("text-[10px] font-semibold", REPAIR_STYLES[row.repair_status] ?? "")}>
-                      {REPAIR_LABELS[row.repair_status] ?? row.repair_status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-[11px] max-w-[200px] truncate">{row.found_server ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-[11px] text-muted-foreground max-w-[180px] truncate" title={row.ai_notes ?? ""}>{row.ai_notes ?? "—"}</td>
-                  <td className="px-4 py-2.5">
-                    {row.repair_status !== "ignored" && (
-                      <button onClick={() => onIgnore(row.tld)} disabled={actionId === row.tld}
-                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive transition-colors">
-                        {actionId === row.tld ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TAB 3: IANA 数据
