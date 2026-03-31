@@ -85,6 +85,31 @@ const nextConfig = {
         'ioredis',
         'nodemailer',
       ];
+    } else {
+      // In the client bundle, server-only packages should never be executed
+      // (they live exclusively in getServerSideProps / API routes), but
+      // webpack may still try to resolve their transitive Node.js built-in
+      // dependencies, producing an undefined module factory and the runtime
+      // error "originalFactory.call is not a function".
+      // Setting each built-in to `false` tells webpack to emit an empty
+      // stub module instead of leaving the factory undefined.
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        tls: false,
+        dns: false,
+        fs: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        path: false,
+        os: false,
+        child_process: false,
+        dgram: false,
+        cluster: false,
+      };
     }
     return config;
   },
