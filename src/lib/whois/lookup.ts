@@ -851,7 +851,9 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   // ── Fast-path: TLDs in STATIC_ALWAYS_FALLBACK have no reachable native server ──
   // Skip RDAP + WHOIS entirely (saves 4–9 s of timeout overhead) and go straight
   // to yisi/tianhu.  This synchronous check costs zero DB/network calls.
-  if (isDomainQuery && isStaticAlwaysFallback(domain)) {
+  // Exception: if the user has configured a custom server for this TLD, honour it
+  // and fall through to the normal lookup flow, which checks custom servers first.
+  if (isDomainQuery && isStaticAlwaysFallback(domain) && !(await isUserManagedServer(domain.split(".").pop()?.toLowerCase() ?? ""))) {
     const [tianhuResult, yisiResult] = await Promise.all([
       lookupTianhu(domain).catch(() => null),
       lookupYisi(domain).catch(() => null),
