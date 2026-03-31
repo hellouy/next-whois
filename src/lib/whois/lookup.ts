@@ -50,7 +50,7 @@ export function invalidateLookupCacheForTld(tld: string): number {
 }
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
-import { lookupRdap, convertRdapToWhoisResult, RDAP_DIRECT_CCTLDS } from "@/lib/whois/rdap_client";
+import { lookupRdap, convertRdapToWhoisResult, RDAP_DIRECT_CCTLDS, RdapResponse } from "@/lib/whois/rdap_client";
 let _whoiserPromise: Promise<typeof import("whoiser")> | null = null;
 const getWhoiser = () => {
   if (!_whoiserPromise) _whoiserPromise = import("whoiser");
@@ -366,35 +366,33 @@ async function getIanaWhoisServer(tld: string): Promise<string | null> {
   }
 }
 
-async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
-  if (isIPAddress(domain)) {
-    const ip = domain.replace(/\/\d{1,3}$/, "");
+// ── IP / ASN lookup ───────────────────────────────────────────────────────────
+async function lookupIpOrAsn(query: string): Promise<WhoisRawResult> {
+  if (isIPAddress(query)) {
+    const ip = query.replace(/\/\d{1,3}$/, "");
     const { whoisIp } = await getWhoiser();
-    const data = await whoisIp(ip, { timeout: LOOKUP_TIMEOUT });
-    return {
-      raw: (data as any).__raw || "",
-      structured: data as any,
-      server: "ip-whois",
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await whoisIp(ip, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
+    return { raw: (data.__raw as string) || "", structured: data, server: "ip-whois" };
   }
+  const asNum = parseInt(query.replace(/^AS/i, ""));
+  const { whoisAsn } = await getWhoiser();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await whoisAsn(asNum, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
+  return { raw: (data.__raw as string) || "", structured: data, server: "asn-whois" };
+}
 
-  if (isASNumber(domain)) {
-    const asNum = parseInt(domain.replace(/^AS/i, ""));
-    const { whoisAsn } = await getWhoiser();
-    const data = await whoisAsn(asNum, { timeout: LOOKUP_TIMEOUT });
-    return {
-      raw: (data as any).__raw || "",
-      structured: data as any,
-      server: "asn-whois",
-    };
-  }
-
-  const rawExtracted = extractDomain(domain) || domain;
-  const domainToQuery = toAsciiDomain(rawExtracted);
-  const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
-  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
-  const tld = domainToQuery.split(".").slice(1).join(".");
-  const tldSuffix = domainToQuery.split(".").pop() || "";
+// ── Custom server (DB) lookup ─────────────────────────────────────────────────
+// Returns data if the configured server responded.
+// Returns null if no custom server is configured, or if a non-user-managed
+// (auto-discovered) server produced no data (caller falls through to RDAP/WHOIS).
+// Throws for user-managed server failures and for scraper-required errors.
+async function tryCustomServerForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
   let customEntry: Awaited<ReturnType<typeof getCustomServerEntry>>;
   let isUserServer: boolean;
   if (tld === tldSuffix) {
@@ -410,81 +408,80 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
     isUserServer = us1 || us2;
   }
 
-  if (customEntry) {
-    if (isScraperEntry(customEntry)) {
-      const { name: scraperName, registryUrl } = customEntry;
-      if (scraperName === "nic-ba") {
-        const nicBaResult = await lookupNicBa(domainToQuery, innerTimeout);
-        if (nicBaResult.success) {
-          return {
-            raw: nicBaResult.raw,
-            structured: {},
-            server: "nic.ba",
-            registryUrl,
-          };
-        }
-        const nicBaFail = nicBaResult as { success: false; blocked: boolean; reason: string };
-        throw new ScraperRequiredError(
-          nicBaFail.blocked
-            ? "nic.ba requires CAPTCHA verification — automated WHOIS lookup is not available for .ba domains"
-            : `nic.ba scraper error: ${nicBaFail.reason}`,
-          registryUrl,
-          nicBaFail.blocked,
-        );
+  if (!customEntry) return null;
+
+  if (isScraperEntry(customEntry)) {
+    const { name: scraperName, registryUrl } = customEntry;
+    if (scraperName === "nic-ba") {
+      const nicBaResult = await lookupNicBa(domainToQuery, innerTimeout);
+      if (nicBaResult.success) {
+        return { raw: nicBaResult.raw, structured: {}, server: "nic.ba", registryUrl };
       }
+      const nicBaFail = nicBaResult as { success: false; blocked: boolean; reason: string };
       throw new ScraperRequiredError(
-        `No scraper implementation for "${scraperName}"`,
+        nicBaFail.blocked
+          ? "nic.ba requires CAPTCHA verification — automated WHOIS lookup is not available for .ba domains"
+          : `nic.ba scraper error: ${nicBaFail.reason}`,
         registryUrl,
+        nicBaFail.blocked,
       );
-    } else if (isHttpEntry(customEntry)) {
-      const raw = await queryWhoisHttp(customEntry, domainToQuery, innerTimeout);
-      if (!raw || raw.trim().length === 0) {
-        if (isUserServer) {
-          throw new Error(`No data returned from HTTP WHOIS server: ${customEntry.url}`);
-        }
-      } else {
+    }
+    throw new ScraperRequiredError(`No scraper implementation for "${scraperName}"`, customEntry.registryUrl);
+  }
+
+  if (isHttpEntry(customEntry)) {
+    const raw = await queryWhoisHttp(customEntry, domainToQuery, innerTimeout);
+    if (!raw || raw.trim().length === 0) {
+      if (isUserServer) throw new Error(`No data returned from HTTP WHOIS server: ${customEntry.url}`);
+      return null;
+    }
+    if (isUserServer && isWhoisRateLimited(raw)) {
+      throw new Error(`Custom WHOIS server ${customEntry.url} is rate-limiting requests — please try again later`);
+    }
+    return { raw, structured: {}, server: customEntry.url };
+  }
+
+  const tcpHost = getTcpHost(customEntry);
+  if (tcpHost) {
+    const port =
+      typeof customEntry === "object" && "port" in customEntry && customEntry.port
+        ? customEntry.port
+        : 43;
+    try {
+      const { whoisQuery } = await getWhoiser();
+      const raw =
+        port === 43
+          ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
+          : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
+      if (raw && raw.trim().length > 0) {
         if (isUserServer && isWhoisRateLimited(raw)) {
-          throw new Error(`Custom WHOIS server ${customEntry.url} is rate-limiting requests — please try again later`);
+          throw new Error(`Custom WHOIS server ${tcpHost} is rate-limiting requests — please try again later`);
         }
-        return { raw, structured: {}, server: customEntry.url };
+        return { raw, structured: {}, server: tcpHost };
       }
-    } else {
-      const tcpHost = getTcpHost(customEntry);
-      if (tcpHost) {
-        const port =
-          typeof customEntry === "object" &&
-          "port" in customEntry &&
-          customEntry.port
-            ? customEntry.port
-            : 43;
-        try {
-          const { whoisQuery } = await getWhoiser();
-          const raw =
-            port === 43
-              ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
-              : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
-          if (raw && raw.trim().length > 0) {
-            if (isUserServer && isWhoisRateLimited(raw)) {
-              throw new Error(`Custom WHOIS server ${tcpHost} is rate-limiting requests — please try again later`);
-            }
-            return { raw, structured: {}, server: tcpHost };
-          }
-          if (isUserServer) {
-            throw new Error(`No data returned from custom WHOIS server: ${tcpHost}`);
-          }
-        } catch (tcpErr) {
-          if (isUserServer) throw tcpErr;
-        }
-      }
+      if (isUserServer) throw new Error(`No data returned from custom WHOIS server: ${tcpHost}`);
+    } catch (tcpErr) {
+      if (isUserServer) throw tcpErr;
     }
   }
 
+  return null;
+}
+
+// ── Generic WHOIS (bootstrap list → whoiser library → IANA refer) ─────────────
+// Consulted when no custom server returned data and RDAP is unavailable or failed.
+async function tryGenericWhoisForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+  follow: 1 | 2,
+): Promise<WhoisRawResult> {
   if (await isTldKnownNoServer(tld || tldSuffix)) {
     throw new Error(`No public WHOIS server available for .${tld || tldSuffix} domains`);
   }
 
   const bootstrapWhoisHost = getGtldWhoisServer(tld) ?? getGtldWhoisServer(tldSuffix);
-
   let primaryError: unknown = null;
 
   if (bootstrapWhoisHost) {
@@ -498,47 +495,41 @@ async function getLookupWhois(domain: string): Promise<WhoisRawResult> {
     }
   }
 
-  {
-    const { whoisDomain } = await getWhoiser();
+  const { whoisDomain } = await getWhoiser();
 
-    function extractRawFromData(data: any): WhoisRawResult | null {
-      const servers = Object.keys(data ?? {});
-      if (servers.length === 0) return null;
-      const lastServer = servers[servers.length - 1];
-      const structured = (data as any)[lastServer] || {};
-      const rawParts: string[] = [];
-      for (const s of servers) {
-        const entry = (data as any)[s];
-        if (entry?.__raw) {
-          rawParts.push(entry.__raw);
-        } else if (entry) {
-          const lines: string[] = [];
-          for (const [k, v] of Object.entries(entry)) {
-            if (k === "text" || k === "__raw" || k === "__comments") continue;
-            if (Array.isArray(v)) {
-              for (const item of v) lines.push(`${k}: ${item}`);
-            } else if (v !== undefined && v !== null && v !== "") {
-              lines.push(`${k}: ${v}`);
-            }
+  function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | null {
+    const servers = Object.keys(data ?? {});
+    if (servers.length === 0) return null;
+    const lastServer = servers[servers.length - 1];
+    const structured = (data[lastServer] as Record<string, unknown>) || {};
+    const rawParts: string[] = [];
+    for (const s of servers) {
+      const entry = data[s] as Record<string, unknown> | null;
+      if (entry?.__raw) {
+        rawParts.push(entry.__raw as string);
+      } else if (entry) {
+        const lines: string[] = [];
+        for (const [k, v] of Object.entries(entry)) {
+          if (k === "text" || k === "__raw" || k === "__comments") continue;
+          if (Array.isArray(v)) {
+            for (const item of v) lines.push(`${k}: ${item}`);
+          } else if (v !== undefined && v !== null && v !== "") {
+            lines.push(`${k}: ${v}`);
           }
-          if (lines.length > 0) rawParts.push(lines.join("\n"));
         }
+        if (lines.length > 0) rawParts.push(lines.join("\n"));
       }
-      const raw = rawParts.join("\n\n") || "";
-      return { raw, structured, server: lastServer };
     }
+    const raw = rawParts.join("\n\n") || "";
+    return { raw, structured, server: lastServer };
+  }
 
-    try {
-      const data = await whoisDomain(domainToQuery, {
-        raw: true,
-        follow,
-        timeout: innerTimeout,
-      });
-      const result = extractRawFromData(data);
-      if (result && result.raw.trim().length > 0) return result;
-    } catch (err) {
-      if (!primaryError) primaryError = err;
-    }
+  try {
+    const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
+    const result = extractRawFromData(data as Record<string, unknown>);
+    if (result && result.raw.trim().length > 0) return result;
+  } catch (err) {
+    if (!primaryError) primaryError = err;
   }
 
   const ianaServer = await getIanaWhoisServer(tldSuffix);
@@ -718,11 +709,13 @@ export async function lookupWhoisWithCache(
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
 const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
 
+// Union of a successful RDAP response and an RDAP error object.
+type RdapResult = RdapResponse | { errorCode: number; title?: string };
+
 export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const startTime = performance.now();
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
-  const tldSuffix = domain.split(".").pop()?.toLowerCase() ?? "";
 
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
     const dnsProbe = isDomainQuery
@@ -731,27 +724,74 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
 
-  // Step 1: Try RDAP
-  let rdapData: any = null;
+  // ── IP / ASN shortcut ────────────────────────────────────────────────────────
+  if (!isDomainQuery) {
+    let whoisData: WhoisRawResult | null = null;
+    let whoisError: unknown = null;
+    try {
+      whoisData = await withTimeout(lookupIpOrAsn(domain), WHOIS_TIMEOUT);
+    } catch (e) {
+      whoisError = e;
+    }
+    const whoisRawStr = whoisData?.raw || null;
+    if (whoisRawStr) {
+      try {
+        const result = await analyzeWhois(whoisRawStr);
+        return { time: elapsed(), status: true, cached: false, source: "whois", result };
+      } catch (parseError: unknown) {
+        return failWithDns(parseError instanceof Error ? parseError.message : "Failed to parse response");
+      }
+    }
+    return failWithDns(whoisError instanceof Error ? whoisError.message : "Unknown error occurred");
+  }
+
+  // ── Domain lookup: custom server → RDAP → generic WHOIS ──────────────────────
+  const rawExtracted = extractDomain(domain) || domain;
+  const domainToQuery = toAsciiDomain(rawExtracted);
+  const tld = domainToQuery.split(".").slice(1).join(".");
+  const tldSuffix = domainToQuery.split(".").pop() || "";
+  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
+  const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
+
+  // Step 1: Custom server (DB) — takes absolute priority
+  let customResult: WhoisRawResult | null = null;
+  let customError: unknown = null;
   try {
-    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT);
-    if (rdap && !rdap.errorCode) rdapData = rdap;
+    customResult = await tryCustomServerForDomain(domainToQuery, tld, tldSuffix, innerTimeout);
+  } catch (e) {
+    customError = e;
+  }
+  if (customError) {
+    const registryUrl = customError instanceof ScraperRequiredError ? customError.registryUrl : undefined;
+    return failWithDns(customError instanceof Error ? customError.message : "Custom server error", registryUrl);
+  }
+
+  // Step 2: RDAP
+  let rdapData: RdapResponse | null = null;
+  try {
+    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as RdapResult;
+    if (rdap && !("errorCode" in rdap)) rdapData = rdap;
   } catch {}
 
-  // Step 2: Try WHOIS (custom server → bootstrap → whoiser → IANA)
-  // Skip for ccTLDs that have a known direct RDAP endpoint and RDAP succeeded.
-  const skipWhois = rdapData !== null && isDomainQuery && RDAP_DIRECT_CCTLDS.has(tldSuffix);
-  let whoisData: WhoisRawResult | null = null;
+  // Step 3: Generic WHOIS — skip when custom server already returned data,
+  // or for ccTLDs with a direct RDAP endpoint when RDAP succeeded.
+  let whoisData: WhoisRawResult | null = customResult;
   let whoisError: unknown = null;
-  if (!skipWhois) {
+  const skipGenericWhois =
+    customResult !== null ||
+    (rdapData !== null && RDAP_DIRECT_CCTLDS.has(tldSuffix));
+  if (!skipGenericWhois) {
     try {
-      whoisData = await withTimeout(getLookupWhois(domain), WHOIS_TIMEOUT);
+      whoisData = await withTimeout(
+        tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+        WHOIS_TIMEOUT,
+      );
     } catch (e) {
       whoisError = e;
     }
   }
 
-  // Step 3: Build result — prefer RDAP, merge WHOIS if available, fall back to WHOIS-only
+  // Step 4: Build result — prefer RDAP, enrich with WHOIS if available
   const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
   const whoisRawStr = whoisData?.raw || null;
 
@@ -772,12 +812,8 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   }
 
   if (whoisRawStr) {
-    if (isIanaFallback(whoisRawStr)) {
-      return failWithDns("No WHOIS/RDAP server available for this TLD");
-    }
-    if (isWhoisRateLimited(whoisRawStr)) {
-      return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
-    }
+    if (isIanaFallback(whoisRawStr)) return failWithDns("No WHOIS/RDAP server available for this TLD");
+    if (isWhoisRateLimited(whoisRawStr)) return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
     try {
       const result = await analyzeWhois(whoisRawStr);
       const detectedError = detectWhoisError(whoisRawStr);
@@ -807,14 +843,11 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
       if (rdapRaw) result.rawRdapContent = rdapRaw;
       return { time: elapsed(), status: true, cached: false, source: "whois", result };
     } catch (parseError: unknown) {
-      return failWithDns(
-        parseError instanceof Error ? parseError.message : "Failed to parse WHOIS response",
-      );
+      return failWithDns(parseError instanceof Error ? parseError.message : "Failed to parse WHOIS response");
     }
   }
 
-  const scraperRegistryUrl =
-    whoisError instanceof ScraperRequiredError ? whoisError.registryUrl : undefined;
+  const scraperRegistryUrl = whoisError instanceof ScraperRequiredError ? whoisError.registryUrl : undefined;
   const whoisMsg = whoisError instanceof Error ? whoisError.message : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
   const errMsg = /not supported/i.test(whoisMsg)

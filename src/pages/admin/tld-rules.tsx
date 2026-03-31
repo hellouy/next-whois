@@ -32,9 +32,8 @@ import { cn } from "@/lib/utils";
 import type { CompareRow } from "@/pages/api/admin/tld-lifecycle-compare";
 
 const TLD_TABS = [
-  { href: "/admin/domains",      label: "TLD 管理" },
-  { href: "/admin/tld-rules",   label: "TLD 规则" },
-  { href: "/admin/tld-fallback", label: "查询兜底" },
+  { href: "/admin/domains",    label: "TLD 管理" },
+  { href: "/admin/tld-rules", label: "TLD 规则" },
 ];
 
 type TldRule = {

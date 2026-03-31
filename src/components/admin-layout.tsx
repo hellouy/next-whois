@@ -61,7 +61,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/domains",          labelKey: "admin.nav_domains",          icon: RiGlobalLine,     activeIcon: RiGlobalLine },
       { href: "/admin/tld-rules",        labelKey: "admin.nav_tld_rules",        icon: RiTimeLine,       activeIcon: RiTimeLine },
-      { href: "/admin/tld-fallback",     labelKey: "admin.nav_tld_fallback",     icon: RiSearchLine,     activeIcon: RiSearchFill },
+
       { href: "/admin/access-control",   labelKey: "admin.nav_access_control",   icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
       { href: "/admin/links",            labelKey: "admin.nav_links",            icon: RiLinksLine,      activeIcon: RiLinksLine },
       { href: "/admin/hot-prefixes",     labelKey: "admin.nav_hot_prefixes",     icon: RiFireLine,       activeIcon: RiFireLine },
