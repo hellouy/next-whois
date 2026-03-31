@@ -428,3 +428,114 @@ export async function syncRegistryServer(
   invalidateAllServersCache();
   return { action: "updated", ianaServer: server, existingEntry, existingSource };
 }
+
+// ── ScraperRequiredError ───────────────────────────────────────────────────────
+
+export class ScraperRequiredError extends Error {
+  registryUrl: string;
+  blocked: boolean;
+  constructor(message: string, registryUrl: string, blocked = false) {
+    super(message);
+    this.name = "ScraperRequiredError";
+    this.registryUrl = registryUrl;
+    this.blocked = blocked;
+  }
+}
+
+// ── Custom server lookup (DB) ─────────────────────────────────────────────────
+// Returns data if the configured server responded.
+// Returns null if no custom server is configured, or if a non-user-managed
+// (auto-discovered) server produced no data (caller falls through to RDAP/WHOIS).
+// Throws for user-managed server failures and for scraper-required errors.
+
+import { WhoisRawResult } from "@/lib/whois/types";
+import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
+import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
+import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
+
+let _whoiserPromiseCustom: Promise<typeof import("whoiser")> | null = null;
+const getWhoiserCustom = () => {
+  if (!_whoiserPromiseCustom) _whoiserPromiseCustom = import("whoiser");
+  return _whoiserPromiseCustom;
+};
+
+export async function tryCustomServerForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
+  let customEntry: Awaited<ReturnType<typeof getCustomServerEntry>>;
+  let isUserServer: boolean;
+  if (tld === tldSuffix) {
+    const [ce, us] = await Promise.all([getCustomServerEntry(tld), isUserManagedServer(tld)]);
+    customEntry = ce;
+    isUserServer = us;
+  } else {
+    const [[ce1, ce2], [us1, us2]] = await Promise.all([
+      Promise.all([getCustomServerEntry(tld), getCustomServerEntry(tldSuffix)]),
+      Promise.all([isUserManagedServer(tld), isUserManagedServer(tldSuffix)]),
+    ]);
+    customEntry = ce1 || ce2;
+    isUserServer = us1 || us2;
+  }
+
+  if (!customEntry) return null;
+
+  if (isScraperEntry(customEntry)) {
+    const { name: scraperName, registryUrl } = customEntry;
+    if (scraperName === "nic-ba") {
+      const nicBaResult = await lookupNicBa(domainToQuery, innerTimeout);
+      if (nicBaResult.success) {
+        return { raw: nicBaResult.raw, structured: {}, server: "nic.ba", registryUrl };
+      }
+      const nicBaFail = nicBaResult as { success: false; blocked: boolean; reason: string };
+      throw new ScraperRequiredError(
+        nicBaFail.blocked
+          ? "nic.ba requires CAPTCHA verification — automated WHOIS lookup is not available for .ba domains"
+          : `nic.ba scraper error: ${nicBaFail.reason}`,
+        registryUrl,
+        nicBaFail.blocked,
+      );
+    }
+    throw new ScraperRequiredError(`No scraper implementation for "${scraperName}"`, customEntry.registryUrl);
+  }
+
+  if (isHttpEntry(customEntry)) {
+    const raw = await queryWhoisHttp(customEntry, domainToQuery, innerTimeout);
+    if (!raw || raw.trim().length === 0) {
+      if (isUserServer) throw new Error(`No data returned from HTTP WHOIS server: ${customEntry.url}`);
+      return null;
+    }
+    if (isUserServer && isWhoisRateLimited(raw)) {
+      throw new Error(`Custom WHOIS server ${customEntry.url} is rate-limiting requests — please try again later`);
+    }
+    return { raw, structured: {}, server: customEntry.url };
+  }
+
+  const tcpHost = getTcpHost(customEntry);
+  if (tcpHost) {
+    const port =
+      typeof customEntry === "object" && "port" in customEntry && customEntry.port
+        ? customEntry.port
+        : 43;
+    try {
+      const { whoisQuery } = await getWhoiserCustom();
+      const raw =
+        port === 43
+          ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
+          : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
+      if (raw && raw.trim().length > 0) {
+        if (isUserServer && isWhoisRateLimited(raw)) {
+          throw new Error(`Custom WHOIS server ${tcpHost} is rate-limiting requests — please try again later`);
+        }
+        return { raw, structured: {}, server: tcpHost };
+      }
+      if (isUserServer) throw new Error(`No data returned from custom WHOIS server: ${tcpHost}`);
+    } catch (tcpErr) {
+      if (isUserServer) throw tcpErr;
+    }
+  }
+
+  return null;
+}

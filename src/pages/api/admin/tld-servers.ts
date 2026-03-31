@@ -31,6 +31,7 @@ type ResponseData = {
   dbServers?: Record<string, ServerWithSource>;
   registryServers?: Record<string, CustomServerEntry>;
   builtinTlds?: string[];
+  purged?: number;
 };
 
 export default async function handler(

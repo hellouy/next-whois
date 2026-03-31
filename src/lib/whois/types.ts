@@ -1,6 +1,14 @@
 import { DomainPricing } from "../pricing/client";
 import { DnsProbeResult } from "./dns-check";
 
+/** Raw output from any WHOIS/scraper transport layer. */
+export interface WhoisRawResult {
+  raw: string;
+  structured: Record<string, unknown>;
+  server?: string;
+  registryUrl?: string;
+}
+
 export type WhoisResult = {
   status: boolean;
   time: number;
