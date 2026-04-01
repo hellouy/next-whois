@@ -24,6 +24,7 @@ import {
 } from "@/lib/whois/whois-patterns";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
+import { recordTldLookupFailure } from "@/lib/db";
 
 warmupDnsCache([
   "whois.verisign-grs.com", "whois.pir.org", "whois.iana.org",
@@ -212,6 +213,13 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const domainToQuery = toAsciiDomain(rawExtracted);
   const tld = domainToQuery.split(".").slice(1).join(".");
   const tldSuffix = domainToQuery.split(".").pop() || "";
+
+  function recordFailure(
+    reason: "no_server" | "timeout" | "parse_error" | "rate_limited" | "iana_fallback",
+    errorMsg?: string,
+  ) {
+    recordTldLookupFailure(tldSuffix, reason, domainToQuery, errorMsg).catch(() => {});
+  }
   const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
@@ -251,8 +259,14 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   }
 
   if (whoisRawStr) {
-    if (isIanaFallback(whoisRawStr)) return failWithDns("No WHOIS/RDAP server available for this TLD");
-    if (isWhoisRateLimited(whoisRawStr)) return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
+    if (isIanaFallback(whoisRawStr)) {
+      recordFailure("iana_fallback", "No WHOIS/RDAP server available for this TLD");
+      return failWithDns("No WHOIS/RDAP server available for this TLD");
+    }
+    if (isWhoisRateLimited(whoisRawStr)) {
+      recordFailure("rate_limited");
+      return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
+    }
     try {
       const result = await analyzeWhois(whoisRawStr);
       const detectedError = detectWhoisError(whoisRawStr);
@@ -266,19 +280,26 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
             },
           };
         }
+        recordFailure("parse_error", detectedError || "Empty WHOIS response");
         return failWithDns(detectedError || "Empty WHOIS response");
       }
       if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       if (rdapRaw) result.rawRdapContent = rdapRaw;
       return { time: elapsed(), status: true, cached: false, source: "whois", result };
     } catch (e: unknown) {
-      return failWithDns(e instanceof Error ? e.message : "Failed to parse WHOIS response");
+      const msg = e instanceof Error ? e.message : "Failed to parse WHOIS response";
+      recordFailure("parse_error", msg);
+      return failWithDns(msg);
     }
   }
 
   const whoisMsg = whoisError instanceof Error ? whoisError.message : "";
   const rdapMsg = rdapSettled.status === "rejected" ? (rdapSettled.reason instanceof Error ? rdapSettled.reason.message : "") : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
+
+  const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout"
+    : /not supported|no.*server|no public/i.test(whoisMsg) ? "no_server"
+    : "no_server";
   const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
     : /cannot read properties/i.test(whoisMsg) || /cannot read properties/i.test(rdapMsg)
@@ -286,5 +307,6 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     : whoisReturnedEmpty && whoisData?.server
     ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
     : whoisMsg || rdapMsg || "Unknown error occurred";
+  recordFailure(reason, errMsg);
   return failWithDns(errMsg);
 }

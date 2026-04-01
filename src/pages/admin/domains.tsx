@@ -20,10 +20,11 @@ import {
   RiExternalLinkLine, RiArrowUpSLine, RiArrowDownSLine,
   RiStopCircleLine, RiInformationLine,
   RiCheckLine, RiDatabase2Line, RiCodeLine, RiFileLine,
-  RiDeleteBin7Line, RiRobot2Line,
+  RiDeleteBin7Line, RiRobot2Line, RiAlertLine,
 } from "@remixicon/react";
+import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
-type MainTab = "lifecycle" | "servers" | "iana";
+type MainTab = "lifecycle" | "servers" | "iana" | "failures";
 
 /* ── Shared Helpers ─────────────────────────────────────────────────────── */
 function fmtRel(d: string | null): string {
@@ -1134,6 +1135,242 @@ function IanaTab() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TAB 4: 失败记录
+══════════════════════════════════════════════════════════════════════════════ */
+const FAIL_REASON_META: Record<string, { label: string; color: string }> = {
+  no_server:    { label: "无服务器",  color: "text-red-600    bg-red-50    dark:bg-red-950/40    border-red-200    dark:border-red-800"    },
+  iana_fallback:{ label: "IANA兜底",  color: "text-orange-600 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800" },
+  timeout:      { label: "超时",      color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-800" },
+  rate_limited: { label: "限速",      color: "text-amber-600  bg-amber-50  dark:bg-amber-950/40  border-amber-200  dark:border-amber-800"  },
+  parse_error:  { label: "解析失败",  color: "text-blue-600   bg-blue-50   dark:bg-blue-950/40   border-blue-200   dark:border-blue-800"   },
+};
+
+function FailuresTab() {
+  const [rows, setRows] = React.useState<TldFailureRow[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const [resettingTld, setResettingTld] = React.useState<string | null>(null);
+
+  // Add-server dialog state
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [addTld, setAddTld] = React.useState("");
+  const [addServer, setAddServer] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/admin/tld-failures");
+      const d = await r.json();
+      setRows(d.rows ?? []);
+    } catch { toast.error("加载失败"); }
+    finally { setLoading(false); }
+  }
+
+  React.useEffect(() => { load(); }, []);
+
+  async function resetTld(tld: string) {
+    if (!confirm(`确认重置 .${tld} 的失败记录？`)) return;
+    setResettingTld(tld);
+    try {
+      const r = await fetch("/api/admin/tld-failures", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld }),
+      });
+      if (!r.ok) throw new Error("重置失败");
+      toast.success(`.${tld} 记录已清零`);
+      await load();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "操作失败"); }
+    finally { setResettingTld(null); }
+  }
+
+  function openAddServer(tld: string) {
+    setAddTld(tld);
+    setAddServer("");
+    setAddOpen(true);
+  }
+
+  async function saveServer() {
+    const tld = addTld.trim().toLowerCase().replace(/^\./, "");
+    const server = addServer.trim();
+    if (!tld || !server) { toast.error("TLD 和服务器地址都是必填项"); return; }
+    setAdding(true);
+    try {
+      const r = await fetch("/api/admin/tld-servers", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, server }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message ?? "添加失败");
+      toast.success(d.message ?? "已添加");
+      setAddOpen(false);
+      await load();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "操作失败"); }
+    finally { setAdding(false); }
+  }
+
+  const filtered = rows.filter(r => !search || r.tld.includes(search.toLowerCase()));
+  const noServerCount = rows.filter(r => r.fail_reason === "no_server" || r.fail_reason === "iana_fallback").length;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-bold flex items-center gap-1.5">
+            <RiAlertLine className="w-4 h-4 text-primary" />查询失败记录
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            记录 WHOIS/RDAP 查询失败的后缀，选择对应后缀一键添加服务器来增强查询能力
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {noServerCount > 0 && (
+            <span className="text-xs bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200 dark:border-red-800 rounded-lg px-2 py-1">
+              {noServerCount} 个后缀无服务器
+            </span>
+          )}
+          <Button onClick={load} variant="outline" size="sm" className="h-8 text-xs rounded-xl" disabled={loading}>
+            {loading ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <RiSearchLine className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="搜索 TLD…" className="pl-8 h-8 text-xs rounded-xl" />
+        </div>
+      </div>
+
+      {loading && rows.length === 0 ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+          <RiLoader4Line className="w-5 h-5 animate-spin mr-2" />加载中…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm gap-2">
+          <RiCheckboxCircleLine className="w-8 h-8 opacity-30" />
+          <p>{search ? "无匹配结果" : "暂无失败记录，所有后缀查询正常"}</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-border overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-muted/40 text-muted-foreground border-b border-border">
+                <th className="text-left py-2.5 px-3 font-semibold w-24">后缀</th>
+                <th className="text-left py-2.5 px-3 font-semibold w-16">失败次数</th>
+                <th className="text-left py-2.5 px-3 font-semibold w-24">原因</th>
+                <th className="text-left py-2.5 px-3 font-semibold hidden sm:table-cell">最近域名</th>
+                <th className="text-left py-2.5 px-3 font-semibold hidden lg:table-cell">错误详情</th>
+                <th className="text-left py-2.5 px-3 font-semibold w-20 hidden md:table-cell">时间</th>
+                <th className="text-right py-2.5 px-3 font-semibold w-40">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map(row => {
+                const meta = FAIL_REASON_META[row.fail_reason ?? "no_server"] ?? FAIL_REASON_META.no_server;
+                return (
+                  <tr key={row.tld} className="hover:bg-muted/20 transition-colors">
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <code className="font-mono font-bold text-foreground">.{row.tld}</code>
+                        {row.has_custom_server && (
+                          <span className="text-emerald-600" title="已有自定义服务器">
+                            <RiCheckboxCircleLine className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={cn(
+                        "inline-flex items-center justify-center w-7 h-7 rounded-lg font-bold text-sm",
+                        row.fail_count >= 10 ? "bg-red-100 dark:bg-red-950/40 text-red-700"
+                          : row.fail_count >= 3 ? "bg-orange-100 dark:bg-orange-950/40 text-orange-700"
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {row.fail_count}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs border font-medium",
+                        meta.color,
+                      )}>
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 hidden sm:table-cell">
+                      <span className="text-muted-foreground font-mono">{row.last_domain ?? "—"}</span>
+                    </td>
+                    <td className="py-2.5 px-3 hidden lg:table-cell max-w-xs">
+                      <span className="text-muted-foreground truncate block" title={row.sample_error ?? ""}>
+                        {row.sample_error ?? "—"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 hidden md:table-cell text-muted-foreground">
+                      {fmtRel(row.last_fail_at)}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!row.has_custom_server && (
+                          <Button size="sm" onClick={() => openAddServer(row.tld)}
+                            className="h-7 text-xs rounded-lg px-2">
+                            <RiAddLine className="w-3 h-3 mr-0.5" />添加服务器
+                          </Button>
+                        )}
+                        <button onClick={() => resetTld(row.tld)} disabled={resettingTld === row.tld}
+                          title="重置计数" className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                          {resettingTld === row.tld
+                            ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                            : <RiDeleteBin7Line className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add Server Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">为 .{addTld} 添加 WHOIS 服务器</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <Label className="text-xs">后缀</Label>
+              <Input value={addTld} onChange={e => setAddTld(e.target.value.replace(/^\./, ""))}
+                placeholder="com" className="h-8 text-xs rounded-xl font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">WHOIS 服务器主机名</Label>
+              <Input value={addServer} onChange={e => setAddServer(e.target.value)}
+                placeholder="whois.example.com" className="h-8 text-xs rounded-xl font-mono" />
+              <p className="text-xs text-muted-foreground">
+                仅填写主机名（如 whois.nic.xxx），高级 JSON 格式请在"服务器管理"标签页配置
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="h-8 text-xs rounded-xl">
+              <RiCloseLine className="w-3.5 h-3.5 mr-1" />取消
+            </Button>
+            <Button onClick={saveServer} disabled={adding} className="h-8 text-xs rounded-xl">
+              {adding ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiSave3Line className="w-3.5 h-3.5 mr-1" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Main Page
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function DomainsPage() {
@@ -1144,6 +1381,7 @@ export default function DomainsPage() {
   React.useEffect(() => {
     if (tabParam === "servers") setActiveTab("servers");
     else if (tabParam === "iana") setActiveTab("iana");
+    else if (tabParam === "failures") setActiveTab("failures");
     else setActiveTab("lifecycle");
   }, [tabParam]);
 
@@ -1151,6 +1389,7 @@ export default function DomainsPage() {
     { key: "lifecycle", label: "生命周期",  icon: RiTimeLine,    desc: "宽限期/赎回期规则" },
     { key: "servers",   label: "服务器管理", icon: RiServerLine,  desc: "WHOIS 服务器列表" },
     { key: "iana",      label: "IANA 数据", icon: RiGlobalLine,  desc: "注册局元数据" },
+    { key: "failures",  label: "失败记录",  icon: RiAlertLine,   desc: "查询失败的后缀统计" },
   ];
 
   return (
@@ -1185,6 +1424,7 @@ export default function DomainsPage() {
         {activeTab === "lifecycle" && <LifecycleTab />}
         {activeTab === "servers" && <ServersTab />}
         {activeTab === "iana" && <IanaTab />}
+        {activeTab === "failures" && <FailuresTab />}
       </div>
     </AdminLayout>
   );

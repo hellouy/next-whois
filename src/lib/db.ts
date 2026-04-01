@@ -117,7 +117,10 @@ const CREATE_TABLES = [
     rdap_skip     BOOLEAN      NOT NULL DEFAULT false,
     last_fail_at  TIMESTAMPTZ
   )`,
-  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS rdap_skip BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS rdap_skip    BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS fail_reason  TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS last_domain  TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS sample_error TEXT`,
   `CREATE TABLE IF NOT EXISTS custom_whois_servers (
     tld        TEXT         PRIMARY KEY,
     entry      JSONB        NOT NULL,
@@ -573,4 +576,38 @@ export async function getDbReady(): Promise<Pool | null> {
     return null;
   }
   return getMigrated() ? db : null;
+}
+
+/**
+ * Record a TLD lookup failure for admin review.
+ * Fire-and-forget — never throws, never blocks the main query path.
+ */
+export async function recordTldLookupFailure(
+  tld: string,
+  reason: "no_server" | "timeout" | "parse_error" | "rate_limited" | "iana_fallback",
+  domain: string,
+  errorMsg?: string,
+): Promise<void> {
+  if (!tld) return;
+  const db = await getDbReady().catch(() => null);
+  if (!db) return;
+  const client = await db.connect().catch(() => null);
+  if (!client) return;
+  try {
+    await client.query(
+      `INSERT INTO tld_fallback_stats (tld, fail_count, last_fail_at, fail_reason, last_domain, sample_error)
+       VALUES ($1, 1, NOW(), $2, $3, $4)
+       ON CONFLICT (tld) DO UPDATE SET
+         fail_count   = tld_fallback_stats.fail_count + 1,
+         last_fail_at = NOW(),
+         fail_reason  = $2,
+         last_domain  = $3,
+         sample_error = COALESCE($4, tld_fallback_stats.sample_error)`,
+      [tld, reason, domain, errorMsg ? errorMsg.slice(0, 200) : null],
+    );
+  } catch {
+    // Silently ignore — never disrupt the query path
+  } finally {
+    client.release();
+  }
 }

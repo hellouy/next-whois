@@ -49,6 +49,22 @@ export async function lookupIpOrAsn(query: string): Promise<WhoisRawResult> {
   return { raw: (data.__raw as string) || "", structured: data, server: "asn-whois" };
 }
 
+// ── Referral chain helper ──────────────────────────────────────────────────────
+/**
+ * Extract the "Registrar WHOIS Server" from registry WHOIS raw text.
+ * Returns null if the server is the same as the one we already queried,
+ * or if the line doesn't contain a valid hostname.
+ */
+function extractRegistrarWhoisServer(raw: string, alreadyQueried: string): string | null {
+  const m = raw.match(/^\s*Registrar WHOIS Server:\s*(\S+)/im);
+  if (!m) return null;
+  const server = m[1].trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  if (!server || server === alreadyQueried.toLowerCase()) return null;
+  // Basic sanity: must look like a hostname (contains a dot, no spaces)
+  if (!server.includes(".") || /\s/.test(server)) return null;
+  return server;
+}
+
 // ── Generic WHOIS (bootstrap list → whoiser library → IANA refer) ─────────────
 export async function tryGenericWhoisForDomain(
   domainToQuery: string,
@@ -71,6 +87,26 @@ export async function tryGenericWhoisForDomain(
     try {
       const raw = await queryWhoisTcp(bootstrapWhoisHost, 43, domainToQuery, innerTimeout);
       if (raw && raw.trim().length > 0 && !isIanaFallback(raw)) {
+        // Follow registrar WHOIS referral if present — registry servers often
+        // return only minimal data and point to the registrar for full details.
+        const referralServer = extractRegistrarWhoisServer(raw, bootstrapWhoisHost);
+        if (referralServer) {
+          try {
+            const referralRaw = await queryWhoisTcp(
+              referralServer, 43, domainToQuery,
+              Math.min(innerTimeout, 6_000),
+            );
+            if (referralRaw && referralRaw.trim().length > 80) {
+              return {
+                raw: raw + "\n\n" + referralRaw,
+                structured: {},
+                server: referralServer,
+              };
+            }
+          } catch {
+            // Referral failed — proceed with registry data only
+          }
+        }
         return { raw, structured: {}, server: bootstrapWhoisHost };
       }
     } catch (err) {
