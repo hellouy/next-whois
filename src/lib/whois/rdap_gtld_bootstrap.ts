@@ -1229,9 +1229,21 @@ const GTLD_RDAP_BOOTSTRAP: Record<string, string> = {
   "xn--xkc2dl3a5ee0h": "https://rdap.nic.lk/",               // .இலங்கை Sri Lanka (Tamil)
   "xn--fzc2c9e2c":     "https://rdap.nic.lk/",               // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
   "xn--qxam":          "https://rdap.gr/",                   // .ελ Greece
-  // ── ccTLDs managed via gTLD-style RDAP (WHOIS blocked/unavailable from our infra) ──
-  "vc":                "https://rdap.identitydigital.services/rdap/", // .vc Saint Vincent — IdentityDigital; WHOIS timeouts
-  "lc":                "https://rdap.identitydigital.services/rdap/", // .lc Saint Lucia — IdentityDigital; WHOIS timeouts
+  // ── ccTLDs managed by Identity Digital (formerly Afilias/Donuts) ─────────────────────────────
+  // Identity Digital deprecated TCP WHOIS (port 43 + web) on Aug 4, 2025 for ALL their TLDs.
+  // All whois.nic.{ac,ag,ai,bm,bz,io,mn,sc,sh,vc} servers block Replit's IP (TIMEOUT/ECONNREFUSED).
+  // RDAP at rdap.identitydigital.services is confirmed working for all of them.
+  // Placed here (GTLD_RDAP_BOOTSTRAP, not CCTLD_RDAP_OVERRIDES) so WHOIS is not attempted after RDAP success.
+  "ac":                "https://rdap.identitydigital.services/rdap/", // .ac Ascension Island
+  "ag":                "https://rdap.identitydigital.services/rdap/", // .ag Antigua & Barbuda
+  "bz":                "https://rdap.identitydigital.services/rdap/", // .bz Belize (rdap.nic.bz ECONNREFUSED)
+  "io":                "https://rdap.identitydigital.services/rdap/", // .io British Indian Ocean Territory
+  "mn":                "https://rdap.identitydigital.services/rdap/", // .mn Mongolia
+  "pr":                "https://rdap.identitydigital.services/rdap/", // .pr Puerto Rico
+  "sc":                "https://rdap.identitydigital.services/rdap/", // .sc Seychelles
+  "sh":                "https://rdap.identitydigital.services/rdap/", // .sh Saint Helena
+  "vc":                "https://rdap.identitydigital.services/rdap/", // .vc Saint Vincent
+  "lc":                "https://rdap.identitydigital.services/rdap/", // .lc Saint Lucia — IdentityDigital infra; WHOIS timeouts
 };
 
 /**
@@ -1243,7 +1255,7 @@ export function getGtldRdapServer(tld: string): string | undefined {
 }
 
 /** Total number of TLDs in the local RDAP bootstrap. */
-export const GTLD_RDAP_COUNT = 1220;
+export const GTLD_RDAP_COUNT = 1224;
 
 /** Returns the full RDAP bootstrap map (TLD → server URL). Admin use only. */
 export function getAllGtldRdapServers(): Record<string, string> {

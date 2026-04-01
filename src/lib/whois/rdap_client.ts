@@ -204,13 +204,13 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // hk: removed — rdap.hkirc.hk ENOTFOUND; WHOIS via whois.hkirc.hk works
   id: "https://rdap.pandi.id/rdap/",
   in: "https://rdap.nixiregistry.in/rdap/",
-  io: "https://rdap.identitydigital.services/rdap/", // confirmed: IdentityDigital
+  // io: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   jp: "https://jprs.jp/rdap/",                     // fixed: rdap.jprs.jp ENOTFOUND; jprs.jp/rdap/ works
   // kh: removed — rdap.nic.kh ENOTFOUND; WHOIS whois.nic.kh also ENOTFOUND
   // kr: removed — rdap.kr ENOTFOUND; WHOIS via whois.kr works
   la: "https://rdap.nic.la/",
   // mm: removed — rdap.nic.mm ENOTFOUND; no known working WHOIS server
-  // mn: removed — rdap.nic.mn ENOTFOUND; WHOIS via whois.nic.mn works
+  // mn: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   ms: "https://rdap.nic.ms/",
   // mv: removed — rdap.nic.mv ENOTFOUND (Maldives, no public RDAP/WHOIS)
   my: "https://rdap.mynic.my/rdap/",               // confirmed: mynic.my/rdap/
@@ -233,13 +233,13 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // vu: removed — rdap.nic.vu ENOTFOUND; WHOIS whois.dnrs.vu also ENOTFOUND
   // ws: removed — rdap.nic.ws ENOTFOUND; WHOIS via whois.website.ws works
   // ── Americas ─────────────────────────────────────────────────────────────
-  // ag: removed — rdap.nic.ag ENOTFOUND; WHOIS via whois.nic.ag works
-  ai: "https://rdap.identitydigital.services/rdap/",
+  // ag: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
+  // ai: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   ar: "https://rdap.nic.ar/",                      // IANA-confirmed; slow → see RDAP_TLD_TIMEOUT_MS
   // bb: removed — rdap.nic.bb ENOTFOUND; WHOIS whois.telecoms-barbados.gov.bb also ENOTFOUND
-  bm: "https://rdap.identitydigital.services/rdap/",
+  // bm: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   br: "https://rdap.registro.br/",                 // IANA-confirmed; HTTP 403 from cloud → fail-fast to WHOIS
-  bz: "https://rdap.nic.bz/",
+  // bz: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; rdap.nic.bz ECONNREFUSED
   ca: "https://rdap.ca.fury.ca/rdap/",
   // co: removed — rdap.cctld.co SSL/TLS error (unrecognized SNI); not in IANA bootstrap
   cr: "https://rdap.nic.cr/",
