@@ -1041,7 +1041,7 @@ function translateDnssecValue(value: string, locale: string): string {
 
 function buildOgUrl(
   target: string,
-  _result?: WhoisAnalyzeResult | undefined,
+  result?: WhoisAnalyzeResult | undefined,
   overrides?: { w?: number; h?: number; theme?: string },
 ): string {
   const params = new URLSearchParams();
@@ -1055,6 +1055,29 @@ function buildOgUrl(
       ? "dark"
       : "light");
   if (themeVal === "dark") params.set("theme", "dark");
+
+  // Embed compact WHOIS fields so the OG handler can skip the lookup fetch.
+  if (result) {
+    const r = result;
+    const ok = (v: unknown): v is string =>
+      typeof v === "string" && v.length > 0 && v !== "Unknown";
+    if (ok(r.registrar))            params.set("reg", r.registrar.slice(0, 60));
+    if (ok(r.creationDate))         params.set("cr",  r.creationDate.slice(0, 10));
+    if (ok(r.expirationDate))       params.set("ex",  r.expirationDate.slice(0, 10));
+    if (ok(r.updatedDate))          params.set("up",  r.updatedDate.slice(0, 10));
+    if (r.remainingDays != null)    params.set("rd",  String(r.remainingDays));
+    if (r.domainAge != null)        params.set("age", String(r.domainAge));
+    if (Array.isArray(r.nameServers) && r.nameServers.length > 0)
+      params.set("ns", r.nameServers.slice(0, 3).join(","));
+    if (Array.isArray(r.status) && r.status.length > 0)
+      params.set("st", r.status.slice(0, 4).map((s: { status: string }) => s.status).join(","));
+    if (ok(r.registrantCountry))    params.set("co",  r.registrantCountry);
+    if (ok(r.registrantOrganization))
+      params.set("org", r.registrantOrganization.slice(0, 50));
+    if (ok(r.dnssec))               params.set("dn",  r.dnssec.slice(0, 30));
+    if (ok(r.whoisServer))          params.set("ws",  r.whoisServer.slice(0, 60));
+  }
+
   return `/api/og?${params.toString()}`;
 }
 
@@ -4650,7 +4673,30 @@ export default function LookupPage({
                "domain lookup", "whois lookup", "rdap", "domain info"].join(", ");
 
           const canonicalUrl = `${origin}/${target}`;
-          const ogImage = `${origin}/api/og?query=${encodeURIComponent(target)}&theme=dark`;
+          // Build OG URL with embedded WHOIS fields so the edge handler skips
+          // the internal /api/lookup fetch (saves 3-10 s on first crawl).
+          const ogParams = new URLSearchParams();
+          ogParams.set("query", target);
+          ogParams.set("theme", "dark");
+          if (r && isRegistered) {
+            const ok = (v: unknown): v is string =>
+              typeof v === "string" && v.length > 0 && v !== "Unknown";
+            if (ok(r.registrar))              ogParams.set("reg", r.registrar.slice(0, 60));
+            if (ok(r.creationDate))           ogParams.set("cr",  r.creationDate.slice(0, 10));
+            if (ok(r.expirationDate))         ogParams.set("ex",  r.expirationDate.slice(0, 10));
+            if (ok(r.updatedDate))            ogParams.set("up",  r.updatedDate.slice(0, 10));
+            if (r.remainingDays != null)      ogParams.set("rd",  String(r.remainingDays));
+            if (r.domainAge != null)          ogParams.set("age", String(r.domainAge));
+            if (Array.isArray(r.nameServers) && r.nameServers.length > 0)
+              ogParams.set("ns", r.nameServers.slice(0, 3).join(","));
+            if (Array.isArray(r.status) && r.status.length > 0)
+              ogParams.set("st", r.status.slice(0, 4).map((s: { status: string }) => s.status).join(","));
+            if (ok(r.registrantCountry))      ogParams.set("co",  r.registrantCountry);
+            if (ok(r.registrantOrganization)) ogParams.set("org", r.registrantOrganization.slice(0, 50));
+            if (ok(r.dnssec))                 ogParams.set("dn",  r.dnssec.slice(0, 30));
+            if (ok(r.whoisServer))            ogParams.set("ws",  r.whoisServer.slice(0, 60));
+          }
+          const ogImage = `${origin}/api/og?${ogParams.toString()}`;
 
           const jsonLd = JSON.stringify({
             "@context": "https://schema.org",

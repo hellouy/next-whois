@@ -151,11 +151,68 @@ export default async function handler(req: NextRequest) {
 
   const origin = new URL(req.url).origin;
 
+  // ── Inline data fast path ────────────────────────────────────────────────
+  // When the OG URL is generated server-side (result page), key WHOIS fields
+  // are embedded as compact URL params, so we never need to call /api/lookup.
+  const hasInlineData =
+    searchParams.has("cr") ||
+    searchParams.has("ex") ||
+    searchParams.has("reg") ||
+    searchParams.has("rd");
+
+  if (hasInlineData) {
+    const regP = searchParams.get("reg");
+    const crP  = searchParams.get("cr");
+    const exP  = searchParams.get("ex");
+    const upP  = searchParams.get("up");
+    const rdP  = searchParams.get("rd");
+    const ageP = searchParams.get("age");
+    const nsP  = searchParams.get("ns");
+    const stP  = searchParams.get("st");
+    const coP  = searchParams.get("co");
+    const orgP = searchParams.get("org");
+    const dnP  = searchParams.get("dn");
+    const wsP  = searchParams.get("ws");
+
+    if (regP) registrar = regP;
+    if (crP)  created   = crP;
+    if (exP)  expires   = exP;
+    if (upP)  updated   = upP;
+    if (rdP !== null) remainingDays = parseInt(rdP, 10);
+    if (ageP) age = ageP;
+    if (nsP)  nsList    = nsP.split(",").filter(Boolean);
+    if (stP)  statusList = stP.split(",").filter(Boolean).map(s => getEppStatusDisplayName(s));
+    if (coP)  country   = coP;
+    if (orgP) registrantOrg = orgP;
+    if (dnP)  dnssec    = dnP;
+    if (wsP)  whoisServer = wsP;
+    hasDetails = !!(registrar || created || expires);
+  }
+
+  // ── Helper: fetch with hard timeout ─────────────────────────────────────
+  async function fetchWithTimeout(url: string, ms: number): Promise<Response | null> {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      return res;
+    } catch {
+      clearTimeout(timer);
+      return null;
+    }
+  }
+
+  // ── Remote fetch (fallback when no inline data) ──────────────────────────
+  // og-config is a cheap, well-cached endpoint; lookup is only called when
+  // the OG URL was opened directly without embedded params (e.g. bot first hit
+  // before the page was ever visited), capped at 5 s to avoid slow responses.
   const [configRes, lookupRes] = await Promise.all([
     fetch(`${origin}/api/og-config`).catch(() => null),
-    !preview && query
-      ? fetch(`${origin}/api/lookup?query=${encodeURIComponent(query)}`).catch(
-          () => null,
+    !preview && query && !hasInlineData
+      ? fetchWithTimeout(
+          `${origin}/api/lookup?query=${encodeURIComponent(query)}`,
+          5000,
         )
       : Promise.resolve(null),
   ]);
@@ -172,7 +229,7 @@ export default async function handler(req: NextRequest) {
     } catch {}
   }
 
-  if (lookupRes?.ok) {
+  if (!hasInlineData && lookupRes?.ok) {
     try {
       const data = await lookupRes.json();
       if (data.status && data.result) {
