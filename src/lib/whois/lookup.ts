@@ -256,26 +256,20 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     }
   }
 
-  // Step 2: RDAP — try registry RDAP first.
-  let rdapData: RdapResponse | null = null;
-  try {
-    const rdap = await withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as RdapResult;
-    if (rdap && !("errorCode" in rdap)) rdapData = rdap;
-  } catch {}
+  // Step 2: RDAP + WHOIS in parallel — always run both, like the original.
+  // Running concurrently avoids skipping WHOIS when RDAP returns incomplete data.
+  const [rdapSettled, whoisSettled] = await Promise.allSettled([
+    withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>,
+    withTimeout(
+      tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+      WHOIS_TIMEOUT,
+    ),
+  ]);
 
-  // Step 3: Generic WHOIS — only if RDAP produced no usable data,
-  // or if this is a ccTLD with a direct RDAP endpoint (WHOIS is more complete).
-  const skipWhois = rdapData !== null && !RDAP_DIRECT_CCTLDS.has(tldSuffix);
-  let whoisData: WhoisRawResult | null = null;
-  let whoisError: unknown = null;
-  if (!skipWhois) {
-    try {
-      whoisData = await withTimeout(
-        tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-        WHOIS_TIMEOUT,
-      );
-    } catch (e) { whoisError = e; }
-  }
+  const rdapSettledResult = rdapSettled.status === "fulfilled" ? rdapSettled.value : null;
+  const rdapData: RdapResponse | null = rdapSettledResult && !("errorCode" in rdapSettledResult) ? rdapSettledResult as RdapResponse : null;
+  const whoisData: WhoisRawResult | null = whoisSettled.status === "fulfilled" ? whoisSettled.value : null;
+  const whoisError: unknown = whoisSettled.status === "rejected" ? whoisSettled.reason : null;
 
   // Step 4: Build result — prefer RDAP, optionally enrich with WHOIS raw text,
   // then fall back to WHOIS-only; if neither succeeded, return error.
