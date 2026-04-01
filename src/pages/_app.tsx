@@ -293,15 +293,19 @@ const pageVariants = {
 };
 
 // Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
-// feedback internally.  No entry animation — the page appears at full opacity
-// instantly so every element (shimmer title AND the dimmer "查询中…" text) is
-// visible from the very first frame, eliminating the perceptual "1→2" jump.
+// feedback internally.
+// Exit is instant (duration 0) so the old page is removed in the same frame
+// it becomes invisible — no 50 ms "blank gap" before the new page renders.
+// The new page fades in over 120 ms so content appears smoothly without a snap.
 const stablePageVariants = {
-  initial: { opacity: 1 },
-  animate: { opacity: 1, transition: { duration: 0 } },
+  initial: { opacity: 0 },
+  animate: {
+    opacity: 1,
+    transition: { duration: 0.12, ease: "easeOut" as const },
+  },
   exit: {
     opacity: 0,
-    transition: { duration: 0.05, ease: "easeIn" as const },
+    transition: { duration: 0 },
   },
 };
 

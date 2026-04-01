@@ -4,7 +4,6 @@ import React, { useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/lib/i18n";
 import Head from "next/head";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchBox } from "@/components/search_box";
 import {
   KeyboardShortcut,
@@ -154,7 +153,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
         }}
       />
     </Head>
-    <ScrollArea className="w-full h-[calc(100vh-4rem)]">
+    <div className="w-full">
       <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 min-h-[calc(100vh-4rem)]">
         <div className="mb-4">
           <div className="relative group">
@@ -166,9 +165,12 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
           <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
         </div>
 
-        {/* Stats bar — shown when home_show_stats is enabled */}
-        {seo.showStats && stats && !loading && (
-          <div className="flex justify-center gap-6 mt-3 mb-1">
+        {/* Stats bar — use opacity so layout doesn't shift when loading changes */}
+        {seo.showStats && stats && (
+          <div
+            className="flex justify-center gap-6 mt-3 mb-1"
+            style={{ opacity: loading ? 0 : 1, transition: "opacity 0.1s ease" }}
+          >
             <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
               <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
               {t("home.stats_total")}
@@ -181,7 +183,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
           </div>
         )}
 
-        {/* Mobile: centered brand display — stays visible while loading, just dims */}
+        {/* Mobile: centered brand display — stays in layout while loading, just dims */}
         <div
           className="sm:hidden flex items-center justify-center"
           style={{
@@ -194,7 +196,7 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
           <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
         </div>
       </main>
-    </ScrollArea>
+    </div>
     </>
   );
 }
