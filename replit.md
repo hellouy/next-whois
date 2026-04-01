@@ -124,6 +124,41 @@ Every admin and user-facing API that previously fired DB queries one-by-one was 
 
 ### TypeScript: 0 errors throughout (verified after all changes)
 
+## Replit Environment Full Sync with Vercel (2026-04-01)
+
+### Vercel Project Identified
+- **Project**: `next-whois` (prj_iUBe5v2wht9SYe1SuFKyj0vMgyLR)
+- **Team**: team_jwt3T9B3Dg8JLPoGEjauWPRr
+- **Region**: iad1 (Washington D.C.)
+
+### Secrets & Env Vars Configured in Replit
+- `POSTGRES_URL_NON_POOLING` — Supabase direct connection (aws-1-ap-southeast-2.pooler.supabase.com:5432, PostgreSQL 17.6)
+- `VERCEL_TOKEN` / `VERCEL_API_TOKEN` — Vercel personal access token
+- `VERCEL_PROJECT_ID` — prj_iUBe5v2wht9SYe1SuFKyj0vMgyLR
+- `VERCEL_TEAM_ID` — team_jwt3T9B3Dg8JLPoGEjauWPRr
+- `GITHUB_TOKEN` / `GH_TOKEN` — GitHub classic token
+- `wr_REDIS_URL`, `wr_KV_URL`, `xrw_REDIS_URL` — Upstash Redis (synced from Vercel)
+- `wr_KV_REST_API_TOKEN`, `wr_KV_REST_API_URL` — Upstash KV REST API
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `CRON_SECRET`, `NEXTAUTH_SECRET`
+
+### Vercel DB Vars Updated
+- `POSTGRES_URL` → set to Supabase pooler URL (was empty)
+- `POSTGRES_URL_NON_POOLING` → set to Supabase direct URL (was empty)
+- `POSTGRES_PRISMA_URL` → set to Supabase URL (was empty)
+
+### DB & Cache Connection Status
+- **PostgreSQL (Supabase)**: Connected ✓, schema migrated ✓
+- **Redis (Upstash)**: Connected and ready ✓ (`[Redis] Connected and ready`)
+- **Keep Alive**: Running ✓, pings DB every 240s to prevent Supabase pool sleep
+
+### Code Fixes Applied
+- **`src/lib/db.ts` `makePool()`**: Auto-detects internal hosts (helium, localhost, 127.0.0.1) and disables SSL; external hosts (Supabase) use `ssl: { rejectUnauthorized: false }`
+- **`src/lib/db.ts` `getDbReady()`**: Wraps `runMigrations()` in try/catch; on failure returns `null` instead of throwing — prevents DB migration errors from crashing WHOIS/RDAP lookup flow
+- **`src/lib/db-query.ts` `isDbReady()`**: Wrapped in try/catch so a DB error returns `false` rather than propagating
+- **`src/data/cctld-whois-servers.json`**: Set `"vc": null` and `"lc": null` (TCP WHOIS server `whois.identitydigital.services` rejects connections; both now use RDAP via `rdap.identitydigital.services`)
+- **`scripts/keep-alive.mjs`**: Updated to accept `POSTGRES_URL_NON_POOLING`, `SUPABASE_DATABASE_URL`, or `DATABASE_URL` as fallbacks; added same SSL auto-detection logic
+
 ## Replit Environment Setup (2026-03-27)
 
 ### Secrets Configured
