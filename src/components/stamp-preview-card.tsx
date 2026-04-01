@@ -8,7 +8,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import {
   RiShieldCheckLine, RiArrowRightSLine, RiGlobalLine,
-  RiSparklingLine, RiLeafLine, RiSunLine, RiVipCrownLine,
+  RiSparklingLine,
   RiFireLine, RiFlashlightLine, RiUserLine,
 } from "@remixicon/react";
 
@@ -124,7 +124,6 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
     <>
       <style>{`
         @keyframes au-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-        @keyframes au-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
       `}</style>
       <div style={{ borderRadius: 16, overflow: "hidden", background: "#0f0728", boxShadow: "0 4px 24px rgba(124,58,237,0.3)" }}>
         {/* Aurora header */}
@@ -137,12 +136,9 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
           <span style={{ position: "relative", zIndex: 1, display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 20, padding: "3px 10px", fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.95)", marginBottom: 8 }}>
             <RiShieldCheckLine style={{ width: 8, height: 8 }} />{tagLabel}
           </span>
-          {/* Avatar */}
-          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", animation: "au-float 3s ease-in-out infinite", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 14, width: 48, height: 48, alignItems: "center", justifyContent: "center" }}>
-            <RiSparklingLine style={{ width: 24, height: 24, color: "rgba(255,255,255,0.9)" }} />
-          </div>
-          <p style={{ position: "relative", zIndex: 1, margin: "8px 0 0", fontWeight: 900, fontSize: 14, color: "#fff", letterSpacing: -0.3 }}>{tagName}</p>
-          <p style={{ position: "relative", zIndex: 1, margin: "2px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.15em" }}>{domain}</p>
+          {/* No avatar icon — clean layout */}
+          <p style={{ position: "relative", zIndex: 1, margin: "0", fontWeight: 900, fontSize: 14, color: "#fff", letterSpacing: -0.3 }}>{tagName}</p>
+          <p style={{ position: "relative", zIndex: 1, margin: "4px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.15em" }}>{domain}</p>
         </div>
         {/* Dark body */}
         <div style={{ padding: "10px 14px 13px", background: "rgba(0,0,0,0.3)" }}>
@@ -158,19 +154,15 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
   /* ═══ emerald — 自然·绿野 ════════════════════════════════════════════ */
   if (themeKey === "emerald") return (
     <div style={{ background: "linear-gradient(145deg,#065f46,#047857,#059669)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 20px rgba(5,150,105,0.35)" }}>
-      {/* Hexagon pattern overlay */}
+      {/* Hexagon pattern overlay — no icon, label badge on left */}
       <div style={{ position: "relative", padding: "18px 16px 14px", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='46' viewBox='0 0 40 46' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 1l19 11v22L20 45 1 34V12z' fill='none' stroke='white' stroke-width='1'/%3E%3C/svg%3E")`, backgroundSize: "40px 46px", pointerEvents: "none" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Avatar */}
-          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "2px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <RiLeafLine style={{ width: 22, height: 22, color: "rgba(255,255,255,0.9)" }} />
-          </div>
+          <span style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 7px", fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.9)", flexShrink: 0 }}>{tagLabel}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#fff", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
             <p style={{ margin: "2px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(255,255,255,0.4)", letterSpacing: "0.12em" }}>{domain}</p>
           </div>
-          <span style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "3px 7px", fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.9)", flexShrink: 0 }}>{tagLabel}</span>
         </div>
       </div>
       {/* Frosted body */}
@@ -188,24 +180,20 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
     <>
       <style>{`@keyframes sol-ray { 0%,100%{opacity:.4;transform:rotate(0deg)} 50%{opacity:.7;transform:rotate(3deg)} }`}</style>
       <div style={{ background: "#fff8f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 20px rgba(251,146,60,0.3)" }}>
-        {/* Radial sunrise header */}
-        <div style={{ position: "relative", background: "radial-gradient(ellipse 100% 120% at 50% 0%,#fb923c 0%,#f59e0b 40%,#fbbf24 70%,#fef3c7 100%)", padding: "24px 16px 28px", textAlign: "center", overflow: "hidden" }}>
-          {/* Sun rays */}
+        {/* Radial sunrise header — no icon; tagLabel badge in title position */}
+        <div style={{ position: "relative", background: "radial-gradient(ellipse 100% 120% at 50% 0%,#fb923c 0%,#f59e0b 40%,#fbbf24 70%,#fef3c7 100%)", padding: "20px 16px 22px", textAlign: "center", overflow: "hidden" }}>
           {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg,i) => (
             <div key={i} style={{ position: "absolute", top: "0%", left: "50%", width: 2, height: "55%", background: "linear-gradient(to bottom, rgba(255,255,255,0.35), transparent)", transformOrigin: "50% 0%", transform: `translateX(-50%) rotate(${deg}deg)`, animation: "sol-ray 3s ease-in-out infinite", animationDelay: `${i*0.15}s`, pointerEvents: "none" }} />
           ))}
-          {/* Avatar */}
-          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "2.5px solid rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(255,140,0,0.35)", marginBottom: 6 }}>
-            <RiSunLine style={{ width: 24, height: 24, color: "#d97706" }} />
-          </div>
-          <p style={{ position: "relative", zIndex: 1, margin: 0, fontWeight: 900, fontSize: 14, color: "#7c2d12", letterSpacing: -0.3 }}>{tagName}</p>
+          {/* tagLabel badge in the header (where title was) */}
+          <span style={{ position: "relative", zIndex: 1, display: "inline-block", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.85)", borderRadius: 6, padding: "3px 10px", fontSize: 9, fontWeight: 700, color: "#92400e" }}>{tagLabel}</span>
         </div>
-        {/* Warm body */}
+        {/* Warm body — tagName on left, domain on right (swapped) */}
         <div style={{ padding: "10px 14px 13px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-            <span style={{ fontSize: 8, fontFamily: "monospace", color: "#d97706", letterSpacing: "0.12em" }}>{domain}</span>
+            <span style={{ fontSize: 13, fontWeight: 900, color: "#7c2d12", letterSpacing: -0.2, flex: "0 0 auto" }}>{tagName}</span>
             <span style={{ flex: 1, height: 1, background: "#fed7aa" }} />
-            <span style={{ background: "#fff3cd", border: "1px solid #fcd34d", borderRadius: 5, padding: "2px 6px", fontSize: 8, fontWeight: 700, color: "#92400e" }}>{tagLabel}</span>
+            <span style={{ fontFamily: "monospace", fontSize: 8, color: "#d97706", letterSpacing: "0.12em", flex: "0 0 auto" }}>{domain}</span>
           </div>
           {desc && <p style={{ margin: "0 0 8px", fontSize: 10, color: "#78350f", lineHeight: 1.6, opacity: 0.7, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none", boxShadow: "0 3px 12px rgba(249,115,22,0.4)" }}>
@@ -259,18 +247,17 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
   /* ═══ warning — 警示·危险 ════════════════════════════════════════════ */
   if (themeKey === "warning") return (
     <>
-      <style>{`@keyframes warn-stripe{0%{background-position:0 0}100%{background-position:28px 0}} @keyframes warn-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}`}</style>
+      <style>{`@keyframes warn-stripe{0%{background-position:0 0}100%{background-position:28px 0}}`}</style>
       <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 20px rgba(251,191,36,0.35)", border: "2px solid #fbbf24" }}>
-        {/* Hazard stripe header */}
+        {/* Hazard stripe header — no icon, label badge on left, title right-aligned */}
         <div style={{ position: "relative", overflow: "hidden", padding: "14px 14px 12px", background: "#fbbf24" }}>
           <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,0,0,0.08) 10px,rgba(0,0,0,0.08) 20px)", animation: "warn-stripe 1.5s linear infinite", pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 38, height: 38, background: "#92400e", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 18, color: "#fbbf24", flexShrink: 0, animation: "warn-pulse 2s ease-in-out infinite" }}>!</div>
-            <div>
-              <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#451a03", letterSpacing: -0.3 }}>{tagName}</p>
+            <span style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 5, padding: "2px 7px", fontSize: 8, fontWeight: 700, color: "#78350f", flexShrink: 0 }}>{tagLabel}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#451a03", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
               <p style={{ margin: "2px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(69,26,3,0.5)", letterSpacing: "0.12em" }}>{domain}</p>
             </div>
-            <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 5, padding: "2px 7px", fontSize: 8, fontWeight: 700, color: "#78350f", flexShrink: 0 }}>{tagLabel}</span>
           </div>
         </div>
         {/* White body */}
@@ -289,25 +276,19 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
     <>
       <style>{`@keyframes prem-shimmer{0%{transform:translateX(-100%) skewX(-20deg)}100%{transform:translateX(300%) skewX(-20deg)}} @keyframes prem-glow{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
       <div style={{ background: "#09090b", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 28px rgba(0,0,0,0.7), 0 0 0 1px rgba(212,175,55,0.25)" }}>
-        {/* Gold shimmer hero */}
+        {/* Gold shimmer hero — no icon, label badge on left */}
         <div style={{ position: "relative", padding: "20px 16px 16px", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,#1a0a2e,#0d0d0d)", opacity: 1 }} />
-          {/* Gold line at top */}
           <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: 1, background: "linear-gradient(90deg,transparent,rgba(212,175,55,0.8),transparent)", animation: "prem-glow 2.5s ease-in-out infinite" }} />
-          {/* Shimmer sweep */}
           <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
             <div style={{ position: "absolute", top: 0, bottom: 0, width: "30%", background: "linear-gradient(90deg,transparent,rgba(212,175,55,0.06),transparent)", animation: "prem-shimmer 4s ease-in-out infinite" }} />
           </div>
-          {/* Gold monogram */}
-          <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#D4AF37,#F7C948,#B8860B)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 20px rgba(212,175,55,0.4)" }}>
-              <RiVipCrownLine style={{ width: 24, height: 24, color: "#1a0a2e" }} />
-            </div>
+          <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ background: "linear-gradient(135deg,rgba(212,175,55,0.15),rgba(247,201,72,0.08))", border: "1px solid rgba(212,175,55,0.35)", borderRadius: 6, padding: "3px 8px", fontSize: 8, fontWeight: 700, color: "#D4AF37", flexShrink: 0 }}>{tagLabel}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#F7C948", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
               <p style={{ margin: "3px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(212,175,55,0.3)", letterSpacing: "0.15em" }}>{domain}</p>
             </div>
-            <span style={{ background: "linear-gradient(135deg,rgba(212,175,55,0.15),rgba(247,201,72,0.08))", border: "1px solid rgba(212,175,55,0.35)", borderRadius: 6, padding: "3px 8px", fontSize: 8, fontWeight: 700, color: "#D4AF37", flexShrink: 0 }}>{tagLabel}</span>
           </div>
         </div>
         {/* Dark body */}
