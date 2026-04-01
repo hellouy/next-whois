@@ -8,11 +8,10 @@ import {
 } from "@/lib/server/redis";
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
-import { lookupRdap, convertRdapToWhoisResult, RDAP_DIRECT_CCTLDS, RdapResponse } from "@/lib/whois/rdap_client";
+import { lookupRdap, convertRdapToWhoisResult, RdapResponse } from "@/lib/whois/rdap_client";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { probeDomain } from "@/lib/whois/dns-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
-import { tryCustomServerForDomain, ScraperRequiredError } from "@/lib/whois/custom-servers";
 import {
   isWhoisRateLimited,
   isNotRegisteredWhoisResponse,
@@ -32,9 +31,6 @@ warmupDnsCache([
   "whois.cnnic.cn", "whois.nic.uk", "whois.apnic.net",
   "whois.arin.net", "whois.ripe.net", "whois.lacnic.net", "whois.afrinic.net",
 ]);
-
-// Warm up module imports
-import("@/lib/whois/custom-servers").then(m => m.getAllCustomServers()).catch(() => {});
 
 // ── L1 in-process cache (30 s / 500 entries) ─────────────────────────────────
 const L1_TTL_MS = 30_000;
@@ -219,44 +215,7 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
-  // Step 1: Custom server (DB) — takes absolute priority.
-  // If it succeeds, skip RDAP/generic WHOIS and parse the raw text directly.
-  let customResult: WhoisRawResult | null = null;
-  let customError: unknown = null;
-  try {
-    customResult = await tryCustomServerForDomain(domainToQuery, tld, tldSuffix, innerTimeout);
-  } catch (e) { customError = e; }
-  if (customError) {
-    const registryUrl = customError instanceof ScraperRequiredError ? customError.registryUrl : undefined;
-    return failWithDns(customError instanceof Error ? customError.message : "Custom server error", registryUrl);
-  }
-  if (customResult) {
-    const raw = customResult.raw;
-    if (isIanaFallback(raw)) return failWithDns("No WHOIS/RDAP server available for this TLD");
-    if (isWhoisRateLimited(raw)) return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
-    try {
-      const result = await analyzeWhois(raw);
-      const detectedError = detectWhoisError(raw);
-      if (detectedError || isEmptyResult(result)) {
-        if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
-          return {
-            time: elapsed(), status: false, cached: false, error: detectedError,
-            dnsProbe: {
-              domain, registrationStatus: "unregistered", confidence: "high",
-              signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
-            },
-          };
-        }
-        return failWithDns(detectedError || "Empty WHOIS response");
-      }
-      result.whoisServer = pickStr(result.whoisServer, customResult.server || "");
-      return { time: elapsed(), status: true, cached: false, source: "whois", result };
-    } catch (e: unknown) {
-      return failWithDns(e instanceof Error ? e.message : "Failed to parse custom server response");
-    }
-  }
-
-  // Step 2: RDAP + WHOIS in parallel — always run both, like the original.
+  // RDAP + WHOIS in parallel — original approach: always run both concurrently.
   // Running concurrently avoids skipping WHOIS when RDAP returns incomplete data.
   const [rdapSettled, whoisSettled] = await Promise.allSettled([
     withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>,
@@ -318,15 +277,15 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     }
   }
 
-  const scraperRegistryUrl = whoisError instanceof ScraperRequiredError ? whoisError.registryUrl : undefined;
   const whoisMsg = whoisError instanceof Error ? whoisError.message : "";
+  const rdapMsg = rdapSettled.status === "rejected" ? (rdapSettled.reason instanceof Error ? rdapSettled.reason.message : "") : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
   const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
-    : /cannot read properties/i.test(whoisMsg)
+    : /cannot read properties/i.test(whoisMsg) || /cannot read properties/i.test(rdapMsg)
     ? "No WHOIS/RDAP data found for this query"
     : whoisReturnedEmpty && whoisData?.server
     ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
-    : whoisMsg || "Unknown error occurred";
-  return failWithDns(errMsg, scraperRegistryUrl);
+    : whoisMsg || rdapMsg || "Unknown error occurred";
+  return failWithDns(errMsg);
 }
