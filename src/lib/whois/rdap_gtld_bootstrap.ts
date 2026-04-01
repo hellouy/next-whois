@@ -1209,6 +1209,26 @@ const GTLD_RDAP_BOOTSTRAP: Record<string, string> = {
   "sr": "https://whois.sr/rdap/",
   "tz": "https://whois.tznic.or.tz/rdap/",
   "fj": "https://www.rdap.fj/",
+  // ── IDN ccTLDs ────────────────────────────────────────────────────────────
+  "xn--j6w193g":       "https://rdap.hkirc.hk/",              // .香港 Hong Kong
+  "xn--kprw13d":       "https://ccrdap.twnic.tw/taiwan/",     // .台灣 Taiwan (traditional)
+  "xn--p1ai":          "https://rdap.nic.ru/",                // .рф Russia
+  "xn--90a3ac":        "https://rdap.rnids.rs/",              // .срб Serbia
+  "xn--j1amh":         "https://rdap.hostmaster.ua/",         // .укр Ukraine
+  "xn--90ais":         "https://rdap.cctld.by/",              // .бел Belarus
+  "xn--y9a3aq":        "https://rdap.nic.am/",                // .հայ Armenia
+  "xn--node":          "https://rdap.nic.ge/",                // .გე Georgia
+  "xn--mgbah1a3hjkrd": "https://rdap.aeda.net.ae/",           // .الإمارات UAE
+  "xn--3e0b707e":      "https://rdap.kr/",                    // .한국 South Korea
+  "xn--h2brj9c":       "https://rdap.nixiregistry.in/rdap/",  // .भारत India (Devanagari)
+  "xn--h2breg3eve":    "https://rdap.nixiregistry.in/rdap/",  // .भारतम् India (Sanskrit)
+  "xn--gecrj9c":       "https://rdap.nixiregistry.in/rdap/",  // .ભારત India (Gujarati)
+  "xn--45brj9c":       "https://rdap.nixiregistry.in/rdap/",  // .ভারত India (Bengali)
+  "xn--xkc2al3hye2a":  "https://rdap.nixiregistry.in/rdap/",  // .இந்தியா India (Tamil)
+  "xn--mgbai9azgqp6j": "https://rdap.nixiregistry.in/rdap/",  // .بھارت India (Urdu)
+  "xn--xkc2dl3a5ee0h": "https://rdap.nic.lk/",               // .இலங்கை Sri Lanka (Tamil)
+  "xn--fzc2c9e2c":     "https://rdap.nic.lk/",               // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
+  "xn--qxam":          "https://rdap.gr/",                   // .ελ Greece
 };
 
 /**
@@ -1220,7 +1240,7 @@ export function getGtldRdapServer(tld: string): string | undefined {
 }
 
 /** Total number of TLDs in the local RDAP bootstrap. */
-export const GTLD_RDAP_COUNT = 1198;
+export const GTLD_RDAP_COUNT = 1218;
 
 /** Returns the full RDAP bootstrap map (TLD → server URL). Admin use only. */
 export function getAllGtldRdapServers(): Record<string, string> {

@@ -18,19 +18,24 @@ function derivePunycode(unicodeName: string): string | undefined {
   }
 }
 
+/** A single vcard property row: [name, params, type, value]. */
+type VcardRow = [string, Record<string, unknown>, string, unknown];
+
+export interface RdapEntity {
+  handle?: string;
+  roles?: string[];
+  /** vcardArray[0] is "vcard"; vcardArray[1] is the array of property rows. */
+  vcardArray?: ["vcard", VcardRow[]];
+  publicIds?: Array<{ type: string; identifier: string }>;
+  links?: Array<{ href?: string; rel?: string; type?: string }>;
+  entities?: RdapEntity[];
+}
+
 export interface RdapResponse {
   handle?: string;
   ldhName?: string;
   unicodeName?: string;
-  entities?: Array<{
-    handle?: string;
-    roles?: string[];
-    vcardArray?: any[];
-    publicIds?: Array<{
-      type: string;
-      identifier: string;
-    }>;
-  }>;
+  entities?: RdapEntity[];
   nameservers?: Array<{
     ldhName?: string;
     unicodeName?: string;
@@ -266,6 +271,33 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   vi: "https://rdap.nic.vi/",
   wf: "https://rdap.nic.wf/",
   yt: "https://rdap.nic.yt/",
+  // ── IDN ccTLDs (Internationalised Country-Code TLDs) ────────────────────
+  // Chinese-script
+  "xn--j6w193g":       "https://rdap.hkirc.hk/",              // .香港 Hong Kong
+  "xn--kprw13d":       "https://ccrdap.twnic.tw/taiwan/",     // .台灣 Taiwan (traditional)
+  // Cyrillic
+  "xn--p1ai":          "https://rdap.nic.ru/",                // .рф Russia
+  "xn--90a3ac":        "https://rdap.rnids.rs/",              // .срб Serbia
+  "xn--j1amh":         "https://rdap.hostmaster.ua/",         // .укр Ukraine
+  "xn--90ais":         "https://rdap.cctld.by/",              // .бел Belarus
+  "xn--y9a3aq":        "https://rdap.nic.am/",                // .հայ Armenia
+  "xn--node":          "https://rdap.nic.ge/",                // .გე Georgia
+  // Arabic-script
+  "xn--mgbah1a3hjkrd": "https://rdap.aeda.net.ae/",           // .الإمارات UAE
+  // Korean
+  "xn--3e0b707e":      "https://rdap.kr/",                    // .한국 South Korea
+  // Indian-script
+  "xn--h2brj9c":       "https://rdap.nixiregistry.in/rdap/",  // .भारत India (Devanagari)
+  "xn--h2breg3eve":    "https://rdap.nixiregistry.in/rdap/",  // .भारतम् India (Sanskrit)
+  "xn--gecrj9c":       "https://rdap.nixiregistry.in/rdap/",  // .ભારત India (Gujarati)
+  "xn--45brj9c":       "https://rdap.nixiregistry.in/rdap/",  // .ভারত India (Bengali)
+  "xn--xkc2al3hye2a":  "https://rdap.nixiregistry.in/rdap/",  // .இந்தியா India (Tamil)
+  "xn--mgbai9azgqp6j": "https://rdap.nixiregistry.in/rdap/",  // .بھارت India (Urdu)
+  // Sinhala/Tamil
+  "xn--xkc2dl3a5ee0h": "https://rdap.nic.lk/",               // .இலங்கை Sri Lanka (Tamil)
+  "xn--fzc2c9e2c":     "https://rdap.nic.lk/",               // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
+  // Greek
+  "xn--qxam":          "https://rdap.gr/",                   // .ελ Greece
 };
 
 /**
@@ -379,7 +411,7 @@ export async function lookupRdap(query: string): Promise<any> {
   }
 }
 
-function extractVcardField(vcardArray: any[], fieldName: string): string {
+function extractVcardField(vcardArray: VcardRow[], fieldName: string): string {
   if (!vcardArray || !Array.isArray(vcardArray)) return "Unknown";
 
   for (const entry of vcardArray) {
@@ -396,7 +428,7 @@ function extractVcardField(vcardArray: any[], fieldName: string): string {
  * Extract a specific component from a vCard `adr` field.
  * vCard 4.0 adr format: [po-box, ext-addr, street, locality, region, postal-code, country]
  */
-function extractVcardAdr(vcardArray: any[], component: "street" | "locality" | "region" | "postal-code" | "country"): string {
+function extractVcardAdr(vcardArray: VcardRow[], component: "street" | "locality" | "region" | "postal-code" | "country"): string {
   if (!vcardArray || !Array.isArray(vcardArray)) return "Unknown";
   const idxMap = { street: 2, locality: 3, region: 4, "postal-code": 5, country: 6 };
   const idx = idxMap[component];
@@ -412,11 +444,11 @@ function extractVcardAdr(vcardArray: any[], component: "street" | "locality" | "
 /**
  * Extract fax number from vCard tel entries with type=fax.
  */
-function extractVcardFax(vcardArray: any[]): string {
+function extractVcardFax(vcardArray: VcardRow[]): string {
   if (!vcardArray || !Array.isArray(vcardArray)) return "Unknown";
   for (const entry of vcardArray) {
     if (Array.isArray(entry) && entry[0] === "tel") {
-      const params = entry[1] as Record<string, any> | undefined;
+      const params = entry[1] as Record<string, unknown> | undefined;
       if (params && (
         String(params.type || "").toLowerCase().includes("fax") ||
         String(params["type"] || "").toLowerCase().includes("fax")
@@ -428,7 +460,7 @@ function extractVcardFax(vcardArray: any[]): string {
   return "Unknown";
 }
 
-function parseRdapEntity(entities: any[]): {
+function parseRdapEntity(entities: RdapEntity[]): {
   registrar: string;
   registrarURL: string;
   ianaId: string;
@@ -487,21 +519,19 @@ function parseRdapEntity(entities: any[]): {
       }
       if (entity.publicIds) {
         const ianaEntry = entity.publicIds.find(
-          (pub: any) => pub.type === "IANA Registrar ID",
+          (pub) => pub.type === "IANA Registrar ID",
         );
         if (ianaEntry) ianaId = ianaEntry.identifier;
       }
       // Prefer explicit `url` field on entity, then fall back to links
-      if (entity.url && entity.url.startsWith("http")) {
-        registrarURL = entity.url;
-      } else if (entity.links) {
+      if (entity.links) {
         const aboutLink = entity.links.find(
-          (l: any) => l.rel === "about" || l.rel === "related",
+          (l) => l.rel === "about" || l.rel === "related",
         );
         const selfLink = entity.links.find(
-          (l: any) => l.rel === "self" || l.type === "application/rdap+json",
+          (l) => l.rel === "self" || l.type === "application/rdap+json",
         );
-        const anyLink = entity.links.find((l: any) => l.href?.startsWith("http"));
+        const anyLink = entity.links.find((l) => l.href?.startsWith("http"));
         const best = aboutLink || selfLink || anyLink;
         if (best?.href && best.href.startsWith("http")) {
           registrarURL = best.href;
@@ -621,7 +651,7 @@ function parseRdapEntity(entities: any[]): {
 }
 
 export async function convertRdapToWhoisResult(
-  rdapData: any,
+  rdapData: RdapResponse,
   originalQuery: string,
 ): Promise<WhoisAnalyzeResult> {
   const entities = rdapData.entities || [];
@@ -629,11 +659,11 @@ export async function convertRdapToWhoisResult(
 
   const events = rdapData.events || [];
   const creationEvent = events.find(
-    (e: any) => e.eventAction === "registration",
+    (e) => e.eventAction === "registration",
   );
-  const updateEvent = events.find((e: any) => e.eventAction === "last changed");
+  const updateEvent = events.find((e) => e.eventAction === "last changed");
   const expirationEvent = events.find(
-    (e: any) => e.eventAction === "expiration",
+    (e) => e.eventAction === "expiration",
   );
 
   const creationDate = creationEvent?.eventDate || "Unknown";
@@ -656,13 +686,13 @@ export async function convertRdapToWhoisResult(
         )
       : null;
 
-  const status: DomainStatusProps[] = (rdapData.status || []).map((s: any) => ({
+  const status: DomainStatusProps[] = (rdapData.status || []).map((s) => ({
     status: s,
     url: "https://icann.org/epp",
   }));
 
   const nameServers = (rdapData.nameservers || []).map(
-    (ns: any) => (ns.ldhName || ns.unicodeName || "Unknown").split(/\s+/)[0],
+    (ns) => (ns.ldhName || ns.unicodeName || "Unknown").split(/\s+/)[0],
   );
 
   const ldhNameRaw = rdapData.ldhName || undefined;

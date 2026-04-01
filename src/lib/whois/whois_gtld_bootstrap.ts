@@ -5,7 +5,7 @@
  *
  * Sources: IANA RDAP bootstrap (data.iana.org/rdap/dns.json) + known registry mappings
  * Generated: 2026-03-27
- * Entries: 1200
+ * Entries: 1235
  */
 export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "aaa": "whois.nic.aaa",
@@ -61,7 +61,6 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "android": "whois.nic.google",
   "anquan": "whois.teleinfo.cn",
   "anz": "whois.nic.anz",
-  "ao": "whois.dns.pt",
   "aol": "whois.identity.digital",
   "apartments": "whois.donuts.co",
   "app": "whois.nic.google",
@@ -1294,6 +1293,43 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "xn--xhq521b": "whois.ngtld.cn",
   "xn--yfro4i67o": "whois.zh.sgnic.sg",
   "xn--zfr164b": "whois.conac.cn",
+  // ── IDN ccTLDs (internationalised country-code TLDs) ─────────────────────
+  // Chinese-script ccTLDs
+  "xn--fiqs8sirgfmh": "whois.cnnic.cn",      // .中国 China (simplified)
+  "xn--fiqz9s":       "whois.cnnic.cn",      // .中國 China (traditional)
+  "xn--j6w193g":      "whois.hkirc.hk",     // .香港 Hong Kong
+  "xn--kprw13d":      "whois.twnic.net.tw", // .台灣 Taiwan (traditional)
+  "xn--mix891f":      "whois.monic.mo",     // .澳門 Macau (traditional)
+  "xn--mix082f":      "whois.monic.mo",     // .澳门 Macau (simplified)
+  // Cyrillic ccTLDs
+  "xn--p1ai":         "whois.tcinet.ru",    // .рф Russia
+  "xn--90a3ac":       "whois.rnids.rs",    // .срб Serbia
+  "xn--j1amh":        "whois.ua",           // .укр Ukraine
+  "xn--90ais":        "whois.cctld.by",    // .бел Belarus
+  "xn--y9a3aq":       "whois.amnic.net",   // .հայ Armenia
+  "xn--node":         "whois.nic.ge",      // .გე Georgia
+  // Arabic-script ccTLDs
+  "xn--mgberp4a5d4ar":"whois.nic.net.sa",  // .السعودية Saudi Arabia
+  "xn--mgbah1a3hjkrd":"whois.aeda.net.ae", // .الإمارات UAE
+  "xn--mgb9awbf":     "whois.registry.om", // .عمان Oman
+  "xn--wgbl6a":       "whois.registry.qa", // .قطر Qatar
+  "xn--pgbs0dh":      "whois.registre.tn", // .تونس Tunisia
+  "xn--lgbbat1ad8j":  "whois.nic.dz",      // .الجزائر Algeria
+  "xn--5dbq4a":       "whois.iam.net.ma",  // .المغرب Morocco
+  // Korean ccTLD
+  "xn--3e0b707e":     "whois.kr",          // .한국 South Korea
+  // Indian-script ccTLDs
+  "xn--h2brj9c":      "whois.registry.in", // .भारत India (Devanagari)
+  "xn--h2breg3eve":   "whois.registry.in", // .भारतम् India (Sanskrit)
+  "xn--gecrj9c":      "whois.registry.in", // .ભારત India (Gujarati)
+  "xn--45brj9c":      "whois.registry.in", // .ভারত India (Bengali)
+  "xn--xkc2al3hye2a": "whois.registry.in", // .இந்தியா India (Tamil)
+  "xn--mgbai9azgqp6j":"whois.registry.in", // .بھارت India (Urdu)
+  // Sinhala/Tamil ccTLDs
+  "xn--xkc2dl3a5ee0h":"whois.nic.lk",     // .இலங்கை Sri Lanka (Tamil)
+  "xn--fzc2c9e2c":    "whois.nic.lk",     // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
+  // Greek ccTLD
+  "xn--qxam":         "whois.ripe.net",   // .ελ Greece
   "xxx": "whois.nic.xxx",
   "xyz": "whois.centralnic.com",
   "yachts": "whois.centralnic.com",
