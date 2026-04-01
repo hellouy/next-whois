@@ -124,6 +124,41 @@ Every admin and user-facing API that previously fired DB queries one-by-one was 
 
 ### TypeScript: 0 errors throughout (verified after all changes)
 
+## RDAP/WHOIS Server List Reorganization (2026-04-01)
+
+### Objective
+Enforce strict separation: RDAP list = all RDAP-capable TLDs; WHOIS list = only TLDs without RDAP support; TLDs with neither = in WHOIS list with `null`.
+
+### Changes
+
+**`src/lib/whois/rdap_gtld_bootstrap.ts`** — 1136 → **1223 entries**
+- Merged IANA dns.json (1198 TLDs) + 6 manually-verified extras (ag, bz, io, lc, mn, vc → Identity Digital) + 4 IDN overrides from CCTLD_RDAP_OVERRIDES not in IANA
+- Now represents the complete set of all TLDs with working RDAP endpoints
+
+**`src/data/cctld-whois-servers.json`** — 255 → **179 entries**
+- Removed 76 ccTLD entries that have RDAP support (au, br, ca, fr, uk, etc.)
+- Kept 140 ccTLDs without RDAP (ae, cn, de, jp, ru, etc.) with their WHOIS servers
+- Kept 39 null entries (truly neither RDAP nor WHOIS: al, an, ao, aq, etc.)
+
+**`src/lib/whois/whois_gtld_bootstrap.ts`** — 1341 → **119 entries**
+- Removed 1222 gTLD entries that have RDAP (com, net, org, io, co, etc.)
+- Kept 119 entries without RDAP (cn, de, jp, ru, kr and other ccTLDs without RDAP)
+
+**Database `custom_whois_servers` table**
+- Deleted 3 stale manual entries for TLDs now covered by RDAP: `vc` (whois.afilias.net), `hk` (whois.hkirc.hk), `me` (whois.nic.me)
+
+### Verified Results
+| Domain | Expected | Result |
+|---|---|---|
+| hello.vc | RDAP (Identity Digital) | ✓ rdap |
+| github.com | RDAP (Verisign) | ✓ rdap |
+| google.co.uk | RDAP (Nominet) | ✓ rdap |
+| google.de | WHOIS (DENIC, no RDAP) | ✓ whois |
+| google.cn | WHOIS (CNNIC, no RDAP) | ✓ whois |
+| google.ru | WHOIS (TCINET, no RDAP) | ✓ whois |
+
+---
+
 ## Replit Environment Full Sync with Vercel (2026-04-01)
 
 ### Vercel Project Identified
