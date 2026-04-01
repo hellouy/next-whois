@@ -1,11 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, verifyAlipaySign } from "@/lib/payment";
-import { isDbReady, one } from "@/lib/db-query";
-
-async function getSetting(key: string): Promise<string> {
-  const row = await one<{ value: string }>(`SELECT value FROM site_settings WHERE key=$1`, [key]);
-  return row?.value ?? "";
-}
+import { isDbReady } from "@/lib/db-query";
+import { getSetting } from "@/lib/server/site-settings-server";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, verifyStripeWebhookSignature } from "@/lib/payment";
-import { isDbReady, one } from "@/lib/db-query";
+import { isDbReady } from "@/lib/db-query";
+import { getSetting } from "@/lib/server/site-settings-server";
 
 export const config = { api: { bodyParser: false } };
 
@@ -11,11 +12,6 @@ async function getRawBody(req: NextApiRequest): Promise<string> {
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
-}
-
-async function getSetting(key: string): Promise<string> {
-  const row = await one<{ value: string }>(`SELECT value FROM site_settings WHERE key=$1`, [key]);
-  return row?.value ?? "";
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

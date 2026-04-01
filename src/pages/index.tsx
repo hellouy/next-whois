@@ -12,7 +12,7 @@ import {
 import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
 import { getOrigin } from "@/lib/seo";
 import type { GetServerSideProps } from "next";
-import { getSetting } from "@/lib/server/site-settings-server";
+import { getSettings } from "@/lib/server/site-settings-server";
 import { useSiteSettings } from "@/lib/site-settings";
 
 interface HomeSeo {
@@ -210,24 +210,24 @@ const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const origin = getOrigin(req);
 
-  const [
-    siteTitle, siteDesc, siteKeywords, siteLogo, siteSubtitle,
-    ogSiteName, ogImage, twitterCard, homeShowStats,
-    homeHeroTitle, homeHeroSubtitle, homePlaceholder,
-  ] = await Promise.all([
-    getSetting("site_title"),
-    getSetting("site_description"),
-    getSetting("site_keywords"),
-    getSetting("site_logo_text"),
-    getSetting("site_subtitle"),
-    getSetting("og_site_name"),
-    getSetting("og_image"),
-    getSetting("twitter_card"),
-    getSetting("home_show_stats"),
-    getSetting("home_hero_title"),
-    getSetting("home_hero_subtitle"),
-    getSetting("home_placeholder"),
-  ]).catch(() => Array(12).fill("") as string[]);
+  const s = await getSettings([
+    "site_title", "site_description", "site_keywords", "site_logo_text",
+    "site_subtitle", "og_site_name", "og_image", "twitter_card",
+    "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_placeholder",
+  ]).catch(() => ({} as Record<string, string>));
+
+  const siteTitle       = s["site_title"]        || "";
+  const siteDesc        = s["site_description"]   || "";
+  const siteKeywords    = s["site_keywords"]       || "";
+  const siteLogo        = s["site_logo_text"]      || "";
+  const siteSubtitle    = s["site_subtitle"]       || "";
+  const ogSiteName      = s["og_site_name"]        || "";
+  const ogImage         = s["og_image"]            || "";
+  const twitterCard     = s["twitter_card"]        || "";
+  const homeShowStats   = s["home_show_stats"]     || "";
+  const homeHeroTitle   = s["home_hero_title"]     || "";
+  const homeHeroSubtitle = s["home_hero_subtitle"] || "";
+  const homePlaceholder = s["home_placeholder"]    || "";
 
   const logoText   = siteLogo   || DEFAULT_LOGO;
   const tagline    = homeHeroSubtitle || siteSubtitle || DEFAULT_TAGLINE;

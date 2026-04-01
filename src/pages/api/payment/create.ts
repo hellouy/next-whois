@@ -5,16 +5,10 @@ import { createOrder, type PaymentProvider } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
 import { many } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getSetting } from "@/lib/server/site-settings-server";
 import Stripe from "stripe";
 
 export const config = { maxDuration: 15 };
-
-async function getSetting(key: string): Promise<string> {
-  const row = await one<{ value: string }>(
-    `SELECT value FROM site_settings WHERE key = $1`, [key]
-  );
-  return row?.value ?? "";
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
