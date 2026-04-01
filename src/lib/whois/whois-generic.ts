@@ -1,8 +1,7 @@
 import { LOOKUP_TIMEOUT } from "@/lib/env";
 import { WhoisRawResult, WhoisAnalyzeResult } from "@/lib/whois/types";
 import { queryWhoisTcp } from "@/lib/whois/whois-transport";
-import { setDiscoveredServer, isTldKnownNoServer } from "@/lib/whois/custom-servers";
-import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
+import { setDiscoveredServer, isTldKnownNoServer, getStaticWhoisServer } from "@/lib/whois/custom-servers";
 import { isIanaFallback } from "@/lib/whois/whois-patterns";
 
 let _whoiserPromise: Promise<typeof import("whoiser")> | null = null;
@@ -62,7 +61,7 @@ export async function tryGenericWhoisForDomain(
     throw new Error(`No public WHOIS server available for .${tld || tldSuffix} domains`);
   }
 
-  const bootstrapWhoisHost = getGtldWhoisServer(tld) ?? getGtldWhoisServer(tldSuffix);
+  const bootstrapWhoisHost = getStaticWhoisServer(tld) ?? getStaticWhoisServer(tldSuffix);
   let primaryError: unknown = null;
 
   if (bootstrapWhoisHost) {

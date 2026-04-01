@@ -34,15 +34,31 @@ export type CustomServerEntry = string | TcpServerEntry | HttpServerEntry | Scra
 
 export type CustomServerMap = Record<string, CustomServerEntry>;
 
-const CCTLD_FILE = path.join(process.cwd(), "src/data/cctld-whois-servers.json");
+const WHOIS_FILE = path.join(process.cwd(), "src/data/whois-servers.json");
 const DATA_FILE  = path.join(process.cwd(), "src/data/custom-tld-servers.json");
 
-function readCctldServers(): Record<string, string | null> {
+let _whoisFileCache: Record<string, string | null> | null = null;
+
+function readWhoisServers(): Record<string, string | null> {
+  if (_whoisFileCache) return _whoisFileCache;
   try {
-    return JSON.parse(fs.readFileSync(CCTLD_FILE, "utf-8")) as Record<string, string | null>;
+    _whoisFileCache = JSON.parse(fs.readFileSync(WHOIS_FILE, "utf-8")) as Record<string, string | null>;
+    return _whoisFileCache;
   } catch {
     return {};
   }
+}
+
+/**
+ * Returns the WHOIS server hostname for a TLD from the static whois-servers.json file.
+ * Returns null if not listed or if the TLD is explicitly marked as having no server.
+ * Used by the generic WHOIS fallback path as a fast bootstrap before whoiser.
+ */
+export function getStaticWhoisServer(tld: string): string | null {
+  const file = readWhoisServers();
+  const normalized = tld.toLowerCase().replace(/^\./, "");
+  const server = file[normalized] ?? null;
+  return typeof server === "string" ? server : null;
 }
 
 /** Exported so admin pages can identify which TLDs are handled by built-in logic. */
@@ -103,7 +119,7 @@ async function readManualDbServers(): Promise<CustomServerMap> {
 /**
  * Reads whois_server values from tld_registry_info (scraped from IANA pages).
  * This is the lowest-priority server source — any explicit custom server or
- * cctld-whois-servers.json entry overrides it.  Gives a useful fallback for
+ * whois-servers.json entry overrides it.  Gives a useful fallback for
  * TLDs not in our curated files.
  */
 async function readRegistryInfoServers(): Promise<CustomServerMap> {
@@ -198,32 +214,32 @@ export async function getAllCustomServers(): Promise<CustomServerMap> {
   if (_allServersCache && now - _allServersCacheAt < ALL_SERVERS_TTL_MS) {
     return _allServersCache;
   }
-  const cctld    = readCctldServers();
+  const whoisFile = readWhoisServers();
   // Include ALL DB entries (manual + iana-discovered + repair-promoted) in the hot cache.
   // The file fallback only activates on a fresh install before any DB entries exist.
   const allDb    = await readDbServers();
   const user     = Object.keys(allDb).length > 0 ? allDb : await readFileServers();
   const registry = await readRegistryInfoServers();
 
-  // Build the no-server set from cctld nulls (not overridden by user DB entries
+  // Build the no-server set from whois-servers.json nulls (not overridden by user DB entries
   // or registry info servers — if we discovered a server via registry scrape,
   // it's no longer "no server").
   _knownNoServerCache = new Set(
-    Object.entries(cctld)
+    Object.entries(whoisFile)
       .filter(([tld, v]) => v === null && !(tld in user) && !(tld in registry))
       .map(([tld]) => tld),
   );
 
-  const cctldFiltered = Object.fromEntries(
-    Object.entries(cctld).filter(([, v]) => v !== null),
+  const whoisFiltered = Object.fromEntries(
+    Object.entries(whoisFile).filter(([, v]) => v !== null),
   ) as CustomServerMap;
 
   // Priority (highest wins, later entries override earlier ones):
   //   1. registry (tld_registry_info.whois_server) — lowest, fills gaps
   //   2. BUILTIN_SERVERS — hard-coded in source
-  //   3. cctld-whois-servers.json — curated static file
+  //   3. whois-servers.json — curated static file (merged ccTLD + gTLD)
   //   4. custom_whois_servers DB — highest, user / repair-queue managed
-  _allServersCache = { ...registry, ...BUILTIN_SERVERS, ...cctldFiltered, ...user };
+  _allServersCache = { ...registry, ...BUILTIN_SERVERS, ...whoisFiltered, ...user };
   _allServersCacheAt = now;
   return _allServersCache;
 }

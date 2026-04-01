@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import { getCctldRdapOverrides } from "@/lib/whois/rdap_client";
 import { getAllGtldRdapServers } from "@/lib/whois/rdap_gtld_bootstrap";
-import cctldWhois from "@/data/cctld-whois-servers.json";
+import whoisServers from "@/data/whois-servers.json";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -21,8 +21,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     rdapMerged[tld] = { url, source: "cctld-override" };
   }
 
-  // ── WHOIS: cctld-whois-servers.json (null = no server) ───────────────────
-  const whoisMap: Record<string, string | null> = cctldWhois as Record<string, string | null>;
+  // ── WHOIS: whois-servers.json (merged ccTLD + gTLD, null = no server) ────
+  const whoisMap: Record<string, string | null> = whoisServers as Record<string, string | null>;
 
   return res.status(200).json({
     rdap: rdapMerged,
