@@ -326,29 +326,32 @@ export default function AdminHotPrefixesPage() {
     const toImport = aiSuggestions.filter(s => aiSelected.has(s.prefix));
     if (toImport.length === 0) { toast.error("请先选择要导入的前缀"); return; }
     setAiImporting(true);
-    let ok = 0;
-    for (const item of toImport) {
-      try {
-        const r = await fetch("/api/admin/hot-prefixes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+    try {
+      const r = await fetch("/api/admin/hot-prefixes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          toImport.map(item => ({
             prefix: item.prefix,
             category: item.category,
             weight: item.weight,
             source: "ai",
             notes: item.reason,
             sale_examples: item.sale_examples || null,
-          }),
-        });
-        if (r.ok) ok++;
-      } catch {}
+          }))
+        ),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "保存失败");
+      await invalidateCacheClient();
+      toast.success(`已导入 ${d.imported ?? toImport.length} 个前缀`);
+      setShowAiDiscover(false);
+      fetchPrefixes();
+    } catch (e: any) {
+      toast.error(e.message ?? "导入失败，请重试");
+    } finally {
+      setAiImporting(false);
     }
-    await invalidateCacheClient();
-    toast.success(`已导入 ${ok} / ${toImport.length} 个前缀`);
-    setAiImporting(false);
-    setShowAiDiscover(false);
-    fetchPrefixes();
   }
 
   async function invalidateCacheClient() {

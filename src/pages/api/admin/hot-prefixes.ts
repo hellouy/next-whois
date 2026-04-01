@@ -320,9 +320,57 @@ Rules:
     return res.status(200).json({ prefixes: rows, total: parseInt(total?.count ?? "0"), categories });
   }
 
-  // ── POST: create new prefix ───────────────────────────────────────────────
+  // ── POST: create new prefix (or batch array) ─────────────────────────────
   if (req.method === "POST") {
-    const { prefix, category, weight, source, sale_examples, notes, enabled } = req.body ?? {};
+    const body = req.body ?? {};
+
+    // Batch import: body is an array of prefix objects
+    if (Array.isArray(body)) {
+      const items = body as Array<{
+        prefix: string; category?: string; weight?: number;
+        source?: string; sale_examples?: string | null; notes?: string | null;
+      }>;
+      if (items.length === 0) return res.status(400).json({ error: "空数组" });
+      const clean = items
+        .map(item => ({
+          prefix: String(item.prefix ?? "").toLowerCase().trim().replace(/[^a-z0-9-]/g, ""),
+          category: ["ai","web3","finance","saas","short","cn","general"].includes(item.category ?? "")
+            ? (item.category ?? "general") : "general",
+          weight: Math.min(30, Math.max(1, Math.round(Number(item.weight) || 10))),
+          source: item.source ?? "ai",
+          sale_examples: item.sale_examples ?? null,
+          notes: item.notes ?? null,
+        }))
+        .filter(item => item.prefix.length >= 2);
+
+      if (clean.length === 0) return res.status(400).json({ error: "无有效前缀" });
+
+      try {
+        // Single multi-row upsert
+        const placeholders = clean.map((_, i) => {
+          const b = i * 6;
+          return `($${b+1}, $${b+2}, $${b+3}, $${b+4}, $${b+5}, $${b+6}, true)`;
+        }).join(", ");
+        const values = clean.flatMap(item => [
+          item.prefix, item.category, item.weight, item.source, item.sale_examples, item.notes,
+        ]);
+        await run(
+          `INSERT INTO hot_prefixes (prefix, category, weight, source, sale_examples, notes, enabled)
+           VALUES ${placeholders}
+           ON CONFLICT (prefix) DO UPDATE SET
+             category = EXCLUDED.category, weight = EXCLUDED.weight, source = EXCLUDED.source,
+             sale_examples = EXCLUDED.sale_examples, notes = EXCLUDED.notes, updated_at = NOW()`,
+          values,
+        );
+        await invalidateCache();
+        return res.status(200).json({ ok: true, imported: clean.length });
+      } catch (e: any) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Single prefix
+    const { prefix, category, weight, source, sale_examples, notes, enabled } = body;
     if (!prefix || typeof prefix !== "string") return res.status(400).json({ error: "prefix 必填" });
     const cleanPrefix = prefix.toLowerCase().trim().replace(/[^a-z0-9-]/g, "");
     if (!cleanPrefix) return res.status(400).json({ error: "prefix 格式无效" });

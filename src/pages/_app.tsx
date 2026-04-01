@@ -63,7 +63,7 @@ function AppHead({ origin }: { origin: string }) {
       <meta key="og:description" property="og:description" content={description} />
       <meta key="og:image" property="og:image" content={ogImage} />
       <meta key="og:image:width" property="og:image:width" content="1200" />
-      <meta key="og:image:height" property="og:image:height" content="1200" />
+      <meta key="og:image:height" property="og:image:height" content="630" />
       <meta key="og:image:type" property="og:image:type" content="image/png" />
       {canonicalUrl && <meta key="og:url" property="og:url" content={canonicalUrl} />}
       <meta key="og:site_name" property="og:site_name" content={siteName} />
