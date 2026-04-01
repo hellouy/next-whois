@@ -43,7 +43,25 @@ const WHOIS_NOT_REGISTERED_PATTERNS = [
 ];
 
 export function isWhoisRateLimited(raw: string): boolean {
-  return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(raw));
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(
+      (l) =>
+        l.length > 0 &&
+        !l.startsWith("%") &&
+        !l.startsWith("#") &&
+        !l.startsWith(">>>") &&
+        !l.startsWith("NOTICE") &&
+        !l.startsWith("TERMS OF USE") &&
+        !l.startsWith("Terms of Use") &&
+        !l.startsWith("By submitting") &&
+        !l.startsWith("This service") &&
+        !l.startsWith("Access to") &&
+        !l.startsWith("You agree"),
+    );
+  const filtered = lines.slice(0, 20).join("\n");
+  return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(filtered));
 }
 
 export function isNotRegisteredWhoisResponse(whoisError: string): boolean {

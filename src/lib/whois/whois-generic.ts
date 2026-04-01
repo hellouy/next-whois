@@ -57,11 +57,14 @@ export async function tryGenericWhoisForDomain(
   innerTimeout: number,
   follow: 1 | 2,
 ): Promise<WhoisRawResult> {
-  if (await isTldKnownNoServer(tld || tldSuffix)) {
-    throw new Error(`No public WHOIS server available for .${tld || tldSuffix} domains`);
-  }
-
   const bootstrapWhoisHost = getStaticWhoisServer(tld) ?? getStaticWhoisServer(tldSuffix);
+
+  if (!bootstrapWhoisHost) {
+    const knownNoServer = await isTldKnownNoServer(tld || tldSuffix).catch(() => false);
+    if (knownNoServer) {
+      throw new Error(`No public WHOIS server available for .${tld || tldSuffix} domains`);
+    }
+  }
   let primaryError: unknown = null;
 
   if (bootstrapWhoisHost) {

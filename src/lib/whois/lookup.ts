@@ -229,7 +229,6 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const rdapData: RdapResponse | null = rdapSettledResult && !("errorCode" in rdapSettledResult) ? rdapSettledResult as RdapResponse : null;
   const whoisData: WhoisRawResult | null = whoisSettled.status === "fulfilled" ? whoisSettled.value : null;
   const whoisError: unknown = whoisSettled.status === "rejected" ? whoisSettled.reason : null;
-
   // Step 4: Build result — prefer RDAP, optionally enrich with WHOIS raw text,
   // then fall back to WHOIS-only; if neither succeeded, return error.
   const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
