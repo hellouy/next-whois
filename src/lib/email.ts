@@ -172,23 +172,39 @@ export function welcomeHtml({ name, email, siteName = "X.RW", locale }: {
     ${darkHeader(s.w_label, s.w_title(name), s.w_sub)}
 
     ${section(`
-      <p style="margin:0 0 20px;font-size:13px;color:#64748b;line-height:1.8">
+      <p style="margin:0 0 22px;font-size:13px;color:#64748b;line-height:1.9">
         ${s.w_intro(siteName)}
       </p>
-      <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:20px">
+
+      <!-- Features grid -->
+      <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:24px">
         ${s.w_features.map(([icon, title, desc]) => `
           <tr>
-            <td style="width:40px;padding:9px 12px 9px 0;vertical-align:middle;font-size:18px;line-height:1">${icon}</td>
-            <td style="padding:9px 0;border-bottom:1px solid #f8fafc">
+            <td style="width:42px;padding:10px 12px 10px 0;vertical-align:top;font-size:20px;line-height:1">${icon}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
               <p style="margin:0;font-size:13px;font-weight:700;color:#1e293b">${title}</p>
-              <p style="margin:2px 0 0;font-size:12px;color:#94a3b8">${desc}</p>
+              <p style="margin:3px 0 0;font-size:12px;color:#94a3b8;line-height:1.6">${desc}</p>
             </td>
           </tr>
         `).join("")}
       </table>
-      <p style="margin:0;font-size:12px;color:#94a3b8">
-        ${s.w_login_label} <span style="font-family:monospace;color:#334155;font-weight:600">${email}</span>
-      </p>
+
+      <!-- Getting started steps -->
+      <div style="background:#f8f7ff;border:1px solid #ede9fe;border-radius:12px;padding:18px 20px;margin-bottom:22px">
+        <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:1px;color:#7c3aed;text-transform:uppercase">${s.w_gs_label}</p>
+        ${[s.w_gs_step1, s.w_gs_step2, s.w_gs_step3].map((step, i) => `
+          <div style="display:flex;align-items:flex-start;gap:12px;${i < 2 ? "margin-bottom:12px" : ""}">
+            <span style="flex-shrink:0;width:22px;height:22px;background:#7c3aed;color:#fff;border-radius:50%;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1">${i + 1}</span>
+            <span style="font-size:12px;color:#475569;line-height:1.7;padding-top:2px">${step}</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <!-- Account login info -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:13px 16px">
+        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;margin-bottom:5px">${s.w_login_label}</p>
+        <p style="margin:0;font-family:ui-monospace,'Fira Code',monospace;font-size:13px;color:#334155;font-weight:600">${email}</p>
+      </div>
     `)}
 
     ${divider()}
@@ -276,11 +292,20 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
     ${darkHeader(s.sc_label, domainBadge(p.domain), s.sc_sub)}
 
     ${section(`
+      <!-- Active monitoring banner -->
+      <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:10px;padding:11px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:15px">✅</span>
+        <div>
+          <p style="margin:0;font-size:12px;font-weight:700;color:#065f46">${s.sc_subscribed}</p>
+          <p style="margin:2px 0 0;font-size:11px;color:#047857">${s.sc_subscribed_desc}</p>
+        </div>
+      </div>
+
       <!-- Info block -->
       <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:20px">
         <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0">
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.sc_expiry_date}</p>
-          <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#1e293b;font-family:ui-monospace,'Fira Code',monospace">${expiryStr}</p>
+          <p style="margin:6px 0 0;font-size:22px;font-weight:800;color:#1e293b;font-family:ui-monospace,'Fira Code',monospace">${expiryStr}</p>
         </div>
         <div style="padding:12px 18px;background:${phaseC.bg}">
           <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${phaseC.color};text-transform:uppercase">${s.sc_current_status} · ${phaseI18n.label}</p>
@@ -294,7 +319,7 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
         ${thresholdPills}
       </div>
       ${lc && (lc.hasGrace || lc.hasRedemption || lc.hasPendingDelete) ? `
-      <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#1e293b">${s.sc_phase_alerts}</p>
+      <p style="margin:8px 0 8px;font-size:12px;font-weight:700;color:#1e293b">${s.sc_phase_alerts}</p>
       <div>
         ${lc.hasGrace         ? pill(s.sc_grace_pill, "#fffbeb", "#d97706") : ""}
         ${lc.hasRedemption    ? pill(s.sc_redemption_pill, "#fff7ed", "#ea580c") : ""}
@@ -346,6 +371,12 @@ export function reminderHtml({
       : darkHeader(hdrLabel, domainBadge(domain), s.r_sub(daysLeft))}
 
     ${section(`
+      <!-- Large countdown display -->
+      <div style="text-align:center;padding:8px 0 18px">
+        <p style="margin:0;font-size:72px;font-weight:900;color:${urgent ? "#dc2626" : warn ? "#d97706" : PRIMARY};line-height:1;font-family:ui-monospace,'Fira Code',monospace">${daysLeft}</p>
+        <p style="margin:4px 0 0;font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px">${s.r_expiry_date.toLowerCase()}</p>
+      </div>
+
       <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
         <div style="padding:14px 18px;border-bottom:1px solid #f1f5f9">
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.r_expiry_date}</p>
@@ -353,7 +384,13 @@ export function reminderHtml({
         </div>
         ${extraRows ? `<div style="padding:4px 18px 8px"><table cellpadding="0" cellspacing="0" style="width:100%">${extraRows}</table></div>` : ""}
       </div>
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.8">${bodyText}</p>
+
+      <p style="margin:0 0 14px;font-size:13px;color:#475569;line-height:1.8">${bodyText}</p>
+
+      <!-- Renewal tip -->
+      <div style="background:#f8f7ff;border:1px solid #ede9fe;border-radius:10px;padding:12px 16px">
+        <p style="margin:0;font-size:12px;color:#5b21b6;line-height:1.7">💡 ${s.r_renewal_tip}</p>
+      </div>
     `)}
 
     ${divider()}
@@ -391,6 +428,7 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
       body: s.pe_grace_body,
       urgency: s.pe_grace_urgency, urgencyColor: "#92400e", urgencyBg: "#fffbeb",
       nextLabel: s.pe_grace_next_label, nextDate: p.graceEnd, nextColor: "#d97706",
+      actions: [s.pe_grace_action1, s.pe_grace_action2, s.pe_grace_action3],
     },
     redemption: {
       bg: "#ea580c",
@@ -399,6 +437,7 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
       body: s.pe_redemption_body,
       urgency: s.pe_redemption_urgency, urgencyColor: "#9a3412", urgencyBg: "#fff7ed",
       nextLabel: s.pe_redemption_next_label, nextDate: p.redemptionEnd, nextColor: "#ea580c",
+      actions: [s.pe_redemption_action1, s.pe_redemption_action2, s.pe_redemption_action3],
     },
     pendingDelete: {
       bg: "#dc2626",
@@ -407,6 +446,7 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
       body: s.pe_pending_body,
       urgency: s.pe_pending_urgency, urgencyColor: "#991b1b", urgencyBg: "#fef2f2",
       nextLabel: s.pe_pending_next_label, nextDate: p.dropDate, nextColor: "#dc2626",
+      actions: [s.pe_pending_action1, s.pe_pending_action2],
     },
   }[p.phase];
 
@@ -438,8 +478,22 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
 
       <p style="margin:0 0 14px;font-size:13px;color:#475569;line-height:1.8">${cfg.body}</p>
 
-      <div style="padding:12px 16px;background:${cfg.urgencyBg};border:1px solid ${cfg.badgeBg};border-radius:8px">
-        <p style="margin:0;font-size:12px;font-weight:700;color:${cfg.urgencyColor}">${cfg.urgency}</p>
+      <!-- Urgency notice -->
+      <div style="padding:12px 16px;background:${cfg.urgencyBg};border:1px solid ${cfg.badgeBg};border-radius:8px;margin-bottom:16px">
+        <p style="margin:0;font-size:12px;font-weight:700;color:${cfg.urgencyColor}">⚠️ ${cfg.urgency}</p>
+      </div>
+
+      <!-- Action items -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+        <div style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:#475569;text-transform:uppercase">${s.pe_action_label}</p>
+        </div>
+        ${cfg.actions.map((action: string, i: number) => `
+          <div style="padding:10px 18px;border-bottom:${i < cfg.actions.length - 1 ? "1px solid #f1f5f9" : "none"};display:flex;align-items:flex-start;gap:12px">
+            <span style="flex-shrink:0;width:20px;height:20px;background:${cfg.bg};color:#fff;border-radius:50%;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1;margin-top:1px">${i + 1}</span>
+            <span style="font-size:12px;color:#475569;line-height:1.7">${action}</span>
+          </div>
+        `).join("")}
       </div>
     `)}
 
@@ -477,15 +531,26 @@ export function dropApproachingHtml(p: DropApproachingParams & { siteName?: stri
         </div>
         <div style="padding:12px 18px;background:#f5f3ff;border-bottom:1px solid #e2e8f0">
           <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:#7c3aed;text-transform:uppercase">${s.da_avail_date}</p>
-          <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#7c3aed;font-family:ui-monospace,'Fira Code',monospace">${p.dropDate}</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:#7c3aed;font-family:ui-monospace,'Fira Code',monospace">${p.dropDate}</p>
         </div>
         <div style="padding:12px 18px;background:#faf5ff">
           <p style="margin:0;font-size:13px;color:#475569;line-height:1.7">${s.da_body}</p>
         </div>
       </div>
 
-      <div style="padding:12px 16px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:14px">
-        <p style="margin:0;font-size:12px;font-weight:700;color:#6d28d9">${urgency}</p>
+      <div style="padding:12px 16px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:16px">
+        <p style="margin:0;font-size:12px;font-weight:700;color:#6d28d9">⚡ ${urgency}</p>
+      </div>
+
+      <!-- Registration services -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pe_action_label}</p>
+        ${[s.pe_pending_action1, s.pe_pending_action2].map((action, i) => `
+          <div style="${i > 0 ? "margin-top:8px;" : ""}display:flex;align-items:flex-start;gap:10px">
+            <span style="color:#7c3aed;font-weight:700;font-size:14px;flex-shrink:0">→</span>
+            <span style="font-size:12px;color:#475569;line-height:1.7">${action}</span>
+          </div>
+        `).join("")}
       </div>
     `)}
 
@@ -513,14 +578,45 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
     ${colorHeader("#059669", s.dd_label, domainBadge(p.domain), s.dd_sub)}
 
     ${section(`
+      <!-- Available banner -->
+      <div style="text-align:center;padding:8px 0 16px">
+        <div style="display:inline-block;background:#ecfdf5;border:2px solid #6ee7b7;border-radius:16px;padding:14px 28px">
+          <p style="margin:0;font-size:36px;line-height:1">✅</p>
+          <p style="margin:6px 0 0;font-size:14px;font-weight:800;color:#065f46">${s.dd_available}</p>
+        </div>
+      </div>
+
       <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
         <div style="padding:12px 18px;border-bottom:1px solid #e2e8f0">
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.dd_orig_expiry}</p>
           <p style="margin:6px 0 0;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace">${expiryStr}</p>
         </div>
-        <div style="padding:14px 18px;background:#ecfdf5">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#059669">${s.dd_available}</p>
-          <p style="margin:8px 0 0;font-size:12px;color:#475569;line-height:1.7">${s.dd_note}</p>
+        <div style="padding:12px 18px;background:#ecfdf5">
+          <p style="margin:0;font-size:12px;color:#047857;line-height:1.7">${s.dd_note}</p>
+        </div>
+      </div>
+
+      <!-- Registration tip -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:16px">
+        <p style="margin:0;font-size:12px;color:#166534;line-height:1.7">🏁 ${s.dd_register_tip}</p>
+      </div>
+
+      <!-- Registrar links -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+        <div style="padding:11px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.dd_cta}</p>
+        </div>
+        ${[
+          { name: "Namecheap", url: `https://www.namecheap.com/domains/registration/results/?domain=${p.domain}` },
+          { name: "GoDaddy",   url: `https://www.godaddy.com/domainsearch/find?domainToCheck=${p.domain}` },
+          { name: "Porkbun",   url: `https://porkbun.com/checkout/search?q=${p.domain}` },
+        ].map(r => `
+          <div style="padding:11px 18px;border-bottom:1px solid #f1f5f9">
+            <a href="${r.url}" style="font-size:13px;font-weight:600;color:#059669;text-decoration:none">${r.name} →</a>
+          </div>
+        `).join("")}
+        <div style="padding:11px 18px">
+          <a href="https://www.namesilo.com/domain/search-domains?query=${encodeURIComponent(p.domain)}" style="font-size:13px;font-weight:600;color:#059669;text-decoration:none">NameSilo →</a>
         </div>
       </div>
     `)}
@@ -542,14 +638,23 @@ export function passwordResetHtml({ resetUrl, siteName = "X.RW", locale }: {
 
     ${section(`
       <p style="margin:0 0 22px;font-size:13px;color:#64748b;line-height:1.8">${s.pr_body}</p>
+
       ${ctaBtn(resetUrl, s.pr_cta, PRIMARY)}
+
       <div style="margin:22px 0 0;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
         <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.7">
           ${s.pr_link_note}<br/>
           <a href="${resetUrl}" style="color:${PRIMARY};font-size:11px;word-break:break-all">${resetUrl}</a>
         </p>
       </div>
-      <p style="margin:16px 0 0;font-size:11px;color:#94a3b8;line-height:1.7">${s.pr_security}</p>
+
+      <p style="margin:16px 0 8px;font-size:11px;color:#94a3b8;line-height:1.7">${s.pr_security}</p>
+
+      <!-- Didn't request section -->
+      <div style="border-top:1px solid #f1f5f9;margin-top:18px;padding-top:16px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#475569">${s.pr_not_you}</p>
+        <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.7">${s.pr_not_you_body}</p>
+      </div>
     `)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
@@ -752,6 +857,140 @@ export function stampVerifyTimeoutHtml({
 
       ${ctaBtn(verifyUrl, s.sv_cta, "#ef4444")}
       <p style="margin:16px 0 0;font-size:11px;color:#94a3b8">${s.sv_retry}</p>
+    `)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 11. Password changed notification
+// ──────────────────────────────────────────────────────────────────────────────
+export function passwordChangedHtml({ siteName = "X.RW", locale, changedAt, name, email }: {
+  siteName?: string; locale?: string; changedAt?: string; name?: string | null; email?: string;
+}): string {
+  const s      = getEmailStrings(locale);
+  const baseUrl = BASE_URL();
+  const ts     = changedAt || new Date().toLocaleString(s.date_locale, { dateStyle: "medium", timeStyle: "short" });
+  return emailLayout(`
+    ${colorHeader("#dc2626", s.pc_label, s.pc_title, s.pc_sub)}
+
+    ${section(`
+      <p style="margin:0 0 20px;font-size:13px;color:#475569;line-height:1.8">${s.pc_body}</p>
+
+      <!-- Change details -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:12px 18px;background:#fef2f2">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pc_time_label}</p>
+          <p style="margin:5px 0 0;font-size:14px;font-weight:700;color:#1e293b;font-family:ui-monospace,monospace">${ts}</p>
+        </div>
+        <div style="padding:12px 18px;border-top:1px solid #fecaca;background:#fff5f5">
+          <p style="margin:0;font-size:12px;color:#ef4444">🔒 ${s.pc_sub}</p>
+        </div>
+      </div>
+
+      ${ctaBtn(baseUrl + "/account", s.pc_cta, "#dc2626")}
+
+      <!-- Didn't change section -->
+      <div style="border-top:1px solid #f1f5f9;margin-top:22px;padding-top:16px;background:#fef2f2;border-radius:10px;padding:14px 18px;margin-top:18px;border:1px solid #fecaca">
+        <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#991b1b">⚠️ ${s.pc_not_you}</p>
+        <p style="margin:0;font-size:12px;color:#7f1d1d;line-height:1.7">${s.pc_not_you_body(siteName)}</p>
+      </div>
+    `)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 12. Email verification code
+// ──────────────────────────────────────────────────────────────────────────────
+export function verifyCodeHtml({ code, siteName = "X.RW", locale, email }: {
+  code: string; siteName?: string; locale?: string; email?: string;
+}): string {
+  const s = getEmailStrings(locale);
+  return emailLayout(`
+    ${darkHeader(s.vc_label, s.vc_title, s.vc_sub)}
+
+    ${section(`
+      <p style="margin:0 0 22px;font-size:13px;color:#64748b;line-height:1.8">${s.vc_body}</p>
+
+      <!-- Large code display -->
+      <div style="text-align:center;padding:28px 20px;background:#f5f3ff;border:2px dashed #c4b5fd;border-radius:14px;margin-bottom:22px">
+        <p style="margin:0;font-size:46px;font-weight:900;letter-spacing:10px;color:#5b21b6;font-family:ui-monospace,'Fira Code',monospace;line-height:1">${code}</p>
+      </div>
+
+      <!-- Expiry info -->
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin-bottom:14px">
+        <p style="margin:0;font-size:12px;color:#92400e;line-height:1.7">⏱️ ${s.vc_expires}</p>
+      </div>
+
+      <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.7;text-align:center">${s.vc_security}</p>
+    `)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 13. Admin broadcast message (admin → all users)
+// ──────────────────────────────────────────────────────────────────────────────
+export function adminBroadcastHtml({ subject, body, bodyHtml, siteName = "X.RW", locale }: {
+  subject: string; body?: string; bodyHtml?: string; siteName?: string; locale?: string;
+}): string {
+  const s       = getEmailStrings(locale);
+  const content = bodyHtml || (body ? `<p style="margin:0;font-size:13px;color:#475569;line-height:1.9;white-space:pre-wrap">${body}</p>` : "");
+  return emailLayout(`
+    ${darkHeader(s.ab_label, subject)}
+
+    ${section(content)}
+
+    ${divider()}
+    ${actionRow(BASE_URL(), siteName, undefined, PRIMARY)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 14. Payment confirmation
+// ──────────────────────────────────────────────────────────────────────────────
+export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency = "USD", orderId, siteName = "X.RW", locale, name, email }: {
+  plan?: string; planName?: string; expiresAt?: string | null; amount?: number | string | null;
+  currency?: string; orderId?: string; siteName?: string; locale?: string; name?: string | null; email?: string;
+}): string {
+  const s        = getEmailStrings(locale);
+  const planDisp = planName || plan || "—";
+  const amtStr   = amount != null ? String(amount) : null;
+  return emailLayout(`
+    ${colorHeader("#059669", s.pay_label, s.pay_title, s.pay_sub)}
+
+    ${section(`
+      <!-- Success banner -->
+      <div style="text-align:center;padding:8px 0 20px">
+        <div style="display:inline-block;background:#ecfdf5;border:2px solid #6ee7b7;border-radius:50%;width:56px;height:56px;line-height:56px;font-size:28px">✅</div>
+      </div>
+
+      <p style="margin:0 0 20px;font-size:13px;color:#475569;line-height:1.8;text-align:center">${s.pay_body}</p>
+
+      <!-- Plan details -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:13px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pay_plan_label}</p>
+          <p style="margin:5px 0 0;font-size:16px;font-weight:700;color:#1e293b">${planDisp}</p>
+        </div>
+        ${orderId ? `
+        <div style="padding:13px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">Order ID</p>
+          <p style="margin:5px 0 0;font-size:12px;font-weight:600;color:#475569;font-family:ui-monospace,monospace">${orderId}</p>
+        </div>` : ""}
+        ${expiresAt ? `
+        <div style="padding:13px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pay_expires_label}</p>
+          <p style="margin:5px 0 0;font-size:14px;font-weight:700;color:#1e293b;font-family:ui-monospace,monospace">${expiresAt}</p>
+        </div>` : ""}
+        ${amtStr ? `
+        <div style="padding:13px 18px;background:#ecfdf5">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pay_amount_label}</p>
+          <p style="margin:5px 0 0;font-size:18px;font-weight:800;color:#059669">${currency} ${amtStr}</p>
+        </div>` : ""}
+      </div>
+
+      <p style="margin:0 0 18px;font-size:11px;color:#94a3b8;line-height:1.7">${s.pay_receipt}</p>
+
+      ${ctaBtn(BASE_URL() + "/account", s.pay_cta, "#059669")}
     `)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }

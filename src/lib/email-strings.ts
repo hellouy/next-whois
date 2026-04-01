@@ -158,6 +158,68 @@ export interface EmailStrings {
   subj_password_reset: (siteName: string) => string;
   subj_stamp_verify: (domain: string) => string;
 
+  // Getting started (welcome email enhancement)
+  w_gs_label: string;
+  w_gs_step1: string;
+  w_gs_step2: string;
+  w_gs_step3: string;
+
+  // Renewal tip (expiry reminder enhancement)
+  r_renewal_tip: string;
+
+  // Domain dropped - register tip
+  dd_register_tip: string;
+
+  // Phase event - action items
+  pe_action_label: string;
+  pe_grace_action1: string;
+  pe_grace_action2: string;
+  pe_grace_action3: string;
+  pe_redemption_action1: string;
+  pe_redemption_action2: string;
+  pe_redemption_action3: string;
+  pe_pending_action1: string;
+  pe_pending_action2: string;
+
+  // Password changed notification
+  pc_label: string;
+  pc_title: string;
+  pc_sub: string;
+  pc_body: string;
+  pc_time_label: string;
+  pc_not_you: string;
+  pc_not_you_body: (siteName: string) => string;
+  pc_cta: string;
+  subj_password_changed: (siteName: string) => string;
+
+  // Email verification code
+  vc_label: string;
+  vc_title: string;
+  vc_sub: string;
+  vc_body: string;
+  vc_expires: string;
+  vc_security: string;
+  subj_verify_code: (siteName: string) => string;
+
+  // Admin broadcast
+  ab_label: string;
+
+  // Payment confirmation
+  pay_label: string;
+  pay_title: string;
+  pay_sub: string;
+  pay_body: string;
+  pay_plan_label: string;
+  pay_expires_label: string;
+  pay_amount_label: string;
+  pay_receipt: string;
+  pay_cta: string;
+  subj_payment: (siteName: string) => string;
+
+  // Password reset: "didn't request this" section
+  pr_not_you: string;
+  pr_not_you_body: string;
+
   // Date formatting locale tag (for toLocaleDateString)
   date_locale: string;
 }
@@ -334,6 +396,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} 已释放，现在可以注册了`,
     subj_password_reset: (s: string) => `${s} 密码重置请求`,
     subj_stamp_verify: (d: string) => `${d} 域名验证超时 — 请改用文件验证`,
+    subj_password_changed: (s: string) => `🔒 ${s} 密码已修改`,
+    subj_verify_code: (s: string) => `${s} 邮箱验证码`,
+    subj_payment: (s: string) => `✅ ${s} 订单确认 — 付款成功`,
+
+    w_gs_label: "快速开始",
+    w_gs_step1: "在搜索框输入域名、IP 或 ASN 进行 WHOIS / RDAP 查询",
+    w_gs_step2: "订阅您关注的域名，到期前自动收到提醒邮件",
+    w_gs_step3: "前往 仪表盘 管理所有订阅和账户设置",
+
+    r_renewal_tip: "请前往注册商控制台续费。续费成功后此提醒将自动停止。",
+    dd_register_tip: "域名目前处于开放注册状态。先到先得，请通过您偏好的注册商立即完成注册。",
+
+    pe_action_label: "建议操作",
+    pe_grace_action1: "立即登录注册商账户续费",
+    pe_grace_action2: "确认付款方式有效可用",
+    pe_grace_action3: "宽限期结束后进入赎回期，赎回费用大幅提高",
+    pe_redemption_action1: "联系您的注册商申请赎回（费用通常高达 $100–$300+）",
+    pe_redemption_action2: "若不再需要此域名，可考虑放弃",
+    pe_redemption_action3: "赎回期结束后进入待删除期，无法再赎回",
+    pe_pending_action1: "此域名即将被完全删除并重新开放注册",
+    pe_pending_action2: "如需抢注，请提前设置抢注服务（如 Dropcatch、SnapNames）",
+
+    pc_label: "安全通知",
+    pc_title: "密码已修改",
+    pc_sub: "如非本人操作，请立即处理",
+    pc_body: "您账户的密码刚刚已成功更改。如果是您本人操作，无需任何处理。",
+    pc_time_label: "操作时间",
+    pc_not_you: "不是您本人操作？",
+    pc_not_you_body: (s: string) => `请立即前往 ${s} 重置密码，并检查您邮箱的安全设置，防止账户被盗。`,
+    pc_cta: "立即重置密码",
+
+    vc_label: "邮箱验证",
+    vc_title: "验证码",
+    vc_sub: "请在 15 分钟内完成验证",
+    vc_body: "您的验证码为：",
+    vc_expires: "验证码将在 15 分钟后失效，请尽快使用。请勿将此验证码分享给任何人。",
+    vc_security: "如果您没有发起此请求，可忽略此邮件。",
+
+    ab_label: "站内通知",
+
+    pay_label: "订单确认",
+    pay_title: "付款成功",
+    pay_sub: "感谢您的订阅",
+    pay_body: "您的订阅已成功激活，现在可以享受所有会员专属功能。",
+    pay_plan_label: "订阅方案",
+    pay_expires_label: "有效期至",
+    pay_amount_label: "付款金额",
+    pay_receipt: "如需发票或有任何问题，请联系客服。",
+    pay_cta: "查看会员权益",
+
+    pr_not_you: "不是您本人发起的？",
+    pr_not_you_body: "如果您没有发起此密码重置请求，请忽略此邮件。您的密码不会发生变化，账户依然安全。",
 
     date_locale: "zh-CN",
   } as any,
@@ -459,6 +573,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} 已釋放，現在可以註冊了`,
     subj_password_reset: (s: string) => `${s} 密碼重置請求`,
     subj_stamp_verify: (d: string) => `${d} 域名驗證超時 — 請改用檔案驗證`,
+    subj_password_changed: (s: string) => `🔒 ${s} 密碼已修改`,
+    subj_verify_code: (s: string) => `${s} 電子信箱驗證碼`,
+    subj_payment: (s: string) => `✅ ${s} 訂單確認 — 付款成功`,
+
+    w_gs_label: "快速開始",
+    w_gs_step1: "在搜索框輸入域名、IP 或 ASN 進行 WHOIS / RDAP 查詢",
+    w_gs_step2: "訂閱您關注的域名，到期前自動收到提醒郵件",
+    w_gs_step3: "前往 儀表板 管理所有訂閱和帳戶設定",
+
+    r_renewal_tip: "請前往註冊商控制台續費。續費成功後此提醒將自動停止。",
+    dd_register_tip: "域名目前處於開放註冊狀態。先到先得，請透過您偏好的註冊商立即完成註冊。",
+
+    pe_action_label: "建議操作",
+    pe_grace_action1: "立即登入註冊商帳戶續費",
+    pe_grace_action2: "確認付款方式有效可用",
+    pe_grace_action3: "寬限期結束後進入贖回期，費用大幅提高",
+    pe_redemption_action1: "聯絡您的註冊商申請贖回（費用通常高達 $100–$300+）",
+    pe_redemption_action2: "若不再需要此域名，可考慮放棄",
+    pe_redemption_action3: "贖回期結束後進入待刪除期，無法再贖回",
+    pe_pending_action1: "此域名即將被完全刪除並重新開放註冊",
+    pe_pending_action2: "如需搶注，請提前設置抢注服務（如 Dropcatch、SnapNames）",
+
+    pc_label: "安全通知",
+    pc_title: "密碼已修改",
+    pc_sub: "如非本人操作，請立即處理",
+    pc_body: "您帳戶的密碼剛剛已成功更改。如果是您本人操作，無需任何處理。",
+    pc_time_label: "操作時間",
+    pc_not_you: "不是您本人操作？",
+    pc_not_you_body: (s: string) => `請立即前往 ${s} 重置密碼，並檢查您電子信箱的安全設定，防止帳戶被盜。`,
+    pc_cta: "立即重置密碼",
+
+    vc_label: "電子信箱驗證",
+    vc_title: "驗證碼",
+    vc_sub: "請在 15 分鐘內完成驗證",
+    vc_body: "您的驗證碼為：",
+    vc_expires: "驗證碼將在 15 分鐘後失效，請盡快使用。請勿將此驗證碼分享給任何人。",
+    vc_security: "如果您沒有發起此請求，可忽略此郵件。",
+
+    ab_label: "站內通知",
+
+    pay_label: "訂單確認",
+    pay_title: "付款成功",
+    pay_sub: "感謝您的訂閱",
+    pay_body: "您的訂閱已成功啟用，現在可以享受所有會員專屬功能。",
+    pay_plan_label: "訂閱方案",
+    pay_expires_label: "有效期至",
+    pay_amount_label: "付款金額",
+    pay_receipt: "如需發票或有任何問題，請聯絡客服。",
+    pay_cta: "查看會員權益",
+
+    pr_not_you: "不是您本人發起的？",
+    pr_not_you_body: "如果您沒有發起此密碼重置請求，請忽略此郵件。您的密碼不會發生變化，帳戶依然安全。",
 
     date_locale: "zh-TW",
   } as any,
@@ -584,6 +750,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — Now available to register`,
     subj_password_reset: (s: string) => `Reset your ${s} password`,
     subj_stamp_verify: (d: string) => `${d} — DNS timeout, use file verification`,
+    subj_password_changed: (s: string) => `🔒 ${s} — Password changed`,
+    subj_verify_code: (s: string) => `${s} — Verification code`,
+    subj_payment: (s: string) => `✅ ${s} — Payment confirmed`,
+
+    w_gs_label: "Getting Started",
+    w_gs_step1: "Search any domain, IP, or ASN using the WHOIS search bar",
+    w_gs_step2: "Subscribe to domains you care about — get auto-reminders before they expire",
+    w_gs_step3: "Visit your Dashboard to manage all subscriptions and account settings",
+
+    r_renewal_tip: "Log in to your registrar's control panel to renew. This reminder will stop automatically once renewed.",
+    dd_register_tip: "This domain is now open for registration on a first-come, first-served basis. Act quickly via your preferred registrar.",
+
+    pe_action_label: "Recommended Actions",
+    pe_grace_action1: "Log in to your registrar and renew the domain immediately",
+    pe_grace_action2: "Confirm your payment method is valid and up to date",
+    pe_grace_action3: "After the grace period, the domain enters redemption — significantly more expensive",
+    pe_redemption_action1: "Contact your registrar to initiate a redemption request (fees can be $100–$300+)",
+    pe_redemption_action2: "Consider releasing the domain if it is no longer needed",
+    pe_redemption_action3: "After redemption ends, the domain enters pending-delete and cannot be recovered",
+    pe_pending_action1: "The domain will soon be fully deleted and reopened for registration",
+    pe_pending_action2: "To catch it on release, set up a backorder service (e.g. Dropcatch, SnapNames)",
+
+    pc_label: "Security Alert",
+    pc_title: "Password Changed",
+    pc_sub: "If this wasn't you, act now",
+    pc_body: "The password for your account was just successfully changed. If you made this change, no action is needed.",
+    pc_time_label: "Changed at",
+    pc_not_you: "Wasn't you?",
+    pc_not_you_body: (s: string) => `Reset your password immediately at ${s} and review your email account security settings to prevent unauthorized access.`,
+    pc_cta: "Reset Password Now",
+
+    vc_label: "Email Verification",
+    vc_title: "Verification Code",
+    vc_sub: "Valid for 15 minutes",
+    vc_body: "Your verification code:",
+    vc_expires: "This code expires in 15 minutes. Do not share it with anyone.",
+    vc_security: "If you didn't request this, you can safely ignore this email.",
+
+    ab_label: "Announcement",
+
+    pay_label: "Order Confirmed",
+    pay_title: "Payment Successful",
+    pay_sub: "Thank you for your subscription",
+    pay_body: "Your subscription is now active. You can enjoy all premium member features.",
+    pay_plan_label: "Plan",
+    pay_expires_label: "Valid until",
+    pay_amount_label: "Amount charged",
+    pay_receipt: "For invoices or questions, please contact support.",
+    pay_cta: "View Member Benefits",
+
+    pr_not_you: "Didn't request this?",
+    pr_not_you_body: "If you did not request a password reset, you can safely ignore this email. Your password will not change and your account remains secure.",
 
     date_locale: "en-US",
   } as any,
@@ -665,6 +883,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — Jetzt registrierbar`,
     subj_password_reset: (s: string) => `Passwort zurücksetzen bei ${s}`,
     subj_stamp_verify: (d: string) => `${d} — DNS-Timeout, Datei-Verifizierung verwenden`,
+    subj_password_changed: (s: string) => `🔒 ${s} — Passwort geändert`,
+    subj_verify_code: (s: string) => `${s} — Verifizierungscode`,
+    subj_payment: (s: string) => `✅ ${s} — Zahlung bestätigt`,
+
+    w_gs_label: "Erste Schritte",
+    w_gs_step1: "Suchen Sie eine Domain, IP oder ASN über die WHOIS-Suchleiste",
+    w_gs_step2: "Abonnieren Sie Domains — Sie erhalten automatische Erinnerungen vor dem Ablauf",
+    w_gs_step3: "Besuchen Sie das Dashboard zur Verwaltung Ihrer Abonnements und Einstellungen",
+
+    r_renewal_tip: "Melden Sie sich beim Registrar an und verlängern Sie die Domain. Diese Erinnerung stoppt automatisch nach der Verlängerung.",
+    dd_register_tip: "Diese Domain ist nun zur Registrierung freigegeben. Wer zuerst kommt, mahlt zuerst — handeln Sie schnell.",
+
+    pe_action_label: "Empfohlene Maßnahmen",
+    pe_grace_action1: "Beim Registrar anmelden und Domain sofort verlängern",
+    pe_grace_action2: "Zahlungsmethode prüfen und aktuell halten",
+    pe_grace_action3: "Nach der Karenzzeit folgt die deutlich teurere Rückholphase",
+    pe_redemption_action1: "Registrar kontaktieren für Rückkauf (Gebühren oft $100–$300+)",
+    pe_redemption_action2: "Domain aufgeben, falls nicht mehr benötigt",
+    pe_redemption_action3: "Nach der Rückholphase: Löschung — kein Rückkauf mehr möglich",
+    pe_pending_action1: "Die Domain wird bald gelöscht und zur Neuregistrierung freigegeben",
+    pe_pending_action2: "Backorder-Dienste nutzen (z.B. Dropcatch, SnapNames) für die Übernahme",
+
+    pc_label: "Sicherheitshinweis",
+    pc_title: "Passwort geändert",
+    pc_sub: "Falls nicht von Ihnen, sofort handeln",
+    pc_body: "Das Passwort Ihres Kontos wurde soeben erfolgreich geändert. Wenn Sie dies veranlasst haben, ist keine Aktion erforderlich.",
+    pc_time_label: "Geändert am",
+    pc_not_you: "Nicht von Ihnen?",
+    pc_not_you_body: (s: string) => `Setzen Sie Ihr Passwort sofort bei ${s} zurück und überprüfen Sie Ihre E-Mail-Sicherheitseinstellungen.`,
+    pc_cta: "Passwort jetzt zurücksetzen",
+
+    vc_label: "E-Mail-Verifizierung",
+    vc_title: "Verifizierungscode",
+    vc_sub: "Gültig für 15 Minuten",
+    vc_body: "Ihr Verifizierungscode:",
+    vc_expires: "Dieser Code läuft in 15 Minuten ab. Teilen Sie ihn nicht mit anderen.",
+    vc_security: "Falls Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.",
+
+    ab_label: "Mitteilung",
+
+    pay_label: "Bestellung bestätigt",
+    pay_title: "Zahlung erfolgreich",
+    pay_sub: "Vielen Dank für Ihr Abonnement",
+    pay_body: "Ihr Abonnement ist nun aktiv. Sie können alle Premium-Funktionen nutzen.",
+    pay_plan_label: "Tarif",
+    pay_expires_label: "Gültig bis",
+    pay_amount_label: "Betrag",
+    pay_receipt: "Für Rechnungen oder Fragen wenden Sie sich an den Support.",
+    pay_cta: "Mitgliedsvorteile ansehen",
+
+    pr_not_you: "Nicht von Ihnen angefordert?",
+    pr_not_you_body: "Wenn Sie kein Passwort zurücksetzen angefordert haben, können Sie diese E-Mail ignorieren. Ihr Passwort bleibt unverändert und Ihr Konto ist sicher.",
 
     date_locale: "de-DE",
   } as any,
@@ -746,6 +1016,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — Теперь доступен для регистрации`,
     subj_password_reset: (s: string) => `Сброс пароля ${s}`,
     subj_stamp_verify: (d: string) => `${d} — Тайм-аут DNS, используйте верификацию через файл`,
+    subj_password_changed: (s: string) => `🔒 ${s} — Пароль изменён`,
+    subj_verify_code: (s: string) => `${s} — Код подтверждения`,
+    subj_payment: (s: string) => `✅ ${s} — Оплата подтверждена`,
+
+    w_gs_label: "Начало работы",
+    w_gs_step1: "Введите домен, IP или ASN в строку WHOIS-поиска",
+    w_gs_step2: "Подпишитесь на домены — получайте авто-уведомления до истечения срока",
+    w_gs_step3: "Посетите панель управления для управления подписками и настройками",
+
+    r_renewal_tip: "Войдите в панель регистратора и продлите домен. Напоминание остановится автоматически после продления.",
+    dd_register_tip: "Домен теперь открыт для регистрации по принципу «первый пришёл — первый получил». Действуйте быстро.",
+
+    pe_action_label: "Рекомендуемые действия",
+    pe_grace_action1: "Войдите к регистратору и немедленно продлите домен",
+    pe_grace_action2: "Проверьте и обновите способ оплаты",
+    pe_grace_action3: "После льготного периода следует значительно более дорогой период выкупа",
+    pe_redemption_action1: "Свяжитесь с регистратором для выкупа (стоимость обычно $100–$300+)",
+    pe_redemption_action2: "Рассмотрите возможность отказа от домена, если он больше не нужен",
+    pe_redemption_action3: "После выкупа — удаление, восстановление невозможно",
+    pe_pending_action1: "Домен скоро будет удалён и открыт для повторной регистрации",
+    pe_pending_action2: "Для перехвата используйте backorder-сервисы (Dropcatch, SnapNames)",
+
+    pc_label: "Уведомление безопасности",
+    pc_title: "Пароль изменён",
+    pc_sub: "Если не вы — действуйте немедленно",
+    pc_body: "Пароль вашей учётной записи только что был успешно изменён. Если вы это сделали — никаких действий не требуется.",
+    pc_time_label: "Изменено",
+    pc_not_you: "Не вы?",
+    pc_not_you_body: (s: string) => `Немедленно сбросьте пароль на ${s} и проверьте настройки безопасности вашей электронной почты.`,
+    pc_cta: "Сбросить пароль сейчас",
+
+    vc_label: "Подтверждение e-mail",
+    vc_title: "Код подтверждения",
+    vc_sub: "Действителен 15 минут",
+    vc_body: "Ваш код подтверждения:",
+    vc_expires: "Этот код истекает через 15 минут. Не сообщайте его никому.",
+    vc_security: "Если вы не запрашивали этот код, просто проигнорируйте письмо.",
+
+    ab_label: "Объявление",
+
+    pay_label: "Заказ подтверждён",
+    pay_title: "Оплата успешна",
+    pay_sub: "Спасибо за подписку",
+    pay_body: "Ваша подписка активирована. Вам доступны все премиум-функции.",
+    pay_plan_label: "Тариф",
+    pay_expires_label: "Действует до",
+    pay_amount_label: "Сумма",
+    pay_receipt: "Для получения счёта или по любым вопросам обратитесь в поддержку.",
+    pay_cta: "Просмотреть преимущества",
+
+    pr_not_you: "Не вы запрашивали?",
+    pr_not_you_body: "Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо. Ваш пароль останется прежним, а аккаунт — в безопасности.",
 
     date_locale: "ru-RU",
   } as any,
@@ -827,6 +1149,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — 登録可能になりました`,
     subj_password_reset: (s: string) => `${s} パスワードリセット`,
     subj_stamp_verify: (d: string) => `${d} — DNSタイムアウト、ファイル検証をご利用ください`,
+    subj_password_changed: (s: string) => `🔒 ${s} — パスワードが変更されました`,
+    subj_verify_code: (s: string) => `${s} — 認証コード`,
+    subj_payment: (s: string) => `✅ ${s} — お支払い完了`,
+
+    w_gs_label: "はじめに",
+    w_gs_step1: "検索バーにドメイン、IP、または ASN を入力して WHOIS / RDAP 検索",
+    w_gs_step2: "ドメインをサブスクライブ — 期限前に自動リマインダーを受け取る",
+    w_gs_step3: "ダッシュボードでサブスクリプションとアカウント設定を管理",
+
+    r_renewal_tip: "レジストラのコントロールパネルにログインして更新してください。更新後、このリマインダーは自動停止します。",
+    dd_register_tip: "このドメインは現在登録可能です。先着順ですので、お好みのレジストラでお早めに登録してください。",
+
+    pe_action_label: "推奨アクション",
+    pe_grace_action1: "レジストラにログインして直ちにドメインを更新する",
+    pe_grace_action2: "支払い方法が有効であることを確認する",
+    pe_grace_action3: "猶予期間終了後は高額な償還期間に入ります",
+    pe_redemption_action1: "レジストラに連絡して償還を申請する（費用は通常 $100〜$300+）",
+    pe_redemption_action2: "不要であれば、ドメインの放棄を検討する",
+    pe_redemption_action3: "償還期間終了後は削除待ちとなり回復不可能",
+    pe_pending_action1: "このドメインはまもなく完全に削除され、再登録が可能になります",
+    pe_pending_action2: "バックオーダーサービス（Dropcatch、SnapNames など）を利用する",
+
+    pc_label: "セキュリティ通知",
+    pc_title: "パスワードが変更されました",
+    pc_sub: "ご自身の操作でない場合は直ちに対応してください",
+    pc_body: "アカウントのパスワードが正常に変更されました。ご自身の操作であれば対応は不要です。",
+    pc_time_label: "変更日時",
+    pc_not_you: "ご自身の操作ではない場合",
+    pc_not_you_body: (s: string) => `直ちに ${s} でパスワードをリセットし、メールアカウントのセキュリティ設定を確認してください。`,
+    pc_cta: "今すぐパスワードをリセット",
+
+    vc_label: "メール認証",
+    vc_title: "認証コード",
+    vc_sub: "15 分間有効",
+    vc_body: "認証コード：",
+    vc_expires: "このコードは 15 分後に失効します。他の人と共有しないでください。",
+    vc_security: "このリクエストを行っていない場合は、このメールを無視してください。",
+
+    ab_label: "お知らせ",
+
+    pay_label: "注文確認",
+    pay_title: "お支払い完了",
+    pay_sub: "ご登録ありがとうございます",
+    pay_body: "サブスクリプションが有効になりました。すべてのプレミアム機能をご利用いただけます。",
+    pay_plan_label: "プラン",
+    pay_expires_label: "有効期限",
+    pay_amount_label: "請求金額",
+    pay_receipt: "領収書やご質問はサポートまでお問い合わせください。",
+    pay_cta: "会員特典を確認",
+
+    pr_not_you: "このリクエストを行っていない場合",
+    pr_not_you_body: "パスワードリセットを要求していない場合は、このメールを無視してください。パスワードは変更されず、アカウントは安全です。",
 
     date_locale: "ja-JP",
   } as any,
@@ -908,6 +1282,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — Disponible à l'enregistrement`,
     subj_password_reset: (s: string) => `Réinitialisation de votre mot de passe ${s}`,
     subj_stamp_verify: (d: string) => `${d} — Délai DNS dépassé, utilisez la vérification par fichier`,
+    subj_password_changed: (s: string) => `🔒 ${s} — Mot de passe modifié`,
+    subj_verify_code: (s: string) => `${s} — Code de vérification`,
+    subj_payment: (s: string) => `✅ ${s} — Paiement confirmé`,
+
+    w_gs_label: "Commencer",
+    w_gs_step1: "Recherchez un domaine, IP ou ASN via la barre de recherche WHOIS / RDAP",
+    w_gs_step2: "Abonnez-vous aux domaines — recevez des rappels automatiques avant l'expiration",
+    w_gs_step3: "Accédez au tableau de bord pour gérer vos abonnements et paramètres",
+
+    r_renewal_tip: "Connectez-vous au panneau de votre registraire et renouvelez. Ce rappel s'arrêtera automatiquement après le renouvellement.",
+    dd_register_tip: "Ce domaine est désormais disponible à l'enregistrement. Premier arrivé, premier servi — agissez rapidement.",
+
+    pe_action_label: "Actions recommandées",
+    pe_grace_action1: "Connectez-vous à votre registraire et renouvelez immédiatement",
+    pe_grace_action2: "Vérifiez que votre moyen de paiement est valide et à jour",
+    pe_grace_action3: "Après la période de grâce, la rédemption est bien plus coûteuse",
+    pe_redemption_action1: "Contactez votre registraire pour une rédemption (frais souvent $100–$300+)",
+    pe_redemption_action2: "Envisagez d'abandonner le domaine s'il n'est plus nécessaire",
+    pe_redemption_action3: "Après la rédemption : suppression définitive, aucune récupération possible",
+    pe_pending_action1: "Le domaine sera bientôt supprimé et rouvert à l'enregistrement",
+    pe_pending_action2: "Utilisez un service de backorder (Dropcatch, SnapNames) pour le récupérer",
+
+    pc_label: "Alerte de sécurité",
+    pc_title: "Mot de passe modifié",
+    pc_sub: "Si ce n'était pas vous, agissez maintenant",
+    pc_body: "Le mot de passe de votre compte vient d'être modifié. Si c'est vous, aucune action n'est requise.",
+    pc_time_label: "Modifié le",
+    pc_not_you: "Pas vous ?",
+    pc_not_you_body: (s: string) => `Réinitialisez immédiatement votre mot de passe sur ${s} et vérifiez les paramètres de sécurité de votre messagerie.`,
+    pc_cta: "Réinitialiser le mot de passe maintenant",
+
+    vc_label: "Vérification d'e-mail",
+    vc_title: "Code de vérification",
+    vc_sub: "Valable 15 minutes",
+    vc_body: "Votre code de vérification :",
+    vc_expires: "Ce code expire dans 15 minutes. Ne le partagez avec personne.",
+    vc_security: "Si vous n'avez pas fait cette demande, ignorez cet e-mail.",
+
+    ab_label: "Annonce",
+
+    pay_label: "Commande confirmée",
+    pay_title: "Paiement réussi",
+    pay_sub: "Merci pour votre abonnement",
+    pay_body: "Votre abonnement est maintenant actif. Profitez de toutes les fonctionnalités premium.",
+    pay_plan_label: "Formule",
+    pay_expires_label: "Valide jusqu'au",
+    pay_amount_label: "Montant facturé",
+    pay_receipt: "Pour une facture ou des questions, contactez le support.",
+    pay_cta: "Voir les avantages membres",
+
+    pr_not_you: "Pas à votre initiative ?",
+    pr_not_you_body: "Si vous n'avez pas demandé de réinitialisation de mot de passe, ignorez cet e-mail. Votre mot de passe restera inchangé et votre compte est sécurisé.",
 
     date_locale: "fr-FR",
   } as any,
@@ -989,6 +1415,58 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_dropped: (d: string) => `✅ ${d} — 이제 등록 가능합니다`,
     subj_password_reset: (s: string) => `${s} 비밀번호 재설정`,
     subj_stamp_verify: (d: string) => `${d} — DNS 시간 초과, 파일 인증을 사용하세요`,
+    subj_password_changed: (s: string) => `🔒 ${s} — 비밀번호가 변경되었습니다`,
+    subj_verify_code: (s: string) => `${s} — 인증 코드`,
+    subj_payment: (s: string) => `✅ ${s} — 결제 확인`,
+
+    w_gs_label: "시작하기",
+    w_gs_step1: "WHOIS / RDAP 검색창에 도메인, IP 또는 ASN을 입력하여 검색",
+    w_gs_step2: "원하는 도메인을 구독하면 만료 전 자동 알림을 받을 수 있습니다",
+    w_gs_step3: "대시보드에서 구독 및 계정 설정을 관리하세요",
+
+    r_renewal_tip: "레지스트라 제어판에 로그인하여 도메인을 갱신하세요. 갱신 후 알림이 자동으로 중단됩니다.",
+    dd_register_tip: "이 도메인은 현재 등록 가능합니다. 선착순이므로 원하시는 레지스트라를 통해 빠르게 등록하세요.",
+
+    pe_action_label: "권장 조치",
+    pe_grace_action1: "레지스트라에 로그인하여 즉시 도메인을 갱신하세요",
+    pe_grace_action2: "결제 수단이 유효한지 확인하세요",
+    pe_grace_action3: "유예 기간 종료 후에는 훨씬 비싼 복구 기간이 시작됩니다",
+    pe_redemption_action1: "레지스트라에 연락하여 복구 신청 (비용 보통 $100~$300+)",
+    pe_redemption_action2: "더 이상 필요하지 않은 경우 도메인 포기를 고려하세요",
+    pe_redemption_action3: "복구 기간 종료 후 삭제 대기 상태가 되어 복구 불가",
+    pe_pending_action1: "이 도메인은 곧 완전히 삭제되어 재등록이 가능해집니다",
+    pe_pending_action2: "백오더 서비스(Dropcatch, SnapNames 등)를 설정하세요",
+
+    pc_label: "보안 알림",
+    pc_title: "비밀번호가 변경되었습니다",
+    pc_sub: "본인이 아닌 경우 즉시 조치하세요",
+    pc_body: "계정 비밀번호가 방금 성공적으로 변경되었습니다. 본인이 변경하셨다면 아무런 조치도 필요하지 않습니다.",
+    pc_time_label: "변경 시간",
+    pc_not_you: "본인이 아니신가요?",
+    pc_not_you_body: (s: string) => `즉시 ${s}에서 비밀번호를 재설정하고 이메일 계정 보안 설정을 확인하여 무단 접근을 방지하세요.`,
+    pc_cta: "지금 비밀번호 재설정",
+
+    vc_label: "이메일 인증",
+    vc_title: "인증 코드",
+    vc_sub: "15분 동안 유효",
+    vc_body: "인증 코드:",
+    vc_expires: "이 코드는 15분 후에 만료됩니다. 다른 사람에게 공유하지 마세요.",
+    vc_security: "이 요청을 하지 않으셨다면 이 이메일을 무시하세요.",
+
+    ab_label: "공지사항",
+
+    pay_label: "주문 확인",
+    pay_title: "결제 성공",
+    pay_sub: "구독해 주셔서 감사합니다",
+    pay_body: "구독이 활성화되었습니다. 모든 프리미엄 기능을 이용할 수 있습니다.",
+    pay_plan_label: "플랜",
+    pay_expires_label: "유효 기간",
+    pay_amount_label: "청구 금액",
+    pay_receipt: "영수증이나 문의 사항은 고객 지원에 연락하세요.",
+    pay_cta: "회원 혜택 보기",
+
+    pr_not_you: "요청하지 않으셨나요?",
+    pr_not_you_body: "비밀번호 재설정을 요청하지 않으셨다면 이 이메일을 무시하세요. 비밀번호는 변경되지 않으며 계정은 안전합니다.",
 
     date_locale: "ko-KR",
   } as any,

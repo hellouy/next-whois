@@ -1,4 +1,4 @@
-# Next Whois UI — v3.30
+# Next Whois UI — v3.31
 
 ## Comprehensive UX Enhancement (2026-04-01, v3.30)
 
