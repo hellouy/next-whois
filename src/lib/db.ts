@@ -439,6 +439,20 @@ const CREATE_INDEXES = [
   // cctld_rdap_servers was an orphaned table — probe results were stored here but
   // never read by the live query engine. Dropped in favour of tld_fallback_stats.rdap_skip.
   `DROP TABLE IF EXISTS cctld_rdap_servers`,
+  `CREATE TABLE IF NOT EXISTS email_queue (
+    id            SERIAL        PRIMARY KEY,
+    to_email      TEXT          NOT NULL,
+    subject       TEXT          NOT NULL,
+    html          TEXT          NOT NULL,
+    status        TEXT          NOT NULL DEFAULT 'pending',
+    attempts      INTEGER       NOT NULL DEFAULT 0,
+    max_attempts  INTEGER       NOT NULL DEFAULT 5,
+    next_retry_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    last_error    TEXT,
+    created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    sent_at       TIMESTAMPTZ
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_email_queue_pending ON email_queue (next_retry_at, created_at) WHERE status = 'pending'`,
 ];
 
 function getConnectionString(): { url: string; source: string } | null {

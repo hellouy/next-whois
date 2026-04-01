@@ -1054,7 +1054,7 @@ async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: 
   await transporter.sendMail({ from: withSenderName(smtp.from, siteLabel), to, subject, html });
 }
 
-async function sendViaResend(to: string, subject: string, html: string) {
+async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
   let resendKey = "";
   let configuredFrom = "";
   try {
@@ -1072,7 +1072,7 @@ async function sendViaResend(to: string, subject: string, html: string) {
     configuredFrom = process.env.RESEND_FROM_EMAIL || "";
   }
   if (!resendKey) {
-    console.warn("[sendEmail] resend_api_key not configured — email skipped");
+    console.warn("[sendEmail] resend_api_key not configured — email skipped (not queued)");
     return;
   }
   const siteLabel    = await getSiteLabel();
@@ -1080,40 +1080,53 @@ async function sendViaResend(to: string, subject: string, html: string) {
     ? [withSenderName(configuredFrom, siteLabel), RESEND_FALLBACK_FROM]
     : [RESEND_FALLBACK_FROM];
 
+  let lastErr = "";
   for (const from of fromAddresses) {
-    try {
-      const resp = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, subject, html }),
-      });
-      if (resp.ok) return;
-      const body = await resp.text().catch(() => "");
-      if (resp.status === 403 && body.includes("not verified") && from !== RESEND_FALLBACK_FROM) {
-        console.warn(`[sendEmail] Domain not verified for "${from}", retrying with ${RESEND_FALLBACK_FROM}`);
-        continue;
-      }
-      console.error("[sendEmail] Resend error:", resp.status, body);
-      return;
-    } catch (err: any) {
-      console.error("[sendEmail] Resend fetch error:", err.message);
-      return;
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+    if (resp.ok) return;
+    const body = await resp.text().catch(() => "");
+    if (resp.status === 403 && body.includes("not verified") && from !== RESEND_FALLBACK_FROM) {
+      console.warn(`[sendEmail] Domain not verified for "${from}", retrying with ${RESEND_FALLBACK_FROM}`);
+      continue;
     }
+    lastErr = `Resend ${resp.status}: ${body.slice(0, 200)}`;
+    console.error("[sendEmail] Resend error:", resp.status, body);
+    throw new Error(lastErr);
   }
+  if (lastErr) throw new Error(lastErr);
 }
 
+/**
+ * sendEmailDirect — raw send that throws on failure.
+ * Used by the queue processor to retry without re-enqueueing.
+ */
+export async function sendEmailDirect(to: string, subject: string, html: string): Promise<void> {
+  const smtp = await getSmtpConfig();
+  if (smtp) {
+    await sendViaSMTP(smtp, to, subject, html);
+    return;
+  }
+  await sendViaResend(to, subject, html);
+}
+
+/**
+ * sendEmail — the public API.
+ * On any send failure the email is written to email_queue for later retry.
+ * The queue processor (api/admin/process-email-queue) will retry with
+ * exponential back-off (2, 4, 8, 16 min) up to max_attempts (default 5).
+ */
 export async function sendEmail({
   to, subject, html,
 }: { to: string; subject: string; html: string }) {
   try {
-    const smtp = await getSmtpConfig();
-    if (smtp) {
-      await sendViaSMTP(smtp, to, subject, html);
-      return;
-    }
+    await sendEmailDirect(to, subject, html);
   } catch (err: any) {
-    console.error("[sendEmail] SMTP error:", err.message);
-    return;
+    console.error(`[sendEmail] Failed — queuing for retry → ${to}: ${err.message}`);
+    const { enqueueEmail } = await import("@/lib/email-queue");
+    await enqueueEmail(to, subject, html);
   }
-  await sendViaResend(to, subject, html);
 }
