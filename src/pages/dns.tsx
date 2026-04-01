@@ -14,7 +14,7 @@ import {
   RiArrowLeftSLine, RiSearchLine, RiLoader4Line, RiCheckLine,
   RiErrorWarningLine, RiTimeLine, RiRefreshLine, RiFileCopyLine,
   RiShieldCheckLine, RiMailLine, RiServerLine, RiGlobalLine,
-  RiKeyLine, RiSpeedUpLine,
+  RiKeyLine, RiSpeedUpLine, RiAlertLine,
 } from "@remixicon/react";
 
 type RecordType = "A" | "AAAA" | "MX" | "NS" | "CNAME" | "TXT" | "SOA" | "CAA" | "PTR" | "SRV" | "HTTPS";
@@ -252,6 +252,69 @@ async function fetchDns(name: string, type: RecordType, label?: string): Promise
 
 const COMMON_DKIM_SELECTORS = ["google", "dkim", "k1", "k2", "s1", "s2", "mail", "smtp", "default", "selector1", "selector2", "protonmail", "pm", "key1", "key2", "mx"];
 
+// SPF record parser
+type SpfAnalysis = {
+  mechanisms: { type: string; value?: string; qualifier: string }[];
+  allDirective: string | null;
+  dnsLookupCount: number;
+  tooManyLookups: boolean;
+  raw: string;
+};
+function parseSpf(raw: string): SpfAnalysis {
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const DNS_LOOKUP_TYPES = ["include", "a", "mx", "exists", "redirect"];
+  const mechanisms: SpfAnalysis["mechanisms"] = [];
+  let allDirective: string | null = null;
+  let dnsLookupCount = 0;
+
+  for (const part of parts) {
+    if (/^v=spf1$/i.test(part)) continue;
+    const match = part.match(/^([+\-~?]?)(\w+)(?::(.+))?$/);
+    if (!match) continue;
+    const [, qualifier, type, value] = match;
+    if (type.toLowerCase() === "all") { allDirective = (qualifier || "+") + "all"; continue; }
+    if (type.toLowerCase() === "redirect") { dnsLookupCount++; }
+    else if (DNS_LOOKUP_TYPES.includes(type.toLowerCase())) dnsLookupCount++;
+    mechanisms.push({ type: type.toLowerCase(), value, qualifier: qualifier || "+" });
+  }
+  return { mechanisms, allDirective, dnsLookupCount, tooManyLookups: dnsLookupCount > 10, raw };
+}
+
+// DMARC record parser
+type DmarcAnalysis = {
+  p: string | null; sp: string | null; pct: string | null;
+  rua: string[]; ruf: string[];
+  adkim: string | null; aspf: string | null;
+  raw: string;
+};
+function parseDmarc(raw: string): DmarcAnalysis {
+  const tags: Record<string, string> = {};
+  for (const part of raw.split(";")) {
+    const [k, v] = part.trim().split("=", 2);
+    if (k && v !== undefined) tags[k.trim().toLowerCase()] = v.trim();
+  }
+  return {
+    p: tags["p"] || null, sp: tags["sp"] || null, pct: tags["pct"] || null,
+    rua: tags["rua"] ? tags["rua"].split(",").map(s => s.trim().replace(/^mailto:/, "")) : [],
+    ruf: tags["ruf"] ? tags["ruf"].split(",").map(s => s.trim().replace(/^mailto:/, "")) : [],
+    adkim: tags["adkim"] || null, aspf: tags["aspf"] || null,
+    raw,
+  };
+}
+
+function policyColor(p: string | null): string {
+  if (p === "reject")     return "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800";
+  if (p === "quarantine") return "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+  return "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800";
+}
+
+function allColor(directive: string | null): string {
+  if (!directive) return "bg-muted text-muted-foreground border-border";
+  if (directive.startsWith("-")) return "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800";
+  if (directive.startsWith("~")) return "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+  return "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800";
+}
+
 const FADE = { duration: 0.18, ease: "easeOut" as const };
 
 export default function DnsPage() {
@@ -376,11 +439,15 @@ export default function DnsPage() {
   const subResults  = results.filter(r => r._label && r._label !== r.name);
 
   const hasMX    = results.some(r => r.type === "MX" && r.found);
-  const hasSPF   = results.some(r => r.type === "TXT" && r.flat.some(f => /^v=spf1/i.test(f)));
-  const hasDMARC = [...results, ...(dkimResult ? [dkimResult] : [])].some(
-    r => r.type === "TXT" && r.flat.some(f => /^v=DMARC1/i.test(f))
-  ) || subResults.some(r => r.found && r.flat.some(f => /^v=DMARC1/i.test(f)));
+  const spfRecord = results.flatMap(r => r.type === "TXT" ? r.flat : []).find(f => /^v=spf1/i.test(f)) || null;
+  const hasSPF   = !!spfRecord;
+  const dmarcRecord = [...results, ...(dkimResult ? [dkimResult] : []), ...subResults]
+    .flatMap(r => r.type === "TXT" ? r.flat : []).find(f => /^v=DMARC1/i.test(f)) || null;
+  const hasDMARC = !!dmarcRecord;
   const hasDKIM  = dkimResult?.found && dkimResult.flat.some(f => /^v=DKIM1/i.test(f) || (/k=rsa/i.test(f) && /p=/.test(f)));
+
+  const spfAnalysis   = spfRecord   ? parseSpf(spfRecord)     : null;
+  const dmarcAnalysis = dmarcRecord ? parseDmarc(dmarcRecord) : null;
 
   const hasContent = results.length > 0;
 
@@ -578,6 +645,103 @@ export default function DnsPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* SPF Analysis */}
+                    {spfAnalysis && (
+                      <div className="pt-1 border-t border-border/40 space-y-2">
+                        <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
+                          <RiShieldCheckLine className="w-3 h-3" />{t("dns.spf_analysis")}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          <div className="flex items-start gap-2 col-span-2">
+                            <span className="text-muted-foreground shrink-0 w-24">{t("dns.spf_all_directive")}</span>
+                            {spfAnalysis.allDirective ? (
+                              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0", allColor(spfAnalysis.allDirective))}>
+                                {spfAnalysis.allDirective}
+                              </span>
+                            ) : <span className="text-muted-foreground/50">—</span>}
+                          </div>
+                          <div className="flex items-start gap-2 col-span-2 mt-1">
+                            <span className="text-muted-foreground shrink-0 w-24">{t("dns.spf_mechanisms")}</span>
+                            <div className="flex flex-wrap gap-1">
+                              {spfAnalysis.mechanisms.map((m, i) => (
+                                <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-foreground/70">
+                                  {m.qualifier !== "+" ? m.qualifier : ""}{m.type}{m.value ? `:${m.value}` : ""}
+                                </span>
+                              ))}
+                              {spfAnalysis.mechanisms.length === 0 && <span className="text-muted-foreground/50">—</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {spfAnalysis.tooManyLookups && (
+                          <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
+                            <RiAlertLine className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <p className="text-[11px]">{t("dns.spf_too_many")} ({spfAnalysis.dnsLookupCount})</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* DMARC Analysis */}
+                    {dmarcAnalysis && (
+                      <div className="pt-1 border-t border-border/40 space-y-2">
+                        <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
+                          <RiShieldCheckLine className="w-3 h-3" />{t("dns.dmarc_analysis")}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          {dmarcAnalysis.p && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_policy")}</span>
+                              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", policyColor(dmarcAnalysis.p))}>
+                                {dmarcAnalysis.p}
+                              </span>
+                            </div>
+                          )}
+                          {dmarcAnalysis.sp && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_subdomain")}</span>
+                              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", policyColor(dmarcAnalysis.sp))}>
+                                {dmarcAnalysis.sp}
+                              </span>
+                            </div>
+                          )}
+                          {(dmarcAnalysis.pct !== null) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_pct")}</span>
+                              <span className="font-mono">{dmarcAnalysis.pct ?? "100"}%</span>
+                            </div>
+                          )}
+                          {dmarcAnalysis.adkim && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_adkim")}</span>
+                              <span className="font-mono">{dmarcAnalysis.adkim === "s" ? "strict" : "relaxed"}</span>
+                            </div>
+                          )}
+                          {dmarcAnalysis.aspf && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_aspf")}</span>
+                              <span className="font-mono">{dmarcAnalysis.aspf === "s" ? "strict" : "relaxed"}</span>
+                            </div>
+                          )}
+                        </div>
+                        {dmarcAnalysis.rua.length > 0 && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_rua")}</span>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              {dmarcAnalysis.rua.map((r, i) => <span key={i} className="font-mono text-[11px] break-all">{r}</span>)}
+                            </div>
+                          </div>
+                        )}
+                        {dmarcAnalysis.ruf.length > 0 && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_ruf")}</span>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              {dmarcAnalysis.ruf.map((r, i) => <span key={i} className="font-mono text-[11px] break-all">{r}</span>)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2 pt-1 border-t border-border/40">
                       <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">

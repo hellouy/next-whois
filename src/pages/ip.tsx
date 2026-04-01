@@ -405,14 +405,57 @@ export default function IpPage() {
                         <div className="px-5">
                           {result!.rdap.name && <InfoRow label={t("ip.net_name")} value={result!.rdap.name} copyLabel={copyLabel} />}
                           {result!.rdap.handle && <InfoRow label="Handle" value={result!.rdap.handle} mono copyLabel={copyLabel} />}
+                          {result!.rdap.cidr && <InfoRow label="CIDR" value={result!.rdap.cidr} mono copyLabel={copyLabel} />}
                           {result!.rdap.startAddress && <InfoRow label={t("ip.seg_start")} value={result!.rdap.startAddress} mono copyLabel={copyLabel} />}
                           {result!.rdap.endAddress && <InfoRow label={t("ip.seg_end")} value={result!.rdap.endAddress} mono copyLabel={copyLabel} />}
                           {result!.rdap.ipVersion && <InfoRow label={t("ip.ip_version")} value={result!.rdap.ipVersion} copyLabel={copyLabel} />}
                           {result!.rdap.contact_org && <InfoRow label={t("ip.reg_org")} value={result!.rdap.contact_org} copyLabel={copyLabel} />}
+                          {result!.rdap.contact_email && <InfoRow label={t("ip.email_label")} value={result!.rdap.contact_email} mono copyLabel={copyLabel} />}
                           {result!.rdap.description && <InfoRow label={t("ip.description")} value={result!.rdap.description} copyLabel={copyLabel} />}
                         </div>
                       </div>
                     )}
+
+                    {/* External lookup links */}
+                    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                        <RiExternalLinkLine className="w-3.5 h-3.5 text-muted-foreground" />
+                        <h3 className="text-sm font-bold">{t("ip.links_section")}</h3>
+                      </div>
+                      <div className="px-5 py-3 flex flex-wrap gap-2">
+                        {result!.as && (() => {
+                          const asnNum = result!.as.match(/AS(\d+)/)?.[1];
+                          return asnNum ? (
+                            <>
+                              <a href={`https://bgp.he.net/AS${asnNum}`} target="_blank" rel="noopener noreferrer"
+                                className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                                <RiExternalLinkLine className="w-3 h-3" /> BGP.he.net AS{asnNum}
+                              </a>
+                              <a href={`https://rdap.arin.net/registry/autnum/${asnNum}`} target="_blank" rel="noopener noreferrer"
+                                className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                                <RiExternalLinkLine className="w-3 h-3" /> ARIN RDAP
+                              </a>
+                            </>
+                          ) : null;
+                        })()}
+                        <a href={`https://bgp.he.net/ip/${result!.query}`} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                          <RiExternalLinkLine className="w-3 h-3" /> BGP.he.net IP
+                        </a>
+                        <a href={`https://www.shodan.io/host/${result!.query}`} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                          <RiExternalLinkLine className="w-3 h-3" /> Shodan
+                        </a>
+                        <a href={`https://www.virustotal.com/gui/ip-address/${result!.query}`} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                          <RiExternalLinkLine className="w-3 h-3" /> VirusTotal
+                        </a>
+                        <a href={`https://ipinfo.io/${result!.query}`} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                          <RiExternalLinkLine className="w-3 h-3" /> IPinfo
+                        </a>
+                      </div>
+                    </div>
 
                     <div className="flex items-start gap-2 text-[10px] text-muted-foreground/60">
                       <RiAlertLine className="w-3 h-3 shrink-0 mt-0.5" />

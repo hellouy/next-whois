@@ -1,3 +1,45 @@
+# Next Whois UI — v3.30
+
+## Comprehensive UX Enhancement (2026-04-01, v3.30)
+
+### HTTP Check — Full Rewrite
+
+**`src/pages/api/http/check.ts`**:
+- Switched from HEAD to GET (then immediately cancels body stream) so security headers added by middleware (HSTS, CSP etc.) are always captured
+- Added 7 security headers extraction: `Strict-Transport-Security`, `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-XSS-Protection`
+- Added `securityScore` (0-100, weighted: critical=30, high=25, medium=10, info=5) and `securityHeaders[]` array in response
+- Added `contentLength`, `xPoweredBy`, `cacheControl`, `via` fields
+- Fixed Chinese error messages → English
+
+**`src/pages/http.tsx`** (complete rewrite):
+- Security headers panel with per-header present/missing indicators, severity badges, click-to-expand raw value
+- `ScoreRing` SVG component showing 0-100 security score with color coding
+- HSTS badge for HTTPS sites (green when present, amber when missing)
+- "Open link" button on response details section
+- URL parameter auto-query (`?q=`) like other tool pages
+- Inline refresh button beside check button when result shown
+- Empty state with quick-try example buttons
+- Response Details section now shows: server, content-type, cache-control, content-size, powered-by, via
+
+### DNS Page — SPF/DMARC Analysis
+
+**`src/pages/dns.tsx`**:
+- Added `parseSpf()` function: extracts mechanisms (include:, a, mx, ip4:, ip6:), `all` directive, counts DNS lookup mechanisms, warns if >10 (RFC violation)
+- Added `parseDmarc()` function: parses all DMARC tags (p=, sp=, pct=, rua=, ruf=, adkim=, aspf=)
+- New SPF Analysis section inside email preset panel: shows all mechanisms as monospace badges, `all` directive with color coding (green=-all, amber=~all, red=+all), DNS lookup count warning
+- New DMARC Analysis section: shows policy/subdomain policy with color coding (green=reject, amber=quarantine, red=none), alignment mode, report email addresses
+
+### IP/ASN Page — External Lookups
+
+**`src/pages/ip.tsx`**:
+- New "External Lookups" panel below RDAP info with clickable links to: BGP.he.net (ASN + IP), ARIN RDAP, Shodan, VirusTotal, IPinfo
+- Added `contact_email` and `cidr` to RDAP display rows
+
+### Locale Updates
+- Added ~20 new keys to all 8 locale files (zh, en, de, fr, ja, ko, ru, zh-tw) covering: `http.loading`, `http.section_details`, `http.section_security`, `http.hsts_*`, `http.result_content_len`, `ip.links_section`, `dns.spf_analysis`, `dns.dmarc_analysis`, and 15 more
+
+---
+
 # Next Whois UI — v3.29
 
 ## whoiser-Primary Lookup + Page Jump Fix (2026-04-01, v3.29)
