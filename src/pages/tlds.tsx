@@ -246,14 +246,14 @@ const TldCard = React.memo(function TldCard({ entry, isChinese }: { entry: TldIn
             WHOIS
           </span>
         )}
-        {(entry.hasRdap || (!entry.hasWhois && !isCc)) && (
+        {entry.hasRdap && (
           <span className="text-[9px] px-1.5 py-0 h-4 leading-4 rounded-sm bg-sky-500/12 text-sky-600 dark:text-sky-400 border border-sky-400/30 inline-flex items-center">
             RDAP
           </span>
         )}
-        {isCc && !entry.hasWhois && !entry.hasRdap && (
-          <span className="text-[10px] text-muted-foreground/40">
-            {t("tlds.not_supported")}
+        {!entry.hasWhois && !entry.hasRdap && (
+          <span className="text-[9px] px-1.5 py-0 h-4 leading-4 rounded-sm bg-red-500/8 text-red-400/70 dark:text-red-500/60 border border-red-400/20 inline-flex items-center">
+            {isChinese ? "不支持" : "No support"}
           </span>
         )}
       </div>

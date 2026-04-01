@@ -2453,8 +2453,18 @@ function getDomainRegistrationStatus(
     rawContent.includes("ihtilaf") ||
     rawContent.includes("tahkim");
 
+  // ── GUARD: A domain with registrar + creation + expiration date is definitively
+  // registered. Reserved/prohibited domains have no registrar or dates.
+  // Without this guard, WHOIS boilerplate text (e.g. RegistrarSafe privacy
+  // notice containing "withheld") triggers false reserved/prohibited positives.
+  const isDefinitelyRegistered =
+    result.registrar && result.registrar !== "Unknown" &&
+    result.creationDate && result.creationDate !== "Unknown" &&
+    result.expirationDate && result.expirationDate !== "Unknown";
+
   const isProhibited =
-    prohibitCheckText.includes("prohibited") ||
+    !isDefinitelyRegistered &&
+    (prohibitCheckText.includes("prohibited") ||
     prohibitCheckText.includes("registrationprohibited") ||
     prohibitCheckText.includes("cannot be registered") ||
     prohibitCheckText.includes("not available for registration") ||
@@ -2463,7 +2473,7 @@ function getDomainRegistrationStatus(
     prohibitCheckText.includes("forbidden") ||
     prohibitCheckText.includes("registry-prohibited") ||
     prohibitCheckText.includes("registrybanned") ||
-    rawHasProhibited;
+    rawHasProhibited);
 
   function makeStatus(
     type: RegistrationStatusType,
@@ -2478,13 +2488,15 @@ function getDomainRegistrationStatus(
     return makeStatus("prohibited", "text-red-600 border-red-400/50 bg-red-50 dark:bg-red-950/20", "bg-red-500");
 
   // "reserved" should not be triggered by "registry-hold" (that is a hold, not a reserve)
+  // Also guarded: an actively registered domain (has registrar + dates) cannot be reserved.
   const isReserved =
-    prohibitCheckText.includes("reserved") ||
+    !isDefinitelyRegistered &&
+    (prohibitCheckText.includes("reserved") ||
     allStatusText.includes("reserved-delegated") ||
     allStatusText.includes("registryreserved") ||
     allStatusText.includes("registry-reserved") ||
     allStatusText.includes("registry-premium") ||
-    rawHasReserved;
+    rawHasReserved);
 
   // A "premium reserved" domain is held by the registry for sale — different
   // from an "official use" reserved domain.  Both display as "reserved" but
