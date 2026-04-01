@@ -270,6 +270,95 @@ export async function applyParams(result: WhoisAnalyzeResult) {
 }
 
 /**
+ * Normalises .sm (San Marino) WHOIS output into standard key: value lines.
+ *
+ * .sm WHOIS uses block-style contact sections:
+ *   Owner:
+ *   Junpeng Niu          ← name on next line
+ *   Chang'An Street 66th ← address (no key prefix)
+ *   100000 Beijing
+ *   CN                   ← 2-letter country code
+ *   Phone: +86 ...       ← sub-fields with colon are passed through
+ *   Email: ...
+ *
+ *   DNS Servers:
+ *   ns1.example.com      ← nameservers, one per line
+ */
+function preprocessSmWhois(data: string): string {
+  // Detect .sm format: "DNS Servers:" alone on a line (no value after colon)
+  if (!/^DNS Servers:\s*$/m.test(data) && !/^Owner:\s*$/m.test(data)) return data;
+
+  const lines = data.split("\n");
+  const out: string[] = [];
+  // Which block we are currently inside
+  let block: "owner" | "tech" | "dns" | null = null;
+  let blockLine = 0; // lines consumed inside current block
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+
+    // Blank line → reset block
+    if (!t) {
+      block = null;
+      blockLine = 0;
+      out.push("");
+      continue;
+    }
+
+    // Detect block headers (nothing after the colon)
+    if (/^Owner:\s*$/.test(t))            { block = "owner"; blockLine = 0; continue; }
+    if (/^Technical Contact:\s*$/.test(t)) { block = "tech";  blockLine = 0; continue; }
+    if (/^Administrative Contact:\s*$/.test(t)) { block = "tech"; blockLine = 0; continue; }
+    if (/^DNS Servers?:\s*$/.test(t))    { block = "dns";   blockLine = 0; continue; }
+
+    if (block === "dns") {
+      // Each non-blank line is a nameserver hostname
+      if (t.includes(".")) out.push(`Nameserver: ${t}`);
+      continue;
+    }
+
+    if (block === "owner" || block === "tech") {
+      // Lines that already contain a colon (Phone:, Email:, Fax:) — pass through as-is
+      const colonIdx = t.indexOf(":");
+      if (colonIdx > 0 && colonIdx < t.length - 1) {
+        out.push(raw);
+        blockLine++;
+        continue;
+      }
+
+      // First content line → registrant/tech name
+      if (blockLine === 0) {
+        out.push(block === "owner"
+          ? `Registrant Name: ${t}`
+          : `Tech Name: ${t}`);
+        blockLine++;
+        continue;
+      }
+
+      // 2-letter country code
+      if (/^[A-Z]{2}$/.test(t) && block === "owner") {
+        out.push(`Registrant Country: ${t}`);
+        blockLine++;
+        continue;
+      }
+
+      // Street / postal lines — emit as registrant street (first one only)
+      if (block === "owner" && blockLine === 1) {
+        out.push(`Registrant Street: ${t}`);
+      }
+      blockLine++;
+      continue;
+    }
+
+    // Not in any block — pass through unchanged
+    out.push(raw);
+  }
+
+  return out.join("\n");
+}
+
+/**
  * Normalises Island Networks (.gg / .je) WHOIS output into standard key: value lines.
  *
  * Their format uses section headers (ending with ":") whose values appear on
@@ -325,6 +414,7 @@ function preprocessIslandNetworks(data: string): string {
 }
 
 export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
+  data = preprocessSmWhois(data);
   data = preprocessIslandNetworks(data);
 
   const lines = data
