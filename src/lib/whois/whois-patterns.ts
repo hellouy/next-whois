@@ -15,6 +15,12 @@ const WHOIS_ERROR_PATTERNS = [
   /is available for/i,
   /no whois information/i,
   /tld is not supported/i,
+  /not registered/i,
+  /domain is available/i,
+  /domain available/i,
+  /available for registration/i,
+  /available for purchase/i,
+  /this domain is free/i,
 ];
 
 const WHOIS_RATE_LIMIT_PATTERNS = [
@@ -40,6 +46,12 @@ const WHOIS_NOT_REGISTERED_PATTERNS = [
   /status:\s*free/i,
   /status:\s*available/i,
   /is available for/i,
+  /not registered/i,
+  /domain is available/i,
+  /domain available/i,
+  /available for registration/i,
+  /available for purchase/i,
+  /this domain is free/i,
 ];
 
 export function isWhoisRateLimited(raw: string): boolean {
@@ -83,13 +95,19 @@ export function detectWhoisError(raw: string): string | null {
         !l.startsWith("#") &&
         !l.startsWith(">>>") &&
         !l.startsWith("NOTICE") &&
-        !l.startsWith("TERMS OF USE"),
+        !l.startsWith("TERMS OF USE") &&
+        !l.startsWith("Terms of Use") &&
+        !l.startsWith("By submitting") &&
+        !l.startsWith("This service") &&
+        !l.startsWith("Access to") &&
+        !l.startsWith("You agree"),
     );
   if (lines.length === 0) return "Empty WHOIS response";
+  const filtered = lines.slice(0, 30).join("\n");
   for (const pattern of WHOIS_ERROR_PATTERNS) {
-    const match = raw.match(pattern);
+    const match = filtered.match(pattern);
     if (match) {
-      const matchLine = raw.split("\n").find((l) => pattern.test(l));
+      const matchLine = lines.find((l) => pattern.test(l));
       return matchLine?.trim() || match[0];
     }
   }

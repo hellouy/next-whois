@@ -4164,7 +4164,7 @@ export default function LookupPage({
       })
       .catch(() => {
         if (!cancelled) {
-          setData({ status: false, time: 0, cached: false, error: "Lookup failed", result: { ...initialWhoisAnalyzeResult } });
+          setData({ status: false, time: 0, cached: false, error: "", result: { ...initialWhoisAnalyzeResult } });
           setLoading(false);
         }
       });

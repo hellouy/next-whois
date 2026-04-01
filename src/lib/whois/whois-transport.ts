@@ -21,9 +21,10 @@ export async function queryWhoisTcp(
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const net = require("node:net") as typeof import("net");
     let data = "";
-    const socket = net.connect({ host: resolvedHost, port }, () =>
-      socket.write(query + "\r\n"),
-    );
+    const socket = net.connect({ host: resolvedHost, port }, () => {
+      socket.write(query + "\r\n");
+      socket.end();
+    });
     socket.setTimeout(timeoutMs);
     socket.on("data", (chunk: Buffer) => (data += chunk.toString()));
     socket.on("close", () => resolve(data));
