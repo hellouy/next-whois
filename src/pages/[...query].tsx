@@ -4650,10 +4650,10 @@ export default function LookupPage({
 
           <div className="relative">
             <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: loading ? 0.82 : 1, y: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              style={{ pointerEvents: loading ? "none" : undefined, willChange: "opacity, transform" }}
+              initial={false}
+              animate={{ opacity: loading ? 0.85 : 1 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
           {result && (
