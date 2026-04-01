@@ -4040,6 +4040,37 @@ function targetFromRouterQuery(query: NodeJS.Dict<string | string[]>): string {
   return cleanDomain(segments.join("/").replace(/\s+/g, ""));
 }
 
+/** Text ad banner shown below the lookup result — fully configurable from admin. */
+function ResultTextAd() {
+  const settings = useSiteSettings();
+  if (settings.result_ad_enabled !== "1") return null;
+  if (!settings.result_ad_text) return null;
+  const label = settings.result_ad_label || "广告";
+  const url   = settings.result_ad_url;
+  const text  = settings.result_ad_text;
+
+  const inner = (
+    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors cursor-default">
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium shrink-0 uppercase tracking-wide">
+        {label}
+      </span>
+      <span className="text-sm text-foreground/70 flex-1 leading-snug">{text}</span>
+      {url && <RiExternalLinkLine className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />}
+    </div>
+  );
+
+  if (url) {
+    return (
+      <div className="mt-6">
+        <Link href={url} target="_blank" rel="noopener noreferrer sponsored">
+          {inner}
+        </Link>
+      </div>
+    );
+  }
+  return <div className="mt-6">{inner}</div>;
+}
+
 export default function LookupPage({
   data: initialData,
   target: propTarget,
@@ -6692,6 +6723,9 @@ export default function LookupPage({
               </motion.div>
             </>
           )}
+
+          {/* Text ad — shown after successful result, admin-configurable */}
+          <ResultTextAd />
 
             </motion.div>
           </div>

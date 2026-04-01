@@ -51,6 +51,16 @@ export interface SiteSettings {
   home_hero_subtitle: string;
   home_placeholder: string;
   home_show_stats: string;
+  // Home announcement
+  home_announcement_enabled: string;
+  home_announcement_text: string;
+  home_announcement_type: string;
+  home_announcement_url: string;
+  // Result page ad
+  result_ad_enabled: string;
+  result_ad_text: string;
+  result_ad_url: string;
+  result_ad_label: string;
   // About page
   about_title: string;
   about_content: string;
@@ -176,6 +186,14 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   home_hero_subtitle: "",
   home_placeholder: "",
   home_show_stats: "1",
+  home_announcement_enabled: "",
+  home_announcement_text: "",
+  home_announcement_type: "info",
+  home_announcement_url: "",
+  result_ad_enabled: "",
+  result_ad_text: "",
+  result_ad_url: "",
+  result_ad_label: "广告",
   about_title: "",
   about_content: "",
   about_intro_en: "",

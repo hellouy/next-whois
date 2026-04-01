@@ -399,13 +399,41 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    id: "announcement",
-    title: "公告与维护",
+    id: "home_announcement",
+    title: "首页公告",
     icon: RiMegaphoneLine,
+    color: "bg-sky-100 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400",
+    fields: [
+      { key: "home_announcement_text", label: "公告内容", desc: "显示在首页搜索框下方的公告文字（留空则不显示）", placeholder: "🎉 新功能上线！支持 RDAP 批量查询，立即体验 →", icon: RiMegaphoneLine },
+      { key: "home_announcement_type", label: "公告类型", desc: "控制公告条颜色风格：info（蓝色）、warning（橙色）、success（绿色）、notice（紫色）", placeholder: "info", icon: RiAlertLine },
+      { key: "home_announcement_url", label: "公告链接", desc: "点击公告跳转的链接（留空则不可点击，外部链接请填写完整 URL）", placeholder: "https://example.com/blog/new-feature", icon: RiGlobalLine },
+    ],
+    toggles: [
+      { key: "home_announcement_enabled", label: "显示首页公告", desc: "开启后，首页搜索框下方显示上方设置的公告内容，不遮挡导航栏", onColor: "bg-sky-500" },
+    ],
+  },
+  {
+    id: "announcement",
+    title: "全站公告与维护",
+    icon: RiAlertLine,
     color: "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400",
     fields: [
-      { key: "site_announcement", label: "公告横幅内容", desc: "显示在页面顶部的公告文字（留空则不显示公告条）", placeholder: "🎉 欢迎使用 X.RW！", icon: RiMegaphoneLine },
+      { key: "site_announcement", label: "全站顶部公告", desc: "显示在页面顶部导航栏上方的通知条（留空则不显示，导航栏会自动下移）", placeholder: "🎉 欢迎使用 X.RW！", icon: RiMegaphoneLine },
       { key: "maintenance_message", label: "维护模式自定义消息", desc: "维护页面显示给访客的额外说明（开启维护模式时生效，留空则显示 site_announcement 内容）", placeholder: "预计维护时间：今晚 22:00 - 23:00，感谢您的耐心等待 🙏", icon: RiAlertLine, multiline: false },
+    ],
+  },
+  {
+    id: "result_ad",
+    title: "结果页广告",
+    icon: RiBarChartLine,
+    color: "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400",
+    fields: [
+      { key: "result_ad_text", label: "广告文字", desc: "显示在查询结果下方的文字广告内容（留空则不显示）", placeholder: "🔥 优质域名注册服务，低至 ¥9.9/年，立即抢注！", icon: RiFileTextLine },
+      { key: "result_ad_url", label: "广告链接", desc: "点击广告跳转的目标 URL（外部链接请填写完整 https://... 格式）", placeholder: "https://example.com/domain-register?ref=whois", icon: RiGlobalLine },
+      { key: "result_ad_label", label: "广告标签文字", desc: "显示在广告左侧的小标签（如：广告、推广、赞助），留空默认显示「广告」", placeholder: "广告", icon: RiFileTextLine },
+    ],
+    toggles: [
+      { key: "result_ad_enabled", label: "显示结果页广告", desc: "开启后，查询结果下方显示文字广告条，适合展示相关服务推广", onColor: "bg-orange-500" },
     ],
   },
   {

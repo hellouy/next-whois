@@ -1,3 +1,43 @@
+# Next Whois UI — v3.33
+
+## Homepage Fix + Announcement + Result Page Ad (2026-04-01, v3.33)
+
+### Homepage Error Fix (iOS download dialog)
+**Root cause**: `getServerSideProps` on homepage made a DB round-trip on every request. On cold start (empty DB pool + no Redis cache), this took 5-9 seconds. iOS Safari treated the stalled response as a binary download.
+
+**Fix** — switched homepage from `getServerSideProps` → `getStaticProps` with ISR:
+- `revalidate: 60` — page is pre-built as a static file, regenerated at most every 60 s
+- DB is never hit at request time; homepage serves from CDN cache instantly
+- Falls back to sensible defaults if DB is unreachable during revalidation
+- `origin` prop removed; `siteUrl` derived from `settings.og_url` (live settings) with `og_url` included in `initialSiteSettings`
+
+### Homepage Announcement Banner
+**`src/pages/index.tsx`** — new `HomeAnnouncementBanner` component:
+- Placed **inline** below the search box, not fixed — does not overlap navbar on mobile
+- Dismissible: clicking ✕ stores a hash of the text in `localStorage`; changing the text un-dismisses it
+- Types: `info` (blue), `warning` (amber), `success` (emerald), `notice` (violet)
+- Optional URL: entire banner becomes a link when `home_announcement_url` is set
+- Reads settings live via `useSiteSettings()` — no page reload needed after admin change
+
+### Result Page Text Ad
+**`src/pages/[...query].tsx`** — new `ResultTextAd` component:
+- Rendered below the main WHOIS/RDAP result section
+- Shows label badge (configurable text, default "广告"), ad content, external link icon
+- Uses `rel="noopener noreferrer sponsored"` for SEO-safe external links
+- Reads from `useSiteSettings()` — no SSR changes needed, live-updates from settings
+
+### Admin Settings
+**`src/pages/admin/settings.tsx`** — two new sections:
+- **首页公告** (`home_announcement`): enabled toggle, text content, type dropdown (info/warning/success/notice), URL
+- **结果页广告** (`result_ad`): enabled toggle, ad text, ad URL, label text
+- Renamed "公告与维护" section to "全站公告与维护" to distinguish from homepage-specific announcement
+
+### New site-settings keys
+- `home_announcement_enabled`, `home_announcement_text`, `home_announcement_type`, `home_announcement_url`
+- `result_ad_enabled`, `result_ad_text`, `result_ad_url`, `result_ad_label`
+
+---
+
 # Next Whois UI — v3.32
 
 ## Vercel Serverless + Redis Optimization (2026-04-01, v3.32)
