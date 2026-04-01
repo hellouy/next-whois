@@ -472,9 +472,20 @@ function stripSslMode(url: string): string {
 
 function makePool(connectionString: string): Pool {
   const cleanUrl = stripSslMode(connectionString);
+  // Disable SSL for local/internal hosts (e.g. Replit's internal "helium" Postgres).
+  // External cloud databases (Supabase, Neon, etc.) still get SSL with self-signed cert support.
+  let sslConfig: boolean | { rejectUnauthorized: boolean };
+  try {
+    const u = new URL(cleanUrl);
+    const h = u.hostname;
+    const isInternal = h === "localhost" || h === "127.0.0.1" || h === "helium" || !h.includes(".");
+    sslConfig = isInternal ? false : { rejectUnauthorized: false };
+  } catch {
+    sslConfig = { rejectUnauthorized: false };
+  }
   const p = new Pool({
     connectionString: cleanUrl,
-    ssl: { rejectUnauthorized: false },
+    ssl: sslConfig,
     max: 10,
     connectionTimeoutMillis: 8000,
     idleTimeoutMillis: 30000,
@@ -539,15 +550,27 @@ export async function getDbReady(): Promise<Pool | null> {
   if (getMigrated()) return db;
 
   if (global.__pgMigrating) {
-    await global.__pgMigrating;
-    return db;
+    try {
+      await global.__pgMigrating;
+    } catch {
+      return null;
+    }
+    return getMigrated() ? db : null;
   }
 
-  global.__pgMigrating = runMigrations(db).then(() => {
-    setMigrated(true);
-    global.__pgMigrating = undefined;
-  });
+  const migrationPromise = runMigrations(db)
+    .then(() => { setMigrated(true); })
+    .catch((err: unknown) => {
+      console.error("[db] Migration failed:", err instanceof Error ? err.message : String(err));
+    })
+    .finally(() => { global.__pgMigrating = undefined; });
 
-  await global.__pgMigrating;
-  return db;
+  global.__pgMigrating = migrationPromise;
+
+  try {
+    await migrationPromise;
+  } catch {
+    return null;
+  }
+  return getMigrated() ? db : null;
 }

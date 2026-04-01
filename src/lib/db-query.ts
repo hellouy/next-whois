@@ -39,6 +39,10 @@ export async function run(sql: string, params?: any[]): Promise<number> {
 
 /** Convenience: return true when the db is reachable (pool not null). */
 export async function isDbReady(): Promise<boolean> {
-  const db = await getDbReady();
-  return db !== null;
+  try {
+    const db = await getDbReady();
+    return db !== null;
+  } catch {
+    return false;
+  }
 }
