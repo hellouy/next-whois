@@ -22,7 +22,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "accountant": "whois.nic.accountant",
   "accountants": "whois.donuts.co",
   "aco": "whois.nic.aco",
-  "ac": "whois.identitydigital.services",  // .ac Ascension Island; IdentityDigital; TCP blocked from Replit
+  "ac": "whois.nic.ac",  // .ac Ascension Island; IANA-specified
   "actor": "whois.donuts.co",
   "ad": "whois.nic.ad",
   "ads": "whois.nic.google",
@@ -139,7 +139,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "blog": "whois.blog.fury.ca",
   "bloomberg": "whois.identity.digital",
   "blue": "whois.identity.digital",
-  "bm": "whois.identitydigital.services",  // IANA-specified; TCP blocked from Replit (IdentityDigital)
+  "bm": "whois.nic.bm",  // .bm Bermuda; IANA-specified (was wrongly set to afilias-srs.net)
   "bms": "whois.identity.digital",
   "bmw": "whois.centralnic.com",
   "bn": "whois.bnnic.bn",
@@ -174,7 +174,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "buzz": "whois.nic.buzz",
   "bw": "whois.nic.bw",
   "by": "whois.cctld.by",
-  "bz": "whois.identitydigital.services",  // IANA-specified; whois.nic.bz ECONNREFUSED (IdentityDigital)
+  // "bz": no WHOIS server registered at IANA; RDAP via rdap.identitydigital.services works
   "bzh": "whois.nic.bzh",
   "ca": "whois.cira.ca",
   "cab": "whois.donuts.co",
@@ -547,7 +547,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "immo": "whois.donuts.co",
   "immobilien": "whois.donuts.co",
   "in": "whois.registry.in",
-  "io": "whois.identitydigital.services",  // .io British Indian Ocean Territory; IdentityDigital; TCP blocked from Replit
+  "io": "whois.nic.io",  // .io British Indian Ocean Territory; IANA-specified
   "inc": "whois.centralnic.com",
   "industries": "whois.donuts.co",
   "infiniti": "whois.gmoregistry.net",
@@ -876,7 +876,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "properties": "whois.donuts.co",
   "property": "whois.donuts.co",
   "protection": "whois.centralnic.com",
-  "pr": "whois.identitydigital.services",  // .pr Puerto Rico; IdentityDigital; TCP blocked from Replit
+  "pr": "whois.afilias-srs.net",  // .pr Puerto Rico; IANA-specified
   "pru": "whois.nic.pru",
   "prudential": "whois.nic.prudential",
   "ps": "whois.pnina.ps",
@@ -953,7 +953,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "sb": "whois.nic.sb",
   "sbi": "whois.identity.digital",
   "sbs": "whois.centralnic.com",
-  "sc": "whois.identitydigital.services",  // .sc Seychelles; IdentityDigital; TCP blocked from Replit
+  "sc": "whois.nic.sc",  // .sc Seychelles; IANA-specified
   "scb": "whois.nic.scb",
   "schaeffler": "whois.nic.schaeffler",
   "schmidt": "whois.nic.schmidt",
@@ -982,7 +982,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "shangrila": "whois.identity.digital",
   "sharp": "whois.gmoregistry.net",
   "shell": "whois.nominet.uk",
-  "sh": "whois.identitydigital.services",  // .sh Saint Helena; IdentityDigital; TCP blocked from Replit
+  "sh": "whois.nic.sh",  // .sh Saint Helena; IANA-specified
   "shia": "whois.nominet.uk",
   "shiksha": "whois.identity.digital",
   "shoes": "whois.donuts.co",
