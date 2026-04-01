@@ -4,15 +4,16 @@ import { AdminLayout } from "@/components/admin-layout";
 import { cn } from "@/lib/utils";
 import {
   RiUserLine, RiShieldCheckLine, RiBellLine, RiSearchLine,
-  RiSettings4Line, RiLoader4Line, RiArrowRightLine, RiUserForbidLine,
+  RiSettings4Line, RiLoader4Line, RiArrowRightLine,
   RiFeedbackLine, RiTimeLine, RiGhostLine, RiVipCrownLine,
-  RiAddLine, RiBarChartLine, RiBankCardLine, RiCheckDoubleLine,
+  RiAddLine, RiBankCardLine,
   RiRefreshLine, RiPlugLine,
   RiShieldUserLine, RiFireLine, RiServerLine,
   RiCodeBoxLine, RiMoneyDollarCircleLine,
   RiPaletteLine, RiGithubLine,
   RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine,
-  RiGlobalLine,
+  RiGlobalLine, RiMailSendLine, RiDownloadLine,
+  RiBillLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -37,9 +38,9 @@ type Stats = {
 function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge }: {
   icon: React.ElementType;
   label: string;
-  value: number | undefined;
+  value: number | string | undefined;
   sub?: string;
-  subValue?: number;
+  subValue?: number | string;
   href: string;
   color: string;
   badge?: { label: string; value: number; color: string };
@@ -49,18 +50,18 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge 
     <button
       type="button"
       onClick={() => router.push(href, undefined, { locale: false })}
-      className="glass-panel border border-border rounded-2xl p-5 flex items-start gap-4 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full active:scale-[0.98]"
+      className="glass-panel border border-border rounded-2xl p-4 flex items-start gap-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full active:scale-[0.98]"
     >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-        <Icon className="w-5 h-5" />
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+        <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground font-medium">{label}</p>
-        <p className="text-2xl font-bold tabular-nums mt-0.5">
-          {value === undefined ? <RiLoader4Line className="w-5 h-5 animate-spin text-muted-foreground" /> : value.toLocaleString()}
+        <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
+        <p className="text-xl font-bold tabular-nums mt-0.5">
+          {value === undefined ? <RiLoader4Line className="w-4 h-4 animate-spin text-muted-foreground" /> : (typeof value === "number" ? value.toLocaleString() : value)}
         </p>
-        {sub && subValue !== undefined && subValue > 0 && (
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}: {subValue.toLocaleString()}</p>
+        {sub && subValue !== undefined && (
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}: {typeof subValue === "number" ? subValue.toLocaleString() : subValue}</p>
         )}
         {badge && badge.value > 0 && (
           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold mt-1 inline-block ${badge.color}`}>
@@ -68,7 +69,7 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge 
           </span>
         )}
       </div>
-      <RiArrowRightLine className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors mt-1" />
+      <RiArrowRightLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors mt-1 shrink-0" />
     </button>
   );
 }
@@ -86,6 +87,89 @@ function fmt(d: string) {
   if (days < 7) return `${days} 天前`;
   return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
+
+type ActionItem = { href: string; label: string; desc: string; icon: React.ElementType; color: string };
+type ActionGroup = { label: string; accentColor: string; items: ActionItem[] };
+
+function QuickActionGroup({ group }: { group: ActionGroup }) {
+  const router = useRouter();
+  return (
+    <div className="space-y-2">
+      <p className={`text-[10px] font-bold uppercase tracking-widest ${group.accentColor} flex items-center gap-1.5`}>
+        {group.label}
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+        {group.items.map(({ href, label, desc, icon: Icon, color }) => (
+          <button
+            key={href}
+            type="button"
+            onClick={() => router.push(href, undefined, { locale: false })}
+            className="glass-panel border border-border/60 rounded-xl p-2.5 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left active:scale-[0.98]"
+          >
+            <Icon className={`w-3.5 h-3.5 shrink-0 ${color} mb-1.5`} />
+            <p className="text-[11px] font-semibold group-hover:text-primary transition-colors leading-tight">{label}</p>
+            <p className="text-[10px] text-muted-foreground leading-snug mt-0.5 hidden sm:block">{desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const ACTION_GROUPS: ActionGroup[] = [
+  {
+    label: "用户与支付",
+    accentColor: "text-violet-500",
+    items: [
+      { href: "/admin/users",            label: "用户管理",    desc: "账号、停用、手动订阅",       icon: RiUserLine,       color: "text-violet-500" },
+      { href: "/admin/payment/plans",    label: "订阅套餐",    desc: "定价策略与功能权益配置",     icon: RiVipCrownLine,   color: "text-indigo-500" },
+      { href: "/admin/payment/orders",   label: "支付订单",    desc: "流水明细与对账管理",         icon: RiBillLine,       color: "text-green-500" },
+      { href: "/admin/access-control",   label: "访问控制",    desc: "API 密钥·邀请码·激活码",     icon: RiShieldUserLine, color: "text-slate-500" },
+    ],
+  },
+  {
+    label: "通知与服务",
+    accentColor: "text-cyan-500",
+    items: [
+      { href: "/admin/reminders",        label: "到期提醒",    desc: "域名监控与续费订阅管理",     icon: RiBellLine,       color: "text-cyan-500" },
+      { href: "/admin/notify",           label: "邮件推送",    desc: "向用户发送群发通知邮件",     icon: RiMailSendLine,   color: "text-blue-400" },
+      { href: "/admin/feedback",         label: "用户反馈",    desc: "处理与回应用户反馈",         icon: RiFeedbackLine,   color: "text-rose-500" },
+      { href: "/admin/search-records",   label: "查询记录",    desc: "浏览、统计、清理历史记录",   icon: RiSearchLine,     color: "text-emerald-500" },
+    ],
+  },
+  {
+    label: "域名与接入",
+    accentColor: "text-blue-500",
+    items: [
+      { href: "/admin/domains",          label: "域名生命周期", desc: "注册·宽限·赎回·删除节点",   icon: RiGlobalLine,     color: "text-blue-600" },
+      { href: "/admin/tld-rules",        label: "后缀解析规则", desc: "WHOIS / RDAP 规则定制",     icon: RiCodeBoxLine,    color: "text-teal-500" },
+      { href: "/admin/api",              label: "API 集成",     desc: "AI Key · 第三方数据源配置", icon: RiPlugLine,       color: "text-orange-500" },
+      { href: "/admin/hot-prefixes",     label: "热门搜索词",   desc: "首页推荐查询词条管理",      icon: RiFireLine,       color: "text-red-500" },
+    ],
+  },
+  {
+    label: "品牌与内容",
+    accentColor: "text-fuchsia-500",
+    items: [
+      { href: "/admin/stamps",           label: "品牌认领审核", desc: "审核用户提交的认领申请",    icon: RiShieldCheckLine,color: "text-amber-500" },
+      { href: "/admin/stamp-styles",     label: "印章样式",     desc: "品牌卡片主题风格配置",      icon: RiPaletteLine,    color: "text-fuchsia-500" },
+      { href: "/admin/og-styles",        label: "OG 分享图",    desc: "链接预览图布局与配色",      icon: RiImageLine,      color: "text-indigo-400" },
+      { href: "/admin/links",            label: "友情链接",     desc: "外部推荐链接管理",          icon: RiLinksLine,      color: "text-blue-400" },
+      { href: "/admin/sponsors",         label: "赞助商",       desc: "合作伙伴与赞助商展示",      icon: RiHeart3Line,     color: "text-rose-500" },
+      { href: "/admin/changelog",        label: "更新日志",     desc: "版本记录与公告发布",        icon: RiHistoryLine,    color: "text-emerald-500" },
+    ],
+  },
+  {
+    label: "系统与设置",
+    accentColor: "text-gray-500",
+    items: [
+      { href: "/admin/settings",         label: "网站设置",    desc: "标题、公告、功能开关",      icon: RiSettings4Line,  color: "text-blue-500" },
+      { href: "/admin/system",           label: "系统监控",    desc: "数据库连接与运行状态",      icon: RiServerLine,     color: "text-gray-500" },
+      { href: "/admin/db-export",        label: "数据导出",    desc: "导出数据库记录与备份",      icon: RiDownloadLine,   color: "text-green-600" },
+      { href: "/admin/git-fix",          label: "仓库工具",    desc: "Git 同步与提交工具",        icon: RiGithubLine,     color: "text-neutral-500" },
+    ],
+  },
+];
 
 export default function AdminIndexPage() {
   const router = useRouter();
@@ -108,37 +192,15 @@ export default function AdminIndexPage() {
 
   React.useEffect(() => { loadStats(); }, []);
 
-  const QUICK_ACTIONS = [
-    { href: "/admin/settings",          label: "网站设置",    desc: "标题、功能开关、公告",        icon: RiSettings4Line,  color: "text-blue-500" },
-    { href: "/admin/users",             label: "用户管理",    desc: "编辑、订阅、停用、删除",      icon: RiUserLine,       color: "text-violet-500" },
-    { href: "/admin/search-records",    label: "查询记录",    desc: "统计、分类、逐条清理",        icon: RiSearchLine,     color: "text-emerald-500" },
-    { href: "/admin/feedback",          label: "用户反馈",    desc: "查看用户提交的反馈",          icon: RiFeedbackLine,   color: "text-rose-500" },
-    { href: "/admin/stamps",            label: "品牌审核",    desc: "审核品牌认领申请",            icon: RiShieldCheckLine,color: "text-amber-500" },
-    { href: "/admin/reminders",         label: "到期提醒",    desc: "管理域名到期订阅",            icon: RiBellLine,       color: "text-cyan-500" },
-    { href: "/admin/payment/plans",     label: "套餐管理",    desc: "新增/编辑订阅套餐",           icon: RiVipCrownLine,   color: "text-indigo-500" },
-    { href: "/admin/payment/orders",    label: "订单管理",    desc: "支付订单与收款明细",          icon: RiBankCardLine,   color: "text-green-500" },
-    { href: "/admin/api",               label: "API 接入",    desc: "AI Key · 第三方数据源",       icon: RiPlugLine,       color: "text-orange-500" },
-    { href: "/admin/domains",           label: "域名数据",    desc: "生命周期规则·服务器·IANA数据", icon: RiGlobalLine,     color: "text-blue-600" },
-    { href: "/admin/tld-rules",         label: "TLD 规则",    desc: "自定义解析规则配置",          icon: RiCodeBoxLine,    color: "text-teal-500" },
-    { href: "/admin/access-control",    label: "访问控制",    desc: "API密钥·邀请码·激活码",       icon: RiShieldUserLine, color: "text-slate-500" },
-    { href: "/admin/hot-prefixes",      label: "热搜词",      desc: "首页热门搜索词管理",          icon: RiFireLine,       color: "text-red-500" },
-    { href: "/admin/system",            label: "系统状态",    desc: "数据库连接、查询趋势",        icon: RiServerLine,     color: "text-gray-500" },
-    { href: "/admin/notify",            label: "邮件通知",    desc: "向用户发送群发通知",          icon: RiBellLine,       color: "text-blue-400" },
-    { href: "/admin/stamp-styles",      label: "印章样式",    desc: "品牌印章风格配置",            icon: RiPaletteLine,    color: "text-fuchsia-500" },
-    { href: "/admin/links",             label: "友情链接",    desc: "管理外部链接/友链展示",        icon: RiLinksLine,      color: "text-blue-400" },
-    { href: "/admin/og-styles",         label: "OG 卡片",     desc: "域名分享图样式配置",           icon: RiImageLine,      color: "text-indigo-500" },
-    { href: "/admin/sponsors",          label: "赞助商",      desc: "赞助商列表与展示管理",         icon: RiHeart3Line,     color: "text-rose-500" },
-    { href: "/admin/changelog",         label: "更新日志",    desc: "版本发布记录与公告",           icon: RiHistoryLine,    color: "text-emerald-500" },
-    { href: "/admin/git-fix",           label: "Git 修复",    desc: "代码仓库问题修复工具",        icon: RiGithubLine,     color: "text-neutral-500" },
-  ];
-
   return (
     <AdminLayout title="概览">
-      <div className="space-y-6">
+      <div className="space-y-5">
+
+        {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold">系统概览</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">所有核心数据汇总</p>
+            <h2 className="text-lg font-bold">后台概览</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">数据实时汇总 · 快捷导航</p>
           </div>
           <button
             onClick={loadStats}
@@ -156,38 +218,48 @@ export default function AdminIndexPage() {
           </div>
         )}
 
-        {/* Today quick stats bar */}
+        {/* Today quick bar */}
         {stats && (stats.todayUsers > 0 || stats.todaySearches > 0) && (
-          <div className="glass-panel border border-primary/20 bg-primary/5 rounded-xl px-4 py-3 flex items-center gap-4 flex-wrap">
-            <span className="text-xs font-semibold text-primary">今日动态</span>
+          <div className="glass-panel border border-primary/20 bg-primary/5 rounded-xl px-4 py-2.5 flex items-center gap-4 flex-wrap">
+            <span className="text-[11px] font-bold text-primary">今日动态</span>
             {stats.todayUsers > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <RiAddLine className="w-3 h-3 text-emerald-500" />
                 <span className="font-semibold text-foreground">{stats.todayUsers}</span> 新用户
               </span>
             )}
             {stats.todaySearches > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <RiSearchLine className="w-3 h-3 text-blue-500" />
                 <span className="font-semibold text-foreground">{stats.todaySearches}</span> 次查询
               </span>
             )}
             {stats.anonSearches > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <RiGhostLine className="w-3 h-3 text-muted-foreground" />
-                <span className="font-semibold text-foreground">{stats.anonSearches}</span> 条匿名记录
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <RiGhostLine className="w-3 h-3 text-muted-foreground/70" />
+                <span className="font-semibold text-foreground">{stats.anonSearches}</span> 条匿名
               </span>
+            )}
+            {(stats.feedback ?? 0) > 0 && (
+              <button
+                onClick={() => router.push("/admin/feedback", undefined, { locale: false })}
+                className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <RiFeedbackLine className="w-3 h-3" />
+                {stats.feedback} 条待处理反馈
+              </button>
             )}
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Core stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           <StatCard
             icon={RiUserLine} label="注册用户" value={stats?.users}
             sub="已停用" subValue={stats?.disabledUsers}
             href="/admin/users"
             color="bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
-            badge={stats?.subscribedUsers ? { label: "订阅用户", value: stats.subscribedUsers, color: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400" } : undefined}
+            badge={stats?.subscribedUsers ? { label: "订阅", value: stats.subscribedUsers, color: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400" } : undefined}
           />
           <StatCard
             icon={RiShieldCheckLine} label="品牌认领" value={stats?.stamps}
@@ -196,13 +268,14 @@ export default function AdminIndexPage() {
             color="bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400"
           />
           <StatCard
-            icon={RiSearchLine} label="全部查询" value={stats?.searches}
-            sub="匿名记录" subValue={stats?.anonSearches}
+            icon={RiSearchLine} label="查询总量" value={stats?.searches}
+            sub="今日新增" subValue={stats?.todaySearches}
             href="/admin/search-records"
             color="bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
           />
           <StatCard
-            icon={RiBellLine} label="活跃订阅" value={stats?.activeReminders}
+            icon={RiBellLine} label="到期监控" value={stats?.activeReminders}
+            sub="活跃提醒" subValue={undefined}
             href="/admin/reminders"
             color="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
           />
@@ -211,11 +284,22 @@ export default function AdminIndexPage() {
             href="/admin/feedback"
             color="bg-pink-100 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400"
           />
-          <StatCard
-            icon={RiVipCrownLine} label="订阅用户" value={stats?.subscribedUsers}
-            href="/admin/users"
-            color="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
-          />
+          {(stats?.paidRevenue ?? 0) > 0 ? (
+            <StatCard
+              icon={RiMoneyDollarCircleLine} label="已收营收"
+              value={stats ? `¥${stats.paidRevenue.toFixed(2)}` : undefined}
+              sub="已付款" subValue={stats?.paidOrders}
+              href="/admin/payment/orders"
+              color="bg-lime-100 dark:bg-lime-950/40 text-lime-600 dark:text-lime-400"
+            />
+          ) : (
+            <StatCard
+              icon={RiVipCrownLine} label="订阅用户" value={stats?.subscribedUsers}
+              sub="总用户" subValue={stats?.users}
+              href="/admin/users"
+              color="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
+            />
+          )}
           {(stats?.totalOrders ?? 0) > 0 && (
             <StatCard
               icon={RiBankCardLine} label="支付订单" value={stats?.totalOrders}
@@ -224,105 +308,78 @@ export default function AdminIndexPage() {
               color="bg-teal-100 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400"
             />
           )}
-          {(stats?.totalOrders ?? 0) > 0 && (
-            <StatCard
-              icon={RiCheckDoubleLine} label="已完成订单" value={stats?.paidOrders}
-              href="/admin/payment/orders"
-              color="bg-green-100 dark:bg-green-950/40 text-green-600 dark:text-green-400"
-            />
-          )}
-          {(stats?.paidRevenue ?? 0) > 0 && (
-            <button
-              type="button"
-              onClick={() => router.push("/admin/payment/orders", undefined, { locale: false })}
-              className="glass-panel border border-border rounded-2xl p-5 flex items-start gap-4 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full active:scale-[0.98]"
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-lime-100 dark:bg-lime-950/40 text-lime-600 dark:text-lime-400">
-                <RiMoneyDollarCircleLine className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">已收营收</p>
-                <p className="text-2xl font-bold tabular-nums mt-0.5">¥{(stats?.paidRevenue ?? 0).toFixed(2)}</p>
-                <p className="text-[10px] text-muted-foreground/70 mt-0.5">来自 {stats?.paidOrders ?? 0} 笔已付款订单</p>
-              </div>
-              <RiArrowRightLine className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors mt-1" />
-            </button>
-          )}
         </div>
 
-        {/* Recent users */}
-        {stats?.recentUsers && stats.recentUsers.length > 0 && (
-          <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2 justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <RiTimeLine className="w-4 h-4 text-primary" />最近注册
-              </h3>
-              <button onClick={() => router.push("/admin/users", undefined, { locale: false })} className="text-xs text-primary hover:underline">查看全部</button>
-            </div>
-            <div className="space-y-2">
-              {stats.recentUsers.map(u => (
-                <div key={u.id} className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center shrink-0">
-                    <RiUserLine className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{u.name || u.email}</p>
-                    {u.name && <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {u.disabled && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-semibold">停用</span>
-                    )}
-                    <span className="text-[10px] text-muted-foreground">{fmt(u.created_at)}</span>
-                  </div>
+        {/* Recent users + searches side by side */}
+        {(stats?.recentUsers?.length ?? 0) > 0 || (stats?.recentSearches?.length ?? 0) > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {stats?.recentUsers && stats.recentUsers.length > 0 && (
+              <div className="glass-panel border border-border rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center gap-2 justify-between">
+                  <h3 className="text-xs font-bold flex items-center gap-1.5">
+                    <RiTimeLine className="w-3.5 h-3.5 text-primary" />最近注册
+                  </h3>
+                  <button onClick={() => router.push("/admin/users", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">全部</button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent searches */}
-        {stats?.recentSearches && stats.recentSearches.length > 0 && (
-          <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2 justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <RiSearchLine className="w-4 h-4 text-primary" />最近查询
-              </h3>
-              <button onClick={() => router.push("/admin/search-records", undefined, { locale: false })} className="text-xs text-primary hover:underline">查看全部</button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {stats.recentSearches.map(s => (
-                <div key={s.id} className="flex items-center gap-1.5 glass-panel border border-border/60 rounded-lg px-2.5 py-1.5">
-                  {!s.user_id && <RiGhostLine className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />}
-                  <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0">{s.query_type}</span>
-                  <span className="text-xs font-mono font-semibold truncate max-w-[120px]">{s.query}</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">{fmt(s.created_at)}</span>
+                <div className="space-y-1.5">
+                  {stats.recentUsers.map(u => (
+                    <div key={u.id} className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center shrink-0">
+                        <RiUserLine className="w-3 h-3 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold truncate">{u.name || u.email}</p>
+                        {u.name && <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {u.disabled && (
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-semibold">停用</span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">{fmt(u.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Quick actions */}
-        <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+            {stats?.recentSearches && stats.recentSearches.length > 0 && (
+              <div className="glass-panel border border-border rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center gap-2 justify-between">
+                  <h3 className="text-xs font-bold flex items-center gap-1.5">
+                    <RiSearchLine className="w-3.5 h-3.5 text-primary" />最近查询
+                  </h3>
+                  <button onClick={() => router.push("/admin/search-records", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">全部</button>
+                </div>
+                <div className="space-y-1">
+                  {stats.recentSearches.map(s => (
+                    <div key={s.id} className="flex items-center gap-1.5 rounded-lg px-0 py-0.5">
+                      {!s.user_id && <RiGhostLine className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />}
+                      <span className="text-[9px] text-muted-foreground uppercase font-mono shrink-0 w-9">{s.query_type}</span>
+                      <span className="text-[11px] font-mono font-semibold truncate flex-1">{s.query}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{fmt(s.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {/* Quick actions — grouped */}
+        <div className="glass-panel border border-border rounded-2xl p-4 space-y-4">
           <h3 className="text-sm font-bold flex items-center gap-2">
-            <RiSettings4Line className="w-4 h-4 text-primary" />快捷操作
+            <RiSettings4Line className="w-4 h-4 text-primary" />功能导航
           </h3>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {QUICK_ACTIONS.map(({ href, label, desc, icon: Icon, color }) => (
-              <button
-                key={href}
-                type="button"
-                onClick={() => router.push(href, undefined, { locale: false })}
-                className="glass-panel border border-border/60 rounded-xl p-2.5 sm:p-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left active:scale-[0.98]"
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${color} mb-1.5`} />
-                <p className="text-xs font-semibold group-hover:text-primary transition-colors leading-tight">{label}</p>
-                <p className="text-[10px] text-muted-foreground leading-snug mt-0.5 hidden sm:block">{desc}</p>
-              </button>
+          <div className="space-y-4 divide-y divide-border/40">
+            {ACTION_GROUPS.map((group, i) => (
+              <div key={group.label} className={i > 0 ? "pt-4" : ""}>
+                <QuickActionGroup group={group} />
+              </div>
             ))}
           </div>
         </div>
+
       </div>
     </AdminLayout>
   );
