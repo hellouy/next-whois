@@ -559,6 +559,30 @@ function Toggle({ value, onChange, onColor }: { value: boolean; onChange: (v: bo
   );
 }
 
+const ALL_TEMPLATES = [
+  { key: "all",              label: "全部模版（17封）" },
+  { key: "welcome",         label: "欢迎邮件" },
+  { key: "subscription",    label: "域名监控订阅确认" },
+  { key: "reminder",        label: "域名到期提醒" },
+  { key: "phase_grace",     label: "宽限期通知" },
+  { key: "phase_redemption",label: "赎回期通知" },
+  { key: "phase_pending",   label: "待删除期通知" },
+  { key: "drop_approaching",label: "域名即将可抢注" },
+  { key: "dropped",         label: "域名已可注册" },
+  { key: "password_reset",  label: "密码重置" },
+  { key: "password_changed",label: "密码已修改（安全通知）" },
+  { key: "verify_code",     label: "邮箱验证码" },
+  { key: "admin_notify",    label: "管理员系统通知" },
+  { key: "admin_broadcast", label: "管理员广播" },
+  { key: "payment_confirm", label: "支付确认" },
+  { key: "high_value",      label: "高价值域名告警" },
+  { key: "stamp_timeout",   label: "时间戳验证超时" },
+  { key: "feedback",        label: "用户反馈通知" },
+];
+
+type TplResult = { key: string; subject: string; ok: boolean; error?: string };
+type QueueStats = { pending: number; sent: number; failed: number; total: number };
+
 export default function AdminSettingsPage() {
   const [form, setForm] = React.useState<SiteSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = React.useState<SiteSettings>(DEFAULT_SETTINGS);
@@ -567,6 +591,17 @@ export default function AdminSettingsPage() {
   const [testingEmail, setTestingEmail] = React.useState(false);
   const [emailOk, setEmailOk] = React.useState<boolean | null>(null);
   const [activeSection, setActiveSection] = React.useState("branding");
+
+  // ── template preview sender ─────────────────────────────────────────────
+  const [tplRecipient, setTplRecipient] = React.useState("");
+  const [tplSelected, setTplSelected]   = React.useState("all");
+  const [tplSending, setTplSending]     = React.useState(false);
+  const [tplResults, setTplResults]     = React.useState<TplResult[] | null>(null);
+
+  // ── email queue stats ───────────────────────────────────────────────────
+  const [queueStats, setQueueStats]         = React.useState<QueueStats | null>(null);
+  const [queueLoading, setQueueLoading]     = React.useState(false);
+  const [queueProcessing, setQueueProcessing] = React.useState(false);
 
   const isDirty = !loading && JSON.stringify(form) !== JSON.stringify(saved);
 
@@ -594,6 +629,67 @@ export default function AdminSettingsPage() {
       toast.error("网络错误，发送失败");
     } finally {
       setTestingEmail(false);
+    }
+  }
+
+  async function handleSendTemplates() {
+    if (!tplRecipient.trim()) {
+      toast.error("请输入收件人邮箱");
+      return;
+    }
+    setTplSending(true);
+    setTplResults(null);
+    try {
+      const res  = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: tplRecipient.trim(), template: tplSelected }),
+      });
+      const data = await res.json();
+      if (data.results) setTplResults(data.results);
+      if (data.sent > 0) {
+        toast.success(`已发送 ${data.sent}/${data.total} 封模版预览至 ${data.to}`);
+      } else {
+        toast.error(data.error || "所有邮件发送失败，请检查邮件服务配置");
+      }
+    } catch {
+      toast.error("网络错误，发送失败");
+    } finally {
+      setTplSending(false);
+    }
+  }
+
+  async function loadQueueStats() {
+    setQueueLoading(true);
+    try {
+      // limit=0 → no emails processed, just returns current stats
+      const res  = await fetch("/api/admin/process-email-queue?limit=0", { method: "POST" });
+      const data = await res.json();
+      if (data.stats) setQueueStats(data.stats);
+    } catch {
+      toast.error("加载队列统计失败");
+    } finally {
+      setQueueLoading(false);
+    }
+  }
+
+  async function handleProcessQueue(requeue = false) {
+    setQueueProcessing(true);
+    try {
+      const res  = await fetch(
+        `/api/admin/process-email-queue${requeue ? "?requeue=1" : ""}`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (data.stats) setQueueStats(data.stats);
+      toast.success(
+        `队列处理完成：发送 ${data.sent}，重试计划 ${data.retried}，永久失败 ${data.failed}` +
+        (requeue ? `（已重置 ${data.requeued} 条失败记录）` : ""),
+      );
+    } catch {
+      toast.error("队列处理失败");
+    } finally {
+      setQueueProcessing(false);
     }
   }
 
@@ -1041,18 +1137,18 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
 
-                  {/* Test email */}
+                  {/* Test email — quick smoke-test */}
                   <div className="glass-panel border border-border rounded-2xl overflow-hidden">
                     <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/30">
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
                         <RiCheckLine className="w-3.5 h-3.5" />
                       </div>
-                      <h3 className="text-sm font-bold">测试邮件发送</h3>
+                      <h3 className="text-sm font-bold">快速连通性测试</h3>
                     </div>
                     <div className="p-5 space-y-3">
                       <p className="text-xs text-muted-foreground">
-                        向管理员账号邮箱发送一封测试邮件，验证当前配置是否正常。SMTP 已启用时使用 SMTP，否则使用 Resend。
-                        <br />请先保存设置后再测试。
+                        向当前管理员账号邮箱发送一封测试邮件，验证 SMTP / Resend 是否正常。
+                        请先保存设置后再测试。
                       </p>
                       {emailOk === true && (
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -1074,6 +1170,168 @@ export default function AdminSettingsPage() {
                           ? <><RiLoader4Line className="w-4 h-4 animate-spin" />发送中…</>
                           : <><RiMailSendLine className="w-4 h-4" />发送测试邮件</>}
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Template preview sender */}
+                  <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 flex items-center gap-2.5 border-b border-border bg-muted/30">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
+                        <RiMailSendLine className="w-3.5 h-3.5" />
+                      </div>
+                      <h3 className="text-sm font-bold">邮件模版预览发送</h3>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        向指定邮箱发送一个或全部通知邮件模版的预览，用于检查模版显示效果。
+                        发送前请确保已保存邮件服务配置（SMTP 或 Resend API Key）。
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label className="text-xs mb-1 block">收件人邮箱</Label>
+                          <Input
+                            type="email"
+                            value={tplRecipient}
+                            onChange={e => setTplRecipient(e.target.value)}
+                            placeholder="admin@example.com"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1 block">选择模版</Label>
+                          <select
+                            value={tplSelected}
+                            onChange={e => { setTplSelected(e.target.value); setTplResults(null); }}
+                            className="w-full h-8 px-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+                          >
+                            {ALL_TEMPLATES.map(t => (
+                              <option key={t.key} value={t.key}>{t.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleSendTemplates}
+                        disabled={tplSending || !tplRecipient.trim()}
+                        className="rounded-xl h-9 gap-2"
+                      >
+                        {tplSending
+                          ? <><RiLoader4Line className="w-4 h-4 animate-spin" />发送中…</>
+                          : <><RiMailSendLine className="w-4 h-4" />
+                            {tplSelected === "all" ? "发送全部 17 封预览" : "发送预览邮件"}
+                          </>}
+                      </Button>
+
+                      {/* Results list */}
+                      {tplResults && tplResults.length > 0 && (
+                        <div className="border border-border rounded-xl overflow-hidden text-xs">
+                          <div className="px-3 py-2 bg-muted/40 border-b border-border font-semibold flex justify-between">
+                            <span>发送结果</span>
+                            <span>
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                ✓ {tplResults.filter(r => r.ok).length} 成功
+                              </span>
+                              {tplResults.some(r => !r.ok) && (
+                                <span className="text-destructive ml-3">
+                                  ✗ {tplResults.filter(r => !r.ok).length} 失败（已入队等待重试）
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="max-h-52 overflow-y-auto divide-y divide-border">
+                            {tplResults.map(r => (
+                              <div key={r.key} className="px-3 py-2 flex items-start gap-2">
+                                <span className={r.ok ? "text-emerald-500 mt-0.5" : "text-destructive mt-0.5"}>
+                                  {r.ok ? "✓" : "✗"}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-mono text-[11px] text-muted-foreground">[{r.key}]</span>
+                                  <span className="ml-1 truncate">{r.subject}</span>
+                                  {r.error && (
+                                    <p className="text-[11px] text-destructive mt-0.5 truncate">{r.error}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Email queue panel */}
+                  <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 flex items-center justify-between border-b border-border bg-muted/30">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                          <RiHistoryLine className="w-3.5 h-3.5" />
+                        </div>
+                        <h3 className="text-sm font-bold">邮件发送队列</h3>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadQueueStats}
+                        disabled={queueLoading}
+                        className="h-7 px-2 rounded-lg text-xs gap-1"
+                      >
+                        {queueLoading
+                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                          : <RiRefreshLine className="w-3.5 h-3.5" />}
+                        刷新
+                      </Button>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        发送失败的邮件会自动写入队列，按指数退避（2/4/8/16 分钟）最多重试 5 次。
+                        可在此手动触发立即补发，或将全部失败记录重置为待发。
+                      </p>
+
+                      {/* Stats grid */}
+                      {queueStats ? (
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          {[
+                            { label: "待发送", value: queueStats.pending, color: "text-amber-600 dark:text-amber-400" },
+                            { label: "已发送", value: queueStats.sent,    color: "text-emerald-600 dark:text-emerald-400" },
+                            { label: "已失败", value: queueStats.failed,  color: "text-destructive" },
+                            { label: "总计",   value: queueStats.total,   color: "text-foreground" },
+                          ].map(s => (
+                            <div key={s.label} className="bg-muted/40 rounded-xl py-3">
+                              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">点击「刷新」查看队列统计</p>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleProcessQueue(false)}
+                          disabled={queueProcessing}
+                          className="rounded-xl h-9 gap-2 text-sm"
+                        >
+                          {queueProcessing
+                            ? <RiLoader4Line className="w-4 h-4 animate-spin" />
+                            : <RiMailSendLine className="w-4 h-4" />}
+                          立即处理队列
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleProcessQueue(true)}
+                          disabled={queueProcessing}
+                          className="rounded-xl h-9 gap-2 text-sm text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                        >
+                          {queueProcessing
+                            ? <RiLoader4Line className="w-4 h-4 animate-spin" />
+                            : <RiRefreshLine className="w-4 h-4" />}
+                          重置失败并重发
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
