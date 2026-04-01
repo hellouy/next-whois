@@ -1242,3 +1242,8 @@ export const GTLD_RDAP_BOOTSTRAP: Record<string, string> = {
 export function getGtldRdapServer(tld: string): string | undefined {
   return GTLD_RDAP_BOOTSTRAP[tld.toLowerCase()];
 }
+
+/** Return a copy of the full gTLD → RDAP URL map. */
+export function getAllGtldRdapServers(): Record<string, string> {
+  return { ...GTLD_RDAP_BOOTSTRAP };
+}

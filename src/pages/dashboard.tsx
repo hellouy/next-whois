@@ -693,7 +693,7 @@ function invalidateDashCache() {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data: session, status, update: updateSession } = useSession();
   const siteSettings = useSiteSettings();
   const paymentEnabled = !!(siteSettings.payment_stripe_enabled || siteSettings.payment_xunhupay_enabled || siteSettings.payment_alipay_enabled || siteSettings.payment_paypal_enabled);

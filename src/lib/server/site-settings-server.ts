@@ -3,7 +3,7 @@
  * Reads individual settings from the DB with short in-process caching.
  * Use this in API handlers to enforce admin-configured toggles.
  */
-import { one } from "@/lib/db-query";
+import { one, many } from "@/lib/db-query";
 
 interface CacheEntry {
   value: string;
