@@ -233,7 +233,7 @@ export default function OgStylesPage({ initialEnabledStyles, initialBrandName, i
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "og_enabled_styles", value }),
+        body: JSON.stringify({ og_enabled_styles: value }),
       });
       if (!res.ok) throw new Error("保存失败");
       setSavedEnabled(new Set(enabled));

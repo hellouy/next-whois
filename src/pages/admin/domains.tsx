@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LIFECYCLE_TABLE } from "@/lib/lifecycle";
+import IANA_TLDS from "@/data/iana-tlds.json";
 import {
   RiTimeLine, RiGlobalLine,
   RiEditLine, RiDeleteBinLine, RiLoader4Line, RiRefreshLine, RiSearchLine,
@@ -148,22 +149,46 @@ function LifecycleTab() {
   const allTlds: TldRow[] = React.useMemo(() => {
     const map: Record<string, DbOverride> = {};
     for (const ov of overrides) map[ov.tld] = ov;
-    const result: TldRow[] = Object.entries(LIFECYCLE_TABLE).map(([tld, entry]) => {
+
+    const seen = new Set<string>();
+    const result: TldRow[] = [];
+
+    // 1. TLDs with curated lifecycle data
+    for (const [tld, entry] of Object.entries(LIFECYCLE_TABLE)) {
+      seen.add(tld);
       const ov = map[tld];
-      return {
+      result.push({
         tld, grace: ov ? ov.grace : entry.grace,
         redemption: ov ? ov.redemption : entry.redemption,
         pendingDelete: ov ? ov.pending_delete : entry.pendingDelete,
         registry: ov ? (ov.registry ?? entry.registry ?? null) : (entry.registry ?? null),
         notes: ov?.notes ?? null, modified: !!ov, dbId: ov?.id ?? null,
-      };
-    });
+      });
+    }
+
+    // 2. Remaining IANA TLDs (default 30/30/5 — ICANN standard)
+    for (const tld of IANA_TLDS as string[]) {
+      if (seen.has(tld)) continue;
+      seen.add(tld);
+      const ov = map[tld];
+      result.push({
+        tld, grace: ov ? ov.grace : 30,
+        redemption: ov ? ov.redemption : 30,
+        pendingDelete: ov ? ov.pending_delete : 5,
+        registry: ov?.registry ?? null,
+        notes: ov?.notes ?? null, modified: !!ov, dbId: ov?.id ?? null,
+      });
+    }
+
+    // 3. DB overrides for TLDs not in either list
     for (const ov of overrides) {
-      if (!LIFECYCLE_TABLE[ov.tld]) {
-        result.push({ tld: ov.tld, grace: ov.grace, redemption: ov.redemption, pendingDelete: ov.pending_delete,
-          registry: ov.registry, notes: ov.notes, modified: true, dbId: ov.id });
+      if (!seen.has(ov.tld)) {
+        result.push({ tld: ov.tld, grace: ov.grace, redemption: ov.redemption,
+          pendingDelete: ov.pending_delete, registry: ov.registry,
+          notes: ov.notes, modified: true, dbId: ov.id });
       }
     }
+
     return result.sort((a, b) => a.tld.localeCompare(b.tld));
   }, [overrides]);
 

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, run } from "@/lib/db-query";
+import { requireAdmin } from "@/lib/admin";
 
 const DEFAULT_BRAND_NAME = "RDAP+WHOIS";
 const DEFAULT_TAGLINE    = "WHOIS / RDAP · Domain Lookup Tool";
@@ -66,6 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "PUT") {
+    const session = await requireAdmin(req, res);
+    if (!session) return;
     const { brand_name, tagline } = req.body as { brand_name?: string; tagline?: string };
     try {
       if (brand_name !== undefined) {

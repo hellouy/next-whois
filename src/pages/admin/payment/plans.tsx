@@ -12,7 +12,9 @@ import {
   RiPriceTag3Line, RiAddLine, RiDeleteBinLine, RiPencilLine,
   RiCheckLine, RiCloseLine, RiLoader4Line, RiToggleLine, RiToggleFill,
   RiMoneyDollarCircleLine, RiCalendarLine, RiStarLine,
+  RiAlipayLine, RiPaypalLine, RiBankCardLine, RiExternalLinkLine,
 } from "@remixicon/react";
+import Link from "next/link";
 
 const PAYMENT_TABS = [
   { href: "/admin/payment/plans",  label: "套餐管理" },
@@ -139,19 +141,39 @@ function PlanForm({ initial, onSave, onCancel, saving }: {
   );
 }
 
+type PaySettings = {
+  payment_stripe_enabled: string;
+  payment_xunhupay_enabled: string;
+  payment_alipay_enabled: string;
+  payment_paypal_enabled: string;
+};
+
+const CHANNELS = [
+  { key: "payment_stripe_enabled",   label: "Stripe",    hint: "信用卡 / 借记卡",  Icon: RiBankCardLine,  color: "text-violet-600" },
+  { key: "payment_xunhupay_enabled", label: "虎皮椒",   hint: "微信支付",          Icon: RiMoneyDollarCircleLine, color: "text-green-600" },
+  { key: "payment_alipay_enabled",   label: "支付宝",   hint: "Alipay",           Icon: RiAlipayLine,    color: "text-sky-600" },
+  { key: "payment_paypal_enabled",   label: "PayPal",   hint: "国际信用卡",        Icon: RiPaypalLine,    color: "text-blue-600" },
+] as const;
+
 export default function PaymentPlansAdmin() {
   const [plans, setPlans] = React.useState<Plan[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [showCreate, setShowCreate] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
+  const [paySettings, setPaySettings] = React.useState<PaySettings | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      const r = await fetch("/api/admin/payment/plans");
-      const d = await r.json();
-      setPlans(d.plans ?? []);
+      const [pr, sr] = await Promise.all([
+        fetch("/api/admin/payment/plans"),
+        fetch("/api/admin/settings"),
+      ]);
+      const pd = await pr.json();
+      const sd = await sr.json();
+      setPlans(pd.plans ?? []);
+      setPaySettings(sd.settings ?? null);
     } catch { toast.error("加载失败"); }
     finally { setLoading(false); }
   }
@@ -327,16 +349,54 @@ export default function PaymentPlansAdmin() {
           </div>
         )}
 
-        <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-            <RiStarLine className="w-3.5 h-3.5" />支付渠道配置
-          </h3>
-          <p className="text-xs text-muted-foreground">在「设置」页面的「支付网关」区块中配置各渠道的 API Key 和 Secret，并选择开启的渠道。</p>
-          <p className="text-xs text-muted-foreground">Webhook 地址：</p>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {["/api/payment/webhook/stripe", "/api/payment/webhook/xunhupay", "/api/payment/webhook/alipay", "/api/payment/webhook/paypal"].map(url => (
-              <code key={url} className="bg-muted px-1.5 py-0.5 rounded text-[11px] break-all">{url}</code>
-            ))}
+        <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <RiStarLine className="w-3.5 h-3.5" />支持的支付方式
+            </h3>
+            <Link href="/admin/settings#payment" className="text-[11px] text-primary flex items-center gap-0.5 hover:underline">
+              配置密钥 <RiExternalLinkLine className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {CHANNELS.map(({ key, label, hint, Icon, color }) => {
+              const enabled = paySettings?.[key as keyof PaySettings] === "true";
+              return (
+                <div key={key} className={cn(
+                  "flex items-center gap-2.5 rounded-lg border p-2.5 transition-colors",
+                  enabled ? "border-border bg-background" : "border-border/40 bg-muted/30 opacity-60"
+                )}>
+                  <span className={cn("flex-shrink-0", enabled ? color : "text-muted-foreground")}>
+                    <Icon className="w-5 h-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold leading-none">{label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>
+                  </div>
+                  <span className={cn("ml-auto flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                    enabled ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400"
+                            : "bg-muted text-muted-foreground")}>
+                    {enabled ? "已开启" : "未启用"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="pt-1">
+            <p className="text-[10px] text-muted-foreground font-medium mb-1">Webhook 回调地址：</p>
+            <div className="flex flex-col gap-1">
+              {[
+                { path: "/api/payment/webhook/stripe",   label: "Stripe" },
+                { path: "/api/payment/webhook/xunhupay", label: "虎皮椒" },
+                { path: "/api/payment/webhook/alipay",   label: "支付宝" },
+                { path: "/api/payment/webhook/paypal",   label: "PayPal" },
+              ].map(({ path, label }) => (
+                <div key={path} className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground w-10 flex-shrink-0">{label}</span>
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] break-all flex-1">{path}</code>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
