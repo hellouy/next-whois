@@ -349,6 +349,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes   TEXT`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repaired_at   TIMESTAMPTZ`,
   `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source         TEXT`,
+  `ALTER TABLE users             ADD COLUMN IF NOT EXISTS locale          TEXT NOT NULL DEFAULT 'zh'`,
 ];
 
 const CREATE_INDEXES = [

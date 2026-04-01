@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useLayoutEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 
 export const LOCALES = ["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -55,20 +56,29 @@ interface LocaleProviderProps {
 }
 
 export function LocaleProvider({ children, initialLocale }: LocaleProviderProps) {
-  // Use server-detected locale (if available) so the first render is correct.
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
+  const { data: session } = useSession();
+  const persistedRef = useRef<string | null>(null);
 
   useIsomorphicLayoutEffect(() => {
-    // Sync with client-side detection BEFORE first paint.
-    // Picks up NEXT_LOCALE cookie changes between SSR and hydration.
-    // Using useLayoutEffect (not useEffect) means any English→Chinese switch
-    // happens before the browser draws, so the user never sees a language flash.
     const clientLocale = detectClientLocale();
     if (clientLocale !== locale) {
       setLocaleState(clientLocale);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // When a logged-in user's locale changes, persist it to the DB (debounced)
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    if (persistedRef.current === locale) return;
+    persistedRef.current = locale;
+    fetch("/api/user/update-locale", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale }),
+    }).catch(() => {});
+  }, [locale, session?.user?.email]);
 
   const setLocale = (newLocale: Locale) => {
     document.cookie = `NEXT_LOCALE=${newLocale};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;

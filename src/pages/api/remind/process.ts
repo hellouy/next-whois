@@ -12,6 +12,7 @@ import {
   PENDING_KEY,
 } from "@/lib/lifecycle";
 import { many, run, isDbReady } from "@/lib/db-query";
+import { getEmailStrings } from "@/lib/email-strings";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -136,6 +137,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
        FROM reminders WHERE active = true AND expiration_date IS NOT NULL`,
     );
 
+    // Batch-fetch user locales so each email can be sent in the user's language
+    const uniqueEmails = [...new Set(remindersRaw.map((r) => r.email))];
+    const userLocaleRows = uniqueEmails.length > 0
+      ? await many<{ email: string; locale: string }>(
+          `SELECT email, locale FROM users WHERE email = ANY($1::text[])`,
+          [uniqueEmails],
+        ).catch(() => [] as { email: string; locale: string }[])
+      : [];
+    const localeMap = new Map<string, string>(userLocaleRows.map((r) => [r.email, r.locale]));
+
     // Refresh WHOIS data for near-expiry domains with stale sync dates (non-blocking batch)
     const whoisRefreshed = await refreshStaleWhoisDates(remindersRaw).catch((e) => {
       console.warn("[process] WHOIS batch refresh error:", e?.message ?? e);
@@ -216,16 +227,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
 
         // ── Domain dropped: send notification then deactivate ─────────────────
+        const locale = localeMap.get(reminder.email) || "zh";
+        const ls = getEmailStrings(locale);
         if (phase === "dropped") {
           if (phaseFlags.dropped && !sentKeys.includes(DROPPED_KEY)) {
             await sendEmail({
               to: reminder.email,
-              subject: `✅ ${reminder.domain} 已释放，现在可以注册了`,
+              subject: ls.subj_dropped(reminder.domain),
               html: domainDroppedHtml({
                 domain: reminder.domain,
                 expirationDate: reminder.expiration_date,
                 cancelToken: reminder.cancel_token,
                 siteName,
+                locale,
               }),
             });
             await upsertLog(DROPPED_KEY);
@@ -262,7 +276,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (phaseFlags.grace && phase === "grace" && cfg.grace > 0 && !sentKeys.includes(GRACE_KEY)) {
           await sendEmail({
             to: reminder.email,
-            subject: `⏰ ${reminder.domain} 已进入宽限期，请尽快续费`,
+            subject: ls.subj_grace(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
               phase: "grace",
@@ -272,6 +286,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               registrar: reminder.registrar,
               creationDate: reminder.creation_date,
               siteName,
+              locale,
             }),
           });
           await upsertLog(GRACE_KEY);
@@ -283,7 +298,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!didSend && phaseFlags.redemption && phase === "redemption" && cfg.redemption > 0 && !sentKeys.includes(REDEMPTION_KEY)) {
           await sendEmail({
             to: reminder.email,
-            subject: `🚨 ${reminder.domain} 已进入赎回期，赎回费用较高`,
+            subject: ls.subj_redemption(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
               phase: "redemption",
@@ -294,6 +309,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               registrar: reminder.registrar,
               creationDate: reminder.creation_date,
               siteName,
+              locale,
             }),
           });
           await upsertLog(REDEMPTION_KEY);
@@ -305,7 +321,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!didSend && phaseFlags.pendingDelete && phase === "pendingDelete" && cfg.pendingDelete > 0 && !sentKeys.includes(PENDING_KEY)) {
           await sendEmail({
             to: reminder.email,
-            subject: `❌ ${reminder.domain} 即将被删除，域名进入待删除期`,
+            subject: ls.subj_pending(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
               phase: "pendingDelete",
@@ -315,6 +331,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               registrar: reminder.registrar,
               creationDate: reminder.creation_date,
               siteName,
+              locale,
             }),
           });
           await upsertLog(PENDING_KEY);
@@ -326,7 +343,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!didSend && phaseFlags.dropSoon && phase === "pendingDelete" && daysToDropDate <= 7 && !sentKeys.includes(DROP_SOON_KEY)) {
           await sendEmail({
             to: reminder.email,
-            subject: `⚡ ${reminder.domain} 将在 ${daysToDropDate} 天后可抢注`,
+            subject: ls.subj_drop_soon(reminder.domain, daysToDropDate),
             html: dropApproachingHtml({
               domain: reminder.domain,
               expirationDate: reminder.expiration_date,
@@ -334,6 +351,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               daysToDropDate,
               cancelToken: reminder.cancel_token,
               siteName,
+              locale,
             }),
           });
           await upsertLog(DROP_SOON_KEY);
@@ -345,13 +363,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!didSend && phase === "active") {
           for (const threshold of thresholds) {
             if (daysToExpiry <= threshold && !sentKeys.includes(threshold)) {
-              const urgencyLabel =
-                daysToExpiry <= 5 ? "🔴 紧急" :
-                daysToExpiry <= 10 ? "🟠 临近" : "📅";
+              const subject =
+                daysToExpiry <= 5  ? ls.subj_reminder_urgent(reminder.domain, daysToExpiry) :
+                daysToExpiry <= 10 ? ls.subj_reminder_warn(reminder.domain, daysToExpiry)   :
+                                     ls.subj_reminder(reminder.domain, daysToExpiry);
 
               await sendEmail({
                 to: reminder.email,
-                subject: `${urgencyLabel} ${reminder.domain} 将在 ${daysToExpiry} 天后到期`,
+                subject,
                 html: reminderHtml({
                   domain: reminder.domain,
                   expirationDate: reminder.expiration_date,
@@ -361,6 +380,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   creationDate: reminder.creation_date,
                   nameservers: reminder.nameservers,
                   siteName,
+                  locale,
                 }),
               });
               await upsertLog(threshold);

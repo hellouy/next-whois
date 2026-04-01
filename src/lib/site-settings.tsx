@@ -325,7 +325,7 @@ export function SiteSettingsProvider({
     function onUpdate() { fetchSettings(); }
     window.addEventListener("site-settings-updated", onUpdate);
 
-    const timer = setInterval(fetchSettings, 60_000);
+    const timer = setInterval(fetchSettings, 300_000);
 
     return () => {
       clearTimeout(initialDelay);

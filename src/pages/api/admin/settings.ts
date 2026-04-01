@@ -86,10 +86,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
       }
-      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader(
+        "Cache-Control",
+        admin ? "private, no-store" : "private, max-age=60, stale-while-revalidate=300",
+      );
       return res.json({ settings: { ...DEFAULT_SETTINGS, ...settings } });
     } catch {
-      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
       return res.json({ settings: DEFAULT_SETTINGS });
     }
   }

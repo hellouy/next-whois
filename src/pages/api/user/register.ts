@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, welcomeHtml, getSiteLabel } from "@/lib/email";
+import { localeFromCookieHeader, localeFromAcceptHeader, getEmailStrings } from "@/lib/email-strings";
 import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
 import { getCaptchaConfig, verifyCaptchaToken } from "@/lib/server/captcha";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -81,10 +82,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cleanName = name ? String(name).trim().slice(0, 50) || null : null;
   const subscriptionAccess = codeRow !== null;
 
+  const locale = localeFromCookieHeader(req.headers.cookie) ||
+                 localeFromAcceptHeader(req.headers["accept-language"]);
+
   try {
     await run(
-      "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used) VALUES ($1, $2, $3, $4, $5, $6)",
-      [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null],
+      "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used, locale) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null, locale],
     );
   } catch (err: any) {
     if (err.code === "23505") {
@@ -110,10 +114,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   getSiteLabel().then((siteName) => {
+    const s = getEmailStrings(locale);
     sendEmail({
       to: cleanEmail,
-      subject: `欢迎加入 ${siteName} 🎉`,
-      html: welcomeHtml({ name: cleanName, email: cleanEmail, siteName }),
+      subject: s.subj_welcome(siteName),
+      html: welcomeHtml({ name: cleanName, email: cleanEmail, siteName, locale }),
     });
   }).catch((e) => console.error("[register] welcome email error:", e));
 

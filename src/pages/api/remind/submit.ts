@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendEmail, subscriptionConfirmHtml, getSiteLabel } from "@/lib/email";
+import { localeFromCookieHeader, getEmailStrings } from "@/lib/email-strings";
 import { computeLifecycle, fmtDate } from "@/lib/lifecycle";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
@@ -233,11 +234,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const siteName = await getSiteLabel().catch(() => "X.RW");
   const isRestricted = regStatusType === "prohibited" || regStatusType === "reserved";
+  const locale = localeFromCookieHeader(req.headers.cookie) || "zh";
+  const s = getEmailStrings(locale);
   await sendEmail({
     to: cleanEmail,
     subject: isRestricted
-      ? `✅ 域名状态变化订阅已设置 · ${cleanDomain}`
-      : `✅ 域名订阅已设置 · ${cleanDomain}`,
+      ? s.subj_sub_restricted(cleanDomain)
+      : s.subj_sub_confirm(cleanDomain),
     html: subscriptionConfirmHtml({
       domain: cleanDomain,
       expirationDate: verifiedExpDate,
@@ -246,6 +249,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       regStatusType: regStatusType ? String(regStatusType) : undefined,
       lifecycle: lifecycleInfo,
       siteName,
+      locale,
     }),
   });
 

@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { localeFromCookieHeader, getEmailStrings } from "@/lib/email-strings";
 
 const RESET_EXPIRES_MINUTES = 60;
 const SITE_URL =
@@ -27,9 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
 
-  const user = await one<{ id: string }>("SELECT id FROM users WHERE email = $1", [cleanEmail]);
+  const user = await one<{ id: string; locale: string | null }>(
+    "SELECT id, locale FROM users WHERE email = $1",
+    [cleanEmail],
+  );
   // Always return ok to prevent email enumeration
   if (!user) return res.status(200).json({ ok: true });
+
+  const locale = user.locale || localeFromCookieHeader(req.headers.cookie) || "zh";
 
   await run(
     "UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false",
@@ -52,11 +58,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
   const siteName = await getSiteLabel().catch(() => "X.RW");
+  const s = getEmailStrings(locale);
   try {
     await sendEmail({
       to: cleanEmail,
-      subject: `重置你的 ${siteName} 密码`,
-      html: passwordResetHtml({ resetUrl, siteName }),
+      subject: s.subj_password_reset(siteName),
+      html: passwordResetHtml({ resetUrl, siteName, locale }),
     });
   } catch (e) {
     console.error("[forgot-password] Failed to send email:", e);
