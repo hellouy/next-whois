@@ -1,8 +1,6 @@
-import { LOOKUP_TIMEOUT } from "@/lib/env";
 import { WhoisRawResult, WhoisAnalyzeResult } from "@/lib/whois/types";
 import { queryWhoisTcp } from "@/lib/whois/whois-transport";
-import { setDiscoveredServer, isTldKnownNoServer, getStaticWhoisServer } from "@/lib/whois/custom-servers";
-import { isIanaFallback } from "@/lib/whois/whois-patterns";
+import { setDiscoveredServer, tryCustomServerForDomain } from "@/lib/whois/custom-servers";
 
 let _whoiserPromise: Promise<typeof import("whoiser")> | null = null;
 const getWhoiser = () => {
@@ -40,32 +38,53 @@ export async function lookupIpOrAsn(query: string): Promise<WhoisRawResult> {
       /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(query)) {
     const ip = query.replace(/\/\d{1,3}$/, "");
     const { whoisIp } = await getWhoiser();
-    const data = await whoisIp(ip, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
+    const data = await whoisIp(ip, { timeout: 10_000 }) as Record<string, unknown>;
     return { raw: (data.__raw as string) || "", structured: data, server: "ip-whois" };
   }
   const asNum = parseInt(query.replace(/^AS/i, ""));
   const { whoisAsn } = await getWhoiser();
-  const data = await whoisAsn(asNum, { timeout: LOOKUP_TIMEOUT }) as Record<string, unknown>;
+  const data = await whoisAsn(asNum, { timeout: 10_000 }) as Record<string, unknown>;
   return { raw: (data.__raw as string) || "", structured: data, server: "asn-whois" };
 }
 
-// ── Referral chain helper ──────────────────────────────────────────────────────
-/**
- * Extract the "Registrar WHOIS Server" from registry WHOIS raw text.
- * Returns null if the server is the same as the one we already queried,
- * or if the line doesn't contain a valid hostname.
- */
-function extractRegistrarWhoisServer(raw: string, alreadyQueried: string): string | null {
-  const m = raw.match(/^\s*Registrar WHOIS Server:\s*(\S+)/im);
-  if (!m) return null;
-  const server = m[1].trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
-  if (!server || server === alreadyQueried.toLowerCase()) return null;
-  // Basic sanity: must look like a hostname (contains a dot, no spaces)
-  if (!server.includes(".") || /\s/.test(server)) return null;
-  return server;
+// ── Extract whoiser result into our WhoisRawResult shape ──────────────────────
+function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | null {
+  const servers = Object.keys(data ?? {});
+  if (servers.length === 0) return null;
+  const lastServer = servers[servers.length - 1];
+  const structured = (data[lastServer] as Record<string, unknown>) || {};
+  const rawParts: string[] = [];
+  for (const s of servers) {
+    const entry = data[s] as Record<string, unknown> | null;
+    if (entry?.__raw) {
+      rawParts.push(entry.__raw as string);
+    } else if (entry) {
+      const lines: string[] = [];
+      for (const [k, v] of Object.entries(entry)) {
+        if (k === "text" || k === "__raw" || k === "__comments") continue;
+        if (Array.isArray(v)) {
+          for (const item of v) lines.push(`${k}: ${item}`);
+        } else if (v !== undefined && v !== null && v !== "") {
+          lines.push(`${k}: ${v}`);
+        }
+      }
+      if (lines.length > 0) rawParts.push(lines.join("\n"));
+    }
+  }
+  return { raw: rawParts.join("\n\n") || "", structured, server: lastServer };
 }
 
-// ── Generic WHOIS (bootstrap list → whoiser library → IANA refer) ─────────────
+// ── Generic WHOIS (DB custom server → whoiser → IANA TCP) ─────────────────────
+//
+// Lookup priority:
+//   1. Admin-managed DB custom servers (manual supplements for broken TLDs,
+//      scrapers for special cases like .ba, hard-coded entries like .bn)
+//   2. whoiser — handles TLD server discovery and referral chain following
+//      natively; works on Vercel without a static server map
+//   3. IANA TCP fallback — whois.iana.org → refer: server as last resort
+//
+// The static whois-servers.json is NOT used here.  It is kept only for
+// admin reference display in the built-in servers admin page.
 export async function tryGenericWhoisForDomain(
   domainToQuery: string,
   tld: string,
@@ -73,85 +92,28 @@ export async function tryGenericWhoisForDomain(
   innerTimeout: number,
   follow: 1 | 2,
 ): Promise<WhoisRawResult> {
-  const bootstrapWhoisHost = getStaticWhoisServer(tld) ?? getStaticWhoisServer(tldSuffix);
+  // ① Admin DB custom server (manual supplement / scraper / special case)
+  const customResult = await tryCustomServerForDomain(
+    domainToQuery, tld, tldSuffix, innerTimeout,
+  );
+  if (customResult) return customResult;
 
-  if (!bootstrapWhoisHost) {
-    const knownNoServer = await isTldKnownNoServer(tld || tldSuffix).catch(() => false);
-    if (knownNoServer) {
-      throw new Error(`No public WHOIS server available for .${tld || tldSuffix} domains`);
-    }
-  }
   let primaryError: unknown = null;
 
-  if (bootstrapWhoisHost) {
-    try {
-      const raw = await queryWhoisTcp(bootstrapWhoisHost, 43, domainToQuery, innerTimeout);
-      if (raw && raw.trim().length > 0 && !isIanaFallback(raw)) {
-        // Follow registrar WHOIS referral if present — registry servers often
-        // return only minimal data and point to the registrar for full details.
-        const referralServer = extractRegistrarWhoisServer(raw, bootstrapWhoisHost);
-        if (referralServer) {
-          try {
-            const referralRaw = await queryWhoisTcp(
-              referralServer, 43, domainToQuery,
-              Math.min(innerTimeout, 6_000),
-            );
-            if (referralRaw && referralRaw.trim().length > 80) {
-              return {
-                raw: raw + "\n\n" + referralRaw,
-                structured: {},
-                server: referralServer,
-              };
-            }
-          } catch {
-            // Referral failed — proceed with registry data only
-          }
-        }
-        return { raw, structured: {}, server: bootstrapWhoisHost };
-      }
-    } catch (err) {
-      primaryError = err;
-    }
-  }
-
+  // ② whoiser — primary path; discovers WHOIS server for TLD automatically
+  //   and follows the registrar referral chain (follow=2) to get full data.
   const { whoisDomain } = await getWhoiser();
-
-  function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | null {
-    const servers = Object.keys(data ?? {});
-    if (servers.length === 0) return null;
-    const lastServer = servers[servers.length - 1];
-    const structured = (data[lastServer] as Record<string, unknown>) || {};
-    const rawParts: string[] = [];
-    for (const s of servers) {
-      const entry = data[s] as Record<string, unknown> | null;
-      if (entry?.__raw) {
-        rawParts.push(entry.__raw as string);
-      } else if (entry) {
-        const lines: string[] = [];
-        for (const [k, v] of Object.entries(entry)) {
-          if (k === "text" || k === "__raw" || k === "__comments") continue;
-          if (Array.isArray(v)) {
-            for (const item of v) lines.push(`${k}: ${item}`);
-          } else if (v !== undefined && v !== null && v !== "") {
-            lines.push(`${k}: ${v}`);
-          }
-        }
-        if (lines.length > 0) rawParts.push(lines.join("\n"));
-      }
-    }
-    return { raw: rawParts.join("\n\n") || "", structured, server: lastServer };
-  }
-
   try {
     const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
     const result = extractRawFromData(data as Record<string, unknown>);
     if (result && result.raw.trim().length > 0) return result;
   } catch (err) {
-    if (!primaryError) primaryError = err;
+    primaryError = err;
   }
 
+  // ③ IANA TCP fallback — ask whois.iana.org for the canonical server
   const ianaServer = await getIanaWhoisServer(tldSuffix);
-  if (ianaServer && ianaServer !== bootstrapWhoisHost) {
+  if (ianaServer) {
     try {
       const raw = await queryWhoisTcp(ianaServer, 43, domainToQuery, innerTimeout);
       if (raw && raw.trim().length > 0) return { raw, structured: {}, server: ianaServer };

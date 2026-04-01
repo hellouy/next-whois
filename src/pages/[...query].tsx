@@ -4650,9 +4650,10 @@ export default function LookupPage({
 
           <div className="relative">
             <motion.div
+              layout
               initial={false}
               animate={{ opacity: loading ? 0.85 : 1 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              transition={{ duration: 0.18, ease: "easeOut", layout: { duration: 0.25, ease: "easeOut" } }}
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
@@ -4710,8 +4711,16 @@ export default function LookupPage({
             </div>
           )}
 
+          <AnimatePresence initial={false}>
           {loading && !status && (
-            <div className="grid grid-cols-1 gap-6">
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="grid grid-cols-1 gap-6"
+            >
               <div className="space-y-4">
                 <div className="glass-panel rounded-xl p-8 sm:p-10">
                   <div className="space-y-5">
@@ -4734,12 +4743,19 @@ export default function LookupPage({
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {!loading && !status && (() => {
             const hasErrorRaw = !!(result && (result.rawWhoisContent || result.rawRdapContent));
             return (
+            <motion.div
+              key={target}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
             <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
             >
@@ -5054,6 +5070,7 @@ export default function LookupPage({
                 </div>
               )}
             </div>
+            </motion.div>
             );
           })()}
 

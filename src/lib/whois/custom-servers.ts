@@ -214,32 +214,21 @@ export async function getAllCustomServers(): Promise<CustomServerMap> {
   if (_allServersCache && now - _allServersCacheAt < ALL_SERVERS_TTL_MS) {
     return _allServersCache;
   }
-  const whoisFile = readWhoisServers();
   // Include ALL DB entries (manual + iana-discovered + repair-promoted) in the hot cache.
-  // The file fallback only activates on a fresh install before any DB entries exist.
+  // whois-servers.json is intentionally excluded here — whoiser handles server discovery
+  // natively, and the static file was causing Vercel-incompatible direct TCP lookups.
   const allDb    = await readDbServers();
   const user     = Object.keys(allDb).length > 0 ? allDb : await readFileServers();
   const registry = await readRegistryInfoServers();
 
-  // Build the no-server set from whois-servers.json nulls (not overridden by user DB entries
-  // or registry info servers — if we discovered a server via registry scrape,
-  // it's no longer "no server").
-  _knownNoServerCache = new Set(
-    Object.entries(whoisFile)
-      .filter(([tld, v]) => v === null && !(tld in user) && !(tld in registry))
-      .map(([tld]) => tld),
-  );
+  // No fast-fail set from static file — whoiser handles unknown TLDs gracefully.
+  _knownNoServerCache = new Set();
 
-  const whoisFiltered = Object.fromEntries(
-    Object.entries(whoisFile).filter(([, v]) => v !== null),
-  ) as CustomServerMap;
-
-  // Priority (highest wins, later entries override earlier ones):
+  // Priority (highest wins):
   //   1. registry (tld_registry_info.whois_server) — lowest, fills gaps
-  //   2. BUILTIN_SERVERS — hard-coded in source
-  //   3. whois-servers.json — curated static file (merged ccTLD + gTLD)
-  //   4. custom_whois_servers DB — highest, user / repair-queue managed
-  _allServersCache = { ...registry, ...BUILTIN_SERVERS, ...whoisFiltered, ...user };
+  //   2. BUILTIN_SERVERS — hard-coded scrapers and special cases
+  //   3. custom_whois_servers DB — highest, admin-managed supplements
+  _allServersCache = { ...registry, ...BUILTIN_SERVERS, ...user };
   _allServersCacheAt = now;
   return _allServersCache;
 }

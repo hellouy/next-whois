@@ -1,3 +1,36 @@
+# Next Whois UI — v3.29
+
+## whoiser-Primary Lookup + Page Jump Fix (2026-04-01, v3.29)
+
+### Problem
+Vercel deployment couldn't query some TLDs (e.g. `.me`) while Replit preview worked fine.
+Root cause: `whois-servers.json` (193 entries) was used as a "bootstrap" to make direct TCP connections to WHOIS servers before whoiser. Those direct TCP connections worked locally but could timeout or be blocked on Vercel's network. Two sequential TCP hops (registry + registrar referral chain) amplified this.
+
+### Lookup Architecture — New (whoiser-primary)
+
+| Priority | Source | Notes |
+|---|---|---|
+| ① | `custom_whois_servers` DB (admin-managed) | Manual supplements for broken TLDs, scrapers (.ba), special cases (.bn) |
+| ② | **whoiser** (primary) | Handles TLD server discovery + referral chain following natively via `follow: 2` |
+| ③ | IANA TCP fallback | `whois.iana.org → refer:` as last resort |
+
+`whois-servers.json` is now **admin-display only** (shown in the built-in servers admin tab); it is **not used in any lookup code path**.
+
+### Files Changed
+- **`src/lib/whois/whois-generic.ts`**: Rewrote `tryGenericWhoisForDomain()`:
+  - Removed: `getStaticWhoisServer`, `isTldKnownNoServer` imports
+  - Removed: `extractRegistrarWhoisServer` referral chain (whoiser's `follow: 2` handles this)
+  - New flow: DB custom server → whoiser → IANA TCP
+- **`src/lib/whois/custom-servers.ts`**: `getAllCustomServers()` no longer merges `whois-servers.json`; uses only DB + builtin scrapers + registry-info table. `_knownNoServerCache` always empty (whoiser fails gracefully for TLDs with no server).
+
+### Page Jump Fix (`src/pages/[...query].tsx`)
+- Added `layout` prop to outer `motion.div` to animate height changes smoothly
+- Wrapped loading skeleton in `AnimatePresence` with `motion.div` (fade in + fade out via `exit`)
+- Wrapped result content in `motion.div` with `initial={{ opacity: 0 }}` fade-in
+- Result: skeleton fades out, content fades in — no abrupt layout shift on first domain query
+
+---
+
 # Next Whois UI — v3.28
 
 ## i18n & UX Fixes (2026-03-29, v3.28)
