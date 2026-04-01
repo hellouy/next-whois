@@ -22,7 +22,7 @@ import {
   RiIdCardLine, RiBuildingLine, RiAwardLine, RiShakeHandsLine,
   RiCodeSLine, RiVipCrownLine, RiCoinLine, RiGiftLine,
   RiCoupon2Line, RiWalletLine, RiArrowLeftLine, RiCheckboxCircleLine,
-  RiRefreshLine,
+  RiRefreshLine, RiInformationLine,
 } from "@remixicon/react";
 import { RiBankCardLine, RiStarLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
@@ -42,6 +42,12 @@ type Subscription = {
   last_reminded_at: string | null;
   next_reminder_at: string | null;
   next_reminder_days: number | null;
+  thresholds: number[];
+  phase_flags: Record<string, boolean>;
+  nameservers: string[];
+  registrar: string | null;
+  creation_date: string | null;
+  whois_synced_at: string | null;
 };
 
 type RegStatus = "registered" | "unregistered" | "reserved" | "error" | "unknown";
@@ -1619,6 +1625,41 @@ export default function DashboardPage() {
                       </div>
                     )}
 
+                    {/* Domain WHOIS info: registrar / creation date / nameservers */}
+                    {(sub.registrar || sub.creation_date || sub.nameservers?.length > 0) && (
+                      <div className="pt-2 border-t border-border/40 space-y-1.5">
+                        {(sub.registrar || sub.creation_date) && (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {sub.registrar && (
+                              <div className="flex items-center gap-1 min-w-0">
+                                <RiInformationLine className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[160px]" title={sub.registrar}>{sub.registrar}</span>
+                              </div>
+                            )}
+                            {sub.creation_date && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <RiTimeLine className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground">{t("dashboard.registered_on")} {fmt(new Date(sub.creation_date), locale)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {sub.nameservers?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {sub.nameservers.slice(0, 4).map((ns, i) => (
+                              <span key={i} className="text-[9px] font-mono bg-muted/50 rounded-md px-1.5 py-0.5 text-muted-foreground lowercase">{ns}</span>
+                            ))}
+                          </div>
+                        )}
+                        {sub.whois_synced_at && (
+                          <div className="flex items-center gap-1">
+                            <RiShieldCheckLine className="w-2.5 h-2.5 text-emerald-500" />
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400">{t("dashboard.whois_synced")} {fmt(new Date(sub.whois_synced_at), locale)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Reminder info section */}
                     {sub.active && (
                       <div className="pt-2 border-t border-border/40 space-y-2">
@@ -1654,26 +1695,19 @@ export default function DashboardPage() {
                           </span>
                         </div>
 
-                        {/* days_before inline editor */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground">{t("dashboard.reminder_threshold")}</span>
-                          {[7, 14, 30, 60, 90].map(d => (
-                            <button
-                              key={d}
-                              disabled={savingDaysBefore === sub.id}
-                              onClick={() => saveDaysBefore(sub.id, d)}
-                              className={cn(
-                                "text-[10px] px-2 py-0.5 rounded-full border transition-colors font-semibold",
-                                sub.days_before === d
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                              )}
-                            >
-                              {savingDaysBefore === sub.id && sub.days_before === d
-                                ? "…"
-                                : t("dashboard.n_days_abbr", { days: d })}
-                            </button>
-                          ))}
+                        {/* Configured reminder thresholds */}
+                        <div className="flex items-start gap-2 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground mt-0.5 shrink-0">{t("dashboard.reminder_threshold")}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {(sub.thresholds?.length ? sub.thresholds : [60, 30, 1]).map(d => (
+                              <span
+                                key={d}
+                                className="text-[9px] px-1.5 py-0.5 rounded-full border bg-sky-50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800 font-semibold tabular-nums"
+                              >
+                                {t("dashboard.n_days_abbr", { days: d })}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

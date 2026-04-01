@@ -9,26 +9,47 @@ import { one, run, isDbReady } from "@/lib/db-query";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 
+type WhoisFetchResult = {
+  date: string;
+  eppStatus: string[];
+  registrar: string | null;
+  creationDate: string | null;
+  nameservers: string[];
+};
+
 /**
- * Try to get the domain's real expiration date from WHOIS/RDAP.
+ * Try to get the domain's real expiration date and other WHOIS fields.
  * Returns null if unavailable or if the lookup takes too long.
  */
-async function fetchWhoisExpiry(domain: string): Promise<{ date: string; eppStatus: string[] } | null> {
+async function fetchWhoisExpiry(domain: string): Promise<WhoisFetchResult | null> {
   try {
     const result = await Promise.race([
       lookupWhoisWithCache(domain),
       new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
     ]);
     if (!result || !result.result) return null;
-    const expiry = result.result.expirationDate;
-    const epp: string[] = Array.isArray(result.result.status)
-      ? result.result.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
+    const r = result.result;
+    const expiry = r.expirationDate;
+    const epp: string[] = Array.isArray(r.status)
+      ? r.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
       : [];
     if (!expiry || expiry === "Unknown") return null;
     const d = new Date(expiry);
     if (isNaN(d.getTime())) return null;
-    // Format as YYYY-MM-DD
-    return { date: d.toISOString().slice(0, 10), eppStatus: epp };
+
+    const clean = (v: any) => (v && v !== "Unknown" && v !== "N/A" ? String(v) : null);
+    const registrar = clean(r.registrar);
+    const creationDate = (() => {
+      const raw = clean(r.creationDate);
+      if (!raw) return null;
+      const cd = new Date(raw);
+      return isNaN(cd.getTime()) ? null : cd.toISOString().slice(0, 10);
+    })();
+    const nameservers: string[] = Array.isArray(r.nameServers)
+      ? r.nameServers.map((ns: any) => String(ns).toLowerCase().trim()).filter((ns: string) => ns && ns !== "unknown").slice(0, 6)
+      : [];
+
+    return { date: d.toISOString().slice(0, 10), eppStatus: epp, registrar, creationDate, nameservers };
   } catch {
     return null;
   }
@@ -164,9 +185,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Runs after DB save; result updates stored expiry if WHOIS provides one.
   let verifiedExpDate = userExpDate;
   let eppStatuses: string[] = [];
+  let whoisRegistrar: string | null = null;
+  let whoisCreationDate: string | null = null;
+  let whoisNameservers: string[] = [];
   const whoisData = await fetchWhoisExpiry(cleanDomain);
   if (whoisData) {
     eppStatuses = whoisData.eppStatus;
+    whoisRegistrar = whoisData.registrar;
+    whoisCreationDate = whoisData.creationDate;
+    whoisNameservers = whoisData.nameservers;
     const whoisDate = whoisData.date;
     // Accept WHOIS date as authoritative unless user-provided date is much newer
     // (user might have manually renewed and WHOIS not yet updated)
@@ -181,9 +208,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       verifiedExpDate = whoisDate;
       await run(
         `UPDATE reminders
-         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW()
-         WHERE id = $3`,
-        [whoisDate, whoisDate, reminderId],
+         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW(),
+             registrar = $3, creation_date = $4, nameservers_json = $5
+         WHERE id = $6`,
+        [whoisDate, whoisDate, whoisRegistrar, whoisCreationDate,
+         whoisNameservers.length ? JSON.stringify(whoisNameservers) : null, reminderId],
       ).catch((e: Error) => console.warn("[remind/submit] WHOIS date update failed:", e.message));
     }
   }

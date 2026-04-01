@@ -5,8 +5,7 @@ import { many, run, isDbReady } from "@/lib/db-query";
 import { computeLifecycle } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 
-// Same thresholds the cron uses — keep in sync with remind/process.ts
-const THRESHOLDS = [60, 30, 10, 5, 1];
+const DEFAULT_THRESHOLDS = [60, 30, 10, 5, 1];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -20,8 +19,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: string; domain: string; expiration_date: string | null;
         active: boolean; cancel_token: string | null; created_at: string;
         days_before: number | null;
+        thresholds_json: string | null;
+        phase_flags: string | null;
+        whois_synced_at: string | null;
+        registrar: string | null;
+        creation_date: string | null;
+        nameservers_json: string | null;
       }>(
-        `SELECT id, domain, expiration_date, active, cancel_token, created_at, days_before
+        `SELECT id, domain, expiration_date, active, cancel_token, created_at, days_before,
+                thresholds_json, phase_flags, whois_synced_at, registrar, creation_date, nameservers_json
          FROM reminders WHERE email = $1 ORDER BY created_at DESC`,
         [session.user.email],
       );
@@ -59,12 +65,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ? reminderLogs.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0]
           : null;
 
+        // Parse stored thresholds (use sub-specific config if available)
+        let subThresholds = DEFAULT_THRESHOLDS;
+        try {
+          if (r.thresholds_json) {
+            const parsed = JSON.parse(r.thresholds_json);
+            if (Array.isArray(parsed) && parsed.length > 0) subThresholds = parsed.sort((a: number, b: number) => b - a);
+          }
+        } catch { /* keep defaults */ }
+
+        // Parse phase flags
+        let phaseFlags: Record<string, boolean> = { grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true };
+        try {
+          if (r.phase_flags) phaseFlags = { ...phaseFlags, ...JSON.parse(r.phase_flags) };
+        } catch { /* keep defaults */ }
+
+        // Parse nameservers
+        let nameservers: string[] = [];
+        try {
+          if (r.nameservers_json) nameservers = JSON.parse(r.nameservers_json);
+        } catch { /* ignore */ }
+
         // Compute when the next reminder threshold will fire
         const daysToExpiry = lc?.daysToExpiry ?? null;
         let nextReminderAt: string | null = null;
         let nextReminderDays: number | null = null;
         if (r.expiration_date && daysToExpiry !== null && daysToExpiry > 0) {
-          for (const t of THRESHOLDS) {
+          for (const t of subThresholds) {
             // Threshold fires when daysToExpiry reaches t; only relevant if we haven't sent it
             if (daysToExpiry > t && !sentKeys.includes(t)) {
               const d = new Date(r.expiration_date);
@@ -89,6 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           last_reminded_at: lastLog?.sent_at ?? null,
           next_reminder_at: nextReminderAt,
           next_reminder_days: nextReminderDays,
+          thresholds: subThresholds,
+          phase_flags: phaseFlags,
+          nameservers,
         };
       });
 

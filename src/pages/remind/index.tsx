@@ -229,6 +229,7 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
   const { data: session, status } = useSession();
   const [email, setEmail] = React.useState("");
   const [thresholds, setThresholds] = React.useState<number[]>([60, 30, 1]);
+  const [phaseAlerts, setPhaseAlerts] = React.useState({ grace: true, redemption: true, pendingDelete: true, dropSoon: false, dropped: false });
   const [submitting, setSubmitting] = React.useState(false);
   const [done, setDone] = React.useState(false);
   const [whois, setWhois] = React.useState<WhoisInfo | null>(null);
@@ -326,7 +327,7 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
           domain: domain.toLowerCase().trim(),
           email,
           expirationDate: (whois?.expirationDate && whois.expirationDate !== "Unknown") ? whois.expirationDate : null,
-          phaseAlerts: { grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true },
+          phaseAlerts,
           thresholds,
           regStatusType: null,
         }),
@@ -684,6 +685,48 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
                   })}
                 </div>
                 <p className="text-[10px] text-muted-foreground">{t("remind.lifecycle_hint")}</p>
+              </div>
+
+              {/* Phase alerts */}
+              <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <RiAlertLine className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold">{t("remind.phase_alerts_label")}</p>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{t("remind.phase_alerts_hint")}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { key: "grace",         label: t("remind.phase_grace"),         color: "amber"  },
+                      { key: "redemption",    label: t("remind.phase_redemption"),    color: "orange" },
+                      { key: "pendingDelete", label: t("remind.phase_pendingDelete"), color: "red"    },
+                      { key: "dropSoon",      label: t("remind.phase_dropSoon"),      color: "rose"   },
+                      { key: "dropped",       label: t("remind.phase_dropped"),       color: "zinc"   },
+                    ] as const
+                  ).map(({ key, label, color }) => {
+                    const active = phaseAlerts[key];
+                    const colorMap: Record<string, { on: string; off: string }> = {
+                      amber:  { on: "bg-amber-500 text-white border-amber-500",  off: "bg-background text-muted-foreground border-border hover:border-amber-400/60 hover:text-amber-600" },
+                      orange: { on: "bg-orange-500 text-white border-orange-500", off: "bg-background text-muted-foreground border-border hover:border-orange-400/60 hover:text-orange-600" },
+                      red:    { on: "bg-red-500 text-white border-red-500",      off: "bg-background text-muted-foreground border-border hover:border-red-400/60 hover:text-red-600" },
+                      rose:   { on: "bg-rose-500 text-white border-rose-500",    off: "bg-background text-muted-foreground border-border hover:border-rose-400/60 hover:text-rose-600" },
+                      zinc:   { on: "bg-zinc-500 text-white border-zinc-500",    off: "bg-background text-muted-foreground border-border hover:border-zinc-400/60 hover:text-zinc-600" },
+                    };
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setPhaseAlerts(prev => ({ ...prev, [key]: !prev[key] }))}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
+                          active ? colorMap[color].on : colorMap[color].off
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Submit */}

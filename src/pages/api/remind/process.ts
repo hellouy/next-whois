@@ -31,7 +31,7 @@ const WHOIS_SYNC_LIMIT = 5;
  */
 async function refreshStaleWhoisDates(
   reminders: Array<{ id: string; domain: string; expiration_date: string | null; whois_synced_at: string | null }>,
-): Promise<Map<string, { date: string; eppStatus: string[] }>> {
+): Promise<Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>> {
   const now = Date.now();
   const msPerDay = 86_400_000;
   const staleMs = WHOIS_STALE_DAYS * msPerDay;
@@ -47,7 +47,7 @@ async function refreshStaleWhoisDates(
     return now - lastSync > staleMs;
   }).slice(0, WHOIS_SYNC_LIMIT);
 
-  const updated = new Map<string, { date: string; eppStatus: string[] }>();
+  const updated = new Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>();
   await Promise.all(candidates.map(async (r) => {
     try {
       const res = await Promise.race([
@@ -55,21 +55,36 @@ async function refreshStaleWhoisDates(
         new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
       ]);
       if (!res?.result) return;
-      const expiry = res.result.expirationDate;
-      const epp: string[] = Array.isArray(res.result.status)
-        ? res.result.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
+      const rv = res.result;
+      const expiry = rv.expirationDate;
+      const epp: string[] = Array.isArray(rv.status)
+        ? rv.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)
         : [];
       if (!expiry || expiry === "Unknown") return;
       const d = new Date(expiry);
       if (isNaN(d.getTime())) return;
       const dateStr = d.toISOString().slice(0, 10);
+
+      const clean = (v: any) => (v && v !== "Unknown" && v !== "N/A" ? String(v) : null);
+      const registrar = clean(rv.registrar);
+      const creationDate = (() => {
+        const raw = clean(rv.creationDate);
+        if (!raw) return null;
+        const cd = new Date(raw);
+        return isNaN(cd.getTime()) ? null : cd.toISOString().slice(0, 10);
+      })();
+      const nameservers: string[] = Array.isArray(rv.nameServers)
+        ? rv.nameServers.map((ns: any) => String(ns).toLowerCase().trim()).filter((ns: string) => ns && ns !== "unknown").slice(0, 6)
+        : [];
+
       await run(
         `UPDATE reminders
-         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW()
-         WHERE id = $3`,
-        [dateStr, dateStr, r.id],
+         SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW(),
+             registrar = $3, creation_date = $4, nameservers_json = $5
+         WHERE id = $6`,
+        [dateStr, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id],
       );
-      updated.set(r.id, { date: dateStr, eppStatus: epp });
+      updated.set(r.id, { date: dateStr, eppStatus: epp, registrar, creationDate, nameservers });
       console.log(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
     } catch (e: any) {
       console.warn(`[process] WHOIS refresh failed for ${r.domain}:`, e?.message ?? e);
@@ -114,16 +129,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: string; domain: string; email: string;
       expiration_date: string | null; cancel_token: string; phase_flags: string | null;
       thresholds_json: string | null; whois_synced_at: string | null; whois_expiry_date: string | null;
+      registrar: string | null; creation_date: string | null; nameservers_json: string | null;
     }>(
       `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json,
-              whois_synced_at, whois_expiry_date
+              whois_synced_at, whois_expiry_date, registrar, creation_date, nameservers_json
        FROM reminders WHERE active = true AND expiration_date IS NOT NULL`,
     );
 
     // Refresh WHOIS data for near-expiry domains with stale sync dates (non-blocking batch)
     const whoisRefreshed = await refreshStaleWhoisDates(remindersRaw).catch((e) => {
       console.warn("[process] WHOIS batch refresh error:", e?.message ?? e);
-      return new Map<string, { date: string; eppStatus: string[] }>();
+      return new Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>();
     });
 
     const reminderIds = remindersRaw.map((r) => r.id);
@@ -140,13 +156,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       logsByReminder[log.reminder_id].push(log.days_before);
     }
 
-    const reminders = remindersRaw.map((r) => ({
-      ...r,
-      // Prefer WHOIS-refreshed data from this run, then stored whois_expiry_date, then user-entered
-      effective_expiry: whoisRefreshed.get(r.id)?.date ?? r.whois_expiry_date ?? r.expiration_date,
-      epp_status:       whoisRefreshed.get(r.id)?.eppStatus ?? [],
-      sent_keys: logsByReminder[r.id] ?? [],
-    }));
+    const reminders = remindersRaw.map((r) => {
+      const fresh = whoisRefreshed.get(r.id);
+      let nameservers: string[] = [];
+      try { if (r.nameservers_json) nameservers = JSON.parse(r.nameservers_json); } catch { /* ignore */ }
+      return {
+        ...r,
+        // Prefer WHOIS-refreshed data from this run, then stored fields, then user-entered
+        effective_expiry: fresh?.date ?? r.whois_expiry_date ?? r.expiration_date,
+        epp_status:       fresh?.eppStatus ?? [],
+        registrar:        fresh?.registrar ?? r.registrar ?? null,
+        creation_date:    fresh?.creationDate ?? r.creation_date ?? null,
+        nameservers:      fresh?.nameservers ?? nameservers,
+        sent_keys:        logsByReminder[r.id] ?? [],
+      };
+    });
 
     const results = { sent: 0, expired: 0, skipped: 0, whois_refreshed: whoisRefreshed.size };
 
@@ -245,6 +269,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               expirationDate: reminder.expiration_date,
               graceEnd: fmtDate(graceEnd),
               cancelToken: reminder.cancel_token,
+              registrar: reminder.registrar,
+              creationDate: reminder.creation_date,
               siteName,
             }),
           });
@@ -265,6 +291,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               redemptionEnd: fmtDate(redemptionEnd),
               dropDate: fmtDate(dropDate),
               cancelToken: reminder.cancel_token,
+              registrar: reminder.registrar,
+              creationDate: reminder.creation_date,
               siteName,
             }),
           });
@@ -284,6 +312,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               expirationDate: reminder.expiration_date,
               dropDate: fmtDate(dropDate),
               cancelToken: reminder.cancel_token,
+              registrar: reminder.registrar,
+              creationDate: reminder.creation_date,
               siteName,
             }),
           });
@@ -327,6 +357,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   expirationDate: reminder.expiration_date,
                   daysLeft: daysToExpiry,
                   cancelToken: reminder.cancel_token,
+                  registrar: reminder.registrar,
+                  creationDate: reminder.creation_date,
+                  nameservers: reminder.nameservers,
                   siteName,
                 }),
               });

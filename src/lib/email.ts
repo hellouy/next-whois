@@ -311,11 +311,18 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
 // ──────────────────────────────────────────────────────────────────────────────
 export function reminderHtml({
   domain, expirationDate, daysLeft, cancelToken, siteName = "X.RW",
-}: { domain: string; expirationDate: string | null; daysLeft: number; cancelToken: string; siteName?: string }): string {
+  registrar, creationDate, nameservers,
+}: {
+  domain: string; expirationDate: string | null; daysLeft: number; cancelToken: string; siteName?: string;
+  registrar?: string | null; creationDate?: string | null; nameservers?: string[];
+}): string {
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${cancelToken}`;
   const expiryStr = expirationDate
     ? new Date(expirationDate).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
     : "即将到期";
+  const creationStr = creationDate
+    ? new Date(creationDate).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
+    : null;
 
   const urgent = daysLeft <= 5;
   const warn   = daysLeft <= 15;
@@ -327,15 +334,28 @@ export function reminderHtml({
     ? `域名将在 <strong>${daysLeft} 天</strong>内过期，请立即前往注册商续费，避免进入宽限期产生额外费用。`
     : `请尽快续费您的域名，以免服务因过期而中断。续费成功后可忽略此提醒。`;
 
+  const extraRows = [
+    creationStr ? kvRow("注册日期", creationStr) : "",
+    registrar   ? kvRow("注册商", registrar) : "",
+    (nameservers && nameservers.length > 0)
+      ? kvRow("域名服务器", nameservers.slice(0, 3).map(ns =>
+          `<span style="font-family:ui-monospace,monospace;font-size:11px">${ns.toLowerCase()}</span>`
+        ).join("<br/>"))
+      : "",
+  ].filter(Boolean).join("");
+
   return emailLayout(`
     ${urgent || warn
       ? colorHeader(hdrBg, hdrLabel, domainBadge(domain), `距离到期还有 ${daysLeft} 天`)
       : darkHeader(hdrLabel, domainBadge(domain), `距离到期还有 ${daysLeft} 天`)}
 
     ${section(`
-      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:18px">
-        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">过期日期</p>
-        <p style="margin:6px 0 0;font-size:22px;font-weight:800;color:#1e293b;font-family:ui-monospace,'Fira Code',monospace">${expiryStr}</p>
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:14px 18px;border-bottom:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">过期日期</p>
+          <p style="margin:6px 0 0;font-size:22px;font-weight:800;color:#1e293b;font-family:ui-monospace,'Fira Code',monospace">${expiryStr}</p>
+        </div>
+        ${extraRows ? `<div style="padding:4px 18px 8px"><table cellpadding="0" cellspacing="0" style="width:100%">${extraRows}</table></div>` : ""}
       </div>
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.8">${bodyText}</p>
     `)}
@@ -356,6 +376,8 @@ export interface PhaseEventEmailParams {
   redemptionEnd?: string;
   dropDate?: string;
   cancelToken: string;
+  registrar?: string | null;
+  creationDate?: string | null;
 }
 
 export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string }): string {
@@ -364,6 +386,9 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string })
   const expiryStr = p.expirationDate
     ? new Date(p.expirationDate).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
     : "未知";
+  const creationStr = p.creationDate
+    ? new Date(p.creationDate).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
+    : null;
 
   const cfg = {
     grace: {
@@ -405,6 +430,13 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string })
         <div style="padding:12px 18px;border-top:1px solid #e2e8f0">
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${cfg.nextLabel}</p>
           <p style="margin:6px 0 0;font-size:16px;font-weight:700;color:${cfg.nextColor};font-family:monospace">${cfg.nextDate}</p>
+        </div>` : ""}
+        ${(creationStr || p.registrar) ? `
+        <div style="padding:8px 18px 10px;border-top:1px solid #f1f5f9">
+          <table cellpadding="0" cellspacing="0" style="width:100%">
+            ${creationStr ? kvRow("注册日期", creationStr) : ""}
+            ${p.registrar  ? kvRow("注册商",   p.registrar) : ""}
+          </table>
         </div>` : ""}
       </div>
 
