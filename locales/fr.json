@@ -1133,7 +1133,11 @@
     "copy": "Copier",
     "key_info": "Clé publique",
     "cipher": "Suite de chiffrement",
-    "ct_logs": "Journaux CT"
+    "ct_logs": "Journaux CT",
+    "err_refused": "Connexion refusée (port {{port}})",
+    "err_timeout": "Délai de connexion dépassé",
+    "err_no_cert": "Aucun certificat reçu",
+    "err_unknown": "Échec de la connexion"
   },
   "dns": {
     "title": "Recherche DNS",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "Système",
     "nav_api": "API",
     "nav_settings": "Paramètres",
-    "nav_git_fix": "Réparation Git Push"
+    "nav_git_fix": "Réparation Git Push",
+    "nav_db_export": "Export DB"
   },
   "common": {
     "retry": "Réessayer",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "On nourrit le serveur avec de nouvelles fonctionnalités 🍕",
   "maintenance_tip_3": "Plus rapide que prévu et ça vaut l'attente ✨",
   "maintenance_tip_4": "Application des correctifs — bientôt de retour 🩹",
-  "close_announcement": "Fermer l'annonce"
+  "close_announcement": "Fermer l'annonce",
+  "home": {
+    "stats_total": "recherches totales",
+    "stats_today": "recherches aujourd'hui"
+  }
 }

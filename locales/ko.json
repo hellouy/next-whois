@@ -1133,7 +1133,11 @@
     "copy": "복사",
     "key_info": "공개 키",
     "cipher": "암호화 스위트",
-    "ct_logs": "CT 로그"
+    "ct_logs": "CT 로그",
+    "err_refused": "연결 거부됨 (포트 {{port}})",
+    "err_timeout": "연결 시간 초과",
+    "err_no_cert": "인증서를 받지 못했습니다",
+    "err_unknown": "연결 실패"
   },
   "dns": {
     "title": "DNS 조회",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "시스템",
     "nav_api": "API",
     "nav_settings": "설정",
-    "nav_git_fix": "Git 푸시 수정"
+    "nav_git_fix": "Git 푸시 수정",
+    "nav_db_export": "DB 내보내기"
   },
   "common": {
     "retry": "재시도",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "서버에 새 기능을 추가하고 있습니다 🍕",
   "maintenance_tip_3": "예상보다 빠르고, 기다릴 만한 가치가 있습니다 ✨",
   "maintenance_tip_4": "패치 적용 중 — 곧 돌아오겠습니다 🩹",
-  "close_announcement": "공지 닫기"
+  "close_announcement": "공지 닫기",
+  "home": {
+    "stats_total": "총 검색 수",
+    "stats_today": "오늘 검색 수"
+  }
 }

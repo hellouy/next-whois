@@ -1133,7 +1133,11 @@
     "copy": "複製",
     "key_info": "公鑰演算法",
     "cipher": "加密套件",
-    "ct_logs": "憑證透明度"
+    "ct_logs": "憑證透明度",
+    "err_refused": "連線被拒絕（埠 {{port}}）",
+    "err_timeout": "連線逾時",
+    "err_no_cert": "未取得憑證",
+    "err_unknown": "連線失敗"
   },
   "dns": {
     "title": "DNS 查詢",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "系統",
     "nav_api": "API",
     "nav_settings": "設置",
-    "nav_git_fix": "Git 推送修復"
+    "nav_git_fix": "Git 推送修復",
+    "nav_db_export": "資料匯出"
   },
   "common": {
     "retry": "重試",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "正在給伺服器「餵」新功能 🍕",
   "maintenance_tip_3": "比你想的快，也比你想的更值得等待 ✨",
   "maintenance_tip_4": "稍等片刻，我們正在修復問題 🩹",
-  "close_announcement": "關閉公告"
+  "close_announcement": "關閉公告",
+  "home": {
+    "stats_total": "次總查詢",
+    "stats_today": "次今日查詢"
+  }
 }

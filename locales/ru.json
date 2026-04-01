@@ -1133,7 +1133,11 @@
     "copy": "Копировать",
     "key_info": "Открытый ключ",
     "cipher": "Набор шифров",
-    "ct_logs": "Журналы CT"
+    "ct_logs": "Журналы CT",
+    "err_refused": "Соединение отклонено (порт {{port}})",
+    "err_timeout": "Превышено время ожидания",
+    "err_no_cert": "Сертификат не получен",
+    "err_unknown": "Ошибка соединения"
   },
   "dns": {
     "title": "Поиск DNS",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "Система",
     "nav_api": "API",
     "nav_settings": "Настройки",
-    "nav_git_fix": "Исправление Git Push"
+    "nav_git_fix": "Исправление Git Push",
+    "nav_db_export": "Экспорт БД"
   },
   "common": {
     "retry": "Повторить",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "Загружаем новые функции на сервер 🍕",
   "maintenance_tip_3": "Лучше, чем ожидалось, и стоит ожидания ✨",
   "maintenance_tip_4": "Применяем патчи — скоро вернёмся 🩹",
-  "close_announcement": "Закрыть объявление"
+  "close_announcement": "Закрыть объявление",
+  "home": {
+    "stats_total": "всего запросов",
+    "stats_today": "запросов сегодня"
+  }
 }

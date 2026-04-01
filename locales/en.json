@@ -1133,7 +1133,11 @@
     "footer_realtime": "Live check, data not cached",
     "footer_tech": "Node.js TLS · No third-party dependencies",
     "feedback": "Feedback",
-    "copy": "Copy"
+    "copy": "Copy",
+    "err_refused": "Connection refused (port {{port}})",
+    "err_timeout": "Connection timed out",
+    "err_no_cert": "No certificate returned",
+    "err_unknown": "Connection failed"
   },
   "dns": {
     "title": "DNS Lookup",
@@ -1644,5 +1648,9 @@
   "maintenance_tip_2": "Feeding the server some fresh new features 🍕",
   "maintenance_tip_3": "Faster than you think, worth every second of the wait ✨",
   "maintenance_tip_4": "Applying patches — we'll be back before you know it 🩹",
-  "close_announcement": "Close announcement"
+  "close_announcement": "Close announcement",
+  "home": {
+    "stats_total": "total searches",
+    "stats_today": "searches today"
+  }
 }

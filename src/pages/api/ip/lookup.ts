@@ -51,16 +51,24 @@ async function fetchRdapIp(ip: string): Promise<any> {
     `https://rdap.lacnic.net/rdap/ip/${ip}`,
     `https://rdap.afrinic.net/rdap/ip/${ip}`,
   ];
-  for (const url of endpoints) {
-    try {
-      const r = await fetch(url, {
-        headers: { Accept: "application/rdap+json", "User-Agent": "NextWhois/1.0" },
-        signal: AbortSignal.timeout(7000),
-      });
-      if (r.ok) return r.json();
-    } catch {}
+  const controller = new AbortController();
+  const jobs = endpoints.map(async (url) => {
+    const r = await fetch(url, {
+      headers: { Accept: "application/rdap+json", "User-Agent": "NextWhois/1.0" },
+      signal: AbortSignal.any
+        ? AbortSignal.any([controller.signal, AbortSignal.timeout(7000)])
+        : controller.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    controller.abort();
+    return data;
+  });
+  try {
+    return await Promise.any(jobs);
+  } catch {
+    return null;
   }
-  return null;
 }
 
 async function fetchRdapAsn(asn: number): Promise<any> {
@@ -71,16 +79,24 @@ async function fetchRdapAsn(asn: number): Promise<any> {
     `https://rdap.lacnic.net/rdap/autnum/${asn}`,
     `https://rdap.afrinic.net/rdap/autnum/${asn}`,
   ];
-  for (const url of endpoints) {
-    try {
-      const r = await fetch(url, {
-        headers: { Accept: "application/rdap+json", "User-Agent": "NextWhois/1.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) return r.json();
-    } catch {}
+  const controller = new AbortController();
+  const jobs = endpoints.map(async (url) => {
+    const r = await fetch(url, {
+      headers: { Accept: "application/rdap+json", "User-Agent": "NextWhois/1.0" },
+      signal: AbortSignal.any
+        ? AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])
+        : controller.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    controller.abort();
+    return data;
+  });
+  try {
+    return await Promise.any(jobs);
+  } catch {
+    return null;
   }
-  return null;
 }
 
 function extractVcard(vcardArray: any[]): { name?: string; org?: string; email?: string } {
@@ -167,7 +183,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let resolvedFrom: string | null = null;
   if (!IP_RE.test(query) && !IPV6_RE.test(query)) {
     const resolved = await resolveHostname(query);
-    if (!resolved) return res.status(400).json({ error: "无法解析主机名，请输入有效的 IP 地址或主机名" });
+    if (!resolved) return res.status(400).json({ error: "Cannot resolve hostname. Please enter a valid IP address or hostname." });
     resolvedFrom = query;
     ip = resolved;
   }
@@ -183,7 +199,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rdapInfo = extractRdapInfo(rdapData);
 
     if (geo?.status === "fail") {
-      return res.status(400).json({ error: geo.message || "IP 查询失败" });
+      return res.status(400).json({ error: geo.message || "IP lookup failed" });
     }
 
     const flagEmoji = geo?.countryCode
@@ -217,6 +233,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       rdap: rdapInfo,
     });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message || "查询失败" });
+    return res.status(500).json({ error: e.message || "Lookup failed" });
   }
 }

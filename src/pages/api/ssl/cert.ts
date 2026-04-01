@@ -176,11 +176,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const msg = e?.message || "Unknown error";
     const isRefused = msg.includes("ECONNREFUSED") || msg.includes("connect");
     const isTimeout = msg.toLowerCase().includes("timeout");
+    const isNoCert = msg.includes("No certificate");
+    const errorCode = isRefused ? "err_refused" : isTimeout ? "err_timeout" : isNoCert ? "err_no_cert" : "err_unknown";
     return res.status(200).json({
       ok: false,
       hostname,
       port,
-      error: isRefused ? `Connection refused on port ${port}` : isTimeout ? "Connection timed out" : msg,
+      errorCode,
+      error: msg,
     });
   }
 }

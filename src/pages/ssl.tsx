@@ -45,6 +45,7 @@ type SslResult = {
   chain: CertChain[];
   latencyMs: number;
   error?: string;
+  errorCode?: string;
 };
 
 function CopyButton({ text, copyLabel }: { text: string; copyLabel: string }) {
@@ -227,7 +228,11 @@ export default function SslPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-red-600 dark:text-red-400">{t("ssl.failed_title")}</p>
-                        <p className="text-sm text-muted-foreground">{result!.error}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {result!.errorCode
+                            ? (t as (k: string) => string)(`ssl.${result!.errorCode}`).replace("{{port}}", String(result!.port))
+                            : result!.error}
+                        </p>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">{t("ssl.failed_note")}</p>

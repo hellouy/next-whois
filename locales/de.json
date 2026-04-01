@@ -1133,7 +1133,11 @@
     "copy": "Kopieren",
     "key_info": "Öffentlicher Schlüssel",
     "cipher": "Cipher-Suite",
-    "ct_logs": "CT-Protokolle"
+    "ct_logs": "CT-Protokolle",
+    "err_refused": "Verbindung verweigert (Port {{port}})",
+    "err_timeout": "Verbindungszeitüberschreitung",
+    "err_no_cert": "Kein Zertifikat erhalten",
+    "err_unknown": "Verbindung fehlgeschlagen"
   },
   "dns": {
     "title": "DNS-Suche",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "System",
     "nav_api": "API",
     "nav_settings": "Einstellungen",
-    "nav_git_fix": "Git Push Reparatur"
+    "nav_git_fix": "Git Push Reparatur",
+    "nav_db_export": "DB-Export"
   },
   "common": {
     "retry": "Wiederholen",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "Wir füttern den Server mit neuen Features 🍕",
   "maintenance_tip_3": "Schneller als erwartet und die Wartezeit wert ✨",
   "maintenance_tip_4": "Patches werden eingespielt — gleich wieder online 🩹",
-  "close_announcement": "Ankündigung schließen"
+  "close_announcement": "Ankündigung schließen",
+  "home": {
+    "stats_total": "Gesamtsuchen",
+    "stats_today": "Suchen heute"
+  }
 }

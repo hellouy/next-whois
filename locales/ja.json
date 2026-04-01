@@ -1133,7 +1133,11 @@
     "copy": "コピー",
     "key_info": "公開鍵",
     "cipher": "暗号スイート",
-    "ct_logs": "CT ログ"
+    "ct_logs": "CT ログ",
+    "err_refused": "接続拒否（ポート {{port}}）",
+    "err_timeout": "接続タイムアウト",
+    "err_no_cert": "証明書が取得できません",
+    "err_unknown": "接続に失敗しました"
   },
   "dns": {
     "title": "DNS検索",
@@ -1602,7 +1606,8 @@
     "nav_system_label": "システム",
     "nav_api": "API",
     "nav_settings": "設定",
-    "nav_git_fix": "Git プッシュ修復"
+    "nav_git_fix": "Git プッシュ修復",
+    "nav_db_export": "DBエクスポート"
   },
   "common": {
     "retry": "再試行",
@@ -1643,5 +1648,9 @@
   "maintenance_tip_2": "サーバーに新機能を追加中です 🍕",
   "maintenance_tip_3": "思ったより早く、思ったより価値があります ✨",
   "maintenance_tip_4": "パッチ適用中 — もうすぐ戻ります 🩹",
-  "close_announcement": "お知らせを閉じる"
+  "close_announcement": "お知らせを閉じる",
+  "home": {
+    "stats_total": "総検索数",
+    "stats_today": "本日の検索数"
+  }
 }

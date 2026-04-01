@@ -1133,7 +1133,11 @@
     "footer_realtime": "直连检测，数据不缓存",
     "footer_tech": "Node.js TLS · 无第三方依赖",
     "feedback": "意见反馈",
-    "copy": "复制"
+    "copy": "复制",
+    "err_refused": "连接被拒绝（端口 {{port}}）",
+    "err_timeout": "连接超时",
+    "err_no_cert": "未返回证书",
+    "err_unknown": "连接失败"
   },
   "dns": {
     "title": "DNS 查询",
@@ -1644,5 +1648,9 @@
   "maintenance_tip_2": "正在给服务器「喂」新功能 🍕",
   "maintenance_tip_3": "比你以为的快，比你想的更值得等待 ✨",
   "maintenance_tip_4": "稍等片刻，我们在给它打补丁 🩹",
-  "close_announcement": "关闭公告"
+  "close_announcement": "关闭公告",
+  "home": {
+    "stats_total": "次总查询",
+    "stats_today": "次今日查询"
+  }
 }

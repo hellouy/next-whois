@@ -302,26 +302,33 @@ export default function IpPage() {
 
                     {result!.lat !== null && result!.lon !== null && (
                       <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                        <a
-                          href={`https://www.openstreetmap.org/?mlat=${result!.lat}&mlon=${result!.lon}&zoom=10`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
-                          <div className="h-36 bg-muted/30 flex items-center justify-center relative group">
-                            <img
-                              src={`https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${result!.lon},${result!.lat}&z=8&l=map&size=600,200&pt=${result!.lon},${result!.lat},pm2rdm`}
-                              alt={t("ip.geo_section")}
-                              className="w-full h-full object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-end justify-end p-2">
-                              <span className="text-[10px] bg-black/50 text-white px-2 py-1 rounded flex items-center gap-1">
-                                {t("ip.open_map")} <RiExternalLinkLine className="w-2.5 h-2.5" />
-                              </span>
-                            </div>
+                        <div className="px-4 py-3 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
+                            <RiMapPinLine className="w-4 h-4 text-violet-500" />
                           </div>
-                        </a>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono text-foreground/80">{result!.lat}, {result!.lon}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{[result!.city, result!.region, result!.country].filter(Boolean).join(", ")}</p>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <a
+                              href={`https://www.openstreetmap.org/?mlat=${result!.lat}&mlon=${result!.lon}&zoom=10`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] px-2 py-1 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            >
+                              OSM <RiExternalLinkLine className="w-2.5 h-2.5" />
+                            </a>
+                            <a
+                              href={`https://www.google.com/maps?q=${result!.lat},${result!.lon}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] px-2 py-1 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            >
+                              Google <RiExternalLinkLine className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
                       </div>
                     )}
 

@@ -105,6 +105,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const typeRaw = ((req.query.type as string) || "A").toUpperCase();
 
   if (!name) return res.status(400).json({ error: "name parameter is required" });
+  if (name.length > 253) return res.status(400).json({ error: "name too long (max 253 characters)" });
+  if (!/^[a-z0-9._*\-[\]]+$/.test(name)) return res.status(400).json({ error: "name contains invalid characters" });
   if (!RECORD_TYPES.includes(typeRaw as RecordType))
     return res.status(400).json({ error: `Unsupported type. Supported: ${RECORD_TYPES.join(", ")}` });
   const type = typeRaw as RecordType;

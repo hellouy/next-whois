@@ -2,6 +2,7 @@ import { cn, toSearchURI, isSearchRoute, cleanDomain } from "@/lib/utils";
 import { prefetchLookup } from "@/lib/lookup-prefetch";
 import React, { useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
+import { useTranslation } from "@/lib/i18n";
 import Head from "next/head";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchBox } from "@/components/search_box";
@@ -70,6 +71,7 @@ function fmt(n: number): string {
 
 export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [loading, setLoading] = React.useState(false);
   const stats = usePublicStats(seo.showStats);
 
@@ -169,12 +171,12 @@ export default function HomePage({ origin, seo }: { origin: string; seo: HomeSeo
           <div className="flex justify-center gap-6 mt-3 mb-1">
             <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
               <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
-              次总查询
+              {t("home.stats_total")}
             </span>
             <span className="text-muted-foreground/30">·</span>
             <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
               <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
-              次今日查询
+              {t("home.stats_today")}
             </span>
           </div>
         )}
