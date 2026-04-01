@@ -455,13 +455,51 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_email_queue_pending ON email_queue (next_retry_at, created_at) WHERE status = 'pending'`,
 ];
 
+/**
+ * Auto-derive a Supabase Transaction Mode URL (port 6543) from a Session Mode URL (port 5432).
+ * Transaction mode allows far more concurrent connections — critical on Vercel serverless.
+ * Returns null if the URL is not a Supabase pooler URL or already uses a non-session port.
+ */
+function deriveTransactionModeUrl(sessionUrl: string): string | null {
+  try {
+    const u = new URL(sessionUrl);
+    if (!u.hostname.includes(".pooler.supabase.com")) return null;
+    if (u.port !== "5432") return null; // already not session mode
+    u.port = "6543";
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function getConnectionString(): { url: string; source: string } | null {
-  if (process.env.POSTGRES_URL) {
-    return { url: process.env.POSTGRES_URL, source: "POSTGRES_URL" };
+  // 1. Explicit POSTGRES_URL — only use if it's on the correct region/host.
+  //    Check that it matches the NON_POOLING host (same Supabase project).
+  const explicitUrl = process.env.POSTGRES_URL;
+  const nonPoolingUrl = process.env.POSTGRES_URL_NON_POOLING;
+  if (explicitUrl && nonPoolingUrl) {
+    try {
+      const eu = new URL(explicitUrl);
+      const nu = new URL(nonPoolingUrl);
+      if (eu.hostname === nu.hostname) {
+        return { url: explicitUrl, source: "POSTGRES_URL" };
+      }
+      // Hosts differ — fall through to auto-derive from NON_POOLING
+    } catch { /* fall through */ }
+  } else if (explicitUrl && !nonPoolingUrl) {
+    return { url: explicitUrl, source: "POSTGRES_URL" };
   }
-  if (process.env.POSTGRES_URL_NON_POOLING) {
-    return { url: process.env.POSTGRES_URL_NON_POOLING, source: "POSTGRES_URL_NON_POOLING" };
+
+  // 2. Auto-derive Transaction Mode URL from POSTGRES_URL_NON_POOLING (port 5432 → 6543).
+  //    Same credentials, same host, just switches connection pooling mode.
+  if (nonPoolingUrl) {
+    const txUrl = deriveTransactionModeUrl(nonPoolingUrl);
+    if (txUrl) {
+      return { url: txUrl, source: "POSTGRES_URL_NON_POOLING→TX" };
+    }
+    return { url: nonPoolingUrl, source: "POSTGRES_URL_NON_POOLING" };
   }
+
   if (process.env.SUPABASE_DATABASE_URL) {
     return { url: process.env.SUPABASE_DATABASE_URL, source: "SUPABASE_DATABASE_URL" };
   }
