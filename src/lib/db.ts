@@ -486,9 +486,9 @@ function makePool(connectionString: string): Pool {
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
-    max: 10,
+    max: 3,
     connectionTimeoutMillis: 8000,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 20000,
     allowExitOnIdle: true,
   });
   p.on("error", (err) => console.error("[db] pool error:", err.message));

@@ -30,13 +30,19 @@ const nextConfig = {
       { source: "/admin/tld-registry",             destination: "/admin/domains?tab=iana",        permanent: true },
     ];
   },
-  // Allow Replit's proxied dev domain to load _next/* resources without warnings
+  // Allow Replit's proxied dev domain to load _next/* resources without warnings.
+  // Replit domains are multi-level (e.g. <uuid>.janeway.replit.dev) so we must
+  // list each region subdomain explicitly — *.replit.dev only matches one level.
   allowedDevOrigins: [
     "*.replit.dev",
+    "*.janeway.replit.dev",
     "*.kirk.replit.dev",
     "*.worf.replit.dev",
     "*.riker.replit.dev",
+    "*.picard.replit.dev",
+    "*.spock.replit.dev",
     "*.repl.co",
+    ...(process.env.REPLIT_DEV_DOMAIN ? [process.env.REPLIT_DEV_DOMAIN] : []),
   ],
   images: {
     formats: ['image/avif', 'image/webp'],
