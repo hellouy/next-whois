@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 import React from "react";
 import type { AppProps, AppContext } from "next/app";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Head from "next/head";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -416,6 +417,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     </SiteSettingsProvider>
     </LocaleProvider>
     <Analytics />
+    <SpeedInsights />
     </SessionProvider>
   );
 }
