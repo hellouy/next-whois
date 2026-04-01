@@ -6,7 +6,11 @@
  */
 import React from "react";
 import { cn } from "@/lib/utils";
-import { RiShieldCheckLine, RiArrowRightSLine, RiGlobalLine } from "@remixicon/react";
+import {
+  RiShieldCheckLine, RiArrowRightSLine, RiGlobalLine,
+  RiSparklingLine, RiLeafLine, RiSunLine, RiVipCrownLine,
+  RiFireLine, RiFlashlightLine, RiUserLine,
+} from "@remixicon/react";
 
 export type CardThemeDef = {
   hero: string; shimmer: string;
@@ -50,8 +54,6 @@ const DEMO: Required<StampPreviewData> & { icon: React.ElementType } = {
   icon:        RiGlobalLine,
 };
 
-function mono2(name: string) { return name.replace(/[•·\s]/g, "").slice(0, 2).toUpperCase(); }
-function mono1(name: string) { return name.replace(/[•·\s]/g, "").slice(0, 1).toUpperCase(); }
 
 export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: StampPreviewData }) {
   const t = STAMP_CARD_THEMES[themeKey] ?? STAMP_CARD_THEMES.app;
@@ -62,14 +64,15 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
   const desc     = data?.description || DEMO.description;
   const link     = data?.link       || DEMO.link;
   const tagLabel = data?.tagLabel   || DEMO.tagLabel;
+  const AvatarIcon = data?.icon ?? DEMO.icon;
 
   /* ═══ app — 苹果式极简 ════════════════════════════════════════════════ */
   if (themeKey === "app") return (
     <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,0.08)" }}>
       {/* Full-width charcoal banner */}
       <div style={{ background: "linear-gradient(135deg,#1c1c1e,#3a3a3c)", padding: "18px 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: "rgba(255,255,255,0.88)", letterSpacing: -0.5, flexShrink: 0 }}>
-          {mono2(tagName)}
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <AvatarIcon style={{ width: 20, height: 20, color: "rgba(255,255,255,0.8)" }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: "#fff", letterSpacing: -0.3, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
@@ -135,8 +138,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
             <RiShieldCheckLine style={{ width: 8, height: 8 }} />{tagLabel}
           </span>
           {/* Avatar */}
-          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", animation: "au-float 3s ease-in-out infinite", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 14, width: 48, height: 48, alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: "#fff" }}>
-            {mono2(tagName)}
+          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", animation: "au-float 3s ease-in-out infinite", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 14, width: 48, height: 48, alignItems: "center", justifyContent: "center" }}>
+            <RiSparklingLine style={{ width: 24, height: 24, color: "rgba(255,255,255,0.9)" }} />
           </div>
           <p style={{ position: "relative", zIndex: 1, margin: "8px 0 0", fontWeight: 900, fontSize: 14, color: "#fff", letterSpacing: -0.3 }}>{tagName}</p>
           <p style={{ position: "relative", zIndex: 1, margin: "2px 0 0", fontFamily: "monospace", fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.15em" }}>{domain}</p>
@@ -160,8 +163,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='46' viewBox='0 0 40 46' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 1l19 11v22L20 45 1 34V12z' fill='none' stroke='white' stroke-width='1'/%3E%3C/svg%3E")`, backgroundSize: "40px 46px", pointerEvents: "none" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Avatar */}
-          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "2px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 15, color: "#fff", flexShrink: 0 }}>
-            {mono2(tagName)}
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "2px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <RiLeafLine style={{ width: 22, height: 22, color: "rgba(255,255,255,0.9)" }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#fff", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
@@ -192,8 +195,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
             <div key={i} style={{ position: "absolute", top: "0%", left: "50%", width: 2, height: "55%", background: "linear-gradient(to bottom, rgba(255,255,255,0.35), transparent)", transformOrigin: "50% 0%", transform: `translateX(-50%) rotate(${deg}deg)`, animation: "sol-ray 3s ease-in-out infinite", animationDelay: `${i*0.15}s`, pointerEvents: "none" }} />
           ))}
           {/* Avatar */}
-          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "2.5px solid rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: "#d97706", boxShadow: "0 4px 16px rgba(255,140,0,0.35)", marginBottom: 6 }}>
-            {mono2(tagName)}
+          <div style={{ position: "relative", zIndex: 1, display: "inline-flex", width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "2.5px solid rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(255,140,0,0.35)", marginBottom: 6 }}>
+            <RiSunLine style={{ width: 24, height: 24, color: "#d97706" }} />
           </div>
           <p style={{ position: "relative", zIndex: 1, margin: 0, fontWeight: 900, fontSize: 14, color: "#7c2d12", letterSpacing: -0.3 }}>{tagName}</p>
         </div>
@@ -297,8 +300,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
           </div>
           {/* Gold monogram */}
           <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#D4AF37,#F7C948,#B8860B)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: "#1a0a2e", flexShrink: 0, boxShadow: "0 0 20px rgba(212,175,55,0.4)" }}>
-              {mono2(tagName)}
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#D4AF37,#F7C948,#B8860B)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 20px rgba(212,175,55,0.4)" }}>
+              <RiVipCrownLine style={{ width: 24, height: 24, color: "#1a0a2e" }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: "#F7C948", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tagName}</p>
@@ -344,7 +347,7 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         </div>
         <div className="flex justify-center -mt-7 relative z-10">
           <div className="w-[54px] h-[54px] rounded-full border-[3px] border-white flex items-center justify-center" style={{background:"linear-gradient(135deg,#F7C948 0%,#D4AF37 50%,#B8860B 100%)",animation:"cel-gold-glow 2s ease-in-out infinite"}}>
-            <span className="font-black text-[15px] text-white/90 leading-none">{mono2(tagName)}</span>
+            <RiFireLine style={{width:26,height:26,color:"rgba(255,255,255,0.92)"}} />
           </div>
         </div>
         <div className="px-4 pt-2 pb-4 text-center">
@@ -382,9 +385,7 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
             </span>
           </div>
           <div className="relative z-10 w-[60px] h-[60px] rounded-full flex items-center justify-center" style={{background:"rgba(0,210,255,0.05)",border:"2px solid rgba(0,210,255,0.45)",animation:"neon-ring 2.4s ease-in-out infinite"}}>
-            <span className="font-black text-[14px] leading-none select-none" style={{color:"rgba(0,210,255,0.85)",animation:"neon-mono-glow 2.4s ease-in-out infinite"}}>
-              {mono2(tagName)}
-            </span>
+            <RiFlashlightLine style={{width:28,height:28,color:"rgba(0,210,255,0.85)"}} />
           </div>
         </div>
         <div className="px-4 pt-1.5 pb-4 text-center">
@@ -412,8 +413,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
           </span>
         </div>
         <div className="flex justify-center my-2" style={{animation:"grad-float 3s ease-in-out infinite"}}>
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-[18px]" style={{background:"rgba(255,255,255,0.42)",backdropFilter:"blur(12px)",border:"1.5px solid rgba(255,255,255,0.65)",boxShadow:"0 4px 24px rgba(0,0,0,0.1)",color:"rgba(20,20,20,0.8)"}}>
-            {mono2(tagName)}
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{background:"rgba(255,255,255,0.42)",backdropFilter:"blur(12px)",border:"1.5px solid rgba(255,255,255,0.65)",boxShadow:"0 4px 24px rgba(0,0,0,0.1)"}}>
+            <RiSparklingLine style={{width:28,height:28,color:"rgba(20,20,20,0.75)"}} />
           </div>
         </div>
         <div className="px-4 text-center pb-2">
@@ -443,11 +444,11 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         {/* Left black panel */}
         <div className="relative flex flex-col items-center justify-center w-[36%] shrink-0 overflow-hidden" style={{background:"#000"}}>
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden select-none pointer-events-none">
-            <span className="font-black select-none" style={{fontSize:80,color:"rgba(255,255,255,0.04)",lineHeight:1}}>{mono1(tagName)}</span>
+            <RiUserLine style={{width:90,height:90,color:"rgba(255,255,255,0.04)"}} />
           </div>
           <div className="absolute top-0 right-0 w-[2.5px] h-full" style={{animation:"split-bar 2.5s ease-in-out infinite"}}/>
-          <div className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center font-black text-[14px] text-white/80" style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)"}}>
-            {mono2(tagName)}
+          <div className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center" style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)"}}>
+            <RiUserLine style={{width:22,height:22,color:"rgba(255,255,255,0.7)"}} />
           </div>
           <p className="relative z-10 font-mono text-[6px] mt-1.5 tracking-wider text-center px-2 truncate" style={{color:"rgba(255,255,255,0.18)"}}>{domain}</p>
         </div>
@@ -483,20 +484,20 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
       <div className="rounded-2xl overflow-hidden shadow-lg">
         {/* top bar — domain only, no tagLabel clutter */}
         <div className="px-3 py-2 flex items-center gap-2" style={{background:"#FF3800"}}>
-          <div className="w-5 h-5 rounded-md flex items-center justify-center font-black text-[9px] text-white/90 shrink-0" style={{background:"rgba(255,255,255,0.15)"}}>
-            {mono1(tagName)}
+          <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{background:"rgba(255,255,255,0.15)"}}>
+            <RiFlashlightLine style={{width:12,height:12,color:"rgba(255,255,255,0.9)"}} />
           </div>
           <p className="text-[7.5px] font-mono flex-1 truncate" style={{color:"rgba(255,255,255,0.85)"}}>{domain}</p>
         </div>
         {/* body */}
         <div className="flex" style={{minHeight:108}}>
-          {/* Left yellow — monogram only */}
+          {/* Left yellow — icon badge */}
           <div className="w-[40%] shrink-0 relative overflow-hidden flex flex-col items-center justify-center px-3 py-4" style={{animation:"flash-panel 2.2s ease-in-out infinite"}}>
             <svg className="absolute top-2 right-2 pointer-events-none" style={{animation:"flash-bolt-a 2.2s ease-in-out infinite"}} width={14} height={22} viewBox="0 0 10 18" fill="rgba(255,80,0,0.5)">
               <path d="M7 0L1 10h5L3 18l8-11H6L7 0Z"/>
             </svg>
-            <div className="relative z-10 font-black leading-none text-center" style={{fontSize:26,color:"#111",animation:"flash-mono-pulse 2.2s ease-in-out infinite"}}>
-              {mono2(tagName)}
+            <div className="relative z-10 flex items-center justify-center rounded-2xl" style={{width:52,height:52,background:"rgba(255,56,0,0.12)",border:"2px solid rgba(255,56,0,0.25)",animation:"flash-mono-pulse 2.2s ease-in-out infinite"}}>
+              <RiFlashlightLine style={{width:28,height:28,color:"#111"}} />
             </div>
           </div>
           {/* Right white */}
