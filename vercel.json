@@ -10,6 +10,10 @@
     {
       "path": "/api/remind/process",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/admin/process-email-queue",
+      "schedule": "*/10 * * * *"
     }
   ],
   "functions": {
@@ -33,6 +37,12 @@
     },
     "src/pages/api/admin/setup.ts": {
       "maxDuration": 30
+    },
+    "src/pages/api/admin/process-email-queue.ts": {
+      "maxDuration": 60
+    },
+    "src/pages/api/admin/notify.ts": {
+      "maxDuration": 60
     },
     "src/pages/api/remind/process.ts": {
       "maxDuration": 60

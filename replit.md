@@ -1,3 +1,39 @@
+# Next Whois UI — v3.32
+
+## Vercel Serverless + Redis Optimization (2026-04-01, v3.32)
+
+### Upstash HTTP Client (major Vercel fix)
+**`src/lib/server/redis.ts`** — complete rewrite:
+- **Primary**: `@upstash/redis` HTTP client (stateless, zero persistent TCP connections, Vercel-safe). Auto-detected via `wr_KV_REST_API_URL` + `wr_KV_REST_API_TOKEN` env vars (supports `wr_`, `xrw_`, unprefixed prefixes)
+- **Fallback**: ioredis TCP client for self-hosted Redis (only activated when Upstash REST env vars are absent)
+- Unified interface: all existing functions (`getRedisValue`, `setRedisValue`, `getJsonRedisValue`, `incrRedisValue`, `deleteRedisKeysByPattern`, `getRemainingTtl`, `getJsonRedisValueWithTtl`) route to the active client transparently
+- Added `getCachedSetting` / `setCachedSetting` / `invalidateCachedSettings` helpers for site-settings Redis cache layer (60 s TTL, key prefix `ss:`)
+- Added `getWhoisDbCache` / `setWhoisDbCache` helpers for PostgreSQL L3 fallback cache
+- `isRedisAvailable()` returns `true` immediately for Upstash (always ready, no "ready" event needed)
+- `@upstash/redis ^1.37.0` added to package.json
+
+### Site Settings — Redis L2 Cache
+**`src/lib/server/site-settings-server.ts`**:
+- Added Redis L2 cache layer between in-process L1 and PostgreSQL L3
+- `getSetting()` / `getSettings()`: L1 (30 s in-process) → L2 (Redis 60 s) → L3 (DB)
+- `invalidateSettingsCache()`: clears both L1 and Redis L2 (best-effort)
+- Prevents repeated DB hits on Vercel cold starts where L1 is empty
+
+### DB Pool — Serverless-Aware
+**`src/lib/db.ts`**:
+- `max: isServerless ? 2 : 8` — reduced pool size on Vercel to avoid exhausting Supabase connection limits
+- `idleTimeoutMillis: isServerless ? 5000 : 30000` — faster idle cleanup on serverless
+- `keepAlive: !isServerless` — disabled on Vercel (connections are short-lived)
+- Detection via `process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME`
+
+### Vercel Config
+**`vercel.json`**:
+- Added `process-email-queue` cron: `*/10 * * * *` (every 10 minutes)
+- Added `maxDuration: 60` for `/api/admin/process-email-queue` and `/api/admin/notify`
+- Total configured functions: 11
+
+---
+
 # Next Whois UI — v3.31
 
 ## Comprehensive UX Enhancement (2026-04-01, v3.30)

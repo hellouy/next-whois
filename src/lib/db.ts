@@ -509,15 +509,19 @@ function makePool(connectionString: string): Pool {
   } catch {
     sslConfig = { rejectUnauthorized: false };
   }
+  // On Vercel (serverless) each function instance is short-lived and isolated.
+  // A pool of 2 is sufficient per instance; more would hit Supabase/Neon limits.
+  // On traditional servers keep a larger pool for throughput.
+  const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
-    max: 8,
+    max: isServerless ? 2 : 8,
     min: 0,
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: isServerless ? 5000 : 30000,
     allowExitOnIdle: true,
-    keepAlive: true,
+    keepAlive: !isServerless,
     keepAliveInitialDelayMillis: 30000,
     query_timeout: 20000,
     statement_timeout: 20000,
