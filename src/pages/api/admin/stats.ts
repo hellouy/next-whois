@@ -16,6 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       users, disabledUsers, stamps, verifiedStamps, reminders, history, feedback,
       anonSearches, todaySearches, todayUsers, subscribedUsers,
       totalOrders, paidOrders, paidRevenue,
+      tldFailures, weeklySearches, domainSearches, ipSearches, asnSearches, cidrSearches,
+      availableSearches, registeredSearches, highValueSearches,
     ] = await Promise.all([
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE disabled = true"),
@@ -31,15 +33,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders").catch(() => ({ count: "0" })),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM payment_orders WHERE status = 'paid'").catch(() => ({ count: "0" })),
       one<{ sum: string | null }>("SELECT SUM(amount)::text AS sum FROM payment_orders WHERE status = 'paid'").catch(() => ({ sum: null })),
+      // TLD failures stats
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM tld_fallback_stats WHERE fail_count > 3").catch(() => ({ count: "0" })),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE created_at >= NOW() - INTERVAL '7 days'"),
+      // query type breakdown
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE query_type = 'domain'"),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE query_type IN ('ipv4','ipv6')"),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE query_type = 'asn'"),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE query_type = 'cidr'"),
+      // reg status breakdown
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE reg_status = 'unregistered'"),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE reg_status = 'registered'"),
+      one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE value_tier = 'high'").catch(() => ({ count: "0" })),
     ]);
 
-    const [recentUsers, recentSearches] = await Promise.all([
+    const [recentUsers, recentSearches, topFailingTlds, dailyTrend] = await Promise.all([
       many<{ id: string; email: string; name: string | null; created_at: string; disabled: boolean }>(
         "SELECT id, email, name, created_at, disabled FROM users ORDER BY created_at DESC LIMIT 5"
       ),
       many<{ id: string; query: string; query_type: string; created_at: string; user_id: string | null }>(
         "SELECT id, query, query_type, created_at, user_id FROM search_history ORDER BY created_at DESC LIMIT 10"
       ),
+      many<{ tld: string; fail_count: number; fail_reason: string | null; last_fail_at: string | null; has_custom_server: boolean }>(
+        `SELECT f.tld, f.fail_count, f.fail_reason, f.last_fail_at::text,
+                (c.tld IS NOT NULL) AS has_custom_server
+         FROM tld_fallback_stats f
+         LEFT JOIN custom_whois_servers c ON c.tld = f.tld
+         WHERE f.fail_count > 3
+         ORDER BY f.fail_count DESC LIMIT 8`
+      ).catch(() => [] as any[]),
+      many<{ day: string; count: string }>(
+        `SELECT DATE(created_at)::text AS day, COUNT(*) AS count
+         FROM search_history
+         WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY DATE(created_at) ORDER BY day`
+      ).catch(() => [] as any[]),
     ]);
 
     return res.json({
@@ -57,6 +85,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalOrders: parseInt(totalOrders?.count ?? "0"),
       paidOrders: parseInt(paidOrders?.count ?? "0"),
       paidRevenue: parseFloat(paidRevenue?.sum ?? "0") || 0,
+      tldFailures: parseInt(tldFailures?.count ?? "0"),
+      weeklySearches: parseInt(weeklySearches?.count ?? "0"),
+      queryTypeBreakdown: {
+        domain: parseInt(domainSearches?.count ?? "0"),
+        ip: parseInt(ipSearches?.count ?? "0"),
+        asn: parseInt(asnSearches?.count ?? "0"),
+        cidr: parseInt(cidrSearches?.count ?? "0"),
+      },
+      regStatusBreakdown: {
+        available: parseInt(availableSearches?.count ?? "0"),
+        registered: parseInt(registeredSearches?.count ?? "0"),
+        highValue: parseInt(highValueSearches?.count ?? "0"),
+      },
+      topFailingTlds,
+      dailyTrend: dailyTrend.map(d => ({ day: d.day, count: parseInt(d.count) })),
       recentUsers,
       recentSearches,
     });

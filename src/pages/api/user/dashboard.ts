@@ -29,8 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const email = session.user.email;
 
   try {
+    const userId = (session.user as any)?.id ?? null;
+
     // ── Phase 1: four DB queries in parallel ─────────────────────────────────
-    const [rows, stampsRows, overrides, userRow] = await Promise.all([
+    const [rows, stampsRows, overrides, userRow, searchStats] = await Promise.all([
       many<{
         id: string; domain: string; expiration_date: string | null;
         active: boolean; cancel_token: string | null; created_at: string;
@@ -56,6 +58,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "SELECT subscription_access, subscription_expires_at, balance_cents, membership_plan FROM users WHERE email = $1",
         [email],
       ),
+      // Search history stats for the user
+      userId ? one<{
+        total: string; today: string; this_week: string;
+        available: string; high_value: string;
+        top_type: string | null;
+      }>(
+        `SELECT
+           COUNT(*)::text                                                                                       AS total,
+           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::text                                AS today,
+           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::text                               AS this_week,
+           COUNT(*) FILTER (WHERE reg_status = 'unregistered')::text                                           AS available,
+           COUNT(*) FILTER (WHERE value_tier = 'high')::text                                                   AS high_value,
+           (SELECT query_type FROM search_history WHERE user_id = $1
+            GROUP BY query_type ORDER BY COUNT(*) DESC LIMIT 1)                                                AS top_type
+         FROM search_history WHERE user_id = $1`,
+        [userId],
+      ).catch(() => null) : Promise.resolve(null),
     ]);
 
     // ── Phase 2: fetch reminder_logs (depends on reminder IDs) ──────────────
@@ -141,6 +160,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscriptionExpiresAt,
       balanceCents: userRow?.balance_cents ?? 0,
       membershipPlan: userRow?.membership_plan ?? null,
+      searchStats: searchStats ? {
+        total: parseInt(searchStats.total ?? "0"),
+        today: parseInt(searchStats.today ?? "0"),
+        thisWeek: parseInt(searchStats.this_week ?? "0"),
+        available: parseInt(searchStats.available ?? "0"),
+        highValue: parseInt(searchStats.high_value ?? "0"),
+        topType: searchStats.top_type,
+      } : null,
     });
   } catch (err: any) {
     console.error("[dashboard] GET error:", err.message);

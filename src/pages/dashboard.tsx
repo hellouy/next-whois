@@ -667,11 +667,21 @@ function SubscribeGuideModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Module-level dashboard data cache (survives tab switches / soft-navs) ────
+interface SearchStats {
+  total: number;
+  today: number;
+  thisWeek: number;
+  available: number;
+  highValue: number;
+  topType: string | null;
+}
+
 interface DashData {
   subscriptions: Subscription[];
   stamps: Stamp[];
   /** DB-authoritative — heals stale JWTs automatically */
   subscriptionAccess: boolean;
+  searchStats: SearchStats | null;
 }
 let _dashCache: DashData | null = null;
 let _dashCacheTs = 0;
@@ -685,6 +695,7 @@ async function fetchDashData(): Promise<DashData> {
     subscriptions: data.subscriptions ?? [],
     stamps: data.stamps ?? [],
     subscriptionAccess: data.subscriptionAccess ?? false,
+    searchStats: data.searchStats ?? null,
   };
   _dashCache = result;
   _dashCacheTs = Date.now();
@@ -755,6 +766,7 @@ export default function DashboardPage() {
   const [avatarColor, setAvatarColor] = React.useState("violet");
   const [editingAvatar, setEditingAvatar] = React.useState(false);
   const [savingAvatar, setSavingAvatar] = React.useState(false);
+  const [searchStats, setSearchStats] = React.useState<SearchStats | null>(null);
 
   React.useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -775,6 +787,7 @@ export default function DashboardPage() {
     setSubscriptionExpiresAt((d as any).subscriptionExpiresAt ?? null);
     setBalanceCents((d as any).balanceCents ?? 0);
     setMembershipPlan((d as any).membershipPlan ?? null);
+    setSearchStats(d.searchStats ?? null);
     // Heal the JWT if DB says TRUE but session says FALSE — no re-login needed
     if (d.subscriptionAccess && !(session?.user as any)?.subscriptionAccess) {
       updateSession({ refreshSubscription: true });
@@ -1253,6 +1266,30 @@ export default function DashboardPage() {
                 <p className="text-base font-bold leading-none">{verifiedStamps.length}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_verified_brands")}</p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Search history stats bar */}
+        {!loadingData && searchStats && searchStats.total > 0 && (
+          <div className="glass-panel border border-border/60 rounded-xl px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.search_stats_title")}</p>
+              <Link href="/" className="text-[10px] text-primary hover:underline">{t("dashboard.search_now")}</Link>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {[
+                { label: t("dashboard.ss_total"),     value: searchStats.total,     color: "text-foreground" },
+                { label: t("dashboard.ss_today"),     value: searchStats.today,     color: "text-blue-600 dark:text-blue-400" },
+                { label: t("dashboard.ss_week"),      value: searchStats.thisWeek,  color: "text-violet-600 dark:text-violet-400" },
+                { label: t("dashboard.ss_available"), value: searchStats.available, color: "text-emerald-600 dark:text-emerald-400" },
+                { label: t("dashboard.ss_high_value"),value: searchStats.highValue, color: "text-amber-600 dark:text-amber-400" },
+              ].map(item => (
+                <div key={item.label} className="text-center">
+                  <p className={cn("text-base font-bold leading-none", item.color)}>{item.value.toLocaleString()}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{item.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}

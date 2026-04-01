@@ -13,7 +13,7 @@ import {
   RiPaletteLine, RiGithubLine,
   RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine,
   RiGlobalLine, RiMailSendLine, RiDownloadLine,
-  RiBillLine,
+  RiBillLine, RiAlertLine, RiBarChartLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -31,6 +31,12 @@ type Stats = {
   totalOrders: number;
   paidOrders: number;
   paidRevenue: number;
+  tldFailures: number;
+  weeklySearches: number;
+  queryTypeBreakdown: { domain: number; ip: number; asn: number; cidr: number };
+  regStatusBreakdown: { available: number; registered: number; highValue: number };
+  topFailingTlds: { tld: string; fail_count: number; fail_reason: string | null; has_custom_server: boolean }[];
+  dailyTrend: { day: string; count: number }[];
   recentUsers: { id: string; email: string; name: string | null; created_at: string; disabled: boolean }[];
   recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null }[];
 };
@@ -143,6 +149,7 @@ const ACTION_GROUPS: ActionGroup[] = [
     items: [
       { href: "/admin/domains",          label: "域名生命周期", desc: "注册·宽限·赎回·删除节点",   icon: RiGlobalLine,     color: "text-blue-600" },
       { href: "/admin/tld-rules",        label: "后缀解析规则", desc: "WHOIS / RDAP 规则定制",     icon: RiCodeBoxLine,    color: "text-teal-500" },
+      { href: "/admin/tld-failures",     label: "查询失败统计", desc: "后缀查询失败分析与修复",    icon: RiAlertLine,      color: "text-amber-500" },
       { href: "/admin/api",              label: "API 集成",     desc: "AI Key · 第三方数据源配置", icon: RiPlugLine,       color: "text-orange-500" },
       { href: "/admin/hot-prefixes",     label: "热门搜索词",   desc: "首页推荐查询词条管理",      icon: RiFireLine,       color: "text-red-500" },
     ],
@@ -308,6 +315,12 @@ export default function AdminIndexPage() {
               color="bg-teal-100 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400"
             />
           )}
+          <StatCard
+            icon={RiAlertLine} label="后缀查询失败" value={stats?.tldFailures}
+            sub="本周查询" subValue={stats?.weeklySearches}
+            href="/admin/tld-failures"
+            color="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
+          />
         </div>
 
         {/* Recent users + searches side by side */}
@@ -365,6 +378,90 @@ export default function AdminIndexPage() {
             )}
           </div>
         ) : null}
+
+        {/* Query type breakdown + top failing TLDs */}
+        {stats && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* Query type breakdown */}
+            <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 justify-between">
+                <h3 className="text-xs font-bold flex items-center gap-1.5">
+                  <RiBarChartLine className="w-3.5 h-3.5 text-primary" />查询类型分布
+                </h3>
+                <button onClick={() => router.push("/admin/search-records", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">详情</button>
+              </div>
+              {(() => {
+                const b = stats.queryTypeBreakdown;
+                const total = (b.domain + b.ip + b.asn + b.cidr) || 1;
+                const items = [
+                  { label: "域名", value: b.domain, color: "bg-blue-500" },
+                  { label: "IP",   value: b.ip,     color: "bg-violet-500" },
+                  { label: "ASN",  value: b.asn,    color: "bg-amber-500" },
+                  { label: "CIDR", value: b.cidr,   color: "bg-rose-500" },
+                ];
+                return (
+                  <div className="space-y-2">
+                    <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+                      {items.map(it => it.value > 0 && (
+                        <div key={it.label} className={cn("rounded-full", it.color)} style={{ width: `${Math.max((it.value / total) * 100, 1)}%` }} />
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      {items.map(it => (
+                        <div key={it.label} className="flex items-center gap-1.5">
+                          <div className={cn("w-2 h-2 rounded-full shrink-0", it.color)} />
+                          <span className="text-[10px] text-muted-foreground">{it.label}</span>
+                          <span className="text-[10px] font-semibold ml-auto">{it.value.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-1 border-t border-border/40 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="text-[10px] text-muted-foreground">可注册</span>
+                        <span className="text-[10px] font-semibold ml-auto">{stats.regStatusBreakdown.available.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                        <span className="text-[10px] text-muted-foreground">高价值</span>
+                        <span className="text-[10px] font-semibold ml-auto">{stats.regStatusBreakdown.highValue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Top failing TLDs */}
+            {stats.topFailingTlds.length > 0 && (
+              <div className="glass-panel border border-amber-200/50 dark:border-amber-800/30 rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center gap-2 justify-between">
+                  <h3 className="text-xs font-bold flex items-center gap-1.5">
+                    <RiAlertLine className="w-3.5 h-3.5 text-amber-500" />查询失败后缀 Top 8
+                  </h3>
+                  <button onClick={() => router.push("/admin/tld-failures", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">全部</button>
+                </div>
+                <div className="space-y-1">
+                  {stats.topFailingTlds.map(t => {
+                    const reasons: Record<string, string> = {
+                      iana_fallback: "无服务器", no_server: "无可达", timeout: "超时",
+                      parse_error: "解析错误", rate_limited: "速率限制",
+                    };
+                    return (
+                      <div key={t.tld} className="flex items-center gap-2">
+                        <code className="text-[10px] font-mono font-semibold shrink-0 w-20 truncate">.{t.tld}</code>
+                        <span className="text-[9px] text-muted-foreground shrink-0">{reasons[t.fail_reason ?? ""] ?? t.fail_reason ?? "—"}</span>
+                        {t.has_custom_server && <span className="text-[9px] text-emerald-500 shrink-0">✓</span>}
+                        <div className="flex-1" />
+                        <span className="text-[10px] font-bold text-red-500 shrink-0">{t.fail_count.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Quick actions — grouped */}
         <div className="glass-panel border border-border rounded-2xl p-4 space-y-4">

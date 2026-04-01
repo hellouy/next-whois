@@ -344,6 +344,11 @@ const ALTER_COLUMNS = [
   `ALTER TABLE friendly_links ADD COLUMN IF NOT EXISTS logo_url TEXT`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled  BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled_at TIMESTAMPTZ`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repair_status TEXT NOT NULL DEFAULT 'pending'`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS found_server  TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes   TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repaired_at   TIMESTAMPTZ`,
+  `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source         TEXT`,
 ];
 
 const CREATE_INDEXES = [
@@ -492,11 +497,16 @@ function makePool(connectionString: string): Pool {
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
-    max: 3,
-    connectionTimeoutMillis: 8000,
-    idleTimeoutMillis: 20000,
+    max: 8,
+    min: 0,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
     allowExitOnIdle: true,
-  });
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 30000,
+    query_timeout: 20000,
+    statement_timeout: 20000,
+  } as any);
   p.on("error", (err) => console.error("[db] pool error:", err.message));
   return p;
 }
