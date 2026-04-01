@@ -257,7 +257,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // jm: removed — rdap.nic.jm ENOTFOUND; no known WHOIS server for Jamaica
   kn: "https://rdap.nic.kn/",
   ky: "https://whois.kyregistry.ky/rdap/",
-  lc: "https://rdap.identitydigital.services/rdap/", // confirmed: IdentityDigital (rdap.nic.lc ENOTFOUND)
+  // lc: moved to GTLD_RDAP_BOOTSTRAP — RDAP is complete, WHOIS blocked from our net
   // mx: removed — rdap.mx ENOTFOUND; WHOIS via whois.mx works
   // pe: removed — rdap.nic.pe ENOTFOUND; WHOIS now fixed to whois.nic.pe
   pm: "https://rdap.nic.pm/",
@@ -265,7 +265,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   sr: "https://whois.sr/rdap/",                    // IANA: whois.sr/rdap/
   tf: "https://rdap.nic.tf/",
   // tt: removed — rdap.nic.tt ENOTFOUND; WHOIS whois.nic.tt also ENOTFOUND
-  vc: "https://rdap.identitydigital.services/rdap/", // confirmed: IdentityDigital (rdap.nic.vc ENOTFOUND)
+  // vc: moved to GTLD_RDAP_BOOTSTRAP — RDAP is complete, WHOIS blocked from our net
   ve: "https://rdap.nic.ve/",                      // confirmed: rdap.nic.ve
   vg: "https://rdap.centralnic.com/vg/",
   vi: "https://rdap.nic.vi/",

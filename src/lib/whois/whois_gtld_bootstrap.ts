@@ -631,7 +631,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "law": "whois.nic.law",
   "lawyer": "whois.identity.digital",
   "lb": "whois.lbdr.org.lb",
-  "lc": "whois.identity.digital",  // whois.nic.lc ENOTFOUND; IdentityDigital manages .lc
+  "lc": "whois.identitydigital.services",  // IANA-specified; whois.nic.lc ENOTFOUND
   "lds": "whois.identity.digital",
   "lease": "whois.donuts.co",
   "leclerc": "whois.nic.leclerc",
@@ -1130,7 +1130,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "vacations": "whois.donuts.co",
   "vana": "whois.tucowsregistry.net",
   "vanguard": "whois.identity.digital",
-  "vc": "whois.identity.digital",  // whois.nic.vc ENOTFOUND; IdentityDigital manages .vc
+  "vc": "whois.identitydigital.services",  // IANA-specified; whois.nic.vc ENOTFOUND
   "ve": "whois.nic.ve",
   "vegas": "whois.identity.digital",
   "ventures": "whois.donuts.co",

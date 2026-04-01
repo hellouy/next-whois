@@ -1229,6 +1229,9 @@ const GTLD_RDAP_BOOTSTRAP: Record<string, string> = {
   "xn--xkc2dl3a5ee0h": "https://rdap.nic.lk/",               // .இலங்கை Sri Lanka (Tamil)
   "xn--fzc2c9e2c":     "https://rdap.nic.lk/",               // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
   "xn--qxam":          "https://rdap.gr/",                   // .ελ Greece
+  // ── ccTLDs managed via gTLD-style RDAP (WHOIS blocked/unavailable from our infra) ──
+  "vc":                "https://rdap.identitydigital.services/rdap/", // .vc Saint Vincent — IdentityDigital; WHOIS timeouts
+  "lc":                "https://rdap.identitydigital.services/rdap/", // .lc Saint Lucia — IdentityDigital; WHOIS timeouts
 };
 
 /**
@@ -1240,7 +1243,7 @@ export function getGtldRdapServer(tld: string): string | undefined {
 }
 
 /** Total number of TLDs in the local RDAP bootstrap. */
-export const GTLD_RDAP_COUNT = 1218;
+export const GTLD_RDAP_COUNT = 1220;
 
 /** Returns the full RDAP bootstrap map (TLD → server URL). Admin use only. */
 export function getAllGtldRdapServers(): Record<string, string> {
