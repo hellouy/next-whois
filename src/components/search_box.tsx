@@ -540,13 +540,16 @@ export function SearchBox({
   };
 
   const handleSuggestionClick = (suggestion: string) => {
+    // Prevent submission while loading
+    if (loading) return;
     setInputValue(suggestion);
     setShowSuggestions(false);
     onSearch(suggestion);
   };
 
   const handleSearch = () => {
-    if (!inputValue) return;
+    // Prevent submission while loading or with empty input
+    if (loading || !inputValue) return;
     const result = validateAndSanitizeInput(inputValue);
     if (!result.valid) {
       setValidationError({ message: t(result.errorKey as any, result.errorArgs as any), isWarning: false });

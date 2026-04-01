@@ -172,7 +172,9 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
   const router = useRouter();
   const { t } = useTranslation();
   const settings = useSiteSettings();
-  const [loading, setLoading] = React.useState(false);
+  // Use a ref to track navigation state without causing re-renders
+  const isNavigatingRef = React.useRef(false);
+  const [isNavigating, setIsNavigating] = React.useState(false);
   const stats = usePublicStats(seo.showStats);
 
   useEffect(() => {
@@ -181,8 +183,19 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
     router.prefetch("/ip");
     router.prefetch("/ssl");
     router.prefetch("/icp");
-    const handleStart = (url: string) => { if (isSearchRoute(url)) setLoading(true); };
-    const handleComplete = () => setLoading(false);
+    
+    // Track navigation state for UI feedback, but don't cause extra re-renders
+    const handleStart = (url: string) => { 
+      if (isSearchRoute(url)) {
+        isNavigatingRef.current = true;
+        setIsNavigating(true);
+      }
+    };
+    const handleComplete = () => {
+      isNavigatingRef.current = false;
+      setIsNavigating(false);
+    };
+    
     router.events.on("routeChangeStart", handleStart);
     router.events.on("routeChangeComplete", handleComplete);
     router.events.on("routeChangeError", handleComplete);
@@ -197,9 +210,13 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
 
   const handleSearch = useCallback(
     (query: string) => {
+      // Prevent double navigation
+      if (isNavigatingRef.current) return;
+      
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
       if (cleaned) prefetchLookup(cleaned);
-      setLoading(true);
+      isNavigatingRef.current = true;
+      setIsNavigating(true);
       router.push(toSearchURI(query));
     },
     [router],
@@ -258,7 +275,7 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
         {/* Search box */}
         <div className="mb-3">
           <div className="relative group">
-            <SearchBox onSearch={handleSearch} loading={loading} autoFocus placeholder={seo.searchPlaceholder || undefined} />
+            <SearchBox onSearch={handleSearch} loading={isNavigating} autoFocus placeholder={seo.searchPlaceholder || undefined} />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
               <KeyboardShortcut k="/" />
             </div>
@@ -273,7 +290,7 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
         {seo.showStats && stats && (
           <div
             className="flex justify-center gap-6 mt-3 mb-1"
-            style={{ opacity: loading ? 0 : 1, transition: "opacity 0.1s ease" }}
+            style={{ opacity: isNavigating ? 0 : 1, transition: "opacity 0.1s ease" }}
           >
             <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
               <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
@@ -292,9 +309,9 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
           className="sm:hidden flex items-center justify-center"
           style={{
             height: "calc(100vh - 22rem)",
-            opacity: loading ? 0 : 1,
+            opacity: isNavigating ? 0 : 1,
             transition: "opacity 0.12s ease",
-            pointerEvents: loading ? "none" : undefined,
+            pointerEvents: isNavigating ? "none" : undefined,
           }}
         >
           <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
