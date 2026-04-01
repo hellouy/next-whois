@@ -131,18 +131,64 @@ const CARD_CONTAINER_VARIANTS = {
   hidden: { opacity: 1 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05, delayChildren: 0 },
+    transition: { staggerChildren: 0.04, delayChildren: 0.08 },
   },
 };
 
 const CARD_ITEM_VARIANTS = {
-  hidden: { opacity: 0, y: 6 },
+  hidden: { opacity: 0, y: 8 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
   },
 };
+
+// ── QueryProgressBar ─────────────────────────────────────────────────────────
+// Thin top-of-content progress bar: fills 0→80% while loading, then 100% + fade.
+function QueryProgressBar({ loading }: { loading: boolean }) {
+  const [width, setWidth] = React.useState(0);
+  const [visible, setVisible] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const doneRef  = React.useRef(false);
+
+  React.useEffect(() => {
+    if (loading) {
+      doneRef.current = false;
+      setWidth(0);
+      setVisible(true);
+      // Advance quickly to 30%, then slow down toward 80%
+      let w = 0;
+      timerRef.current = setInterval(() => {
+        if (doneRef.current) return;
+        w += w < 30 ? 8 : w < 60 ? 3 : w < 78 ? 0.8 : 0;
+        if (w > 80) w = 80;
+        setWidth(w);
+      }, 120);
+    } else {
+      doneRef.current = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      setWidth(100);
+      const t = setTimeout(() => setVisible(false), 500);
+      return () => clearTimeout(t);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [loading]);
+
+  if (!visible) return null;
+  return (
+    <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden rounded-t z-20 pointer-events-none">
+      <div
+        className="h-full bg-primary/70 transition-all"
+        style={{
+          width: `${width}%`,
+          transitionDuration: width === 100 ? "200ms" : "120ms",
+          transitionTimingFunction: width === 100 ? "ease-out" : "linear",
+        }}
+      />
+    </div>
+  );
+}
 
 const REGISTRAR_ICONS: Record<string, { slug: string | null; color: string }> =
   {
@@ -4692,11 +4738,12 @@ export default function LookupPage({
           </div>
 
           <div className="relative">
+            <QueryProgressBar loading={loading} />
             <motion.div
               layout
               initial={false}
-              animate={{ opacity: loading ? 0.85 : 1 }}
-              transition={{ duration: 0.18, ease: "easeOut", layout: { duration: 0.25, ease: "easeOut" } }}
+              animate={{ opacity: loading ? 0.82 : 1 }}
+              transition={{ duration: 0.22, ease: "easeOut", layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
@@ -4760,8 +4807,8 @@ export default function LookupPage({
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeIn" } }}
+              transition={{ duration: 0.15 }}
               className="grid grid-cols-1 gap-6"
             >
               <div className="space-y-4">
@@ -4795,9 +4842,9 @@ export default function LookupPage({
             return (
             <motion.div
               key={target}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1], delay: 0.06 }}
             >
             <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
