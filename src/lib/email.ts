@@ -1072,8 +1072,7 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
     configuredFrom = process.env.RESEND_FROM_EMAIL || "";
   }
   if (!resendKey) {
-    console.warn("[sendEmail] resend_api_key not configured — email skipped (not queued)");
-    return;
+    throw new Error("邮件服务未配置：请在管理后台的「邮件」设置中配置 SMTP 或填写 Resend API Key，否则无法发送邮件。");
   }
   const siteLabel    = await getSiteLabel();
   const fromAddresses = configuredFrom

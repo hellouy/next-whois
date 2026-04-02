@@ -28,7 +28,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import {
-  sendEmail,
+  sendEmailDirect,
   getSiteLabel,
   welcomeHtml,
   subscriptionConfirmHtml,
@@ -298,7 +298,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   for (const t of targets) {
     try {
-      await sendEmail({ to, subject: t.subject, html: t.html });
+      await sendEmailDirect(to, t.subject, t.html);
       results.push({ key: t.key, subject: t.subject, ok: true });
       console.log(`[test-email] Sent "${t.key}" → ${to}`);
     } catch (err: any) {

@@ -569,26 +569,36 @@ const FEATURE_GROUPS: { title: string; icon: React.ElementType; color: string; i
 
 function Toggle({ value, onChange, onColor }: { value: boolean; onChange: (v: boolean) => void; onColor: string }) {
   return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span className={["text-[11px] font-semibold w-4 text-right transition-colors", value ? "text-foreground" : "text-muted-foreground/40"].join(" ")}>
-        {value ? "开" : "关"}
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className={[
+        "flex items-center gap-2 shrink-0 rounded-full px-2 py-1 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/50",
+        value
+          ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-300 dark:ring-emerald-700"
+          : "bg-muted/50 ring-1 ring-border hover:bg-muted",
+      ].join(" ")}
+      aria-pressed={value}
+      title={value ? "点击关闭" : "点击开启"}
+    >
+      {/* Pill switch track */}
+      <span className={[
+        "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200",
+        value ? onColor : "bg-slate-300 dark:bg-slate-600",
+      ].join(" ")}>
+        <span className={[
+          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform duration-200",
+          value ? "translate-x-4" : "translate-x-0",
+        ].join(" ")} />
       </span>
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        className={[
-          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-          value ? onColor : "bg-slate-300 dark:bg-slate-600",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-            value ? "translate-x-4" : "translate-x-0",
-          ].join(" ")}
-        />
-      </button>
-    </div>
+      {/* State label */}
+      <span className={[
+        "text-[11px] font-bold tracking-wide transition-colors whitespace-nowrap",
+        value ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/60",
+      ].join(" ")}>
+        {value ? "已开启" : "已关闭"}
+      </span>
+    </button>
   );
 }
 
@@ -623,6 +633,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = React.useState(false);
   const [testingEmail, setTestingEmail] = React.useState(false);
   const [emailOk, setEmailOk] = React.useState<boolean | null>(null);
+  const [emailError, setEmailError] = React.useState<string>("");
   const [activeSection, setActiveSection] = React.useState("branding");
 
   // ── template preview sender ─────────────────────────────────────────────
@@ -647,6 +658,7 @@ export default function AdminSettingsPage() {
   async function handleTestEmail() {
     setTestingEmail(true);
     setEmailOk(null);
+    setEmailError("");
     try {
       const res = await fetch("/api/admin/test-email", {
         method: "POST",
@@ -656,13 +668,19 @@ export default function AdminSettingsPage() {
       const data = await res.json();
       if (res.ok && data.ok) {
         setEmailOk(true);
-        toast.success(`测试邮件已发送至 ${data.to}${data.provider ? `（通道：${data.provider}）` : ""}`);
+        toast.success(`测试邮件已发送至 ${data.to}`);
       } else {
         setEmailOk(false);
-        toast.error(data.error || "发送失败");
+        // Extract error from results array if top-level error not present
+        const errMsg = data.error
+          || data.results?.[0]?.error
+          || "发送失败，请检查邮件服务配置";
+        setEmailError(errMsg);
+        toast.error(errMsg);
       }
     } catch {
       setEmailOk(false);
+      setEmailError("网络错误，请稍后重试");
       toast.error("网络错误，发送失败");
     } finally {
       setTestingEmail(false);
@@ -1044,21 +1062,11 @@ export default function AdminSettingsPage() {
                           <p className="text-sm font-semibold">启用 SMTP 发送</p>
                           <p className="text-xs text-muted-foreground mt-0.5">开启后所有系统邮件将通过 SMTP 发送，优先级高于 Resend</p>
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={!!form.smtp_enabled}
-                          onClick={() => set("smtp_enabled", form.smtp_enabled ? "" : "1")}
-                          className={[
-                            "relative w-10 h-6 rounded-full transition-colors shrink-0",
-                            form.smtp_enabled ? "bg-emerald-500" : "bg-muted-foreground/25",
-                          ].join(" ")}
-                        >
-                          <span className={[
-                            "absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform",
-                            form.smtp_enabled ? "translate-x-5" : "translate-x-1",
-                          ].join(" ")} />
-                        </button>
+                        <Toggle
+                          value={!!form.smtp_enabled}
+                          onChange={v => set("smtp_enabled", v ? "1" : "")}
+                          onColor="bg-emerald-500"
+                        />
                       </div>
 
                       {/* SMTP fields */}
@@ -1193,9 +1201,14 @@ export default function AdminSettingsPage() {
                         </p>
                       )}
                       {emailOk === false && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <RiAlertLine className="w-3.5 h-3.5" />发送失败，请检查 SMTP 配置或 Resend API Key
-                        </p>
+                        <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 space-y-0.5">
+                          <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+                            <RiAlertLine className="w-3.5 h-3.5 shrink-0" />发送失败
+                          </p>
+                          {emailError && (
+                            <p className="text-[11px] text-destructive/80 leading-relaxed">{emailError}</p>
+                          )}
+                        </div>
                       )}
                       <Button
                         variant="outline"
