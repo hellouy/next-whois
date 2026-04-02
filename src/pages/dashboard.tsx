@@ -148,6 +148,12 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
   const { t, locale } = useTranslation();
   const isZh = locale.startsWith("zh");
 
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -234,10 +240,11 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
         </div>
       )}
 
-      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-6 sm:p-4">
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 space-y-4 max-h-[88vh] overflow-y-auto">
-          <div className="flex items-center justify-between">
+        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: "min(92dvh, calc(100dvh - 56px))" }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
             <h2 className="text-base font-bold flex items-center gap-2">
               <RiPencilLine className="w-4 h-4 text-primary" />{t("dashboard.edit_stamp_title")}
             </h2>
@@ -245,9 +252,11 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
               <RiCloseLine className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
 
-          <div className="space-y-3">
+          {/* Scrollable content */}
+          <div className="overflow-y-auto overscroll-contain flex-1 px-6 pb-2 space-y-3">
+            <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
+
             {/* Tag name */}
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between">
@@ -355,9 +364,11 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
                 />
               </div>
             </div>
+            <div className="h-1" />
           </div>
 
-          <div className="flex gap-2 pt-1">
+          {/* Footer buttons — always visible */}
+          <div className="flex gap-2 px-6 py-4 border-t border-border/50 shrink-0">
             <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
             <Button onClick={handleSave} disabled={saving} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
               {saving ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.saving")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.save")}</>}
@@ -376,6 +387,12 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
   );
   const [saving, setSaving] = React.useState(false);
   const { t } = useTranslation();
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   async function handleSave() {
     if (!dateValue) { toast.error(t("dashboard.date_required")); return; }
@@ -398,10 +415,10 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-6 sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2">
             <RiCalendarLine className="w-4 h-4 text-primary" />{t("dashboard.edit_expiry_title")}
           </h2>
@@ -409,12 +426,14 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
             <RiCloseLine className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{sub.domain}</span></p>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">{t("dashboard.expiry_date")}</Label>
-          <Input type="date" value={dateValue} onChange={e => setDateValue(e.target.value)} className="h-9 rounded-xl text-sm" />
+        <div className="px-6 pb-2 space-y-4">
+          <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{sub.domain}</span></p>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">{t("dashboard.expiry_date")}</Label>
+            <Input type="date" value={dateValue} onChange={e => setDateValue(e.target.value)} className="h-9 rounded-xl text-sm" />
+          </div>
         </div>
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2 px-6 py-4 border-t border-border/50 shrink-0">
           <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
           <Button onClick={handleSave} disabled={saving} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
             {saving ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.saving")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.save")}</>}
@@ -1266,30 +1285,6 @@ export default function DashboardPage() {
                 <p className="text-base font-bold leading-none">{verifiedStamps.length}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_verified_brands")}</p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Search history stats bar */}
-        {!loadingData && searchStats && searchStats.total > 0 && (
-          <div className="glass-panel border border-border/60 rounded-xl px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.search_stats_title")}</p>
-              <Link href="/" className="text-[10px] text-primary hover:underline">{t("dashboard.search_now")}</Link>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {[
-                { label: t("dashboard.ss_total"),     value: searchStats.total,     color: "text-foreground" },
-                { label: t("dashboard.ss_today"),     value: searchStats.today,     color: "text-blue-600 dark:text-blue-400" },
-                { label: t("dashboard.ss_week"),      value: searchStats.thisWeek,  color: "text-violet-600 dark:text-violet-400" },
-                { label: t("dashboard.ss_available"), value: searchStats.available, color: "text-emerald-600 dark:text-emerald-400" },
-                { label: t("dashboard.ss_high_value"),value: searchStats.highValue, color: "text-amber-600 dark:text-amber-400" },
-              ].map(item => (
-                <div key={item.label} className="text-center">
-                  <p className={cn("text-base font-bold leading-none", item.color)}>{item.value.toLocaleString()}</p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{item.label}</p>
-                </div>
-              ))}
             </div>
           </div>
         )}
