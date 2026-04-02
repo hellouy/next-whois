@@ -1459,6 +1459,8 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
         rawWhoisContent: `[CN Reserved] ${cnReservedSsr.descZh}`,
       },
     };
+    // CN reserved SLDs are static — safe to cache at edge for 12 h
+    context.res.setHeader("Cache-Control", "public, s-maxage=43200, stale-while-revalidate=86400");
     return {
       props: {
         data: JSON.parse(JSON.stringify(syntheticData)),
@@ -1513,6 +1515,25 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     }
   } catch {
     ssrData = null;
+  }
+
+  // ── Edge / CDN caching for SSR HTML ─────────────────────────────────────
+  // When require_login is OFF, allow Vercel's CDN to cache the rendered HTML
+  // at the edge so repeat visitors don't hit the origin server.
+  // - With WHOIS data: cache matches the data TTL (capped at 1 h) so the HTML
+  //   is as fresh as the underlying WHOIS cache.
+  // - Without WHOIS data (loading shell): short TTL so the shell is cached
+  //   briefly; the client will fetch live data via /api/lookup regardless.
+  // When require_login is ON, the response is user-specific — no edge caching.
+  if (requireLogin !== "1") {
+    const sMaxAge = ssrData?.cacheTtl && ssrData.cacheTtl > 0
+      ? Math.min(ssrData.cacheTtl, 3600)
+      : 30;
+    const swr = Math.min(sMaxAge * 4, 86_400);
+    context.res.setHeader(
+      "Cache-Control",
+      `public, s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`,
+    );
   }
 
   return {
