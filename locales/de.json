@@ -1460,6 +1460,7 @@
     "order_history": "Kaufverlauf",
     "refresh": "Aktualisieren",
     "no_orders": "Keine Kaufaufzeichnungen",
+    "no_balance_history": "Keine Kontobewegungen",
     "payment_methods": "Unterstützt Alipay, WeChat-Scan, Kreditkarte usw. · Nach Zahlung automatisch aktiviert",
     "order_paid": "Bezahlt",
     "order_pending": "Ausstehend",

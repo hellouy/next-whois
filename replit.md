@@ -1,3 +1,35 @@
+# Next Whois UI — v3.35
+
+## Speed Optimization + UX Improvements (2026-04-02, v3.35)
+
+### Streaming Progressive Lookup API (major speed improvement)
+**`src/pages/api/lookup-stream.ts`** — new NDJSON streaming endpoint:
+- For RDAP-supported TLDs: sends partial RDAP result ~1-2s, then full merged result
+- For cache hits: single line returned immediately (~0ms)
+- `src/lib/whois/lookup.ts`: added `lookupWhoisCacheStreaming()` with `onPartialResult` callback
+- `src/lib/lookup-prefetch.ts`: fires streaming endpoint on search submit (before SSR)
+- `src/pages/[...query].tsx`: client useEffect consumes NDJSON stream with `refreshing` state
+- Subtle "Updating..." pulsing label in result card timing row during WHOIS enrichment
+- `QueryProgressBar` pulses at 90-95% during streaming partial phase
+
+### Reduced Timeouts
+- `WHOIS_TIMEOUT`: 7000ms → 5000ms
+- `RDAP_WIN_WHOIS_GRACE_MS`: 800ms → 400ms
+
+### /account Redirect Page
+**`src/pages/account.tsx`** — new redirect page:
+- `getServerSideProps` returns `{ redirect: { destination: "/dashboard?tab=account" } }`
+- Fixes broken "Manage Account" links in email templates
+
+### User Dashboard: Balance Transaction History
+**`src/pages/api/user/balance-transactions.ts`** — new user-facing API:
+- Returns last 30 balance transactions for the current user
+- Balance row in membership tab is now an accordion — click to expand transaction history
+- Shows credit/debit amounts with +/- color coding
+- Translation key `dashboard.no_balance_history` added to all 8 locale files
+
+---
+
 # Next Whois UI — v3.34
 
 ## Analytics Injection + Meta Fix + UX Polish (2026-04-02, v3.34)

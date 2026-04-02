@@ -1460,6 +1460,7 @@
     "order_history": "購買記錄",
     "refresh": "重新整理",
     "no_orders": "暫無購買記錄",
+    "no_balance_history": "暫無餘額變動記錄",
     "payment_methods": "支援支付寶、微信掃碼、信用卡等方式 · 付款成功後自動啟用",
     "order_paid": "已付款",
     "order_pending": "待付款",

@@ -1,10 +1,15 @@
 /**
  * lookup-prefetch.ts
  *
- * Fires /api/lookup fetch requests as early as possible — the moment the user
- * submits a search — so the WHOIS query is already in-flight while Next.js
- * does its SSR + page hydration cycle (~400-700 ms).  By the time the result
- * page mounts and its useEffect runs, the response is often already waiting.
+ * Fires /api/lookup-stream fetch requests as early as possible — the moment
+ * the user submits a search — so the WHOIS query is already in-flight while
+ * Next.js does its SSR + page hydration cycle (~400-700 ms).  By the time the
+ * result page mounts and its useEffect runs, the response is often already
+ * waiting (or has already delivered the partial RDAP result).
+ *
+ * The endpoint returns NDJSON (newline-delimited JSON).  For RDAP-supported
+ * TLDs the first line (partial RDAP result) typically arrives within 1-2 s,
+ * well before the full WHOIS round-trip completes.
  *
  * Usage:
  *   1. Call `prefetchLookup(target)` right before `router.push(...)`.
@@ -33,7 +38,7 @@ function evict() {
 }
 
 /**
- * Starts a /api/lookup fetch for `target` and caches the pending Promise.
+ * Starts a /api/lookup-stream fetch for `target` and caches the pending Promise.
  * Safe to call multiple times — a second call for the same target within the
  * TTL window is a no-op (the existing promise is reused).
  */
@@ -41,7 +46,7 @@ export function prefetchLookup(target: string): void {
   if (!target) return;
   evict();
   if (cache.has(target)) return;
-  const promise = fetch(`/api/lookup?query=${encodeURIComponent(target)}`);
+  const promise = fetch(`/api/lookup-stream?query=${encodeURIComponent(target)}`);
   cache.set(target, { promise, createdAt: Date.now() });
 }
 

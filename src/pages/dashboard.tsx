@@ -23,7 +23,7 @@ import {
   RiIdCardLine, RiBuildingLine, RiAwardLine, RiShakeHandsLine,
   RiCodeSLine, RiVipCrownLine, RiCoinLine, RiGiftLine,
   RiCoupon2Line, RiWalletLine, RiArrowLeftLine, RiCheckboxCircleLine,
-  RiRefreshLine, RiInformationLine,
+  RiRefreshLine, RiInformationLine, RiAddLine, RiSubtractLine, RiArrowDownSLine,
 } from "@remixicon/react";
 import { RiBankCardLine, RiStarLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
@@ -61,6 +61,14 @@ type Order = {
   provider: string;
   status: string;
   paid_at: string | null;
+  created_at: string;
+};
+
+type BalanceTx = {
+  id: number;
+  amount_cents: number;
+  type: string;
+  description: string | null;
   created_at: string;
 };
 
@@ -769,6 +777,9 @@ export default function DashboardPage() {
   const [membershipPlan, setMembershipPlan] = React.useState<string | null>(null);
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = React.useState(false);
+  const [balanceTxs, setBalanceTxs] = React.useState<BalanceTx[]>([]);
+  const [showBalanceTxs, setShowBalanceTxs] = React.useState(false);
+  const [loadingBalanceTxs, setLoadingBalanceTxs] = React.useState(false);
   const [plans, setPlans] = React.useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = React.useState(false);
   const [redeemCode, setRedeemCode] = React.useState("");
@@ -2024,15 +2035,83 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* Balance row */}
-                  <div className="px-4 py-3 border-t border-border/60 flex items-center justify-between">
+                  {/* Balance row — click to expand transaction history */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !showBalanceTxs;
+                      setShowBalanceTxs(next);
+                      if (next && balanceTxs.length === 0) {
+                        setLoadingBalanceTxs(true);
+                        fetch("/api/user/balance-transactions")
+                          .then(r => r.json())
+                          .then(d => {
+                            if (d.transactions) setBalanceTxs(d.transactions);
+                            if (typeof d.balanceCents === "number") setBalanceCents(d.balanceCents);
+                          })
+                          .catch(() => {})
+                          .finally(() => setLoadingBalanceTxs(false));
+                      }
+                    }}
+                    className="px-4 py-3 border-t border-border/60 flex items-center justify-between w-full hover:bg-muted/30 transition-colors group"
+                  >
                     <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                       <RiWalletLine className="w-3.5 h-3.5" /> {t("dashboard.balance")}
                     </span>
-                    <span className="text-sm font-bold font-mono">
-                      {balanceSym}{(balanceCents / 100).toFixed(2)}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold font-mono">
+                        {balanceSym}{(balanceCents / 100).toFixed(2)}
+                      </span>
+                      <RiArrowDownSLine className={cn(
+                        "w-3.5 h-3.5 text-muted-foreground/50 transition-transform",
+                        showBalanceTxs ? "rotate-180" : ""
+                      )} />
+                    </div>
+                  </button>
+
+                  {/* Balance transaction history */}
+                  {showBalanceTxs && (
+                    <div className="border-t border-border/60">
+                      {loadingBalanceTxs ? (
+                        <div className="px-4 py-3 space-y-2 animate-pulse">
+                          {[1,2,3].map(i => <div key={i} className="h-8 rounded bg-muted/40" />)}
+                        </div>
+                      ) : balanceTxs.length === 0 ? (
+                        <div className="px-4 py-5 text-center text-[11px] text-muted-foreground/60">
+                          {t("dashboard.no_balance_history")}
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border/40 max-h-48 overflow-y-auto">
+                          {balanceTxs.map(tx => (
+                            <div key={tx.id} className="px-4 py-2 flex items-center gap-2">
+                              <div className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                                tx.amount_cents >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30"
+                              )}>
+                                {tx.amount_cents >= 0
+                                  ? <RiAddLine className="w-3 h-3 text-emerald-600" />
+                                  : <RiSubtractLine className="w-3 h-3 text-red-500" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] text-muted-foreground truncate">
+                                  {tx.description || tx.type}
+                                </p>
+                                <p className="text-[9px] text-muted-foreground/50">
+                                  {new Date(tx.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <span className={cn(
+                                "text-[11px] font-bold font-mono tabular-nums shrink-0",
+                                tx.amount_cents >= 0 ? "text-emerald-600" : "text-red-500"
+                              )}>
+                                {tx.amount_cents >= 0 ? "+" : ""}{balanceSym}{(tx.amount_cents / 100).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* ── 会员权益说明 ── */}

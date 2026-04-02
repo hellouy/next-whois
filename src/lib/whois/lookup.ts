@@ -172,15 +172,88 @@ function intEnv(name: string, def: number): number {
 }
 
 // ── Core lookup: custom server → RDAP → generic WHOIS → merge/error ──────────
-// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 7 s).
+// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 5 s).
 // Reduced RDAP: 3500 → 2500 ms — RDAP servers are fast; extra budget was wasted.
-// Reduced WHOIS: 8000 → 7000 ms — still covers slow ccTLDs (.cn, .de) while
-// shaving 1 s off the worst-case path when RDAP unavailable.
+// Reduced WHOIS: 8000 → 7000 → 5000 ms — covers slow ccTLDs (.cn, .de) while
+// shaving 2 s off the worst-case path when RDAP unavailable.
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  2_500);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 7_000);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 5_000);
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
 
-export async function lookupWhois(domain: string): Promise<WhoisResult> {
+/**
+ * lookupWhoisWithCache variant that supports streaming partial results.
+ * When RDAP returns before WHOIS, `onPartialResult` is called immediately
+ * so callers can stream RDAP-only data to the client before WHOIS enrichment
+ * completes. The returned Promise resolves with the fully merged result.
+ */
+export async function lookupWhoisCacheStreaming(
+  domain: string,
+  options: { nocache?: boolean } = {},
+  onPartialResult?: (partial: WhoisResult) => void,
+): Promise<WhoisResult> {
+  const cnReserved = getCnReservedSldInfo(domain);
+  if (cnReserved) {
+    const r: WhoisResult = {
+      time: 0, status: true, cached: false, cacheTtl: 43_200, source: "whois",
+      result: {
+        ...initialWhoisAnalyzeResult,
+        domain,
+        status: [{ status: "registry-reserved", url: "" }],
+        rawWhoisContent: `[CN Reserved] ${cnReserved.descZh}`,
+      },
+    };
+    onPartialResult?.(r);
+    return r;
+  }
+
+  const key = `whois:${domain}`;
+
+  if (!options.nocache) {
+    const l1Hit = l1Get(key);
+    if (l1Hit) {
+      const remainingTtl = await getRemainingTtl(key).catch(() => null);
+      const r = { ...l1Hit, time: 0, cached: true, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+      onPartialResult?.(r);
+      return r;
+    }
+    if (isRedisAvailable()) {
+      const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
+      if (l2) {
+        l1Set(key, l2.value);
+        const r = { ...l2.value, time: 0, cached: true, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+        onPartialResult?.(r);
+        return r;
+      }
+    }
+  }
+
+  const result = await lookupWhoisStreaming(domain, onPartialResult);
+  if (result.status) {
+    const ttl = computeSmartTtl(result);
+    const now = Date.now();
+    const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
+    l1Set(key, toStore);
+    if (isRedisAvailable() && ttl > 0) setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+    return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
+  }
+  return { ...result, cached: false };
+}
+
+/**
+ * Core streaming lookup — fires RDAP + WHOIS in parallel.
+ * When RDAP resolves first with good data, `onPartialResult` is called
+ * immediately with an RDAP-only result so the caller can stream it to the
+ * client. The function then waits for WHOIS enrichment (short grace period)
+ * before returning the fully merged final result.
+ */
+async function lookupWhoisStreaming(
+  domain: string,
+  onPartialResult?: (partial: WhoisResult) => void,
+): Promise<WhoisResult> {
+  return lookupWhois(domain, onPartialResult);
+}
+
+export async function lookupWhois(domain: string, onPartialResult?: (partial: WhoisResult) => void): Promise<WhoisResult> {
   const startTime = performance.now();
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
@@ -226,11 +299,11 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
-  // This avoids waiting the full WHOIS_TIMEOUT (e.g. 10 s) for TLDs where RDAP
-  // is fast but the WHOIS server is slow or deprecated (e.g. .ai, .io).
-  // Reduced from 2500 → 800 ms: RDAP already provides complete data; WHOIS
-  // enrichment is nice-to-have but not worth a 2.5 s wait on every query.
-  const RDAP_WIN_WHOIS_GRACE_MS = 800;
+  // This avoids waiting the full WHOIS_TIMEOUT for TLDs where RDAP is fast
+  // but the WHOIS server is slow or deprecated (e.g. .ai, .io).
+  // Reduced from 2500 → 800 → 400 ms: RDAP already provides complete data;
+  // WHOIS enrichment (raw text) is useful but not worth a long wait.
+  const RDAP_WIN_WHOIS_GRACE_MS = 400;
 
   // Start RDAP + WHOIS in parallel.
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>;
@@ -254,6 +327,21 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
     const rdapVal: RdapResult | null = rdapEarlyResult.value ?? null;
     const hasGoodRdap = rdapVal !== null && !("errorCode" in rdapVal);
     if (hasGoodRdap) {
+      // If a streaming callback is provided, fire the partial RDAP-only result
+      // immediately so the caller can stream it to the client before WHOIS arrives.
+      if (onPartialResult) {
+        try {
+          const partialRdapResult = await convertRdapToWhoisResult(rdapVal as RdapResponse, domain);
+          partialRdapResult.rawRdapContent = JSON.stringify(rdapVal, null, 2);
+          onPartialResult({
+            time: elapsed(),
+            status: true,
+            cached: false,
+            source: "rdap",
+            result: partialRdapResult,
+          });
+        } catch { /* ignore — final result will include RDAP data */ }
+      }
       // Give WHOIS a short grace window to add enrichment data
       const whoisGraceResult = await Promise.race([
         whoisPromise

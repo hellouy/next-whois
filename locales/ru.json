@@ -1460,6 +1460,7 @@
     "order_history": "История покупок",
     "refresh": "Обновить",
     "no_orders": "Нет записей о покупках",
+    "no_balance_history": "История баланса пуста",
     "payment_methods": "Поддерживает Alipay, WeChat scan, кредитная карта и т.д. · Автоматическая активация после оплаты",
     "order_paid": "Оплачено",
     "order_pending": "Ожидание",

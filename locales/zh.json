@@ -1460,6 +1460,7 @@
     "order_history": "购买记录",
     "refresh": "刷新",
     "no_orders": "暂无购买记录",
+    "no_balance_history": "暂无余额变动记录",
     "payment_methods": "支持支付宝、微信扫码、信用卡等方式 · 付款成功后自动激活",
     "order_paid": "已付款",
     "order_pending": "待付款",

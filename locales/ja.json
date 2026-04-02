@@ -1460,6 +1460,7 @@
     "order_history": "購入履歴",
     "refresh": "更新",
     "no_orders": "購入記録なし",
+    "no_balance_history": "残高履歴なし",
     "payment_methods": "Alipay、WeChatスキャン、クレジットカードなど対応 · 支払い後自動的に有効化",
     "order_paid": "支払い済み",
     "order_pending": "保留中",

@@ -147,7 +147,8 @@ const CARD_ITEM_VARIANTS = {
 
 // ── QueryProgressBar ─────────────────────────────────────────────────────────
 // Thin top-of-content progress bar: fills 0→80% while loading, then 100% + fade.
-function QueryProgressBar({ loading }: { loading: boolean }) {
+// When refreshing (RDAP done, WHOIS pending), shows a slow crawl at 90-95%.
+function QueryProgressBar({ loading, refreshing }: { loading: boolean; refreshing?: boolean }) {
   const [width, setWidth] = React.useState(0);
   const [visible, setVisible] = React.useState(false);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -166,6 +167,20 @@ function QueryProgressBar({ loading }: { loading: boolean }) {
         if (w > 85) w = 85;
         setWidth(w);
       }, 80);
+    } else if (refreshing) {
+      // Partial result: stay at 90% and pulse slowly (WHOIS enrichment in-flight)
+      doneRef.current = false;
+      setWidth(90);
+      setVisible(true);
+      let w = 90;
+      let direction = 1;
+      timerRef.current = setInterval(() => {
+        if (doneRef.current) return;
+        w += direction * 0.5;
+        if (w >= 95) direction = -1;
+        if (w <= 88) direction = 1;
+        setWidth(w);
+      }, 120);
     } else {
       doneRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
@@ -174,16 +189,16 @@ function QueryProgressBar({ loading }: { loading: boolean }) {
       return () => clearTimeout(t);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [loading]);
+  }, [loading, refreshing]);
 
   if (!visible) return null;
   return (
     <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden rounded-t z-20 pointer-events-none">
       <div
-        className="h-full bg-primary/70 transition-all"
+        className={`h-full transition-all ${refreshing && !loading ? "bg-primary/40" : "bg-primary/70"}`}
         style={{
           width: `${width}%`,
-          transitionDuration: width === 100 ? "200ms" : "120ms",
+          transitionDuration: width === 100 ? "200ms" : refreshing ? "500ms" : "120ms",
           transitionTimingFunction: width === 100 ? "ease-out" : "linear",
         }}
       />
@@ -4249,6 +4264,9 @@ export default function LookupPage({
   // The client-side useEffect always fires a fresh /api/lookup to get up-to-date
   // data, so the SSR snapshot is just a warm-start hint.
   const [loading, setLoading] = React.useState(initialData == null);
+  // refreshing=true means partial RDAP data is shown; WHOIS enrichment still in-flight.
+  // A subtle indicator is shown while refreshing, but the main content is visible.
+  const [refreshing, setRefreshing] = React.useState(false);
   const [data, setData] = React.useState<WhoisResult>(initialData ?? _EMPTY_WHOIS_RESULT);
   // Incrementing this forces a fresh fetch for the same target (re-query button).
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -4267,7 +4285,7 @@ export default function LookupPage({
         suppressNextLoad.current = false;
         return;
       }
-      if (isSearchRoute(url)) setLoading(true);
+      if (isSearchRoute(url)) { setLoading(true); setRefreshing(false); }
     };
     // routeChangeComplete is intentionally NOT handled here: the
     // client-side fetch useEffect sets loading=false once data arrives.
@@ -4310,32 +4328,79 @@ export default function LookupPage({
     // hydration latency ~400-700 ms inside the reported lookup time).
     // refreshKey > 0 means a forced re-query, skip the prefetch cache.
     const prefetched = refreshKey === 0 ? consumePrefetch(target) : undefined;
-    const url = `/api/lookup?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
-    const responsePromise = prefetched ?? fetch(url);
-    responsePromise
-      .then(async (r) => {
+    const streamUrl = `/api/lookup-stream?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
+    const responsePromise = prefetched ?? fetch(streamUrl);
+
+    (async () => {
+      try {
+        const r = await responsePromise;
+        if (cancelled) return;
+
         if (r.status === 401) {
-          // require_login is enabled — show notice then redirect to login page
-          if (!cancelled) {
-            toast.warning(t("auth.require_login_notice"));
-            setTimeout(() => router.replace(`/login?callbackUrl=${encodeURIComponent(router.asPath)}&msg=require_login`), 1200);
+          toast.warning(t("auth.require_login_notice"));
+          setTimeout(() => router.replace(`/login?callbackUrl=${encodeURIComponent(router.asPath)}&msg=require_login`), 1200);
+          return;
+        }
+
+        if (!r.ok || !r.body) {
+          // Non-streaming fallback: parse single JSON response
+          const d = await r.json().catch(() => null) as WhoisResult | null;
+          if (!cancelled && d) {
+            setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
           }
-          return null;
+          if (!cancelled) { setLoading(false); setRefreshing(false); }
+          return;
         }
-        return r.json();
-      })
-      .then((d: WhoisResult | null) => {
-        if (!cancelled && d != null) {
-          setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
+
+        // ── Consume NDJSON stream ──────────────────────────────────────────
+        // Each newline-delimited JSON line is either a partial (RDAP-only)
+        // or final (merged RDAP+WHOIS) result.  Partial results clear the
+        // loading skeleton immediately; the final result stops the subtle
+        // refreshing indicator.
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!cancelled) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim() || cancelled) continue;
+            try {
+              const d = JSON.parse(line) as WhoisResult & { partial?: boolean };
+              if (cancelled) break;
+              setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
+              if (d.partial) {
+                // First chunk: RDAP data — show result immediately, keep subtle refresh spinner
+                setLoading(false);
+                setRefreshing(true);
+              } else {
+                // Final chunk: fully merged result
+                setLoading(false);
+                setRefreshing(false);
+              }
+            } catch { /* malformed JSON line, skip */ }
+          }
+        }
+
+        if (!cancelled) {
+          // If stream ended without a final chunk (e.g. single-chunk response),
+          // ensure loading/refreshing states are cleared.
           setLoading(false);
+          setRefreshing(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setData({ status: false, time: 0, cached: false, error: "", result: { ...initialWhoisAnalyzeResult } });
           setLoading(false);
+          setRefreshing(false);
         }
-      });
+      }
+    })();
+
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, refreshKey]);
@@ -4867,7 +4932,7 @@ export default function LookupPage({
           </div>
 
           <div className="relative">
-            <QueryProgressBar loading={loading} />
+            <QueryProgressBar loading={loading} refreshing={refreshing} />
             <motion.div
               initial={false}
               animate={{ opacity: loading ? 0.85 : 1 }}
@@ -5653,6 +5718,12 @@ export default function LookupPage({
                             </>
                           )}
                         </span>
+                        {refreshing && (
+                          <span className="flex items-center gap-1 text-[10px] text-primary/60 font-mono animate-pulse">
+                            <RiLoader4Line className="w-2.5 h-2.5 animate-spin" />
+                            {isChinese ? "更新中" : "Updating"}
+                          </span>
+                        )}
                         <div className="ml-auto flex items-center gap-1">
                           <button
                             onClick={() => setFeedbackOpen(true)}

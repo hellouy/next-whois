@@ -1460,6 +1460,7 @@
     "order_history": "Purchase History",
     "refresh": "Refresh",
     "no_orders": "No purchase records",
+    "no_balance_history": "No balance history",
     "payment_methods": "Supports Alipay, WeChat scan, credit card, etc. · Auto-activated after payment",
     "order_paid": "Paid",
     "order_pending": "Pending",

@@ -1460,6 +1460,7 @@
     "order_history": "구매 기록",
     "refresh": "새로고침",
     "no_orders": "구매 기록 없음",
+    "no_balance_history": "잔액 내역 없음",
     "payment_methods": "Alipay, WeChat 스캔, 신용카드 등 지원 · 결제 후 자동 활성화",
     "order_paid": "결제됨",
     "order_pending": "대기 중",
