@@ -25,7 +25,10 @@ type Stats = {
   searches: number;
   feedback: number;
   anonSearches: number;
+  loggedSearches: number;
   todaySearches: number;
+  todayAnonSearches: number;
+  todayLoggedSearches: number;
   todayUsers: number;
   subscribedUsers: number;
   totalOrders: number;
@@ -239,12 +242,12 @@ export default function AdminIndexPage() {
               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <RiSearchLine className="w-3 h-3 text-blue-500" />
                 <span className="font-semibold text-foreground">{stats.todaySearches}</span> 次查询
-              </span>
-            )}
-            {stats.anonSearches > 0 && (
-              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <RiGhostLine className="w-3 h-3 text-muted-foreground/70" />
-                <span className="font-semibold text-foreground">{stats.anonSearches}</span> 条匿名
+                {stats.todayLoggedSearches > 0 && (
+                  <span className="text-primary/70">（登录 {stats.todayLoggedSearches}</span>
+                )}
+                {stats.todayAnonSearches > 0 && (
+                  <span className="text-muted-foreground/70">匿名 {stats.todayAnonSearches}）</span>
+                )}
               </span>
             )}
             {(stats.feedback ?? 0) > 0 && (

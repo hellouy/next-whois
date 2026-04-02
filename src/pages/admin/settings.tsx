@@ -569,21 +569,26 @@ const FEATURE_GROUPS: { title: string; icon: React.ElementType; color: string; i
 
 function Toggle({ value, onChange, onColor }: { value: boolean; onChange: (v: boolean) => void; onColor: string }) {
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={[
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-        value ? onColor : "bg-muted",
-      ].join(" ")}
-    >
-      <span
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className={["text-[11px] font-semibold w-4 text-right transition-colors", value ? "text-foreground" : "text-muted-foreground/40"].join(" ")}>
+        {value ? "开" : "关"}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
         className={[
-          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-          value ? "translate-x-4" : "translate-x-0",
+          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+          value ? onColor : "bg-slate-300 dark:bg-slate-600",
         ].join(" ")}
-      />
-    </button>
+      >
+        <span
+          className={[
+            "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+            value ? "translate-x-4" : "translate-x-0",
+          ].join(" ")}
+        />
+      </button>
+    </div>
   );
 }
 
@@ -643,7 +648,11 @@ export default function AdminSettingsPage() {
     setTestingEmail(true);
     setEmailOk(null);
     try {
-      const res = await fetch("/api/admin/test-email", { method: "POST" });
+      const res = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template: "welcome" }),
+      });
       const data = await res.json();
       if (res.ok && data.ok) {
         setEmailOk(true);
