@@ -133,7 +133,10 @@ function buildTemplates(siteName: string): { key: string; subject: string; html:
       subject: `[预览] 域名即将可抢注 — ${siteName}`,
       html: dropApproachingHtml({
         domain: SAMPLE_DOMAIN,
-        dropAt: dropDate.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
+        expirationDate: new Date(now.getTime() - 5 * 86400 * 1000).toLocaleDateString("zh-CN"),
+        dropDate: dropDate.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
+        daysToDropDate: 3,
+        cancelToken: "preview-cancel-token",
         siteName,
         locale: SAMPLE_LOCALE,
       }),
@@ -143,7 +146,8 @@ function buildTemplates(siteName: string): { key: string; subject: string; html:
       subject: `[预览] 域名已可抢注 — ${siteName}`,
       html: domainDroppedHtml({
         domain: SAMPLE_DOMAIN,
-        droppedAt: now.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
+        expirationDate: new Date(now.getTime() - 10 * 86400 * 1000).toLocaleDateString("zh-CN"),
+        cancelToken: "preview-cancel-token",
         siteName,
         locale: SAMPLE_LOCALE,
       }),

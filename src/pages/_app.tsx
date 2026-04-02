@@ -365,20 +365,13 @@ const pageVariants = {
 };
 
 // Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
-// feedback internally.
-// Exit is instant (duration 0) so the old page is removed in the same frame
-// it becomes invisible — no 50 ms "blank gap" before the new page renders.
-// The new page fades in over 120 ms so content appears smoothly without a snap.
+// feedback internally.  Both enter and exit are instant so there is no
+// "blank flash" between the homepage and the result skeleton — the skeleton
+// appears in the same frame that the homepage disappears.
 const stablePageVariants = {
-  initial: { opacity: 0 },
-  animate: {
-    opacity: 1,
-    transition: { duration: 0.12, ease: "easeOut" as const },
-  },
-  exit: {
-    opacity: 0,
-    transition: { duration: 0 },
-  },
+  initial: { opacity: 1 },
+  animate: { opacity: 1, transition: { duration: 0 } },
+  exit:    { opacity: 0, transition: { duration: 0 } },
 };
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
@@ -388,14 +381,23 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   const isAdminPage = router.pathname.startsWith("/admin");
 
   // ── Route-change progress bar ──────────────────────────────────────────────
-  // Thin top-of-page bar that starts animating the moment routeChangeStart
-  // fires, giving immediate visual feedback while getServerSideProps is running.
-  // Inlined here (not a child component) so the state lifecycle matches App
-  // and avoids SSR/hydration mismatches.  CSS keyframes: globals.css.
+  // Only shown for navigations TO non-stable pages (login, about, etc.).
+  // Stable pages (homepage, result, DNS…) show their own skeleton/spinner, so
+  // the top bar would create a distracting double-loading signal.
+  // Derive the destination pathname from the URL passed to routeChangeStart.
   const [npStatus, setNpStatus] = React.useState<"idle" | "start" | "done">("idle");
   const npResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
-    const onStart = () => {
+    const onStart = (url: string) => {
+      // Extract pathname from url (may include query string / hash)
+      const dest = url.split("?")[0].split("#")[0];
+      // Determine if destination matches any stable page pattern
+      const destIsStable = [...STABLE_KEY_PAGES].some(p => {
+        if (!p.includes("[")) return dest === p;           // exact match
+        if (p === "/[...query]") return dest !== "/" && !dest.startsWith("/admin") && dest.split("/").length >= 2;
+        return false;
+      });
+      if (destIsStable) return; // stable page handles its own loading feedback
       if (npResetRef.current) clearTimeout(npResetRef.current);
       setNpStatus("start");
     };

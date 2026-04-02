@@ -223,15 +223,57 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
-  // RDAP + WHOIS in parallel — original approach: always run both concurrently.
-  // Running concurrently avoids skipping WHOIS when RDAP returns incomplete data.
-  const [rdapSettled, whoisSettled] = await Promise.allSettled([
-    withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>,
-    withTimeout(
-      tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-      WHOIS_TIMEOUT,
-    ),
+  // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
+  // This avoids waiting the full WHOIS_TIMEOUT (e.g. 10 s) for TLDs where RDAP
+  // is fast but the WHOIS server is slow or deprecated (e.g. .ai, .io).
+  const RDAP_WIN_WHOIS_GRACE_MS = 2_500;
+
+  // Start RDAP + WHOIS in parallel.
+  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>;
+  const whoisPromise = withTimeout(
+    tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+    WHOIS_TIMEOUT,
+  );
+
+  // When RDAP finishes first with good data, only wait an additional grace period
+  // for WHOIS to add raw text — then proceed rather than blocking until WHOIS_TIMEOUT.
+  let rdapSettled: PromiseSettledResult<RdapResult | null>;
+  let whoisSettled: PromiseSettledResult<WhoisRawResult | null>;
+
+  const rdapEarlyResult = await Promise.race([
+    rdapPromise.then(v => ({ settled: true as const, value: v as RdapResult | null })).catch(() => ({ settled: true as const, value: null as RdapResult | null })),
+    whoisPromise.then(() => ({ settled: false as const })).catch(() => ({ settled: false as const })),
   ]);
+
+  if (rdapEarlyResult.settled) {
+    // RDAP finished first — check if it has good data
+    const rdapVal: RdapResult | null = rdapEarlyResult.value ?? null;
+    const hasGoodRdap = rdapVal !== null && !("errorCode" in rdapVal);
+    if (hasGoodRdap) {
+      // Give WHOIS a short grace window to add enrichment data
+      const whoisGraceResult = await Promise.race([
+        whoisPromise
+          .then(v  => ({ status: "fulfilled" as const, value: v }))
+          .catch(e  => ({ status: "rejected"  as const, reason: e })),
+        new Promise<{ status: "rejected"; reason: Error }>(res =>
+          setTimeout(() => res({ status: "rejected", reason: new Error("whois-grace-timeout") }), RDAP_WIN_WHOIS_GRACE_MS)
+        ),
+      ]);
+      rdapSettled  = { status: "fulfilled", value: rdapVal };
+      whoisSettled = whoisGraceResult;
+    } else {
+      // RDAP failed/empty — wait for WHOIS normally
+      const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
+      rdapSettled  = { status: "fulfilled", value: rdapVal };
+      whoisSettled = w;
+      void r; // already settled, just for symmetry
+    }
+  } else {
+    // WHOIS finished first — wait for both to finish normally
+    const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
+    rdapSettled  = r;
+    whoisSettled = w;
+  }
 
   const rdapSettledResult = rdapSettled.status === "fulfilled" ? rdapSettled.value : null;
   const rdapData: RdapResponse | null = rdapSettledResult && !("errorCode" in rdapSettledResult) ? rdapSettledResult as RdapResponse : null;

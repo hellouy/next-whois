@@ -13,7 +13,7 @@
  *   attempt 1 → 2 min, 2 → 4, 3 → 8, 4 → 16, 5 → final failure
  */
 
-import { query as dbQuery, many, one } from "@/lib/db-query";
+import { run as dbQuery, many, one } from "@/lib/db-query";
 
 export interface QueuedEmail {
   id: number;
@@ -193,5 +193,5 @@ export async function requeueFailed(): Promise<number> {
             next_retry_at = NOW()
       WHERE status = 'failed'`,
   );
-  return (r as any).rowCount ?? 0;
+  return r;
 }
