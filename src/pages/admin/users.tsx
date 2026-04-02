@@ -103,9 +103,11 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
   }
 
   const [sendingReset, setSendingReset] = React.useState(false);
+  const [confirmReset, setConfirmReset] = React.useState(false);
 
   async function sendPasswordReset() {
-    if (!window.confirm(`确认向 ${user.email} 发送密码重置邮件？`)) return;
+    if (!confirmReset) { setConfirmReset(true); return; }
+    setConfirmReset(false);
     setSendingReset(true);
     try {
       const res = await fetch("/api/admin/send-reset", {
@@ -336,17 +338,37 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
           <Button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl h-10 gap-2 min-w-[120px]">
             {saving ? <><RiLoader4Line className="w-4 h-4 animate-spin" />保存中…</> : <><RiSaveLine className="w-4 h-4" />保存更改</>}
           </Button>
-          <Button
-            variant="outline"
-            onClick={sendPasswordReset}
-            disabled={saving || sendingReset}
-            className="rounded-xl h-10 gap-1.5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-            title="向该用户邮箱发送密码重置链接"
-          >
-            {sendingReset
-              ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />发送中</>
-              : <><RiLockPasswordLine className="w-3.5 h-3.5" />重置密码</>}
-          </Button>
+          {confirmReset ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-amber-600 dark:text-amber-400">确认发送？</span>
+              <Button
+                variant="outline"
+                onClick={sendPasswordReset}
+                disabled={sendingReset}
+                className="rounded-xl h-8 px-2.5 text-xs gap-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700"
+              >
+                {sendingReset ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : "确认"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmReset(false)}
+                disabled={sendingReset}
+                className="rounded-xl h-8 px-2.5 text-xs"
+              >
+                取消
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={sendPasswordReset}
+              disabled={saving || sendingReset}
+              className="rounded-xl h-10 gap-1.5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+              title="向该用户邮箱发送密码重置链接"
+            >
+              <RiLockPasswordLine className="w-3.5 h-3.5" />重置密码
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => { onClose(); onViewOrders(user.email); }}

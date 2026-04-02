@@ -1,3 +1,33 @@
+# Next Whois UI — v3.34
+
+## Analytics Injection + Meta Fix + UX Polish (2026-04-02, v3.34)
+
+### Critical Fix: Analytics & Custom Head Script Injection
+**`src/pages/_app.tsx`** — new `AnalyticsScripts` component:
+- Reads `analytics_google` (GA4 measurement ID, e.g. `G-XXXXXXXXXX`), `analytics_umami` (website ID), `analytics_umami_src` (script URL, defaults to `https://cloud.umami.is/script.js`), and `custom_head_script` from site settings
+- Injects the appropriate `<script>` tags into `<Head>` via Next.js head management
+- Rendered inside `<SiteSettingsProvider>` so it reacts to live settings without page reload
+- Returns `null` if all three are empty (no unnecessary DOM nodes)
+
+### Fix: Hardcoded OG Meta in `_document.tsx`
+**`src/pages/_document.tsx`** — removed two hardcoded meta tags:
+- `<meta property="og:site_name" content="RDAP+WHOIS 域名查询" />` — was overriding the dynamic site name from settings
+- `<meta name="twitter:site" content="@nextwhois" />` — static placeholder that should not be embedded
+- `AppHead` in `_app.tsx` already handles `og:site_name` dynamically from `settings.site_title`
+
+### Fix: Replace `window.confirm()` with inline confirmation UI
+**`src/pages/admin/users.tsx`**:
+- Added `confirmReset` state; first click on "重置密码" button sets it to `true`
+- An inline confirmation row (with "确认" / "取消" buttons) replaces the button while confirming
+- Second click calls the actual API; "取消" dismisses without side effects
+
+**`src/pages/admin/notify.tsx`**:
+- Added `pendingSend` state; first click on "发送邮件" validates inputs then enters confirmation mode
+- Displays recipient count in amber text + swaps "清空" for "取消" + highlights send button amber with "确认发送" label
+- Second click executes the API send; "取消" returns to normal state
+
+---
+
 # Next Whois UI — v3.33
 
 ## Homepage Fix + Announcement + Result Page Ad (2026-04-01, v3.33)

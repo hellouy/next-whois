@@ -90,6 +90,52 @@ function AppHead({ origin }: { origin: string }) {
   );
 }
 
+// ── Analytics & custom head script injection ────────────────────────────────
+// Reads analytics_google (GA4), analytics_umami, analytics_umami_src, and
+// custom_head_script from site settings and injects the relevant scripts.
+function AnalyticsScripts() {
+  const settings = useSiteSettings();
+  const gaId     = settings.analytics_google?.trim();
+  const umamiId  = settings.analytics_umami?.trim();
+  const umamiSrc = settings.analytics_umami_src?.trim() || "https://cloud.umami.is/script.js";
+  const custom   = settings.custom_head_script?.trim();
+
+  if (!gaId && !umamiId && !custom) return null;
+
+  return (
+    <Head>
+      {/* Google Analytics 4 */}
+      {gaId && (
+        <>
+          <script
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+          />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');`,
+            }}
+          />
+        </>
+      )}
+      {/* Umami Analytics */}
+      {umamiId && (
+        <script
+          defer
+          src={umamiSrc}
+          data-website-id={umamiId}
+        />
+      )}
+      {/* Custom <head> script (admin-controlled) */}
+      {custom && (
+        <script
+          dangerouslySetInnerHTML={{ __html: custom }}
+        />
+      )}
+    </Head>
+  );
+}
+
 function SiteFooter() {
   const settings = useSiteSettings();
   const router = useRouter();
@@ -428,6 +474,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     <LocaleProvider initialLocale={initialLocale}>
     <SiteSettingsProvider initialSettings={(pageProps as any).initialSiteSettings}>
       <AppHead origin={origin} />
+      <AnalyticsScripts />
       <Toaster />
       {/* Route-change progress bar — only shown client-side (npStatus starts "idle") */}
       {npStatus !== "idle" && (

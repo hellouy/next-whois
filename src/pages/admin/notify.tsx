@@ -28,6 +28,7 @@ export default function AdminNotifyPage() {
   const [body, setBody] = React.useState("");
   const [count, setCount] = React.useState<number | null>(null);
   const [sending, setSending] = React.useState(false);
+  const [pendingSend, setPendingSend] = React.useState(false);
   const [result, setResult] = React.useState<{ sent: number; failed: number; total: number } | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
 
@@ -59,11 +60,8 @@ export default function AdminNotifyPage() {
       ? customEmailList.length
       : (count ?? "?");
 
-    const confirmed = window.confirm(
-      `确认发送邮件给 ${totalHint} 位收件人？\n主题：${subject}\n\n此操作不可撤销。`
-    );
-    if (!confirmed) return;
-
+    if (!pendingSend) { setPendingSend(true); return; }
+    setPendingSend(false);
     setSending(true);
     setResult(null);
 
@@ -214,18 +212,35 @@ export default function AdminNotifyPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => { setSubject(""); setBody(""); setResult(null); }}
-            disabled={sending}
-          >
-            清空
-          </Button>
-          <Button onClick={handleSend} disabled={sending} className="gap-2 min-w-[120px]">
+        <div className="flex items-center justify-end gap-3 flex-wrap">
+          {pendingSend && (
+            <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              确认发送给 {mode === "custom" ? customEmailList.length : (count ?? "?")} 位收件人？
+            </span>
+          )}
+          {pendingSend ? (
+            <Button
+              variant="outline"
+              onClick={() => setPendingSend(false)}
+              disabled={sending}
+            >
+              取消
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => { setSubject(""); setBody(""); setResult(null); }}
+              disabled={sending}
+            >
+              清空
+            </Button>
+          )}
+          <Button onClick={handleSend} disabled={sending} className={`gap-2 min-w-[120px] ${pendingSend ? "bg-amber-600 hover:bg-amber-700" : ""}`}>
             {sending
               ? <><RiLoader4Line className="w-4 h-4 animate-spin" /> 发送中…</>
-              : <><RiMailSendLine className="w-4 h-4" /> 发送邮件</>
+              : pendingSend
+                ? <><RiMailSendLine className="w-4 h-4" /> 确认发送</>
+                : <><RiMailSendLine className="w-4 h-4" /> 发送邮件</>
             }
           </Button>
         </div>

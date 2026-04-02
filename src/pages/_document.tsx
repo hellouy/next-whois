@@ -5,9 +5,7 @@ export default function Document() {
   return (
     <Html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <Head>
-        {/* Site-wide identity */}
-        <meta property="og:site_name" content="RDAP+WHOIS 域名查询" />
-        <meta name="twitter:site" content="@nextwhois" />
+        {/* Baseline identity — overridden per-page by AppHead in _app.tsx */}
         <meta name="application-name" content="Next Whois" />
 
         {/* DNS prefetch for third-party APIs used client-side */}
