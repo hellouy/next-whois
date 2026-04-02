@@ -5859,9 +5859,6 @@ export default function LookupPage({
                       regStatusType={getDomainRegistrationStatus(result, locale).type}
                     />
 
-                    {/* Mobile-only inline ad — between registration info and domain status card */}
-                    <ResultTextAd loading={loading} inline />
-
                     {result.remainingDays === null &&
                       (() => {
                         const regStatus = getDomainRegistrationStatus(result, locale);
@@ -6526,6 +6523,9 @@ export default function LookupPage({
                       </div>
                     )}
                   </div>
+
+                  {/* Mobile-only inline ad — above status / nameservers cards */}
+                  <ResultTextAd loading={loading} inline />
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {result.status.length > 0 && (
