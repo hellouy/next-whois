@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -176,7 +177,7 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
   const curTheme = STAMP_CARD_THEMES[cardTheme];
   const selStyle = EDIT_TAG_STYLES.find(ts => ts.value === tagStyle) || EDIT_TAG_STYLES[0];
 
-  return (
+  return createPortal(
     <>
       {/* ── Theme picker overlay ── */}
       {themePickerOpen && (
@@ -385,7 +386,8 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -423,7 +425,7 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
@@ -452,7 +454,8 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -471,7 +474,7 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
       onClick={onClose}
@@ -506,7 +509,8 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
           <div className="p-4 space-y-3 pb-safe">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
