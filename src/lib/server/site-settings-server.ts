@@ -25,8 +25,15 @@ interface CacheEntry {
   ts: number;
 }
 
-const _l1 = new Map<string, CacheEntry>();
-const L1_TTL_MS = 30_000; // 30 seconds
+// Persist cache on globalThis so it survives Next.js Fast Refresh module
+// reloads in dev — without this, HMR resets the Map and every homepage
+// navigation triggers a cold Postgres round-trip (~2 s blank page).
+const _g = globalThis as any;
+if (!_g.__settingsL1Cache) _g.__settingsL1Cache = new Map<string, CacheEntry>();
+const _l1: Map<string, CacheEntry> = _g.__settingsL1Cache;
+
+// 5 minutes — settings change rarely; this keeps repeated navigations instant.
+const L1_TTL_MS = 5 * 60_000;
 
 export function invalidateSettingsCache(key?: string) {
   if (key) _l1.delete(key);
