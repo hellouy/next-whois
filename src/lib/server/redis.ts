@@ -20,6 +20,35 @@
 
 type UpstashClient = import("@upstash/redis").Redis;
 
+// ── Circuit breaker for Upstash ───────────────────────────────────────────────
+// When Upstash returns "max requests limit exceeded", disable all Redis calls
+// until the window resets. Persisted on globalThis so HMR reloads don't reset it.
+
+const _cbg = globalThis as any;
+if (_cbg.__upstashDisabledUntil === undefined) _cbg.__upstashDisabledUntil = 0;
+
+const MAX_LIMIT_MSG = "max requests limit exceeded";
+// Re-enable check interval: 1 hour. When the limit resets (daily/monthly),
+// the next request after this interval will try Redis again automatically.
+const CB_RETRY_MS = 60 * 60 * 1000; // 1 hour
+
+function isUpstashCircuitOpen(): boolean {
+  return Date.now() < (_cbg.__upstashDisabledUntil as number);
+}
+
+function tripUpstashCircuit() {
+  if (isUpstashCircuitOpen()) return; // already tripped
+  _cbg.__upstashDisabledUntil = Date.now() + CB_RETRY_MS;
+  console.warn("[Redis] Upstash limit reached — disabling Redis calls for 1 hour to save quota.");
+}
+
+function handleUpstashError(err: any) {
+  const msg: string = err?.message ?? String(err);
+  if (msg.toLowerCase().includes(MAX_LIMIT_MSG)) {
+    tripUpstashCircuit();
+  }
+}
+
 // Resolve env vars that Upstash Vercel integration writes with a project prefix
 // (e.g. wr_KV_REST_API_URL / xrw_KV_REST_API_URL) and the unprefixed defaults.
 function resolveUpstashEnv(): { url: string; token: string } | null {
@@ -35,6 +64,7 @@ function resolveUpstashEnv(): { url: string; token: string } | null {
 let _upstash: UpstashClient | null | undefined; // undefined = not yet tried
 
 function getUpstashClient(): UpstashClient | null {
+  if (isUpstashCircuitOpen()) return null; // circuit tripped — skip Redis entirely
   if (_upstash !== undefined) return _upstash;
   const creds = resolveUpstashEnv();
   if (!creds) { _upstash = null; return null; }
@@ -127,7 +157,8 @@ export const redis: import("ioredis").Redis | undefined = (() => {
 // ── Availability check ────────────────────────────────────────────────────────
 
 export function isRedisAvailable(): boolean {
-  if (getUpstashClient()) return true;          // Upstash is always ready
+  // Circuit breaker: Upstash is unavailable if limit is tripped
+  if (!isUpstashCircuitOpen() && getUpstashClient()) return true;
   return _ioredisAvailable || global.__redisAvailable;
 }
 
@@ -137,7 +168,7 @@ export async function getRedisValue(key: string): Promise<string | null> {
   const up = getUpstashClient();
   if (up) {
     try { return await up.get<string>(key) ?? null; }
-    catch (err: any) { console.error(`[Redis] GET ${key}:`, err.message); return null; }
+    catch (err: any) { handleUpstashError(err); console.error(`[Redis] GET ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try { return await redis.get(key); }
@@ -155,7 +186,7 @@ export async function setRedisValue(
       if (ttl && ttl > 0) await up.set(key, value, { ex: ttl });
       else                 await up.set(key, value);
       return true;
-    } catch (err: any) { console.error(`[Redis] SET ${key}:`, err.message); return false; }
+    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] SET ${key}:`, err.message); return false; }
   }
   if (!redis || !_ioredisAvailable) return false;
   try {
@@ -169,7 +200,7 @@ export async function deleteRedisValue(key: string): Promise<boolean> {
   const up = getUpstashClient();
   if (up) {
     try { await up.del(key); return true; }
-    catch (err: any) { console.error(`[Redis] DEL ${key}:`, err.message); return false; }
+    catch (err: any) { handleUpstashError(err); console.error(`[Redis] DEL ${key}:`, err.message); return false; }
   }
   if (!redis || !_ioredisAvailable) return false;
   try { await redis.del(key); return true; }
@@ -197,6 +228,7 @@ export async function deleteRedisKeysByPattern(pattern: string): Promise<number>
       } while (cursor !== 0);
       return deleted;
     } catch (err: any) {
+      handleUpstashError(err);
       console.error(`[Redis] SCAN/DEL ${pattern}:`, err.message);
       return 0;
     }
@@ -230,7 +262,7 @@ export async function incrRedisValue(key: string, ttlSeconds: number): Promise<n
       const count = await up.incr(key);
       if (count === 1) await up.expire(key, ttlSeconds);
       return count;
-    } catch (err: any) { console.error(`[Redis] INCR ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] INCR ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
@@ -244,7 +276,7 @@ export async function getRemainingTtl(key: string): Promise<number | null> {
   const up = getUpstashClient();
   if (up) {
     try { const t = await up.ttl(key); return t >= 0 ? t : null; }
-    catch { return null; }
+    catch (err: any) { handleUpstashError(err); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try { const t = await redis.ttl(key); return t >= 0 ? t : null; }
@@ -264,7 +296,7 @@ export async function getJsonRedisValue<T>(key: string): Promise<T | null> {
       // Upstash may return already-parsed object when stored as JSON
       if (typeof raw === "object") return raw as unknown as T;
       return JSON.parse(raw) as T;
-    } catch (err: any) { console.error(`[Redis] getJson ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] getJson ${key}:`, err.message); return null; }
   }
   const raw = await getRedisValue(key);
   if (!raw) return null;
@@ -292,7 +324,7 @@ export async function getJsonRedisValueWithTtl<T>(
       if (raw == null) return null;
       const value = typeof raw === "object" ? (raw as unknown as T) : JSON.parse(raw as string) as T;
       return { value, remainingTtl: ttl >= 0 ? ttl : null };
-    } catch (err: any) { console.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
