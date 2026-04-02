@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, isDbReady } from "@/lib/db-query";
+import { invalidateStampCache } from "@/lib/stamp-cache";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return res.status(400).json({ error: "Missing id" });
 
     const existing = await one(
-      "SELECT id FROM stamps WHERE id = $1 AND email = $2",
+      "SELECT id, domain FROM stamps WHERE id = $1 AND email = $2",
       [id as string, session.user.email],
     );
     if (!existing) return res.status(404).json({ error: "Stamp not found" });
@@ -63,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `UPDATE stamps SET ${setClauses.join(", ")} WHERE id = $${idx++} AND email = $${idx++}`,
         values,
       );
+      invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
       console.error("[stamps] PATCH error:", err.message);
       return res.status(500).json({ error: "更新失败" });
@@ -75,10 +77,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return res.status(400).json({ error: "Missing id" });
 
     try {
+      const existing = await one(
+        "SELECT domain FROM stamps WHERE id = $1 AND email = $2",
+        [id as string, session.user.email],
+      );
       await run(
         "DELETE FROM stamps WHERE id = $1 AND email = $2",
         [id as string, session.user.email],
       );
+      if (existing?.domain) invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
       console.error("[stamps] DELETE error:", err.message);
       return res.status(500).json({ error: "删除失败" });
