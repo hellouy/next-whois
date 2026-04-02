@@ -235,7 +235,7 @@ export const getStaticProps: GetStaticProps = async () => {
         "home_announcement_enabled", "home_announcement_text", "home_announcement_type",
         "home_announcement_url",
       ]),
-      new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 3000)),
+      new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 1500)),
     ]);
   } catch {
     // DB unavailable — use all defaults; page will still render correctly

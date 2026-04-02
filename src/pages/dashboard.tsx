@@ -1196,33 +1196,31 @@ export default function DashboardPage() {
   const postExpirySubs = activeSubs.filter(s => s.phase && s.phase !== "active");
   const verifiedStamps = stamps.filter(s => s.verified);
 
-  const filteredSubscriptions = React.useMemo(() => {
-    return [...subscriptions]
-      .filter(s => {
-        if (subSearch.trim() && !s.domain.toLowerCase().includes(subSearch.trim().toLowerCase())) return false;
-        if (subFilter === "all") return true;
-        const d = daysUntilExpiry(s);
-        const dd = s.days_to_drop;
-        if (subFilter === "urgent") return s.active && ((d !== null && d >= 0 && d <= 7) || (dd !== null && dd >= 0 && dd <= 7));
-        if (subFilter === "expiring") return s.active && d !== null && d >= 0 && d <= 30;
-        if (subFilter === "expired") return !!(s.active && s.phase && s.phase !== "active");
-        return true;
-      })
-      .sort((a, b) => {
-        if (!a.active && b.active) return 1;
-        if (a.active && !b.active) return -1;
-        const da = daysUntilExpiry(a) ?? 9999;
-        const db = daysUntilExpiry(b) ?? 9999;
-        return da - db;
-      });
-  }, [subscriptions, subSearch, subFilter]);
-
   const TABS = [
     { key: "subscriptions" as const, label: t("dashboard.tab_subscriptions"), icon: <RiCalendarLine className="w-3.5 h-3.5" />, count: activeSubs.length || undefined },
     { key: "stamps" as const, label: t("dashboard.tab_stamps"), icon: <RiShieldCheckLine className="w-3.5 h-3.5" />, count: stamps.length || undefined },
     { key: "membership" as const, label: t("dashboard.tab_membership"), icon: <RiVipCrownLine className="w-3.5 h-3.5" /> },
     { key: "account" as const, label: t("dashboard.tab_account"), icon: <RiUserLine className="w-3.5 h-3.5" /> },
   ];
+
+  const filteredSubscriptions = [...subscriptions]
+    .filter(s => {
+      if (subSearch.trim() && !s.domain.toLowerCase().includes(subSearch.trim().toLowerCase())) return false;
+      if (subFilter === "all") return true;
+      const d = daysUntilExpiry(s);
+      const dd = s.days_to_drop;
+      if (subFilter === "urgent") return s.active && ((d !== null && d >= 0 && d <= 7) || (dd !== null && dd >= 0 && dd <= 7));
+      if (subFilter === "expiring") return s.active && d !== null && d >= 0 && d <= 30;
+      if (subFilter === "expired") return !!(s.active && s.phase && s.phase !== "active");
+      return true;
+    })
+    .sort((a, b) => {
+      if (!a.active && b.active) return 1;
+      if (a.active && !b.active) return -1;
+      const da = daysUntilExpiry(a) ?? 9999;
+      const db = daysUntilExpiry(b) ?? 9999;
+      return da - db;
+    });
 
 
   return (
