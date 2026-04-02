@@ -269,7 +269,63 @@ function buildTemplates(siteName: string): { key: string; subject: string; html:
   ];
 }
 
+export const config = { maxDuration: 30 };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // GET: diagnose email configuration state without sending any email
+  if (req.method === "GET") {
+    const session = await requireAdmin(req, res);
+    if (!session) return;
+
+    const { many } = await import("@/lib/db-query");
+    const rows = await many<{ key: string; value: string }>(
+      `SELECT key, value FROM site_settings WHERE key IN
+       ('smtp_enabled','smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from','smtp_secure',
+        'resend_api_key','resend_from_email')`
+    ).catch(() => [] as { key: string; value: string }[]);
+
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.key] = r.value;
+
+    const smtpEnabled  = map.smtp_enabled === "1";
+    const smtpHost     = map.smtp_host || "";
+    const smtpUser     = map.smtp_user || "";
+    const smtpPass     = !!map.smtp_pass; // bool only — never expose the value
+    const resendApiKey = !!map.resend_api_key;
+
+    const smtpPartial  = !!(smtpHost || smtpUser || smtpPass); // fields filled but maybe toggle off
+    const smtpReady    = smtpEnabled && smtpHost && smtpUser && smtpPass;
+
+    let status: "ok" | "partial" | "unconfigured";
+    let provider: string;
+    let hint: string;
+
+    if (smtpReady) {
+      status   = "ok";
+      provider = `SMTP (${smtpHost})`;
+      hint     = "SMTP 已启用，配置完整，可以正常发送邮件。";
+    } else if (smtpPartial && !smtpEnabled) {
+      status   = "partial";
+      provider = "SMTP（未启用）";
+      hint     = `您已填写 SMTP 配置（服务器：${smtpHost || "未填"}），但「启用 SMTP 发送」开关尚未打开，请先开启该开关再保存。`;
+    } else if (smtpPartial && smtpEnabled) {
+      status   = "partial";
+      provider = "SMTP（配置不完整）";
+      const missing = [!smtpHost && "服务器地址", !smtpUser && "用户名", !smtpPass && "密码"].filter(Boolean).join("、");
+      hint     = `SMTP 已启用但缺少字段：${missing}。`;
+    } else if (resendApiKey) {
+      status   = "ok";
+      provider = "Resend API";
+      hint     = "Resend API Key 已配置，SMTP 未启用，将通过 Resend 发送邮件。";
+    } else {
+      status   = "unconfigured";
+      provider = "无";
+      hint     = "SMTP 和 Resend API Key 均未配置，无法发送邮件。请配置其中一种发送方式。";
+    }
+
+    return res.json({ status, provider, hint, smtpEnabled, smtpHost, smtpUser, smtpPass, resendApiKey });
+  }
+
   if (req.method !== "POST") return res.status(405).end();
 
   const session = await requireAdmin(req, res);

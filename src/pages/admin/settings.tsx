@@ -642,6 +642,29 @@ export default function AdminSettingsPage() {
   const [tplSending, setTplSending]     = React.useState(false);
   const [tplResults, setTplResults]     = React.useState<TplResult[] | null>(null);
 
+  // ── email config diagnostic ─────────────────────────────────────────────
+  const [emailDiag, setEmailDiag] = React.useState<{
+    status: "ok" | "partial" | "unconfigured";
+    provider: string;
+    hint: string;
+    smtpEnabled: boolean;
+    smtpHost: string;
+    smtpUser: string;
+    smtpPass: boolean;
+    resendApiKey: boolean;
+  } | null>(null);
+  const [emailDiagLoading, setEmailDiagLoading] = React.useState(false);
+
+  async function loadEmailDiag() {
+    setEmailDiagLoading(true);
+    try {
+      const res = await fetch("/api/admin/test-email");
+      if (res.ok) setEmailDiag(await res.json());
+    } catch { /* ignore */ } finally {
+      setEmailDiagLoading(false);
+    }
+  }
+
   // ── email queue stats ───────────────────────────────────────────────────
   const [queueStats, setQueueStats]         = React.useState<QueueStats | null>(null);
   const [queueLoading, setQueueLoading]     = React.useState(false);
@@ -775,6 +798,7 @@ export default function AdminSettingsPage() {
       })
       .catch(() => toast.error("加载设置失败"))
       .finally(() => setLoading(false));
+    loadEmailDiag();
   }, []);
 
   async function handleSave() {
@@ -802,6 +826,8 @@ export default function AdminSettingsPage() {
       setSaved({ ...form });
       notifySettingsUpdated();
       toast.success("设置已保存，已同步到所有页面");
+      // Refresh email diagnostic so the status card reflects new config
+      loadEmailDiag();
     } catch (e: any) {
       toast.error(e.message || "保存失败");
     } finally {
@@ -1069,6 +1095,16 @@ export default function AdminSettingsPage() {
                         />
                       </div>
 
+                      {/* Warning: credentials filled but toggle is OFF */}
+                      {!form.smtp_enabled && (form.smtp_host || form.smtp_user || form.smtp_pass) && (
+                        <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/30 px-3.5 py-2.5 flex items-start gap-2">
+                          <RiAlertLine className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                            您已填写 SMTP 配置，但「启用 SMTP 发送」开关尚未打开。请先开启上方开关，否则邮件不会通过 SMTP 发送。
+                          </p>
+                        </div>
+                      )}
+
                       {/* SMTP fields */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
@@ -1131,7 +1167,7 @@ export default function AdminSettingsPage() {
                             autoComplete="new-password"
                             className="h-9 rounded-xl text-sm font-mono"
                           />
-                          <p className="text-[10px] text-muted-foreground">密码加密保存，GET 接口不返回此字段</p>
+                          <p className="text-[10px] text-muted-foreground">密码仅管理员可见，其他用户无法读取</p>
                         </div>
                       </div>
 
@@ -1141,6 +1177,10 @@ export default function AdminSettingsPage() {
                         <p>163 邮箱：smtp.163.com · 端口 465 · SSL · 需在邮箱设置中开启并获取授权码</p>
                         <p>Gmail：smtp.gmail.com · 端口 587 · STARTTLS · 需开启两步验证后生成应用密码</p>
                         <p>阿里云邮：smtp.aliyun.com · 端口 465 · SSL</p>
+                        <p className="pt-1 border-t border-sky-200/50 dark:border-sky-800/30 font-semibold">通过 Resend 的 SMTP 中继发送（推荐）</p>
+                        <p>服务器：smtp.resend.com · 端口 465（SSL）或 587（STARTTLS）</p>
+                        <p>用户名：<span className="font-mono">resend</span>（固定，不是邮箱地址）· 密码：你的 Resend API Key（re_xxx…）</p>
+                        <p className="text-sky-600 dark:text-sky-500">使用此方案后，无需再单独填写 Resend API Key，两者选其一即可。</p>
                       </div>
                     </div>
                   </div>
@@ -1188,16 +1228,55 @@ export default function AdminSettingsPage() {
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
                         <RiCheckLine className="w-3.5 h-3.5" />
                       </div>
-                      <h3 className="text-sm font-bold">快速连通性测试</h3>
+                      <h3 className="text-sm font-bold">邮件服务状态 & 测试</h3>
+                      {emailDiagLoading && <RiLoader4Line className="w-3.5 h-3.5 animate-spin text-muted-foreground ml-auto" />}
+                      {!emailDiagLoading && (
+                        <button onClick={loadEmailDiag} className="ml-auto text-muted-foreground hover:text-foreground transition p-0.5 rounded" title="刷新状态">
+                          <RiRefreshLine className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <div className="p-5 space-y-3">
+                      {/* Diagnostic status card */}
+                      {emailDiag && (
+                        <div className={`rounded-xl border px-4 py-3 space-y-1 ${
+                          emailDiag.status === "ok"
+                            ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/30"
+                            : emailDiag.status === "partial"
+                            ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/30"
+                            : "bg-destructive/5 border-destructive/20"
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {emailDiag.status === "ok"
+                              ? <RiCheckLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              : <RiAlertLine className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            }
+                            <p className={`text-xs font-semibold ${
+                              emailDiag.status === "ok"
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : emailDiag.status === "partial"
+                                ? "text-amber-700 dark:text-amber-400"
+                                : "text-destructive"
+                            }`}>
+                              当前发送方式：{emailDiag.provider}
+                            </p>
+                          </div>
+                          <p className={`text-[11px] leading-relaxed ${
+                            emailDiag.status === "ok"
+                              ? "text-emerald-700/80 dark:text-emerald-400/80"
+                              : emailDiag.status === "partial"
+                              ? "text-amber-700/80 dark:text-amber-400/80"
+                              : "text-destructive/80"
+                          }`}>{emailDiag.hint}</p>
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground">
-                        向当前管理员账号邮箱发送一封测试邮件，验证 SMTP / Resend 是否正常。
+                        向当前管理员账号邮箱发送一封测试邮件，验证邮件服务是否正常。
                         请先保存设置后再测试。
                       </p>
                       {emailOk === true && (
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <RiCheckLine className="w-3.5 h-3.5" />测试邮件发送成功，请检查收件箱
+                          <RiCheckLine className="w-3.5 h-3.5" />测试邮件已发送，请检查收件箱
                         </p>
                       )}
                       {emailOk === false && (
