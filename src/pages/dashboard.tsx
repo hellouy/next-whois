@@ -242,9 +242,9 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
 
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: "min(92dvh, calc(100dvh - 56px))" }}>
+        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-base font-bold flex items-center gap-2">
               <RiPencilLine className="w-4 h-4 text-primary" />{t("dashboard.edit_stamp_title")}
             </h2>
@@ -253,8 +253,8 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
             </button>
           </div>
 
-          {/* Scrollable content */}
-          <div className="overflow-y-auto overscroll-contain flex-1 px-6 pb-2 space-y-3">
+          {/* Scrollable content — capped so header+scroll+footer ≤ 92svh */}
+          <div className="overflow-y-auto overscroll-contain px-6 pb-2 space-y-3" style={{ maxHeight: "calc(92svh - 130px)" }}>
             <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
 
             {/* Tag name */}
