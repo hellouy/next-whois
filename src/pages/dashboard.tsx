@@ -424,13 +424,13 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
-      style={{ paddingTop: "calc(var(--ann-h, 0px) + 4.5rem)" }}
+      className="fixed inset-0 z-[70] flex items-center justify-center"
+      style={{ padding: "calc(var(--ann-h, 0px) + 4.5rem) 1rem 1rem" }}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4.5rem)" }}
+        className="relative w-full max-w-sm bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 5.5rem)" }}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2">
