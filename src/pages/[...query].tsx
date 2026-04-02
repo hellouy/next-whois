@@ -62,6 +62,7 @@ import {
   RiArrowRightSLine,
   RiFlagLine,
   RiInformationLine,
+  RiMegaphoneLine,
 } from "@remixicon/react";
 import { getTopRegistrars, DomainPricing } from "@/lib/pricing/client";
 import { useSiteSettings } from "@/lib/site-settings";
@@ -4151,15 +4152,16 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
 
   React.useEffect(() => {
     if (items.length <= 1) return;
+    setActiveIdx(0);
     const timer = setInterval(() => {
       setFading(true);
       setTimeout(() => {
         setActiveIdx(i => (i + 1) % items.length);
         setFading(false);
       }, 350);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(timer);
-  }, [items.length]);
+  }, [items.length, rawText]);
 
   if (settings.result_ad_enabled !== "1") return null;
   if (items.length === 0) return null;
@@ -4170,28 +4172,40 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   const text  = items[activeIdx];
 
   const inner = (
-    <div
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors cursor-default"
-      style={{ opacity: fading ? 0 : 1, transition: "opacity 0.3s ease" }}
-    >
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium shrink-0 uppercase tracking-wide">
-        {label}
+    <div className="flex items-center gap-2 py-1 cursor-default">
+      <RiMegaphoneLine
+        className="w-3.5 h-3.5 shrink-0 text-primary/70"
+        style={{ animation: "ad-icon 2.4s ease-in-out infinite" }}
+      />
+      <span
+        className="text-xs text-foreground/65 flex-1 leading-snug"
+        style={{ opacity: fading ? 0 : 1, transition: "opacity 0.35s ease" }}
+      >
+        <span className="font-semibold text-primary/80 mr-1">{label}：</span>
+        {text}
       </span>
-      <span className="text-sm text-foreground/70 flex-1 leading-snug">{text}</span>
-      {url && <RiExternalLinkLine className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />}
+      {url && <RiExternalLinkLine className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
+      <style>{`
+        @keyframes ad-icon {
+          0%, 100% { transform: rotate(-8deg) scale(1);   opacity: 0.7; }
+          25%       { transform: rotate(8deg) scale(1.1);  opacity: 1;   }
+          50%       { transform: rotate(-6deg) scale(1);   opacity: 0.7; }
+          75%       { transform: rotate(6deg) scale(1.05); opacity: 1;   }
+        }
+      `}</style>
     </div>
   );
 
   const wrapper = url ? (
-    <Link href={url} target="_blank" rel="noopener noreferrer sponsored">
+    <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block hover:opacity-80 transition-opacity">
       {inner}
     </Link>
   ) : inner;
 
   if (inline) {
-    return <div className="sm:hidden mt-4">{wrapper}</div>;
+    return <div className="sm:hidden mt-3">{wrapper}</div>;
   }
-  return <div className="hidden sm:block mt-6">{wrapper}</div>;
+  return <div className="hidden sm:block mt-4">{wrapper}</div>;
 }
 
 export default function LookupPage({

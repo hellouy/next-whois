@@ -240,7 +240,7 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
         </div>
       )}
 
-      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
         {/*
           On mobile (items-end) the sheet sits at the bottom.  We cap the total panel height to
@@ -424,7 +424,7 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
@@ -473,14 +473,13 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center px-4 pb-4"
-      style={{ paddingTop: "calc(4rem + var(--ann-h, 0px) + 8px)" }}
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-none" />
       <div
-        className="relative z-10 w-full max-w-sm bg-background border border-border rounded-2xl shadow-2xl flex flex-col"
-        style={{ maxHeight: "calc(100dvh - 4rem - var(--ann-h, 0px) - 16px)" }}
+        className="relative z-10 w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
+        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -504,7 +503,7 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
           style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
-          <div className="p-4 space-y-3">{children}</div>
+          <div className="p-4 space-y-3 pb-safe">{children}</div>
         </div>
       </div>
     </div>

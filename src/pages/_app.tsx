@@ -365,13 +365,13 @@ const pageVariants = {
 };
 
 // Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
-// feedback internally.  Both enter and exit are instant so there is no
-// "blank flash" between the homepage and the result skeleton — the skeleton
-// appears in the same frame that the homepage disappears.
+// feedback internally.  Enter and exit are instant with no opacity change so
+// there is never a blank frame when swapping between stable pages — the new
+// page mounts at full opacity the same frame the old page unmounts.
 const stablePageVariants = {
   initial: { opacity: 1 },
   animate: { opacity: 1, transition: { duration: 0 } },
-  exit:    { opacity: 0, transition: { duration: 0 } },
+  exit:    { opacity: 1, transition: { duration: 0 } },
 };
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {

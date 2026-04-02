@@ -2321,12 +2321,12 @@ export default function StampPage() {
                   return (
                     <>
                       <motion.div
-                        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+                        className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         onClick={() => setPreviewStyleId(null)}
                       />
                       <motion.div
-                        className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                        className="fixed inset-0 z-[75] flex items-center justify-center px-4"
                         initial={{ scale: 0.93, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.93, opacity: 0 }}
                         transition={{ type: "spring", damping: 24, stiffness: 300 }}
                         onClick={(e) => { if (e.target === e.currentTarget) setPreviewStyleId(null); }}
@@ -2413,10 +2413,10 @@ export default function StampPage() {
                   const isSelected = form.cardTheme === previewThemeKey;
                   return (
                     <>
-                      <motion.div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+                      <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         onClick={() => setPreviewThemeKey(null)} />
-                      <motion.div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                      <motion.div className="fixed inset-0 z-[75] flex items-center justify-center px-4"
                         initial={{ scale: 0.93, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.93, opacity: 0 }}
                         transition={{ type: "spring", damping: 24, stiffness: 300 }}
                         onClick={(e) => { if (e.target === e.currentTarget) setPreviewThemeKey(null); }}
@@ -2481,14 +2481,14 @@ export default function StampPage() {
                 {showGuide && (
                   <>
                     <motion.div
-                      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+                      className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       onClick={dismissGuide}
                     />
                     <motion.div
-                      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                      className="fixed inset-0 z-[75] flex items-center justify-center px-4"
                       initial={{ scale: 0.93, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.93, opacity: 0 }}
