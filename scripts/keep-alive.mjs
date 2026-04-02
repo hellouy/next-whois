@@ -1,16 +1,11 @@
 /**
- * Keep-Alive — 每隔 4 分钟 ping 一次数据库，防止 Supabase 连接池休眠。
- *
- * 用法:
- *   node scripts/keep-alive.mjs
+ * Keep-Alive — ping the database every 4 minutes to prevent Supabase connection pool from sleeping.
  */
 
 import pg from "pg";
 
-const INTERVAL_MS = 4 * 60 * 1000; // 4 分钟
+const INTERVAL_MS = 4 * 60 * 1000;
 
-// Auto-derive Transaction Mode URL (port 6543) from Session Mode URL (port 5432).
-// Transaction mode supports many more concurrent connections on Vercel/serverless.
 function deriveTransactionModeUrl(sessionUrl) {
   try {
     const u = new URL(sessionUrl);
@@ -25,7 +20,6 @@ function resolveDbUrl() {
   const explicitUrl = process.env.POSTGRES_URL;
   const nonPoolingUrl = process.env.POSTGRES_URL_NON_POOLING;
 
-  // Use POSTGRES_URL only if it matches the same host as NON_POOLING (same project)
   if (explicitUrl && nonPoolingUrl) {
     try {
       const eu = new URL(explicitUrl);
@@ -36,7 +30,6 @@ function resolveDbUrl() {
     return { url: explicitUrl, source: "POSTGRES_URL" };
   }
 
-  // Auto-derive TX mode from NON_POOLING
   if (nonPoolingUrl) {
     const txUrl = deriveTransactionModeUrl(nonPoolingUrl);
     if (txUrl) return { url: txUrl, source: "POSTGRES_URL_NON_POOLING→TX" };
@@ -52,34 +45,34 @@ const resolved = resolveDbUrl();
 const DB_URL = resolved?.url;
 
 if (!DB_URL) {
-  console.error("[keep-alive] 缺少数据库 URL 环境变量，退出。请设置 POSTGRES_URL 或 POSTGRES_URL_NON_POOLING。");
-  process.exit(1);
-}
-
-// Disable SSL for internal hosts (e.g. helium), enable for cloud databases
-let sslConfig;
-try {
-  const u = new URL(DB_URL);
-  const h = u.hostname;
-  sslConfig = (h === "localhost" || h === "127.0.0.1" || h === "helium" || !h.includes("."))
-    ? false
-    : { rejectUnauthorized: false };
-} catch {
-  sslConfig = { rejectUnauthorized: false };
-}
-
-const pool = new pg.Pool({ connectionString: DB_URL, max: 1, ssl: sslConfig });
-
-async function ping() {
-  const t0 = Date.now();
+  console.warn("[keep-alive] No database URL found. Set POSTGRES_URL or POSTGRES_URL_NON_POOLING to enable keep-alive pings.");
+  console.warn("[keep-alive] Sleeping — no pings will be sent until a DB URL is configured.");
+  setInterval(() => {}, 60 * 60 * 1000);
+} else {
+  let sslConfig;
   try {
-    await pool.query("SELECT 1");
-    console.log(`[keep-alive] ${new Date().toISOString()} ✓ DB ping OK (${Date.now() - t0}ms)`);
-  } catch (err) {
-    console.error(`[keep-alive] ${new Date().toISOString()} ✗ DB ping 失败:`, err.message);
+    const u = new URL(DB_URL);
+    const h = u.hostname;
+    sslConfig = (h === "localhost" || h === "127.0.0.1" || h === "helium" || !h.includes("."))
+      ? false
+      : { rejectUnauthorized: false };
+  } catch {
+    sslConfig = { rejectUnauthorized: false };
   }
-}
 
-console.log(`[keep-alive] 启动，每 ${INTERVAL_MS / 1000}s ping 一次 DB… (source: ${resolved?.source ?? "none"})`);
-await ping();
-setInterval(ping, INTERVAL_MS);
+  const pool = new pg.Pool({ connectionString: DB_URL, max: 1, ssl: sslConfig });
+
+  async function ping() {
+    const t0 = Date.now();
+    try {
+      await pool.query("SELECT 1");
+      console.log(`[keep-alive] ${new Date().toISOString()} ✓ DB ping OK (${Date.now() - t0}ms)`);
+    } catch (err) {
+      console.error(`[keep-alive] ${new Date().toISOString()} ✗ DB ping failed:`, err.message);
+    }
+  }
+
+  console.log(`[keep-alive] Started, pinging DB every ${INTERVAL_MS / 1000}s… (source: ${resolved.source})`);
+  await ping();
+  setInterval(ping, INTERVAL_MS);
+}
