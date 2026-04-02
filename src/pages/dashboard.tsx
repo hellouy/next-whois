@@ -745,6 +745,7 @@ export default function DashboardPage() {
   const siteSettings = useSiteSettings();
   const paymentEnabled = !!(siteSettings.payment_stripe_enabled || siteSettings.payment_xunhupay_enabled || siteSettings.payment_alipay_enabled || siteSettings.payment_paypal_enabled);
   const [tab, setTab] = React.useState<"subscriptions" | "stamps" | "account" | "membership">("stamps");
+  const [subFilter, setSubFilter] = React.useState<"all" | "expiring" | "urgent" | "expired">("all");
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
   const [stamps, setStamps] = React.useState<Stamp[]>([]);
   // DB-authoritative access flag; initialized from session (fast), then confirmed by API
@@ -1195,6 +1196,27 @@ export default function DashboardPage() {
   const postExpirySubs = activeSubs.filter(s => s.phase && s.phase !== "active");
   const verifiedStamps = stamps.filter(s => s.verified);
 
+  const filteredSubscriptions = React.useMemo(() => {
+    return [...subscriptions]
+      .filter(s => {
+        if (subSearch.trim() && !s.domain.toLowerCase().includes(subSearch.trim().toLowerCase())) return false;
+        if (subFilter === "all") return true;
+        const d = daysUntilExpiry(s);
+        const dd = s.days_to_drop;
+        if (subFilter === "urgent") return s.active && ((d !== null && d >= 0 && d <= 7) || (dd !== null && dd >= 0 && dd <= 7));
+        if (subFilter === "expiring") return s.active && d !== null && d >= 0 && d <= 30;
+        if (subFilter === "expired") return !!(s.active && s.phase && s.phase !== "active");
+        return true;
+      })
+      .sort((a, b) => {
+        if (!a.active && b.active) return 1;
+        if (a.active && !b.active) return -1;
+        const da = daysUntilExpiry(a) ?? 9999;
+        const db = daysUntilExpiry(b) ?? 9999;
+        return da - db;
+      });
+  }, [subscriptions, subSearch, subFilter]);
+
   const TABS = [
     { key: "subscriptions" as const, label: t("dashboard.tab_subscriptions"), icon: <RiCalendarLine className="w-3.5 h-3.5" />, count: activeSubs.length || undefined },
     { key: "stamps" as const, label: t("dashboard.tab_stamps"), icon: <RiShieldCheckLine className="w-3.5 h-3.5" />, count: stamps.length || undefined },
@@ -1257,7 +1279,11 @@ export default function DashboardPage() {
         {/* Stats overview bar */}
         {!loadingData && (activeSubs.length > 0 || stamps.length > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => { setTab("subscriptions"); setSubFilter("all"); }}
+              className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
               <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <RiCalendarLine className="w-3.5 h-3.5 text-primary" />
               </div>
@@ -1265,12 +1291,16 @@ export default function DashboardPage() {
                 <p className="text-base font-bold leading-none">{activeSubs.length}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_active_subs")}</p>
               </div>
-            </div>
-            <div className={cn(
-              "glass-panel border rounded-xl px-3 py-2.5 flex items-center gap-2.5",
-              urgentSubs.length > 0 ? "border-red-300/60 bg-red-50/40 dark:bg-red-950/20" :
-              expiringSoon.length > 0 ? "border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20" : "border-border"
-            )}>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab("subscriptions"); setSubFilter(urgentSubs.length > 0 ? "urgent" : "expiring"); }}
+              className={cn(
+                "glass-panel border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left transition-colors",
+                urgentSubs.length > 0 ? "border-red-300/60 bg-red-50/40 dark:bg-red-950/20 hover:bg-red-100/40 dark:hover:bg-red-950/30" :
+                expiringSoon.length > 0 ? "border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-100/40 dark:hover:bg-amber-950/30" : "border-border hover:border-primary/40 hover:bg-primary/5"
+              )}
+            >
               <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
                 urgentSubs.length > 0 ? "bg-red-100 dark:bg-red-950/40" :
                 expiringSoon.length > 0 ? "bg-amber-100 dark:bg-amber-950/40" : "bg-muted"
@@ -1287,7 +1317,7 @@ export default function DashboardPage() {
                 )}>{expiringSoon.length}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_expiring_30")}</p>
               </div>
-            </div>
+            </button>
             <div className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
                 <RiShieldCheckLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -1433,26 +1463,62 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* In-tab stats chips */}
+              {/* In-tab filter chips */}
               {activeSubs.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-semibold border border-emerald-200/50 dark:border-emerald-700/30">
+                  <button
+                    type="button"
+                    onClick={() => setSubFilter("all")}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                      subFilter === "all"
+                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border-emerald-400/60"
+                        : "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-700/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                    )}
+                  >
                     <RiCheckLine className="w-2.5 h-2.5" />{activeSubs.length} {t("dashboard.chip_active")}
-                  </span>
+                  </button>
                   {expiringSoon.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-[10px] font-semibold border border-amber-200/50 dark:border-amber-700/30">
+                    <button
+                      type="button"
+                      onClick={() => setSubFilter(subFilter === "expiring" ? "all" : "expiring")}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                        subFilter === "expiring"
+                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border-amber-400/60"
+                          : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200/50 dark:border-amber-700/30 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                      )}
+                    >
                       <RiTimerLine className="w-2.5 h-2.5" />{expiringSoon.length} {t("dashboard.chip_expiring")}
-                    </span>
+                    </button>
                   )}
                   {urgentSubs.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-[10px] font-semibold border border-red-200/50 dark:border-red-700/30">
+                    <button
+                      type="button"
+                      onClick={() => setSubFilter(subFilter === "urgent" ? "all" : "urgent")}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                        subFilter === "urgent"
+                          ? "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 border-red-400/60"
+                          : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-700/30 hover:bg-red-100 dark:hover:bg-red-900/40"
+                      )}
+                    >
                       <RiFireLine className="w-2.5 h-2.5" />{urgentSubs.length} {t("dashboard.chip_urgent")}
-                    </span>
+                    </button>
                   )}
                   {postExpirySubs.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 text-[10px] font-semibold border border-orange-200/50 dark:border-orange-700/30">
+                    <button
+                      type="button"
+                      onClick={() => setSubFilter(subFilter === "expired" ? "all" : "expired")}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                        subFilter === "expired"
+                          ? "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 border-orange-400/60"
+                          : "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-700/30 hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                      )}
+                    >
                       <RiAlertLine className="w-2.5 h-2.5" />{postExpirySubs.length} {t("dashboard.chip_expired")}
-                    </span>
+                    </button>
                   )}
                 </div>
               )}
@@ -1523,16 +1589,13 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 </div>
-              ) : [...subscriptions]
-                .filter(s => !subSearch.trim() || s.domain.toLowerCase().includes(subSearch.trim().toLowerCase()))
-                .sort((a, b) => {
-                  if (!a.active && b.active) return 1;
-                  if (a.active && !b.active) return -1;
-                  const da = daysUntilExpiry(a) ?? 9999;
-                  const db = daysUntilExpiry(b) ?? 9999;
-                  return da - db;
-                })
-                .map(sub => {
+              ) : filteredSubscriptions.length === 0 ? (
+                <div className="flex flex-col items-center py-8 gap-2 text-center">
+                  <RiSearchLine className="w-6 h-6 text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">{t("dashboard.no_filter_results")}</p>
+                  <button type="button" onClick={() => setSubFilter("all")} className="text-[11px] text-primary hover:underline">{t("dashboard.clear_filter")}</button>
+                </div>
+              ) : filteredSubscriptions.map(sub => {
                 const phase = sub.phase;
                 const phaseInfo = phase ? PHASE_LABEL[phase] : null;
                 const days = daysUntilExpiry(sub);
@@ -1591,17 +1654,17 @@ export default function DashboardPage() {
                           {!sub.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("dashboard.cancelled")}</span>}
                           {isUrgent && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
-                              {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { days: days ?? 0 })}
+                              {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
                             </span>
                           )}
                           {isWarn && !isUrgent && !isPostExpiry && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50">
-                              {t("dashboard.expires_in_days", { days: days ?? 0 })}
+                              {t("dashboard.expires_in_days", { n: days ?? 0 })}
                             </span>
                           )}
                           {isDropSoon && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold border border-purple-300/50">
-                              {daysDropping === 0 ? t("dashboard.drop_today") : t("dashboard.drop_in_days", { days: daysDropping })}
+                              {daysDropping === 0 ? t("dashboard.drop_today") : t("dashboard.drop_in_days", { n: daysDropping })}
                             </span>
                           )}
                           {phaseInfo && phase !== "active" && (
@@ -1647,7 +1710,7 @@ export default function DashboardPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] text-muted-foreground">{t("dashboard.remaining_validity")}</span>
                           <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                            {days !== null && days > 0 ? t("dashboard.n_days", { days }) : days === 0 ? t("dashboard.expires_today") : t("dashboard.expired")}
+                            {days !== null && days > 0 ? t("dashboard.n_days", { n: days }) : days === 0 ? t("dashboard.expires_today") : t("dashboard.expired")}
                           </span>
                         </div>
                         <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
@@ -1721,7 +1784,7 @@ export default function DashboardPage() {
                           </div>
                           {sub.next_reminder_days !== null && sub.next_reminder_days !== undefined && nextReminderIsUpcoming && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-semibold shrink-0 tabular-nums">
-                              {t("dashboard.advance_days", { days: sub.next_reminder_days })}
+                              {t("dashboard.advance_days", { n: sub.next_reminder_days })}
                             </span>
                           )}
                         </div>
@@ -1733,7 +1796,7 @@ export default function DashboardPage() {
                             {daysSinceLastReminder !== null
                               ? daysSinceLastReminder === 0
                                 ? <>{t("dashboard.last_reminded_today")}</>
-                                : <>{t("dashboard.last_reminded_days_ago", { days: daysSinceLastReminder })}</>
+                                : <>{t("dashboard.last_reminded_days_ago", { n: daysSinceLastReminder })}</>
                               : t("dashboard.never_reminded")}
                           </span>
                         </div>

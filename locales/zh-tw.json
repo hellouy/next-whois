@@ -1537,6 +1537,8 @@
     "chip_expired": "已過期",
     "chip_expiring": "即將到期",
     "chip_urgent": "緊急",
+    "no_filter_results": "No results for this filter",
+    "clear_filter": "Clear filter",
     "claim_new_domain": "認領新網域",
     "click_btn_hint": "← 點擊{{label}}按鈕",
     "confirm_clear_history": "將永久刪除所有歷史記錄，確認繼續？",

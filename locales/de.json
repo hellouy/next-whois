@@ -1537,6 +1537,8 @@
     "chip_expired": "Abgelaufen",
     "chip_expiring": "Läuft bald ab",
     "chip_urgent": "Dringend",
+    "no_filter_results": "No results for this filter",
+    "clear_filter": "Clear filter",
     "claim_new_domain": "Neue Domain beanspruchen",
     "click_btn_hint": "← Klicke auf {{label}}",
     "confirm_clear_history": "Alle Verlaufsdaten werden dauerhaft gelöscht. Fortfahren?",

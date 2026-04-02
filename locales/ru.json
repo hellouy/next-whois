@@ -1537,6 +1537,8 @@
     "chip_expired": "Истекло",
     "chip_expiring": "Скоро истечёт",
     "chip_urgent": "Срочно",
+    "no_filter_results": "No results for this filter",
+    "clear_filter": "Clear filter",
     "claim_new_domain": "Заявить домен",
     "click_btn_hint": "← Нажмите кнопку {{label}}",
     "confirm_clear_history": "Удалить всю историю навсегда?",

@@ -1537,6 +1537,8 @@
     "chip_expired": "만료됨",
     "chip_expiring": "곧 만료",
     "chip_urgent": "긴급",
+    "no_filter_results": "No results for this filter",
+    "clear_filter": "Clear filter",
     "claim_new_domain": "새 도메인 등록",
     "click_btn_hint": "← {{label}} 버튼 클릭",
     "confirm_clear_history": "모든 기록을 영구 삭제하시겠습니까?",

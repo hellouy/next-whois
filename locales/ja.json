@@ -1537,6 +1537,8 @@
     "chip_expired": "期限切れ",
     "chip_expiring": "もうすぐ期限切れ",
     "chip_urgent": "緊急",
+    "no_filter_results": "No results for this filter",
+    "clear_filter": "Clear filter",
     "claim_new_domain": "新規ドメイン申請",
     "click_btn_hint": "← {{label}}ボタンをクリック",
     "confirm_clear_history": "すべての履歴を完全に削除しますか？",

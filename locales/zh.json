@@ -1537,6 +1537,8 @@
     "chip_expired": "已过期",
     "chip_expiring": "即将到期",
     "chip_urgent": "紧急",
+    "no_filter_results": "当前筛选无结果",
+    "clear_filter": "清除筛选",
     "claim_new_domain": "认领新域名",
     "click_btn_hint": "← 点击{{label}}按钮",
     "confirm_clear_history": "将永久删除所有历史记录，确认继续？",
