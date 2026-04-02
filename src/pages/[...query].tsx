@@ -3048,7 +3048,7 @@ function DomainReminderDialog({
         </div>
 
         {/* ── Body ── */}
-        <div className="px-5 pb-5 overflow-y-auto max-h-[72vh]">
+        <div className="px-5 pb-5 overflow-y-auto max-h-[72dvh]">
 
           {/* ── Domain name card — centered, above pricing ── */}
           <div className="flex flex-col items-center justify-center pt-4 pb-1 gap-1">
@@ -3125,6 +3125,13 @@ function DomainReminderDialog({
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground/55">{isZh ? "确认邮件已发送，请查收" : "Check your inbox for confirmation"}</p>
+                <button
+                  type="button"
+                  onClick={() => setDone(false)}
+                  className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                >
+                  {isZh ? "← 返回修改信息" : "← Edit subscription"}
+                </button>
               </motion.div>
 
             ) : (

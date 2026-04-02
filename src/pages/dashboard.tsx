@@ -242,9 +242,18 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
 
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+        {/*
+          On mobile (items-end) the sheet sits at the bottom.  We cap the total panel height to
+          (100dvh − navbar − announcement bar) so the header is never pushed behind the navbar.
+          On desktop (sm:items-center) the panel is centred and the 92svh cap from the scrollable
+          area naturally keeps it fully visible.
+        */}
+        <div
+          className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
+          style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
+        >
+          {/* Header — always visible, never scrolled away */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
             <h2 className="text-base font-bold flex items-center gap-2">
               <RiPencilLine className="w-4 h-4 text-primary" />{t("dashboard.edit_stamp_title")}
             </h2>
@@ -253,8 +262,8 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
             </button>
           </div>
 
-          {/* Scrollable content — capped so header+scroll+footer ≤ 92svh */}
-          <div className="overflow-y-auto overscroll-contain px-6 pb-2 space-y-3" style={{ maxHeight: "calc(92svh - 130px)" }}>
+          {/* Scrollable content — fills remaining space between header and footer */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2 space-y-3" style={{ minHeight: 0 }}>
             <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{stamp.domain}</span></p>
 
             {/* Tag name */}
@@ -417,7 +426,10 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
+      <div
+        className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
+        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
+      >
         <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2">
             <RiCalendarLine className="w-4 h-4 text-primary" />{t("dashboard.edit_expiry_title")}
@@ -426,7 +438,7 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
             <RiCloseLine className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
-        <div className="px-6 pb-2 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2 space-y-4" style={{ minHeight: 0 }}>
           <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{sub.domain}</span></p>
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">{t("dashboard.expiry_date")}</Label>
@@ -462,13 +474,13 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center px-4 pb-4"
-      style={{ paddingTop: "clamp(60px, 10vh, 80px)" }}
+      style={{ paddingTop: "calc(4rem + var(--ann-h, 0px) + 8px)" }}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-none" />
       <div
         className="relative z-10 w-full max-w-sm bg-background border border-border rounded-2xl shadow-2xl flex flex-col"
-        style={{ maxHeight: "calc(100vh - clamp(60px,10vh,80px) - 16px)" }}
+        style={{ maxHeight: "calc(100dvh - 4rem - var(--ann-h, 0px) - 16px)" }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
