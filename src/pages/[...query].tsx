@@ -2149,6 +2149,11 @@ function getDomainRegistrationStatus(
     rawContent.includes("保留中") ||
     rawContent.includes("该域名已保留") ||
     rawContent.includes("域名已锁定") ||
+    // CNNIC (.cn) reserved domains — registry holds name, offline only
+    // Response text: "the Domain Name you apply can not be registered online.
+    //                 Please consult your Domain Name registrar"
+    rawContent.includes("can not be registered online") ||
+    rawContent.includes("cannot be registered online") ||
     // Standalone "reserved" on its own line (TWNIC / NZRS)
     /(?:^|\n)\s*reserved\s*(?:\n|$)/.test(rawContent);
 

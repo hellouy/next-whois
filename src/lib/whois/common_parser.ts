@@ -1197,6 +1197,11 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         rawLow.includes("注册局保留") ||
         rawLow.includes("保留中") ||
         rawLow.includes("该域名已保留") ||
+        // ── CNNIC (.cn) reserved domains — registry holds name offline ────
+        // Response: "the Domain Name you apply can not be registered online.
+        //            Please consult your Domain Name registrar"
+        rawLow.includes("can not be registered online") ||
+        rawLow.includes("cannot be registered online") ||
         // ── standalone "reserved" on its own line (TWNIC / NZRS) ─────────
         /(?:^|\n)\s*reserved\s*(?:\n|$)/.test(rawLow));
 
