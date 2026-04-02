@@ -100,7 +100,7 @@ export function extractApiKey(req: NextApiRequest): string | null {
  * client-side pages call /api/lookup without an API key even when the admin
  * has enabled API-key enforcement for external consumers.
  */
-function isSameOriginRequest(req: NextApiRequest): boolean {
+export function isSameOriginRequest(req: NextApiRequest): boolean {
   const host = req.headers["host"];
   if (!host) return false;
 

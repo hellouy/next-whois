@@ -3917,59 +3917,65 @@ function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: { dom
       <div className={cn("h-1 w-full", isPremium ? "bg-gradient-to-r from-amber-400 to-amber-500" : "bg-gradient-to-r from-emerald-400 to-emerald-500")} />
 
       {/* ── Hero ── */}
-      <div className="px-5 pt-8 pb-6 text-center">
-        {/* Big icon */}
-        <div className="flex justify-center mb-4">
-          <div className={cn(
-            "w-16 h-16 rounded-full flex items-center justify-center border-2",
-            isPremium
-              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-700/50"
-              : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-700/50"
-          )}>
-            {isPremium
-              ? <RiVipCrownLine className="w-7 h-7 text-amber-500 dark:text-amber-400" />
-              : <RiCheckLine className="w-8 h-8 text-emerald-500 dark:text-emerald-400" />}
+      <div className={cn(
+        "px-5 sm:px-8 pt-6 pb-5",
+        isPremium ? "bg-amber-500/5 dark:bg-amber-950/15" : "bg-emerald-500/5 dark:bg-emerald-950/15"
+      )}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Icon */}
+            <div className={cn(
+              "shrink-0 w-11 h-11 rounded-xl flex items-center justify-center border",
+              isPremium
+                ? "bg-amber-500/10 border-amber-400/30 dark:border-amber-500/30"
+                : "bg-emerald-500/10 border-emerald-400/30 dark:border-emerald-500/30"
+            )}>
+              {isPremium
+                ? <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+                : <RiCheckLine className="w-6 h-6 text-emerald-500 dark:text-emerald-400" />}
+            </div>
+            <div className="min-w-0">
+              {/* Domain name */}
+              <div className="mb-1 leading-tight">
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-all">{sldForDisplay}</span>
+                <span className={cn(
+                  "text-2xl sm:text-3xl font-bold tracking-tight",
+                  isPremium ? "text-amber-500 dark:text-amber-400" : "text-emerald-500 dark:text-emerald-400"
+                )}>{tldForDisplay}</span>
+              </div>
+              {/* Description */}
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {isPremium
+                  ? (anyApiPremium && premiumRegistrars.length > 0
+                      ? (isZh
+                          ? `溢价域名，注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，实际以注册商报价为准。`
+                          : `Premium domain — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm price with registrar.`)
+                      : (isZh
+                          ? "溢价域名，注册价格高于普通域名，请以注册商实时报价为准。"
+                          : "Premium domain — registration costs above standard rates. Confirm with registrar."))
+                  : (isZh
+                      ? "该域名目前可注册，抓紧时间抢注吧！"
+                      : "This domain is available. Grab it before someone else does.")}
+              </p>
+            </div>
+          </div>
+          {/* Badge */}
+          <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end gap-2">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border",
+              isPremium
+                ? "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-400/30 dark:border-amber-500/30"
+                : "text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-400/30 dark:border-emerald-500/30"
+            )}>
+              <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isPremium ? "bg-amber-500" : "bg-emerald-500")} />
+              {isPremium ? (isZh ? "溢价域名" : "Premium") : (isZh ? "可注册" : "Available")}
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Badge */}
-        <div className="flex justify-center mb-3">
-          <span className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border",
-            isPremium
-              ? "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-400/30 dark:border-amber-500/30"
-              : "text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-400/30 dark:border-emerald-500/30"
-          )}>
-            <span className={cn("w-1.5 h-1.5 rounded-full", isPremium ? "bg-amber-500" : "bg-emerald-500")} />
-            {isPremium ? (isZh ? "溢价域名" : "Premium Domain") : (isZh ? "可注册" : "Available")}
-          </span>
-        </div>
-
-        {/* Domain name */}
-        <div className="mb-2.5 leading-tight">
-          <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground break-all">{sldForDisplay}</span>
-          <span className={cn(
-            "text-3xl sm:text-4xl font-bold tracking-tight",
-            isPremium ? "text-amber-500 dark:text-amber-400" : "text-emerald-500 dark:text-emerald-400"
-          )}>{tldForDisplay}</span>
-        </div>
-
-        {/* Description */}
-        <p className="text-sm text-muted-foreground leading-relaxed mb-5 max-w-xs mx-auto">
-          {isPremium
-            ? (anyApiPremium && premiumRegistrars.length > 0
-                ? (isZh
-                    ? `溢价域名，注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，实际以注册商报价为准。`
-                    : `Premium domain — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm price with registrar.`)
-                : (isZh
-                    ? "溢价域名，注册价格高于普通域名，请以注册商实时报价为准。"
-                    : "Premium domain — registration costs above standard rates. Confirm with registrar."))
-            : (isZh
-                ? "恭喜！该域名目前可注册，抓紧时间抢注吧！"
-                : "Great news! This domain is available. Grab it before someone else does.")}
-        </p>
-
-        {/* Action buttons */}
+      {/* ── Action buttons ── */}
+      <div className="px-5 sm:px-8 py-4 border-t border-border/40">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
           {loadingPrices ? (
             <div className="h-9 w-44 rounded-lg bg-muted/40 animate-pulse mx-auto" />

@@ -4,7 +4,7 @@ import { WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types
 import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
-import { enforceApiKey } from "@/lib/access-key";
+import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
@@ -44,9 +44,12 @@ export default async function handler(
     return res.status(405).json({ time: -1, status: false, error: "Method not allowed" });
   }
 
-  // Rate limiting
+  // Rate limiting — same-origin requests (the site itself) bypass the limit
   const ip = getClientIp(req);
-  const { allowed, remaining, resetMs } = rateLimit(ip, RATE_LIMIT, RATE_WINDOW_MS);
+  const sameOrigin = isSameOriginRequest(req);
+  const { allowed, remaining, resetMs } = sameOrigin
+    ? { allowed: true, remaining: RATE_LIMIT, resetMs: 0 }
+    : rateLimit(ip, RATE_LIMIT, RATE_WINDOW_MS);
   res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
   res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));

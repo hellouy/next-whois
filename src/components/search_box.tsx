@@ -499,7 +499,11 @@ export function SearchBox({
       return;
     }
     if (result.isWarning && result.errorKey) {
-      setValidationError({ message: t(result.errorKey as any, result.errorArgs as any), isWarning: true });
+      if (!validationError?.isWarning) {
+        setValidationError({ message: t(result.errorKey as any, result.errorArgs as any), isWarning: true });
+        return;
+      }
+      setValidationError(null);
     } else {
       setValidationError(null);
     }
