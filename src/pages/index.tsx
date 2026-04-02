@@ -14,14 +14,6 @@ import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
 import type { GetStaticProps } from "next";
 import { getSettings } from "@/lib/server/site-settings-server";
 import { useSiteSettings } from "@/lib/site-settings";
-import {
-  RiInformationLine,
-  RiAlertLine,
-  RiCheckboxCircleLine,
-  RiMegaphoneLine,
-  RiCloseLine,
-  RiArrowRightSLine,
-} from "@remixicon/react";
 
 interface HomeSeo {
   title: string;
@@ -38,92 +30,6 @@ interface HomeSeo {
   heroSubtitle: string;
   searchPlaceholder: string;
   showStats: boolean;
-}
-
-// ── Homepage Announcement Banner ──────────────────────────────────────────────
-
-const ANN_DISMISS_KEY = "home_ann_dismissed";
-
-function HomeAnnouncementBanner() {
-  const settings = useSiteSettings();
-  const [dismissed, setDismissed] = React.useState(true);
-
-  // Hydrate from localStorage after mount to avoid SSR mismatch
-  useEffect(() => {
-    const stored = localStorage.getItem(ANN_DISMISS_KEY);
-    // Dismiss key includes the text hash so changing text un-dismisses
-    const currentHash = settings.home_announcement_text.slice(0, 40);
-    if (stored === currentHash) {
-      setDismissed(true);
-    } else {
-      setDismissed(false);
-    }
-  }, [settings.home_announcement_text]);
-
-  const handleDismiss = () => {
-    const hash = settings.home_announcement_text.slice(0, 40);
-    localStorage.setItem(ANN_DISMISS_KEY, hash);
-    setDismissed(true);
-  };
-
-  if (settings.home_announcement_enabled !== "1") return null;
-  if (!settings.home_announcement_text) return null;
-  if (dismissed) return null;
-
-  const type = settings.home_announcement_type || "info";
-  const url = settings.home_announcement_url;
-
-  const typeStyles: Record<string, { wrapper: string; icon: React.ReactNode }> = {
-    info: {
-      wrapper: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200",
-      icon: <RiInformationLine className="w-4 h-4 shrink-0 text-blue-500 dark:text-blue-400" />,
-    },
-    warning: {
-      wrapper: "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200",
-      icon: <RiAlertLine className="w-4 h-4 shrink-0 text-amber-500 dark:text-amber-400" />,
-    },
-    success: {
-      wrapper: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200",
-      icon: <RiCheckboxCircleLine className="w-4 h-4 shrink-0 text-emerald-500 dark:text-emerald-400" />,
-    },
-    notice: {
-      wrapper: "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-200",
-      icon: <RiMegaphoneLine className="w-4 h-4 shrink-0 text-violet-500 dark:text-violet-400" />,
-    },
-  };
-
-  const style = typeStyles[type] ?? typeStyles.info;
-  const content = (
-    <div className={cn(
-      "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm",
-      style.wrapper,
-    )}>
-      {style.icon}
-      <span className="flex-1 leading-snug">{settings.home_announcement_text}</span>
-      {url && (
-        <span className="flex items-center gap-0.5 text-xs opacity-70 shrink-0">
-          <RiArrowRightSLine className="w-3 h-3" />
-        </span>
-      )}
-      <button
-        onClick={(e) => { e.preventDefault(); handleDismiss(); }}
-        className="p-0.5 rounded hover:opacity-70 transition-opacity shrink-0"
-        aria-label="关闭公告"
-      >
-        <RiCloseLine className="w-4 h-4" />
-      </button>
-    </div>
-  );
-
-  return (
-    <div className="mb-3">
-      {url ? (
-        <Link href={url} target={url.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer">
-          {content}
-        </Link>
-      ) : content}
-    </div>
-  );
 }
 
 // ── Brand display ─────────────────────────────────────────────────────────────
@@ -258,16 +164,13 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
         {/* Search box */}
         <div className="mb-3">
           <div className="relative group">
-            <SearchBox onSearch={handleSearch} loading={loading} autoFocus placeholder={seo.searchPlaceholder || undefined} />
+            <SearchBox onSearch={handleSearch} loading={loading} placeholder={seo.searchPlaceholder || undefined} />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
               <KeyboardShortcut k="/" />
             </div>
           </div>
           <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
         </div>
-
-        {/* Homepage announcement banner — inline, below search, not fixed */}
-        <HomeAnnouncementBanner />
 
         {/* Stats bar */}
         {seo.showStats && stats && (
@@ -321,12 +224,18 @@ const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
 export const getStaticProps: GetStaticProps = async () => {
   let s: Record<string, string> = {};
   try {
-    s = await getSettings([
-      "site_title", "site_description", "site_keywords", "site_logo_text",
-      "site_subtitle", "og_site_name", "og_image", "og_url", "twitter_card",
-      "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_placeholder",
-      "home_announcement_enabled", "home_announcement_text", "home_announcement_type",
-      "home_announcement_url",
+    // Race the DB query against a 3-second timeout so dev-mode cold-starts
+    // (Supabase connection latency) never stall the page for more than 3 s.
+    // On Vercel with warm ISR cache this completes in < 100 ms.
+    s = await Promise.race([
+      getSettings([
+        "site_title", "site_description", "site_keywords", "site_logo_text",
+        "site_subtitle", "og_site_name", "og_image", "og_url", "twitter_card",
+        "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_placeholder",
+        "home_announcement_enabled", "home_announcement_text", "home_announcement_type",
+        "home_announcement_url",
+      ]),
+      new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 3000)),
     ]);
   } catch {
     // DB unavailable — use all defaults; page will still render correctly

@@ -122,31 +122,101 @@ function SiteFooter() {
   );
 }
 
+const HOME_ANN_DISMISS_KEY = "home_ann_dismissed_v2";
+
 function AnnouncementBanner() {
   const settings = useSiteSettings();
   const { t } = useTranslation();
+  const router = useRouter();
+  const isHome = router.pathname === "/";
+
+  // Pick announcement source: homepage-specific on "/", global elsewhere
+  const homeEnabled = settings.home_announcement_enabled === "1";
+  const homeMsg = settings.home_announcement_text || "";
+  const globalMsg = settings.site_announcement || "";
+  const rawMsg = isHome && homeEnabled && homeMsg ? homeMsg : (!isHome ? globalMsg : globalMsg);
+
   const [dismissed, setDismissed] = React.useState(false);
-  const msg = settings.site_announcement;
-  const visible = !!msg && !dismissed;
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const [fading, setFading] = React.useState(false);
+
+  const items = React.useMemo(
+    () => (rawMsg || "").split("|").map(s => s.trim()).filter(Boolean),
+    [rawMsg],
+  );
+  const visible = items.length > 0 && !dismissed;
+
+  // For homepage announcement: persist dismiss in localStorage keyed by text hash
+  // so changing the text auto-reappears the bar.
+  React.useEffect(() => {
+    if (!isHome || !homeEnabled || !homeMsg) return;
+    const hash = homeMsg.slice(0, 40);
+    const stored = localStorage.getItem(HOME_ANN_DISMISS_KEY);
+    setDismissed(stored === hash);
+  }, [isHome, homeEnabled, homeMsg]);
+
+  // For global announcement: reset dismissed when message changes
+  React.useEffect(() => {
+    if (isHome) return;
+    setDismissed(false);
+  }, [globalMsg, isHome]);
+
+  const handleDismiss = () => {
+    if (isHome && homeEnabled && homeMsg) {
+      localStorage.setItem(HOME_ANN_DISMISS_KEY, homeMsg.slice(0, 40));
+    }
+    setDismissed(true);
+  };
 
   React.useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--ann-h", visible ? "36px" : "0px");
+    root.style.setProperty("--ann-h", visible ? "32px" : "0px");
     return () => { root.style.setProperty("--ann-h", "0px"); };
   }, [visible]);
 
-  if (!msg || dismissed) return null;
+  React.useEffect(() => {
+    if (items.length <= 1) return;
+    setActiveIdx(0);
+    const timer = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setActiveIdx(i => (i + 1) % items.length);
+        setFading(false);
+      }, 350);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [items.length, rawMsg]);
+
+  if (!visible) return null;
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center px-4 py-2 bg-gradient-to-r from-primary to-violet-600 text-white text-xs font-medium gap-2 shadow-md">
-      <RiMegaphoneLine className="w-3.5 h-3.5 shrink-0" />
-      <span className="flex-1 text-center">{msg}</span>
+    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-xs font-medium border-b border-border/30 bg-background/80 backdrop-blur-sm">
+      <RiMegaphoneLine
+        className="w-3.5 h-3.5 shrink-0 text-primary"
+        style={{ animation: "ann-horn 2.4s ease-in-out infinite" }}
+      />
+      <span
+        className="text-foreground/80 text-center truncate transition-opacity duration-300"
+        style={{ opacity: fading ? 0 : 1 }}
+      >
+        <span className="font-semibold text-primary mr-1">公告：</span>
+        {items[activeIdx]}
+      </span>
       <button
-        onClick={() => setDismissed(true)}
-        className="p-0.5 rounded hover:bg-white/20 transition-colors shrink-0"
+        onClick={handleDismiss}
+        className="ml-auto p-0.5 rounded hover:bg-muted/60 transition-colors shrink-0 text-muted-foreground hover:text-foreground"
         aria-label={t("close_announcement")}
       >
         <RiCloseLine className="w-3.5 h-3.5" />
       </button>
+      <style>{`
+        @keyframes ann-horn {
+          0%, 100% { transform: rotate(-8deg) scale(1); }
+          25%       { transform: rotate(8deg) scale(1.1); }
+          50%       { transform: rotate(-6deg) scale(1); }
+          75%       { transform: rotate(6deg) scale(1.05); }
+        }
+      `}</style>
     </div>
   );
 }

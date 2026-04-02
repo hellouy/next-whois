@@ -4130,17 +4130,43 @@ function targetFromRouterQuery(query: NodeJS.Dict<string | string[]>): string {
   return cleanDomain(segments.join("/").replace(/\s+/g, ""));
 }
 
-/** Text ad banner shown below the lookup result — fully configurable from admin. */
-function ResultTextAd() {
+/** Text ad banner — multi-item with 4s fade cycling, only shown after results load. */
+function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; inline?: boolean }) {
   const settings = useSiteSettings();
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const [fading, setFading] = React.useState(false);
+
+  const rawText = settings.result_ad_text || "";
+  const items = React.useMemo(
+    () => rawText.split("|").map(s => s.trim()).filter(Boolean),
+    [rawText],
+  );
+
+  React.useEffect(() => {
+    if (items.length <= 1) return;
+    const timer = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setActiveIdx(i => (i + 1) % items.length);
+        setFading(false);
+      }, 350);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [items.length]);
+
   if (settings.result_ad_enabled !== "1") return null;
-  if (!settings.result_ad_text) return null;
+  if (items.length === 0) return null;
+  if (loading) return null;
+
   const label = settings.result_ad_label || "广告";
   const url   = settings.result_ad_url;
-  const text  = settings.result_ad_text;
+  const text  = items[activeIdx];
 
   const inner = (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors cursor-default">
+    <div
+      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors cursor-default"
+      style={{ opacity: fading ? 0 : 1, transition: "opacity 0.3s ease" }}
+    >
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium shrink-0 uppercase tracking-wide">
         {label}
       </span>
@@ -4149,16 +4175,16 @@ function ResultTextAd() {
     </div>
   );
 
-  if (url) {
-    return (
-      <div className="mt-6">
-        <Link href={url} target="_blank" rel="noopener noreferrer sponsored">
-          {inner}
-        </Link>
-      </div>
-    );
+  const wrapper = url ? (
+    <Link href={url} target="_blank" rel="noopener noreferrer sponsored">
+      {inner}
+    </Link>
+  ) : inner;
+
+  if (inline) {
+    return <div className="sm:hidden mt-4">{wrapper}</div>;
   }
-  return <div className="mt-6">{inner}</div>;
+  return <div className="hidden sm:block mt-6">{wrapper}</div>;
 }
 
 export default function LookupPage({
@@ -4463,15 +4489,30 @@ export default function LookupPage({
   useEffect(() => {
     const domainKey = data.result?.domain || target;
     if (!domainKey) return;
-    const ctrl = new AbortController();
-    // Defer until after initial paint so it doesn't compete with critical rendering
-    const timer = setTimeout(() => {
+
+    let ctrl = new AbortController();
+
+    const fetchStamps = () => {
+      ctrl.abort();
+      ctrl = new AbortController();
       fetch(`/api/stamp/check?domain=${encodeURIComponent(domainKey)}`, { signal: ctrl.signal })
         .then((r) => r.json())
         .then((d) => setVerifiedStamps(d.stamps || []))
         .catch(() => {});
-    }, 300);
-    return () => { clearTimeout(timer); ctrl.abort(); };
+    };
+
+    // Defer until after initial paint so it doesn't compete with critical rendering
+    const timer = setTimeout(fetchStamps, 300);
+
+    // Re-fetch when tab regains focus so admin stamp changes are reflected immediately
+    const onVisibility = () => { if (document.visibilityState === "visible") fetchStamps(); };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [data.result?.domain, target]);
 
   const FALLBACK_EUR_RATES: Record<string, number> = {
@@ -5811,6 +5852,9 @@ export default function LookupPage({
                       regStatusType={getDomainRegistrationStatus(result, locale).type}
                     />
 
+                    {/* Mobile-only inline ad — between registration info and domain status card */}
+                    <ResultTextAd loading={loading} inline />
+
                     {result.remainingDays === null &&
                       (() => {
                         const regStatus = getDomainRegistrationStatus(result, locale);
@@ -6838,8 +6882,8 @@ export default function LookupPage({
             </>
           )}
 
-          {/* Text ad — shown after successful result, admin-configurable */}
-          <ResultTextAd />
+          {/* Text ad — shown after successful result, desktop only (mobile version is inline) */}
+          <ResultTextAd loading={loading} />
 
             </motion.div>
           </div>
