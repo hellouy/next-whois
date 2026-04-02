@@ -172,10 +172,12 @@ function intEnv(name: string, def: number): number {
 }
 
 // ── Core lookup: custom server → RDAP → generic WHOIS → merge/error ──────────
-// Timeouts: RDAP_TIMEOUT_MS (default 3.5 s), WHOIS_TIMEOUT_MS (default 8 s).
-// 8 s WHOIS budget accommodates slow ccTLD servers (e.g. .cn, .de).
-const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  3_500);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
+// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 7 s).
+// Reduced RDAP: 3500 → 2500 ms — RDAP servers are fast; extra budget was wasted.
+// Reduced WHOIS: 8000 → 7000 ms — still covers slow ccTLDs (.cn, .de) while
+// shaving 1 s off the worst-case path when RDAP unavailable.
+const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  2_500);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 7_000);
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
 
 export async function lookupWhois(domain: string): Promise<WhoisResult> {
@@ -226,7 +228,9 @@ export async function lookupWhois(domain: string): Promise<WhoisResult> {
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
   // This avoids waiting the full WHOIS_TIMEOUT (e.g. 10 s) for TLDs where RDAP
   // is fast but the WHOIS server is slow or deprecated (e.g. .ai, .io).
-  const RDAP_WIN_WHOIS_GRACE_MS = 2_500;
+  // Reduced from 2500 → 800 ms: RDAP already provides complete data; WHOIS
+  // enrichment is nice-to-have but not worth a 2.5 s wait on every query.
+  const RDAP_WIN_WHOIS_GRACE_MS = 800;
 
   // Start RDAP + WHOIS in parallel.
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>;

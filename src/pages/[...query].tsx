@@ -158,19 +158,19 @@ function QueryProgressBar({ loading }: { loading: boolean }) {
       doneRef.current = false;
       setWidth(0);
       setVisible(true);
-      // Advance quickly to 30%, then slow down toward 80%
+      // Fast initial burst to 40%, then ease toward 85% to signal active work
       let w = 0;
       timerRef.current = setInterval(() => {
         if (doneRef.current) return;
-        w += w < 30 ? 8 : w < 60 ? 3 : w < 78 ? 0.8 : 0;
-        if (w > 80) w = 80;
+        w += w < 40 ? 12 : w < 65 ? 4 : w < 82 ? 1 : 0;
+        if (w > 85) w = 85;
         setWidth(w);
-      }, 120);
+      }, 80);
     } else {
       doneRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
       setWidth(100);
-      const t = setTimeout(() => setVisible(false), 500);
+      const t = setTimeout(() => setVisible(false), 400);
       return () => clearTimeout(t);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
@@ -4869,10 +4869,9 @@ export default function LookupPage({
           <div className="relative">
             <QueryProgressBar loading={loading} />
             <motion.div
-              layout
               initial={false}
-              animate={{ opacity: loading ? 0.82 : 1 }}
-              transition={{ duration: 0.22, ease: "easeOut", layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+              animate={{ opacity: loading ? 0.85 : 1 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
@@ -4936,28 +4935,75 @@ export default function LookupPage({
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeIn" } }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeIn" } }}
+              transition={{ duration: 0.12 }}
               className="grid grid-cols-1 gap-6"
             >
-              <div className="space-y-4">
-                <div className="glass-panel rounded-xl p-8 sm:p-10">
-                  <div className="space-y-5">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-muted/40 animate-pulse shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-5 w-36 rounded bg-muted/40 animate-pulse" />
-                        <div className="h-3.5 w-24 rounded bg-muted/30 animate-pulse" />
+              {/* Main domain info card */}
+              <div className="glass-panel rounded-xl p-8 sm:p-10">
+                <div className="space-y-6">
+                  {/* Header: icon + domain name */}
+                  <div className="flex items-center gap-4">
+                    <div className="h-11 w-11 rounded-full bg-muted/40 animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      {target ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-semibold font-mono truncate">{target}</p>
+                          <RiLoader4Line className="w-4 h-4 text-muted-foreground/60 animate-spin shrink-0" />
+                        </div>
+                      ) : (
+                        <div className="h-5 w-40 rounded bg-muted/40 animate-pulse" />
+                      )}
+                      <div className="h-3.5 w-28 rounded bg-muted/30 animate-pulse mt-2" />
+                    </div>
+                  </div>
+                  {/* Status badge row */}
+                  <div className="flex gap-2 flex-wrap">
+                    <div className="h-6 w-24 rounded-full bg-muted/40 animate-pulse" />
+                    <div className="h-6 w-32 rounded-full bg-muted/30 animate-pulse" />
+                  </div>
+                  {/* Date rows */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="space-y-1.5">
+                        <div className="h-3 w-16 rounded bg-muted/25 animate-pulse" />
+                        <div className="h-4 w-24 rounded bg-muted/35 animate-pulse" />
                       </div>
+                    ))}
+                  </div>
+                  {/* Registrar row */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="h-3 w-14 rounded bg-muted/25 animate-pulse" />
+                    <div className="h-4 w-48 rounded bg-muted/35 animate-pulse" />
+                  </div>
+                  {/* Action buttons */}
+                  <div className="flex gap-3 pt-1">
+                    <div className="h-8 w-24 rounded-md bg-muted/40 animate-pulse" />
+                    <div className="h-8 w-24 rounded-md bg-muted/30 animate-pulse" />
+                    <div className="h-8 w-20 rounded-md bg-muted/25 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Secondary cards row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="glass-panel rounded-xl p-6">
+                  <div className="space-y-3">
+                    <div className="h-4 w-28 rounded bg-muted/40 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3.5 w-full rounded bg-muted/25 animate-pulse" />
+                      <div className="h-3.5 w-5/6 rounded bg-muted/25 animate-pulse" />
+                      <div className="h-3.5 w-4/6 rounded bg-muted/25 animate-pulse" />
                     </div>
-                    <div className="space-y-2 pt-2">
-                      <div className="h-3.5 w-full rounded bg-muted/30 animate-pulse" />
-                      <div className="h-3.5 w-5/6 rounded bg-muted/30 animate-pulse" />
-                      <div className="h-3.5 w-4/6 rounded bg-muted/30 animate-pulse" />
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                      <div className="h-7 w-20 rounded-md bg-muted/40 animate-pulse" />
-                      <div className="h-7 w-20 rounded-md bg-muted/30 animate-pulse" />
+                  </div>
+                </div>
+                <div className="glass-panel rounded-xl p-6">
+                  <div className="space-y-3">
+                    <div className="h-4 w-24 rounded bg-muted/40 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3.5 w-full rounded bg-muted/25 animate-pulse" />
+                      <div className="h-3.5 w-3/4 rounded bg-muted/25 animate-pulse" />
+                      <div className="h-3.5 w-5/6 rounded bg-muted/25 animate-pulse" />
                     </div>
                   </div>
                 </div>
