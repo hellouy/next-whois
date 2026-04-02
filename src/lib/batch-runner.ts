@@ -204,10 +204,26 @@ async function _runLoop() {
       _notify();
     }
 
-    if (!_aborted) {
-      await new Promise(r => setTimeout(r, 800));
-      _state = { ..._state, idx: _state.idx + 1 };
-      _notify();
+    if (_aborted) break;
+
+    // Auto-stop when failure rate is too high (checked after every 20th processed item)
+    const processed = _state.items.filter(i => i.status === "ok" || i.status === "error").length;
+    if (processed >= 20 && processed % 20 === 0) {
+      const errors = _state.items.filter(i => i.status === "error").length;
+      if (errors / processed > 0.85) {
+        _aborted = true;
+        _state = {
+          ..._state,
+          status: "stopped",
+        };
+        _notify();
+        console.warn(`[BatchRunner] Auto-stopped: failure rate ${Math.round(errors / processed * 100)}% (${errors}/${processed})`);
+        break;
+      }
     }
+
+    await new Promise(r => setTimeout(r, 800));
+    _state = { ..._state, idx: _state.idx + 1 };
+    _notify();
   }
 }

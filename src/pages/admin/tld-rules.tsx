@@ -585,8 +585,12 @@ export default function AdminTldRulesPage() {
     : 0;
 
   function BatchPanel({ list, label }: { list: { tld: string; source_url?: string }[]; label: string }) {
-    const isActive = batch.status === "running";
-    const isDone   = batch.status === "done";
+    const isActive  = batch.status === "running";
+    const isDone    = batch.status === "done";
+    const isStopped = batch.status === "stopped";
+    const processed = batch.items.filter(i => i.status === "ok" || i.status === "error").length;
+    const autoStopRate = processed > 0 ? Math.round(batchErr / processed * 100) : 0;
+    const wasAutoStopped = isStopped && processed >= 20 && autoStopRate > 85;
 
     return (
       <div className="border rounded-xl p-5 space-y-4 bg-card">
@@ -637,19 +641,32 @@ export default function AdminTldRulesPage() {
           </div>
         </div>
 
+        {/* ── Auto-stop warning ── */}
+        {wasAutoStopped && (
+          <div className="flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-4 py-3">
+            <RiErrorWarningLine className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-700 dark:text-amber-400">
+              <strong>已自动停止：</strong>失败率过高（{autoStopRate}%，已处理 {processed} 个），批量抓取已暂停以防止刷爆请求。
+              可检查 API 密钥、模型配置或稍后重试。
+            </div>
+          </div>
+        )}
+
         {/* ── Progress bar (running or done) ── */}
-        {(isActive || isDone) && batch.items.length > 0 && (
+        {(isActive || isDone || isStopped) && batch.items.length > 0 && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>
                 {isActive
                   ? `正在处理 .${batch.items[batch.idx]?.tld ?? "…"} (${batch.idx + 1} / ${batch.items.length})`
+                  : isStopped
+                  ? `已停止 — 完成 ${batchDone} · 失败 ${batchErr} · 跳过 ${batchSkip}`
                   : `本次完成 ${batchDone} · 失败 ${batchErr} · 跳过 ${batchSkip}`}
               </span>
               <span>{batchPct}%</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${batchPct}%` }} />
+              <div className={cn("h-full transition-all duration-300", isStopped ? "bg-amber-500" : "bg-violet-500")} style={{ width: `${batchPct}%` }} />
             </div>
           </div>
         )}

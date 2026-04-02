@@ -54,6 +54,7 @@ export default function TldFailuresPage() {
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
   const [clearing, setClearing] = React.useState<string | null>(null);
+  const [clearingAll, setClearingAll] = React.useState(false);
   const [patchingStatus, setPatchingStatus] = React.useState<string | null>(null);
 
   function load() {
@@ -82,6 +83,22 @@ export default function TldFailuresPage() {
       if (r.ok) { toast.success(`.${tld} 失败计数已清零`); load(); }
       else toast.error("操作失败");
     } finally { setClearing(null); }
+  }
+
+  async function clearAll() {
+    const total = summary.reduce((s, r) => s + parseInt(r.count), 0);
+    if (!confirm(`确认清零全部 ${total} 条失败记录？此操作不可撤销。`)) return;
+    setClearingAll(true);
+    try {
+      const r = await fetch("/api/admin/tld-failures", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear_all: true, reason: reasonFilter || undefined }),
+      });
+      const d = await r.json();
+      if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`); load(); }
+      else toast.error("操作失败");
+    } finally { setClearingAll(false); }
   }
 
   async function patchStatus(tld: string, repair_status: string) {
@@ -127,13 +144,25 @@ export default function TldFailuresPage() {
               记录 WHOIS/RDAP 查询失败的后缀 — 帮助管理员添加正确服务器或排查原因
             </p>
           </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
-          >
-            <RiRefreshLine className={cn("w-4 h-4", loading && "animate-spin")} />
-          </button>
+          <div className="flex items-center gap-2">
+            {rows.length > 0 && (
+              <button
+                onClick={clearAll}
+                disabled={clearingAll}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+              >
+                {clearingAll ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
+                清除全部失败记录
+              </button>
+            )}
+            <button
+              onClick={load}
+              disabled={loading}
+              className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
+            >
+              <RiRefreshLine className={cn("w-4 h-4", loading && "animate-spin")} />
+            </button>
+          </div>
         </div>
 
         {/* Summary pills */}
@@ -205,7 +234,7 @@ export default function TldFailuresPage() {
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <div className="text-xs text-sky-700 dark:text-sky-400 space-y-0.5">
             <p><strong>失败原因说明：</strong>无服务器 = IANA未收录该后缀的WHOIS服务器；超时 = 服务器有记录但无法连接；解析失败 = 响应内容无法识别；速率限制 = 服务器拒绝过频访问</p>
-            <p>点击 <strong>配置服务器</strong> 可跳转到后缀规则页面为该后缀添加自定义WHOIS服务器</p>
+            <p>点击 <strong>配置服务器</strong> 可跳转到域名管理页面为该后缀添加自定义WHOIS服务器，保存后立即生效</p>
           </div>
         </div>
 
@@ -333,9 +362,7 @@ export default function TldFailuresPage() {
 
                     {/* Configure server */}
                     <a
-                      href={`/admin/tld-rules#${row.tld}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={`/admin/domains?tab=failures`}
                       className="text-[10px] px-2 py-1 rounded-lg border border-border/60 text-sky-600 dark:text-sky-400 hover:border-sky-400/60 flex items-center gap-1"
                     >
                       <RiServerLine className="w-2.5 h-2.5" />

@@ -506,6 +506,7 @@ function FailuresTab() {
   const [loading, setLoading] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [resettingTld, setResettingTld] = React.useState<string | null>(null);
+  const [clearingAll, setClearingAll] = React.useState(false);
 
   // Add-server dialog state
   const [addOpen, setAddOpen] = React.useState(false);
@@ -538,6 +539,22 @@ function FailuresTab() {
       await load();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "操作失败"); }
     finally { setResettingTld(null); }
+  }
+
+  async function clearAllFailures() {
+    if (!confirm(`确认清零全部 ${rows.length} 条失败记录？此操作不可撤销。`)) return;
+    setClearingAll(true);
+    try {
+      const r = await fetch("/api/admin/tld-failures", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear_all: true }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error("操作失败");
+      toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`);
+      await load();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "操作失败"); }
+    finally { setClearingAll(false); }
   }
 
   function openAddServer(tld: string) {
@@ -584,6 +601,12 @@ function FailuresTab() {
             <span className="text-xs bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200 dark:border-red-800 rounded-lg px-2 py-1">
               {noServerCount} 个后缀无服务器
             </span>
+          )}
+          {rows.length > 0 && (
+            <Button onClick={clearAllFailures} variant="outline" size="sm" className="h-8 text-xs rounded-xl border-red-200/60 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30" disabled={clearingAll}>
+              {clearingAll ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiDeleteBin7Line className="w-3.5 h-3.5 mr-1" />}
+              清除全部
+            </Button>
           )}
           <Button onClick={load} variant="outline" size="sm" className="h-8 text-xs rounded-xl" disabled={loading}>
             {loading ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}

@@ -65,8 +65,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "DELETE") {
-    const { tld } = req.body as { tld?: string };
-    if (!tld) return res.status(400).json({ error: "tld required" });
+    const { tld, clear_all, reason } = req.body as { tld?: string; clear_all?: boolean; reason?: string };
+
+    if (clear_all) {
+      const client = await db.connect();
+      try {
+        let where = `WHERE fail_count > 0`;
+        const params: any[] = [];
+        if (reason) { params.push(reason); where += ` AND fail_reason = $${params.length}`; }
+        const { rowCount } = await client.query(
+          `UPDATE tld_fallback_stats
+           SET fail_count = 0, fail_reason = NULL, sample_error = NULL, last_fail_at = NULL
+           ${where}`,
+          params,
+        );
+        return res.status(200).json({ ok: true, cleared: rowCount ?? 0 });
+      } finally {
+        client.release();
+      }
+    }
+
+    if (!tld) return res.status(400).json({ error: "tld or clear_all required" });
     const client = await db.connect();
     try {
       await client.query(
