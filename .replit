@@ -71,8 +71,8 @@ NEXT_PUBLIC_SUPABASE_URL = "https://zyhyufxaccjvmkbyivxz.supabase.co"
 VERCEL_TEAM_ID = "team_jwt3T9B3Dg8JLPoGEjauWPRr"
 
 [userenv.development]
-NEXTAUTH_URL = "https://3c867b8f-a45e-4449-aa48-680bd4e403ae-00-89ewzym5zeqp.worf.replit.dev"
-NEXT_PUBLIC_BASE_URL = "https://3c867b8f-a45e-4449-aa48-680bd4e403ae-00-89ewzym5zeqp.worf.replit.dev"
+NEXTAUTH_URL = "https://88581982-1823-4790-b07c-abca09faa164-00-2ojcwl8lrvf7g.riker.replit.dev"
+NEXT_PUBLIC_BASE_URL = "https://88581982-1823-4790-b07c-abca09faa164-00-2ojcwl8lrvf7g.riker.replit.dev"
 
 [postMerge]
 path = "scripts/post-merge.sh"
