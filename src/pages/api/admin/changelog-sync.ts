@@ -11,6 +11,50 @@ type SeedEntry = {
 };
 
 const SEED: SeedEntry[] = [
+  // v3.35
+  { entry_date: "2026-04-02", type: "improve", version: "3.35", zh: "流式 WHOIS 查询提速：RDAP 结果提前推送，WHOIS 补全后静默更新，首屏加载体感大幅缩短" },
+  { entry_date: "2026-04-02", type: "improve", version: "3.35", zh: "查询超时优化：WHOIS_TIMEOUT 从 7s 降至 5s，RDAP 容忍窗口从 800ms 降至 400ms" },
+  { entry_date: "2026-04-02", type: "new",     version: "3.35", zh: "用户中心余额明细展开：点击余额行查看最近 30 条充值/消费记录，支持金额正负色区分" },
+  // v3.34
+  { entry_date: "2026-04-02", type: "new",     version: "3.34", zh: "支持接入 Google Analytics 4 / Umami 统计：后台填入 ID 即时生效，无需改代码" },
+  { entry_date: "2026-04-02", type: "fix",     version: "3.34", zh: "修复 OG 站点名称被硬编码覆盖的问题，og:site_name 现由后台设置动态控制" },
+  { entry_date: "2026-04-02", type: "improve", version: "3.34", zh: "管理后台批量邮件和重置密码操作改为两步确认，避免误触" },
+  // v3.33
+  { entry_date: "2026-04-01", type: "new",     version: "3.33", zh: "首页公告横幅：支持 info / warning / success / notice 类型，可配置跳转 URL，关闭后不再弹出" },
+  { entry_date: "2026-04-01", type: "new",     version: "3.33", zh: "结果页文字广告位：可配置广告内容、外链、标签文字，使用 rel=sponsored 标记" },
+  { entry_date: "2026-04-01", type: "fix",     version: "3.33", zh: "修复首页冷启动慢（5-9s）导致 iOS Safari 弹出下载框的问题：改用 ISR 静态生成" },
+  // v3.32
+  { entry_date: "2026-04-01", type: "improve", version: "3.32", zh: "Redis 客户端升级为 Upstash HTTP 模式，无持久 TCP 连接，完全兼容 Vercel Serverless" },
+  { entry_date: "2026-04-01", type: "improve", version: "3.32", zh: "站点设置新增 Redis L2 缓存（60s），冷启动时跳过 DB 查询，首屏响应更快" },
+  { entry_date: "2026-04-01", type: "improve", version: "3.32", zh: "DB 连接池在 Vercel 环境自动降低 max 至 2，避免 Supabase 连接数超限" },
+  // v3.31
+  { entry_date: "2026-04-01", type: "improve", version: "3.31", zh: "HTTP 检测工具全面升级：安全评分环形图、7 项安全响应头检测、HSTS 徽标、详细响应信息" },
+  { entry_date: "2026-04-01", type: "improve", version: "3.31", zh: "DNS 工具新增 SPF / DMARC 深度解析：机制列表、all 指令色码、策略对齐、报告地址" },
+  { entry_date: "2026-04-01", type: "improve", version: "3.31", zh: "IP/ASN 页面新增外部查询链接：BGP.he.net、ARIN RDAP、Shodan、VirusTotal、IPinfo" },
+  // v3.30
+  { entry_date: "2026-04-01", type: "improve", version: "3.30", zh: "WHOIS 查询架构重构：whoiser 作为主查询源，自动处理 TLD 发现与转介链，移除静态 whois-servers.json 依赖" },
+  { entry_date: "2026-04-01", type: "fix",     version: "3.30", zh: "修复切换查询时结果页跳动问题：骨架屏淡出 + 内容淡入动画，消除布局突变" },
+  // v3.29
+  { entry_date: "2026-04-01", type: "fix",     version: "3.29", zh: "修复 Vercel 环境无法查询部分 TLD（如 .me）的问题：改用 whoiser 作为主通道" },
+  { entry_date: "2026-04-01", type: "improve", version: "3.29", zh: "服务器列表文件合并为两个：rdap_gtld_bootstrap.ts（1223 条）+ whois-servers.json（192 条），结构更清晰" },
+  // v3.28
+  { entry_date: "2026-03-29", type: "fix",     version: "3.28", zh: "仪表盘日期格式跟随用户语言显示，不再强制使用中文格式" },
+  { entry_date: "2026-03-29", type: "improve", version: "3.28", zh: "WHOIS 结果页 meta 标签完整国际化：标题、描述、关键词、og:locale、JSON-LD 全部随语言切换" },
+  // v3.27
+  { entry_date: "2026-03-29", type: "fix",     version: "3.27", zh: "WHOIS 错误模式识别精化：速率限制不再触发付费 API 兜底，保护用量配额" },
+  { entry_date: "2026-03-29", type: "improve", version: "3.27", zh: "管理后台全面性能优化：并行 DB 查询、DNS 缓存头、兜底表服务端搜索、实时内存门更新" },
+  { entry_date: "2026-03-29", type: "improve", version: "3.27", zh: "管理后台 9 个旧页面整合为 2 个统一标签页（access-control / domains），旧 URL 自动 301 跳转" },
+  // v3.26
+  { entry_date: "2026-03-29", type: "improve", version: "3.26", zh: "首页预加载查询页编译，首次搜索等待时间从 12s 降至约 100ms" },
+  { entry_date: "2026-03-29", type: "improve", version: "3.26", zh: "页面进度条：路由切换即时出现进度动画，消除「页面冻结」体感" },
+  // v3.25
+  { entry_date: "2026-03-29", type: "improve", version: "3.25", zh: "页面切换退出动画从 100ms 缩短至 50ms，路由跳转更流畅" },
+  // v3.24
+  { entry_date: "2026-03-29", type: "improve", version: "3.24", zh: "语言切换在首次绘制前同步，消除非中文用户的语言闪烁问题" },
+  // v3.23
+  { entry_date: "2026-03-29", type: "fix",     version: "3.23", zh: "修复查询失败错误提示误导性文字，更新为明确的 WHOIS/RDAP 查询失败说明" },
+  { entry_date: "2026-03-29", type: "fix",     version: "3.23", zh: "无效 TLD 查询首次阻断：输入非法 TLD 会提示警告，二次确认才放行查询" },
+  { entry_date: "2026-03-29", type: "improve", version: "3.23", zh: "同源请求绕过速率限制，管理后台及内部批量操作不受 40次/分钟约束" },
   // v3.22
   { entry_date: "2026-03-24", type: "fix",     version: "3.22", zh: "订阅权限跨设备/跨会话失效修复：后台从数据库实时读取权限，JWT 过期时自动修复，无需重新登录" },
   // v3.21

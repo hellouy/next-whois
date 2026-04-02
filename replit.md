@@ -1,5 +1,40 @@
 # Next Whois UI — v3.35
 
+## Pre-Launch Security & Quality Audit (2026-04-02, v3.35 patch)
+
+### Security Hardening
+- **HSTS header added** (`next.config.js`): `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` — forces HTTPS on all connections; submitted for browser preload
+- **GA4 ID injection hardened** (`_app.tsx`): validates format `/^G-[A-Z0-9]{4,20}$/i` before injecting into inline script; invalid values silently dropped
+- **Umami src URL validated** (`_app.tsx`): only `http(s)://` URLs accepted; falls back to official CDN to block `javascript:` injection
+- **Admin auth coverage**: verified all `src/pages/api/admin/*.ts` routes (40+) require `requireAdmin` — no unprotected endpoints found
+
+### Build & TypeScript
+- **Removed `typescript: { ignoreBuildErrors: true }`**: TypeScript is 100% clean (0 errors); builds now fail on new TS errors, preventing regressions
+- **Verified**: `npx tsc --noEmit` → 0 errors across full codebase
+
+### Error Resilience
+- **React ErrorBoundary** (`src/components/error-boundary.tsx`): class component with `getDerivedStateFromError` + `componentDidCatch`; shows user-friendly error UI with retry button instead of blank screen
+- **Integrated in `_app.tsx`**: wraps all admin pages and all regular pages inside AnimatePresence
+
+### Vercel Configuration
+- **`lookup-stream.ts` added** to `vercel.json` functions with `maxDuration: 30` (explicit, matching file-level config)
+- **`[...query].tsx` maxDuration**: 10s → 15s — extra headroom for cold SSR starts with slow DB/Redis
+
+### Version Tracking
+- **`src/lib/env.ts`**: `VERSION = "3.23"` → `"3.35"` — navbar now shows correct version
+- **`package.json`**: `"version": "1.0.0"` → `"3.35.0"`
+- **`changelog-sync.ts`**: added 30 new entries for v3.23–v3.35 covering all recent features
+
+### Audit Results (No Changes Needed)
+- All 8 locale files: 1659 keys each, perfectly in sync ✓
+- `robots.txt`: properly excludes `/api/`, `/dashboard`, `/payment/`, `/admin/` ✓
+- Custom error page `_error.tsx`: handles 404/500 gracefully ✓
+- Payment APIs: all use DB settings or env vars for secrets, never hardcoded ✓
+- SQL injection: parameterized queries throughout, no raw string interpolation ✓
+- Rate limiting: same-origin bypass in both `/api/lookup.ts` and `/api/lookup-stream.ts` ✓
+
+---
+
 ## Speed Optimization + UX Improvements (2026-04-02, v3.35)
 
 ### Streaming Progressive Lookup API (major speed improvement)

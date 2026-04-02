@@ -17,6 +17,7 @@ import { RiMegaphoneLine, RiCloseLine, RiWrenchLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 
 function AppHead({ origin }: { origin: string }) {
@@ -95,9 +96,13 @@ function AppHead({ origin }: { origin: string }) {
 // custom_head_script from site settings and injects the relevant scripts.
 function AnalyticsScripts() {
   const settings = useSiteSettings();
-  const gaId     = settings.analytics_google?.trim();
+  // Validate GA4 ID format (G-XXXXXXXXXX) to prevent script injection
+  const rawGaId  = settings.analytics_google?.trim();
+  const gaId     = rawGaId && /^G-[A-Z0-9]{4,20}$/i.test(rawGaId) ? rawGaId : undefined;
   const umamiId  = settings.analytics_umami?.trim();
-  const umamiSrc = settings.analytics_umami_src?.trim() || "https://cloud.umami.is/script.js";
+  // Only allow http(s) URLs for Umami src to prevent javascript: injection
+  const rawUmamiSrc = settings.analytics_umami_src?.trim() || "https://cloud.umami.is/script.js";
+  const umamiSrc = /^https?:\/\//.test(rawUmamiSrc) ? rawUmamiSrc : "https://cloud.umami.is/script.js";
   const custom   = settings.custom_head_script?.trim();
 
   if (!gaId && !umamiId && !custom) return null;
@@ -513,7 +518,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
           {!isAdminPage && <Navbar />}
           <main style={!isAdminPage ? { paddingTop: "calc(4rem + var(--ann-h, 0px))" } : undefined}>
             {isAdminPage ? (
-              <Component {...pageProps} />
+              <ErrorBoundary>
+                <Component {...pageProps} />
+              </ErrorBoundary>
             ) : (
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
@@ -524,7 +531,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
                   exit="exit"
                   style={{ willChange: isStablePage ? "opacity" : "opacity, transform" }}
                 >
-                  <Component {...pageProps} />
+                  <ErrorBoundary>
+                    <Component {...pageProps} />
+                  </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             )}

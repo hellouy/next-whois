@@ -18,9 +18,12 @@
   ],
   "functions": {
     "src/pages/[...query].tsx": {
-      "maxDuration": 10
+      "maxDuration": 15
     },
     "src/pages/api/lookup.ts": {
+      "maxDuration": 30
+    },
+    "src/pages/api/lookup-stream.ts": {
       "maxDuration": 30
     },
     "src/pages/api/whois-servers.ts": {
