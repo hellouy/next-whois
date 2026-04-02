@@ -241,17 +241,14 @@ function EditStampModal({ stamp, onClose, onSaved, isMember }: { stamp: Stamp; o
         </div>
       )}
 
-      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+      <div
+        className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
+        style={{ paddingTop: "calc(var(--ann-h, 0px) + 4.5rem)" }}
+      >
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        {/*
-          On mobile (items-end) the sheet sits at the bottom.  We cap the total panel height to
-          (100dvh − navbar − announcement bar) so the header is never pushed behind the navbar.
-          On desktop (sm:items-center) the panel is centred and the 92svh cap from the scrollable
-          area naturally keeps it fully visible.
-        */}
         <div
-          className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
-          style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
+          className="relative w-full max-w-md bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4.5rem)" }}
         >
           {/* Header — always visible, never scrolled away */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
@@ -426,11 +423,14 @@ function EditExpiryModal({ sub, onClose, onSaved }: { sub: Subscription; onClose
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+    <div
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
+      style={{ paddingTop: "calc(var(--ann-h, 0px) + 4.5rem)" }}
+    >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
-        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
+        className="relative w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4.5rem)" }}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
           <h2 className="text-base font-bold flex items-center gap-2">
@@ -477,12 +477,13 @@ function GuideModalShell({ onClose, icon, iconBg, title, subtitle, children }: {
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
+      style={{ paddingTop: "calc(var(--ann-h, 0px) + 4.5rem)" }}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-none" />
       <div
-        className="relative z-10 w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
-        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4rem)" }}
+        className="relative z-10 w-full max-w-sm bg-background border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - var(--ann-h, 0px) - 4.5rem)" }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
