@@ -4275,7 +4275,7 @@ export default function LookupPage({
                           {cached && (
                             <>
                               {" · "}
-                              {cachedAt ? (() => {
+                              {cachedAt && typeof window !== "undefined" ? (() => {
                                 const ageMs = Date.now() - cachedAt;
                                 const ageMins = Math.floor(ageMs / 60_000);
                                 const ageHrs = Math.floor(ageMs / 3_600_000);
@@ -4284,7 +4284,7 @@ export default function LookupPage({
                                   : ageMins >= 1
                                     ? isChinese ? `${ageMins}分钟前缓存` : `cached ${ageMins}m ago`
                                     : isChinese ? "刚刚缓存" : "cached just now";
-                                return <span title={new Date(cachedAt).toLocaleString()}>{ageStr}</span>;
+                                return <span suppressHydrationWarning title={new Date(cachedAt).toLocaleString()}>{ageStr}</span>;
                               })() : t("cached")}
                               {cacheTtl && cacheTtl > 0 && (
                                 <span className="opacity-60">
