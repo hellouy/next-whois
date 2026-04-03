@@ -205,6 +205,10 @@ const SLOW_WHOIS_TLDS: Readonly<Record<string, number>> = {
   vn:  9_000,  // whois.vnnic.vn — variable
   ir: 10_000,  // whois.nic.ir — slow
   pk:  9_000,  // whois.pknic.net.pk — slow
+  pl:  9_000,  // whois.dns.pl — 3-6 s typical
+  za: 10_000,  // whois.registry.net.za — 4-8 s typical
+  mx:  9_000,  // whois.nic.mx — 3-6 s typical
+  th:  9_000,  // whois.thnic.co.th — 3-6 s typical
 };
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
 
@@ -241,7 +245,10 @@ export async function lookupWhoisCacheStreaming(
     if (l1Hit) {
       const remainingTtl = await getRemainingTtl(key).catch(() => null);
       const r = { ...l1Hit, time: 0, cached: true, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
-      onPartialResult?.(r);
+      // Cache hits are already complete — do NOT call onPartialResult here.
+      // Emitting a partial chunk for a cache hit would cause the streaming
+      // endpoint to send partial:true followed by partial:false with identical
+      // data, producing a false "refreshing" flash in the UI.
       return r;
     }
     if (isRedisAvailable()) {
@@ -249,7 +256,7 @@ export async function lookupWhoisCacheStreaming(
       if (l2) {
         l1Set(key, l2.value);
         const r = { ...l2.value, time: 0, cached: true, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
-        onPartialResult?.(r);
+        // Same reasoning as L1: cache hits skip partial notification.
         return r;
       }
     }

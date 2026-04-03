@@ -64,7 +64,7 @@ import { useSiteSettings } from "@/lib/site-settings";
 import { computeLifecycle, fmtDate, fmtDateTime, fmtCountdown } from "@/lib/lifecycle";
 import React, { useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
-import { addHistory, detectQueryType } from "@/lib/history";
+import { addHistory, detectQueryType, RegStatus } from "@/lib/history";
 import { prefetchLookup, consumePrefetch } from "@/lib/lookup-prefetch";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { domainToUnicode } from "url";
 import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -951,8 +952,9 @@ function parseWhoisDate(dateStr: string): Date | null {
     .trim();
   d = new Date(stripped);
   if (!isNaN(d.getTime())) return d;
-  // 3. Replace space separator with T for strict ISO parsing
-  const isoLike = stripped.replace(" ", "T") + "Z";
+  // 3. Replace first space separator with T for strict ISO parsing.
+  // Use regex to replace the first whitespace run (handles multiple spaces).
+  const isoLike = stripped.replace(/\s+/, "T") + "Z";
   d = new Date(isoLike);
   if (!isNaN(d.getTime())) return d;
   return null;
@@ -1394,7 +1396,6 @@ function ResponsePanel({
 
 function targetToDisplayName(target: string): string {
   try {
-    const { domainToUnicode } = require("url");
     const hasAce = target
       .toLowerCase()
       .split(".")
@@ -4401,7 +4402,7 @@ export default function LookupPage({
         }
       } catch {
         if (!cancelled) {
-          setData({ status: false, time: 0, cached: false, error: "", result: { ...initialWhoisAnalyzeResult } });
+          setData({ status: false, time: 0, cached: false, error: t("lookup_failed_fallback"), result: { ...initialWhoisAnalyzeResult } });
           setLoading(false);
           setRefreshing(false);
         }
@@ -4600,13 +4601,13 @@ export default function LookupPage({
 
   useEffect(() => {
     if (!status) return;
-    const regStatus =
+    const regStatus: RegStatus =
       status && result ? "registered" :
       dnsProbe?.registrationStatus === "unregistered" ? "unregistered" :
       dnsProbe?.registrationStatus === "registered" ? "registered" :
       "unknown";
 
-    addHistory(target, regStatus as any);
+    addHistory(target, regStatus);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, target]);
 
