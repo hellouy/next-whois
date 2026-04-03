@@ -1,6 +1,12 @@
 import { WhoisRawResult, WhoisAnalyzeResult } from "@/lib/whois/types";
 import { queryWhoisTcp } from "@/lib/whois/whois-transport";
-import { setDiscoveredServer, tryCustomServerForDomain, getStaticWhoisServer } from "@/lib/whois/custom-servers";
+import {
+  setDiscoveredServer,
+  tryBuiltinServerForDomain,
+  tryManualServerForDomain,
+  getStaticWhoisServer,
+} from "@/lib/whois/custom-servers";
+import { isWhoiserBypassed, recordWhoiserFailure } from "@/lib/whois/whoiser-bypass";
 
 let _whoiserPromise: Promise<typeof import("whoiser")> | null = null;
 const getWhoiser = () => {
@@ -74,18 +80,21 @@ function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | nul
   return { raw: rawParts.join("\n\n") || "", structured, server: lastServer };
 }
 
-// ── Generic WHOIS (DB custom server → static map + whoiser race → IANA TCP) ───
-//
-// Lookup priority:
-//   1. Admin-managed DB custom servers (manual supplements for broken TLDs,
-//      scrapers for special cases like .ba, hard-coded entries like .bn)
-//   1.5 Static whois-servers.json fast bootstrap — if the TLD is in the static
-//      map, fire a direct TCP query to that server in PARALLEL with whoiser.
-//      This eliminates whoiser's server-discovery round-trip for ~200+ ccTLDs.
-//      Whichever returns first with non-empty data wins.
-//   2. whoiser — handles TLD server discovery and referral chain following
-//      natively; covers any TLD not in the static map
-//   3. IANA TCP fallback — whois.iana.org → refer: server as last resort
+/**
+ * Generic WHOIS lookup with the following priority order:
+ *
+ *   ① BUILTIN servers (.ba scraper, .bn) — whoiser cannot handle these.
+ *   ② whoiser + static-map TCP race (skipped if TLD is auto-bypassed):
+ *      - For TLDs in whois-servers.json: static TCP + whoiser run in parallel;
+ *        first non-empty result wins (preserves original speed optimisation).
+ *      - For TLDs NOT in the static map: whoiser only.
+ *      - Success → reset failure counter and return.
+ *      - Both fail → record failure; if ≥3 consecutive: mark TLD bypassed.
+ *   ③ Admin manual DB server (source='manual') — fallback after whoiser fails
+ *      or when TLD is bypassed.
+ *   ④ IANA TCP fallback — last resort server discovery.
+ *   ⑤ Throw with the most descriptive error available.
+ */
 export async function tryGenericWhoisForDomain(
   domainToQuery: string,
   tld: string,
@@ -93,76 +102,94 @@ export async function tryGenericWhoisForDomain(
   innerTimeout: number,
   follow: 1 | 2,
 ): Promise<WhoisRawResult> {
-  // ① Admin DB custom server (manual supplement / scraper / special case)
-  const customResult = await tryCustomServerForDomain(
+  // ① BUILTIN scrapers / special-case servers (.ba, .bn, etc.)
+  //    These are tried unconditionally before whoiser because whoiser cannot
+  //    handle CAPTCHA-protected registries or non-standard WHOIS endpoints.
+  const builtinResult = await tryBuiltinServerForDomain(
     domainToQuery, tld, tldSuffix, innerTimeout,
   );
-  if (customResult) return customResult;
+  if (builtinResult) return builtinResult;
 
   let primaryError: unknown = null;
 
-  // ①.5 Static map fast path + whoiser race
-  //   For TLDs in whois-servers.json: start a direct TCP query IMMEDIATELY
-  //   (before awaiting whoiser import so it gets a head-start while the module
-  //   loads). Both the TCP query and whoiser discovery run in parallel.
-  //   The first non-empty response wins.
-  //   For TLDs NOT in the static map: fall through to whoiser-only.
-  const staticServer = getStaticWhoisServer(tldSuffix);
+  // ② whoiser + static-map TCP race (unless TLD is whoiser-bypassed)
+  //    Bypass is set automatically after BYPASS_FAIL_THRESHOLD consecutive
+  //    failures; it can also be set/cleared manually from the admin panel.
+  const bypassed = await isWhoiserBypassed(tldSuffix);
 
-  // Kick off static TCP first (before awaiting whoiser), then load whoiser
-  // in parallel. On hot paths whoiser is already cached so the gap is ~0 ms;
-  // on cold starts (fresh deploy) it can shave 50-200 ms off .hu/.jp/.de etc.
-  const staticP: Promise<WhoisRawResult | null> = staticServer
-    ? queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
-        .then((raw): WhoisRawResult | null => {
-          if (!raw || raw.trim().length === 0) return null;
-          return { raw, structured: {}, server: staticServer };
-        })
-        .catch((): null => null)
-    : Promise.resolve(null);
+  if (!bypassed) {
+    // For TLDs in whois-servers.json: kick off static TCP immediately in
+    // parallel with whoiser. Whichever returns a non-empty result first wins.
+    // This preserves the original speed optimisation for known ccTLDs.
+    const staticServer = getStaticWhoisServer(tldSuffix);
 
-  const { whoisDomain } = await getWhoiser();
+    const staticP: Promise<WhoisRawResult | null> = staticServer
+      ? queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
+          .then((raw): WhoisRawResult | null => {
+            if (!raw || raw.trim().length === 0) return null;
+            return { raw, structured: {}, server: staticServer };
+          })
+          .catch((): null => null)
+      : Promise.resolve(null);
 
-  if (staticServer) {
-    const whoiserP = (async (): Promise<WhoisRawResult | null> => {
+    const { whoisDomain } = await getWhoiser();
+
+    let winner: WhoisRawResult | null = null;
+
+    if (staticServer) {
+      const whoiserP = (async (): Promise<WhoisRawResult | null> => {
+        try {
+          const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
+          const result = extractRawFromData(data as Record<string, unknown>);
+          return result && result.raw.trim().length > 0 ? result : null;
+        } catch (err) {
+          primaryError = err;
+          return null;
+        }
+      })();
+
+      winner = await new Promise<WhoisRawResult | null>((resolve) => {
+        let pending = 2;
+        let resolved = false;
+        function handleResult(v: WhoisRawResult | null) {
+          if (resolved) return;
+          if (v !== null) { resolved = true; resolve(v); return; }
+          pending--;
+          if (pending === 0) resolve(null);
+        }
+        staticP.then(handleResult);
+        whoiserP.then(handleResult);
+      });
+    } else {
       try {
         const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
         const result = extractRawFromData(data as Record<string, unknown>);
-        return result && result.raw.trim().length > 0 ? result : null;
+        if (result && result.raw.trim().length > 0) winner = result;
       } catch (err) {
         primaryError = err;
-        return null;
       }
-    })();
-
-    // Custom race: resolve as soon as one query returns a non-null result.
-    const winner = await new Promise<WhoisRawResult | null>((resolve) => {
-      let pending = 2;
-      let resolved = false;
-      function handleResult(v: WhoisRawResult | null) {
-        if (resolved) return;
-        if (v !== null) { resolved = true; resolve(v); return; }
-        pending--;
-        if (pending === 0) resolve(null);
-      }
-      staticP.then(handleResult);
-      whoiserP.then(handleResult);
-    });
+    }
 
     if (winner) return winner;
-    // Both failed — fall through to IANA TCP below
-  } else {
-    // ② whoiser — primary path for TLDs not in the static map
-    try {
-      const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
-      const result = extractRawFromData(data as Record<string, unknown>);
-      if (result && result.raw.trim().length > 0) return result;
-    } catch (err) {
-      primaryError = err;
-    }
+
+    // whoiser (and static-map) failed — record the failure.
+    // recordWhoiserFailure is fire-and-forget; never awaited on the hot path.
+    recordWhoiserFailure(tldSuffix).catch(() => {});
   }
 
-  // ③ IANA TCP fallback — ask whois.iana.org for the canonical server
+  // ③ Admin manual DB server (source='manual') — fallback for whoiser failures
+  //    and the primary path when TLD is bypassed.
+  try {
+    const manualResult = await tryManualServerForDomain(
+      domainToQuery, tld, tldSuffix, innerTimeout,
+    );
+    if (manualResult) return manualResult;
+  } catch (manualErr) {
+    // Manual server failed — keep going, prefer the original whoiser error
+    if (!primaryError) primaryError = manualErr;
+  }
+
+  // ④ IANA TCP fallback — ask whois.iana.org for the canonical server
   const ianaServer = await getIanaWhoisServer(tldSuffix);
   if (ianaServer) {
     try {

@@ -9,6 +9,7 @@ import {
   RiCheckLine, RiServerLine,
   RiErrorWarningLine, RiDeleteBinLine,
   RiInformationLine, RiEdit2Line, RiGlobalLine,
+  RiProhibitedLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
@@ -56,6 +57,7 @@ export default function TldFailuresPage() {
   const [clearing, setClearing] = React.useState<string | null>(null);
   const [clearingAll, setClearingAll] = React.useState(false);
   const [patchingStatus, setPatchingStatus] = React.useState<string | null>(null);
+  const [resettingBypass, setResettingBypass] = React.useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -99,6 +101,20 @@ export default function TldFailuresPage() {
       if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`); load(); }
       else toast.error("操作失败");
     } finally { setClearingAll(false); }
+  }
+
+  async function resetBypass(tld: string) {
+    if (!confirm(`重置 .${tld} 的 whoiser 旁路标记？重置后查询将再次尝试 whoiser。`)) return;
+    setResettingBypass(tld);
+    try {
+      const r = await fetch("/api/admin/whoiser-bypass", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld }),
+      });
+      if (r.ok) { toast.success(`.${tld} 旁路已重置`); load(); }
+      else toast.error("重置失败");
+    } finally { setResettingBypass(null); }
   }
 
   async function patchStatus(tld: string, repair_status: string) {
@@ -265,6 +281,12 @@ export default function TldFailuresPage() {
                       {row.has_custom_server && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">已配置服务器</span>
                       )}
+                      {row.whoiser_bypass && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-semibold shrink-0 flex items-center gap-0.5">
+                          <RiProhibitedLine className="w-2.5 h-2.5" />
+                          whoiser 已旁路
+                        </span>
+                      )}
                       <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0", repairInfo.cls)}>{repairInfo.label}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -368,6 +390,21 @@ export default function TldFailuresPage() {
                       <RiServerLine className="w-2.5 h-2.5" />
                       配置服务器
                     </a>
+
+                    {/* Reset whoiser bypass */}
+                    {row.whoiser_bypass && (
+                      <button
+                        onClick={() => resetBypass(row.tld)}
+                        disabled={resettingBypass === row.tld}
+                        className="text-[10px] px-2 py-1 rounded-lg border border-red-200/60 dark:border-red-800/40 text-red-600 dark:text-red-400 hover:border-red-400/60 flex items-center gap-1"
+                      >
+                        {resettingBypass === row.tld
+                          ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" />
+                          : <RiProhibitedLine className="w-2.5 h-2.5" />
+                        }
+                        重置旁路
+                      </button>
+                    )}
 
                     {/* Reset count */}
                     <button

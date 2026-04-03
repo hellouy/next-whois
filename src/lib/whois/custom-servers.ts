@@ -167,6 +167,8 @@ function invalidateAllServersCache() {
   _knownNoServerCache = null;
   _userManagedCache = null;
   _userManagedCacheAt = 0;
+  _manualServersCacheShadow = null;
+  _manualServersCacheShadowAt = 0;
 }
 
 async function writeDbServer(
@@ -451,11 +453,9 @@ export class ScraperRequiredError extends Error {
   }
 }
 
-// ── Custom server lookup (DB) ─────────────────────────────────────────────────
-// Returns data if the configured server responded.
-// Returns null if no custom server is configured, or if a non-user-managed
-// (auto-discovered) server produced no data (caller falls through to RDAP/WHOIS).
-// Throws for user-managed server failures and for scraper-required errors.
+// ── Shared server-entry executor ──────────────────────────────────────────────
+// Handles scraper / HTTP / TCP entries uniformly.
+// isUserServer=true → throw on failure; false → return null on failure.
 
 let _whoiserPromiseCustom: Promise<typeof import("whoiser")> | null = null;
 const getWhoiserCustom = () => {
@@ -463,29 +463,12 @@ const getWhoiserCustom = () => {
   return _whoiserPromiseCustom;
 };
 
-export async function tryCustomServerForDomain(
+async function executeServerEntry(
+  customEntry: CustomServerEntry,
   domainToQuery: string,
-  tld: string,
-  tldSuffix: string,
+  isUserServer: boolean,
   innerTimeout: number,
 ): Promise<WhoisRawResult | null> {
-  let customEntry: Awaited<ReturnType<typeof getCustomServerEntry>>;
-  let isUserServer: boolean;
-  if (tld === tldSuffix) {
-    const [ce, us] = await Promise.all([getCustomServerEntry(tld), isUserManagedServer(tld)]);
-    customEntry = ce;
-    isUserServer = us;
-  } else {
-    const [[ce1, ce2], [us1, us2]] = await Promise.all([
-      Promise.all([getCustomServerEntry(tld), getCustomServerEntry(tldSuffix)]),
-      Promise.all([isUserManagedServer(tld), isUserManagedServer(tldSuffix)]),
-    ]);
-    customEntry = ce1 || ce2;
-    isUserServer = us1 || us2;
-  }
-
-  if (!customEntry) return null;
-
   if (isScraperEntry(customEntry)) {
     const { name: scraperName, registryUrl } = customEntry;
     if (scraperName === "nic-ba") {
@@ -542,4 +525,94 @@ export async function tryCustomServerForDomain(
   }
 
   return null;
+}
+
+// ── Custom server lookup (merged cache: DB + builtin + registry) ──────────────
+// Returns data if the configured server responded.
+// Returns null if no custom server is configured, or if a non-user-managed
+// (auto-discovered) server produced no data (caller falls through to RDAP/WHOIS).
+// Throws for user-managed server failures and for scraper-required errors.
+
+export async function tryCustomServerForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
+  let customEntry: Awaited<ReturnType<typeof getCustomServerEntry>>;
+  let isUserServer: boolean;
+  if (tld === tldSuffix) {
+    const [ce, us] = await Promise.all([getCustomServerEntry(tld), isUserManagedServer(tld)]);
+    customEntry = ce;
+    isUserServer = us;
+  } else {
+    const [[ce1, ce2], [us1, us2]] = await Promise.all([
+      Promise.all([getCustomServerEntry(tld), getCustomServerEntry(tldSuffix)]),
+      Promise.all([isUserManagedServer(tld), isUserManagedServer(tldSuffix)]),
+    ]);
+    customEntry = ce1 || ce2;
+    isUserServer = us1 || us2;
+  }
+
+  if (!customEntry) return null;
+  return executeServerEntry(customEntry, domainToQuery, isUserServer, innerTimeout);
+}
+
+// ── Priority-aware wrappers used by the new lookup order ─────────────────────
+
+/**
+ * Step 1 of the new priority chain: try BUILTIN servers (scrapers, .bn).
+ * Returns immediately if the TLD is in BUILTIN_SERVER_TLDS; otherwise null.
+ * These TLDs are always handled before whoiser because they require scrapers
+ * or special handling that whoiser cannot perform.
+ */
+export async function tryBuiltinServerForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
+  const n1 = tld.toLowerCase().replace(/^\./, "");
+  const n2 = tldSuffix.toLowerCase().replace(/^\./, "");
+  if (!BUILTIN_SERVER_TLDS.has(n1) && !BUILTIN_SERVER_TLDS.has(n2)) return null;
+  // Delegate to the full merged-cache lookup; it resolves the correct entry.
+  return tryCustomServerForDomain(domainToQuery, tld, tldSuffix, innerTimeout);
+}
+
+// Cached user-managed servers (source='manual' or file fallback).
+// Shares the same TTL & invalidation cycle as _allServersCache.
+// Invalidated by invalidateAllServersCache() above.
+let _manualServersCacheShadow: CustomServerMap | null = null;
+let _manualServersCacheShadowAt = 0;
+
+/**
+ * Step 4 of the new priority chain: try only admin-manually-configured
+ * WHOIS servers (source='manual' in DB, or file fallback if DB empty).
+ * Called after whoiser has already failed.
+ * BUILTIN TLDs are excluded — they are handled in step 1.
+ */
+export async function tryManualServerForDomain(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
+  const n1 = tld.toLowerCase().replace(/^\./, "");
+  const n2 = tldSuffix.toLowerCase().replace(/^\./, "");
+
+  // BUILTIN TLDs are handled before whoiser — don't double-process them here.
+  if (BUILTIN_SERVER_TLDS.has(n1) || BUILTIN_SERVER_TLDS.has(n2)) return null;
+
+  // Use the shared user-managed cache (same TTL as _allServersCache).
+  const now = Date.now();
+  if (!_manualServersCacheShadow || now - _manualServersCacheShadowAt >= ALL_SERVERS_TTL_MS) {
+    _manualServersCacheShadow = await readUserManagedServers();
+    _manualServersCacheShadowAt = now;
+  }
+  const manualMap = _manualServersCacheShadow;
+  const entry = manualMap[n1] ?? (n1 !== n2 ? manualMap[n2] : null) ?? null;
+  if (!entry) return null;
+
+  // isUserServer=true: throw on failure so callers see a clear error.
+  return executeServerEntry(entry, domainToQuery, true, innerTimeout);
 }

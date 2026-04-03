@@ -344,11 +344,12 @@ const ALTER_COLUMNS = [
   `ALTER TABLE friendly_links ADD COLUMN IF NOT EXISTS logo_url TEXT`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled  BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled_at TIMESTAMPTZ`,
-  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repair_status TEXT NOT NULL DEFAULT 'pending'`,
-  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS found_server  TEXT`,
-  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes   TEXT`,
-  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repaired_at   TIMESTAMPTZ`,
-  `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source         TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repair_status  TEXT NOT NULL DEFAULT 'pending'`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS found_server   TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes    TEXT`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repaired_at    TIMESTAMPTZ`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS whoiser_bypass BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source          TEXT`,
   `ALTER TABLE users             ADD COLUMN IF NOT EXISTS locale          TEXT NOT NULL DEFAULT 'zh'`,
 ];
 

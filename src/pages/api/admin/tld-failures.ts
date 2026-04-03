@@ -14,6 +14,7 @@ export type TldFailureRow = {
   found_server: string | null;
   admin_notes: string | null;
   repaired_at: string | null;
+  whoiser_bypass: boolean;
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -45,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            f.found_server,
            f.admin_notes,
            f.repaired_at::text,
+           COALESCE(f.whoiser_bypass, false) AS whoiser_bypass,
            (c.tld IS NOT NULL) AS has_custom_server
          FROM tld_fallback_stats f
          LEFT JOIN custom_whois_servers c ON c.tld = f.tld
