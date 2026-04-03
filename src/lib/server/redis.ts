@@ -272,6 +272,30 @@ export async function incrRedisValue(key: string, ttlSeconds: number): Promise<n
   } catch (err: any) { console.error(`[Redis] INCR ${key}:`, err.message); return null; }
 }
 
+/**
+ * Increment a counter and **always** refresh its TTL (rolling window).
+ * Unlike `incrRedisValue`, this resets the expiry on every increment,
+ * so the window slides forward each time the key is touched.
+ * Use this when you want "N events within the last T seconds" semantics
+ * rather than a fixed-window rate limit.
+ */
+export async function incrRedisValueRolling(key: string, ttlSeconds: number): Promise<number | null> {
+  const up = getUpstashClient();
+  if (up) {
+    try {
+      const count = await up.incr(key);
+      await up.expire(key, ttlSeconds);
+      return count;
+    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
+  }
+  if (!redis || !_ioredisAvailable) return null;
+  try {
+    const count = await redis.incr(key);
+    await redis.expire(key, ttlSeconds);
+    return count;
+  } catch (err: any) { console.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
+}
+
 export async function getRemainingTtl(key: string): Promise<number | null> {
   const up = getUpstashClient();
   if (up) {

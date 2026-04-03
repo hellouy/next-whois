@@ -20,7 +20,7 @@ import {
   getRedisValue,
   setRedisValue,
   deleteRedisValue,
-  incrRedisValue,
+  incrRedisValueRolling,
   deleteRedisKeysByPattern,
 } from "@/lib/server/redis";
 import { run, many, isDbReady } from "@/lib/db-query";
@@ -138,7 +138,10 @@ export async function recordWhoiserFailure(tld: string): Promise<void> {
 
   let count: number | null = null;
   if (isRedisAvailable()) {
-    count = await incrRedisValue(failKey(t), FAIL_TTL_SECONDS).catch(() => null);
+    // Use rolling TTL so spaced failures within the 7-day window always extend
+    // the counter lifetime. This ensures "3 consecutive failures" triggers
+    // bypass regardless of how far apart they occur within the window.
+    count = await incrRedisValueRolling(failKey(t), FAIL_TTL_SECONDS).catch(() => null);
   }
 
   // If Redis unavailable, use a rough in-process counter as fallback.
