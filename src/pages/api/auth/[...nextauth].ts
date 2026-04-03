@@ -102,6 +102,11 @@ export const authOptions: NextAuthOptions = {
         const { isAdminEmail } = await import("@/lib/admin-server");
         const isAdm = await isAdminEmail(email);
 
+        // Admin: proactively clear any stale brute-force lock so prior
+        // test-login failures can never block the admin account.
+        const emailKey = `login:email:${email}`;
+        if (isAdm) await clearFailedAttempts(emailKey);
+
         // If disable_login is enabled, block all logins except the admin account
         const disableLogin = await getSetting("disable_login");
         if (disableLogin === "1" && !isAdm) return null;
@@ -112,15 +117,16 @@ export const authOptions: NextAuthOptions = {
           "unknown"
         ).split(",")[0].trim();
 
-        // ── Rate-limit by IP (global) ───────────────────────────────────────
-        const ipRl = await checkRateLimit(`login:ip:${ip}`, 20, 10 * 60 * 1000);
-        if (!ipRl.ok) return null; // silently reject — caller sees "CredentialsSignin"
+        // ── Rate-limit by IP (global) — admin is exempt ─────────────────────
+        if (!isAdm) {
+          const ipRl = await checkRateLimit(`login:ip:${ip}`, 20, 10 * 60 * 1000);
+          if (!ipRl.ok) return null;
+        }
 
-        // ── Rate-limit by email (per-account brute-force, Redis-backed) ───────
-        const emailKey = `login:email:${email}`;
-        if (await isLockedOut(emailKey)) return null;
+        // ── Rate-limit by email (per-account brute-force) — admin is exempt ──
+        if (!isAdm && (await isLockedOut(emailKey))) return null;
 
-        // ── Captcha verification (admin bypasses to prevent lockout) ──────────
+        // ── Captcha verification — admin is exempt to prevent lockout ─────────
         if (!isAdm) {
           const { getCaptchaConfig, verifyCaptchaToken } = await import("@/lib/server/captcha");
           const captchaConfig = await getCaptchaConfig();
@@ -146,14 +152,16 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user) {
-          await recordFailedAttempt(emailKey);
+          // Admin missing from DB is a config error — don't lock out
+          if (!isAdm) await recordFailedAttempt(emailKey);
           return null;
         }
         if (user.disabled) return null;
 
         const valid = await compare(credentials.password, user.password_hash);
         if (!valid) {
-          await recordFailedAttempt(emailKey);
+          // Wrong password — record for non-admin only
+          if (!isAdm) await recordFailedAttempt(emailKey);
           return null;
         }
 
