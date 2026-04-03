@@ -1,3 +1,5 @@
+import type { TranslationKey, InterpolationValues } from "@/lib/i18n";
+
 export type Subscription = {
   id: string; domain: string; expiration_date: string | null;
   active: boolean; created_at: string; cancel_token: string;
@@ -100,4 +102,4 @@ export interface DashboardUser {
   subscriptionAccess?: boolean;
 }
 
-export type TFunction = (key: string, params?: Record<string, string | number>) => string;
+export type TFunction = (key: TranslationKey, params?: InterpolationValues) => string;

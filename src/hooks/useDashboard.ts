@@ -449,7 +449,7 @@ export function useDashboard() {
     deletingStamp,
     showClaimGuide, setShowClaimGuide,
     showSubscribeGuide, setShowSubscribeGuide,
-    balanceCents,
+    balanceCents, setBalanceCents,
     membershipPlan,
     orders, setOrders,
     loadingOrders, setLoadingOrders,

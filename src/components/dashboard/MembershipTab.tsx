@@ -11,6 +11,7 @@ import {
   RiArrowRightLine,
 } from "@remixicon/react";
 import type { Order, BalanceTx, Plan, TFunction } from "./types";
+import type { SiteSettings } from "@/lib/site-settings";
 
 export type MembershipTabProps = {
   subscriptionAccessDB: boolean | null;
@@ -28,7 +29,7 @@ export type MembershipTabProps = {
   redeemCode: string;
   redeeming: boolean;
   paymentEnabled: boolean;
-  siteSettings: Record<string, unknown>;
+  siteSettings: SiteSettings;
   t: TFunction;
   setShowBalanceTxs: (v: boolean) => void;
   setLoadingBalanceTxs: (v: boolean) => void;
