@@ -8,7 +8,7 @@ import {
   RiDeleteBinLine, RiPencilLine, RiExternalLinkLine,
   RiFlashlightLine, RiTimeLine, RiCheckLine,
 } from "@remixicon/react";
-import type { Stamp } from "./types";
+import type { Stamp, TFunction } from "./types";
 import { TAG_COLORS } from "./types";
 
 function TagBadge({ style, name }: { style: string; name: string }) {
@@ -24,7 +24,7 @@ export type StampsTabProps = {
   loadingData: boolean;
   dashError: boolean;
   deletingStamp: string | null;
-  t: (key: any, params?: any) => string;
+  t: TFunction;
   onShowClaimGuide: () => void;
   onEditStamp: (stamp: Stamp) => void;
   onDeleteStamp: (id: string) => void;

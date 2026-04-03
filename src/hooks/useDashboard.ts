@@ -8,7 +8,7 @@ import {
   fetchDashData, invalidateDashCache, getDashCache,
   type DashData, type SearchStats,
 } from "@/lib/dashboard-cache";
-import type { Subscription, Stamp, Order, BalanceTx, Plan } from "@/components/dashboard/types";
+import type { Subscription, Stamp, Order, BalanceTx, Plan, DashboardUser } from "@/components/dashboard/types";
 
 export function useDashboard() {
   const router = useRouter();
@@ -85,7 +85,7 @@ export function useDashboard() {
 
   React.useEffect(() => {
     if (status !== "authenticated") return;
-    if ((session?.user as any)?.subscriptionAccess) setTab("subscriptions");
+    if ((session?.user as DashboardUser)?.subscriptionAccess) setTab("subscriptions");
   }, [status, session]);
 
   const applyDashData = React.useCallback((d: DashData) => {
@@ -96,7 +96,7 @@ export function useDashboard() {
     setBalanceCents(d.balanceCents ?? 0);
     setMembershipPlan(d.membershipPlan ?? null);
     setSearchStats(d.searchStats ?? null);
-    if (d.subscriptionAccess && !(session?.user as any)?.subscriptionAccess) {
+    if (d.subscriptionAccess && !(session?.user as DashboardUser)?.subscriptionAccess) {
       updateSession({ refreshSubscription: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

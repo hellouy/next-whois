@@ -10,8 +10,9 @@ import {
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
   RiKeyLine, RiBankCardLine,
 } from "@remixicon/react";
-import type { Subscription } from "./types";
+import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
+import type { TranslationKey } from "@/lib/i18n";
 
 export type SubscriptionsTabProps = {
   subscriptionAccessDB: boolean | null;
@@ -30,9 +31,9 @@ export type SubscriptionsTabProps = {
   inviteCodeInput: string;
   applyingCode: boolean;
   paymentEnabled: boolean;
-  user: any;
+  user: DashboardUser;
   locale: string;
-  t: (key: any, params?: any) => string;
+  t: TFunction;
   setSubSearch: (v: string) => void;
   setSubFilter: (v: "all" | "expiring" | "urgent" | "expired") => void;
   onShowSubscribeGuide: () => void;
@@ -55,7 +56,7 @@ export function SubscriptionsTab({
 }: SubscriptionsTabProps) {
   return (
     <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
-      {!(subscriptionAccessDB ?? (user as any).subscriptionAccess) && (
+      {!(subscriptionAccessDB ?? user.subscriptionAccess) && (
         <div className="space-y-5 py-4">
           <div className="flex flex-col items-center text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center">
@@ -106,7 +107,7 @@ export function SubscriptionsTab({
           </form>
         </div>
       )}
-      {(subscriptionAccessDB ?? (user as any).subscriptionAccess) && <>
+      {(subscriptionAccessDB ?? user.subscriptionAccess) && <>
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.sub_section_title")}</p>
@@ -341,7 +342,7 @@ export function SubscriptionsTab({
                       phase === "redemption" ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300/50" :
                       phase === "pendingDelete" ? "bg-purple-50 dark:bg-purple-950/30 border-purple-300/50" :
                       "bg-muted border-border/50"
-                    )}>{t(("dashboard.phase_" + phase) as any)}</span>
+                    )}>{t(("dashboard.phase_" + phase) as TranslationKey)}</span>
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">

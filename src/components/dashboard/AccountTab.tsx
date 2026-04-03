@@ -11,7 +11,7 @@ import {
   RiEyeLine, RiEyeOffLine, RiPaletteLine, RiLockLine,
   RiDeleteBinLine,
 } from "@remixicon/react";
-import type { Subscription, Stamp } from "./types";
+import type { Subscription, Stamp, DashboardUser, TFunction } from "./types";
 import { AVATAR_COLORS } from "./types";
 
 interface StrengthResult { score: number; label: string; color: string; }
@@ -32,7 +32,7 @@ function getPwdStrength(pwd: string, labels: string[]): StrengthResult {
 }
 
 export type AccountTabProps = {
-  user: any;
+  user: DashboardUser;
   isAdminUser: boolean;
   avatarColor: string;
   editingAvatar: boolean;
@@ -62,7 +62,7 @@ export type AccountTabProps = {
   contactSent: boolean;
   subscriptions: Subscription[];
   stamps: Stamp[];
-  t: (key: any, params?: any) => string;
+  t: TFunction;
   setEditingAvatar: (v: boolean | ((prev: boolean) => boolean)) => void;
   onSaveAvatarColor: (color: string) => void;
   setEditingName: (v: boolean) => void;
@@ -107,7 +107,7 @@ export function AccountTab({
   setShowDeleteConfirm, setDeleteConfirmEmail, onDeleteAccount,
 }: AccountTabProps) {
   const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
-  const initial = ((user as any).name || user.email || "U").charAt(0).toUpperCase();
+  const initial = (user.name || user.email || "U").charAt(0).toUpperCase();
 
   return (
     <motion.div key="account" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
@@ -126,7 +126,7 @@ export function AccountTab({
           </button>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-base truncate">{(user as any).name || t("dashboard.nickname_not_set")}</p>
+          <p className="font-bold text-base truncate">{user.name || t("dashboard.nickname_not_set")}</p>
           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           {isAdminUser && (
             <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300 font-bold border border-violet-200/50 dark:border-violet-700/30 uppercase tracking-wider">
@@ -187,8 +187,8 @@ export function AccountTab({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold">{(user as any).name || t("dashboard.not_set")}</p>
-              <button onClick={() => { setNameValue((user as any).name || ""); setEditingName(true); }}
+              <p className="text-xs font-semibold">{user.name || t("dashboard.not_set")}</p>
+              <button onClick={() => { setNameValue(user.name || ""); setEditingName(true); }}
                 className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                 <RiPencilLine className="w-3.5 h-3.5" />
               </button>

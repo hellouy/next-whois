@@ -15,6 +15,7 @@ import { SubscriptionsTab } from "@/components/dashboard/SubscriptionsTab";
 import { StampsTab } from "@/components/dashboard/StampsTab";
 import { MembershipTab } from "@/components/dashboard/MembershipTab";
 import { AccountTab } from "@/components/dashboard/AccountTab";
+import type { DashboardUser } from "@/components/dashboard/types";
 import { EditStampModal } from "@/components/dashboard/EditStampModal";
 import { EditExpiryModal } from "@/components/dashboard/EditExpiryModal";
 import { ClaimGuideModal, SubscribeGuideModal } from "@/components/dashboard/GuideModals";
@@ -94,8 +95,8 @@ export default function DashboardPage() {
     );
   }
 
-  const user = session!.user!;
-  const isAdminUser = (user as any)?.email?.toLowerCase?.()?.trim?.() === ADMIN_EMAIL;
+  const user = session!.user! as DashboardUser;
+  const isAdminUser = user.email?.toLowerCase()?.trim() === ADMIN_EMAIL;
 
   const activeSubs = subscriptions.filter(s => s.active);
   const expiringSoon = activeSubs.filter(s => {

@@ -29,7 +29,7 @@ type DotNestedKeys<T> = (
 
 export type TranslationKey = DotNestedKeys<typeof en>;
 
-type InterpolationValues = Record<string, string | number>;
+export type InterpolationValues = Record<string, string | number>;
 
 export function useTranslation() {
   const { locale } = useLocale();

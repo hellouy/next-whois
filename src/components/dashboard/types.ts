@@ -91,3 +91,13 @@ export function fmt(d: Date, locale?: string) {
 export function daysUntilExpiry(sub: Subscription): number | null {
   return sub.days_to_expiry ?? null;
 }
+
+export interface DashboardUser {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  subscriptionAccess?: boolean;
+}
+
+export type TFunction = (key: string, params?: Record<string, string | number>) => string;

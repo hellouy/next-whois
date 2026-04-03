@@ -10,7 +10,7 @@ import {
   RiCoupon2Line, RiFileTextLine, RiRefreshLine, RiCheckboxCircleLine,
   RiArrowRightLine,
 } from "@remixicon/react";
-import type { Order, BalanceTx, Plan } from "./types";
+import type { Order, BalanceTx, Plan, TFunction } from "./types";
 
 export type MembershipTabProps = {
   subscriptionAccessDB: boolean | null;
@@ -28,8 +28,8 @@ export type MembershipTabProps = {
   redeemCode: string;
   redeeming: boolean;
   paymentEnabled: boolean;
-  siteSettings: Record<string, any>;
-  t: (key: any, params?: any) => string;
+  siteSettings: Record<string, unknown>;
+  t: TFunction;
   setShowBalanceTxs: (v: boolean) => void;
   setLoadingBalanceTxs: (v: boolean) => void;
   setBalanceTxs: (txs: BalanceTx[]) => void;
@@ -70,7 +70,7 @@ export function MembershipTab({
   const isLifetime = subscriptionAccessDB && !subscriptionExpiresAt;
   const expiresDate = subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null;
   const remainingDays = expiresDate ? Math.ceil((expiresDate.getTime() - Date.now()) / 86_400_000) : null;
-  const currencyCode = (siteSettings.payment_currency || "CNY").toUpperCase();
+  const currencyCode = ((siteSettings.payment_currency as string) || "CNY").toUpperCase();
   const balanceSym = CURRENCY_SYM[currencyCode] ?? currencyCode + " ";
   const PROVIDER_LABEL: Record<string, string> = {
     stripe: t("dashboard.provider_stripe"), xunhupay: t("dashboard.provider_xunhupay"), alipay: t("dashboard.provider_alipay"), paypal: "PayPal",
