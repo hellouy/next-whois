@@ -98,51 +98,51 @@ function isASNumber(query: string): boolean {
 const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // ── Western Europe ───────────────────────────────────────────────────────
   ad: "https://rdap.nic.ad/",
-  at: "https://rdap.nic.at/",
-  be: "https://rdap.dns.be/",
+  // at: removed — rdap.nic.at NXDOMAIN; WHOIS via whois.nic.at works
+  // be: removed — rdap.dns.be NXDOMAIN; WHOIS via whois.dnsbelgium.be works
   ch: "https://rdap.nic.ch/",
   de: "https://rdap.denic.de/",
-  dk: "https://rdap.punktum.dk/",
-  ee: "https://rdap.tld.ee/",
-  es: "https://rdap.nic.es/",
+  // dk: removed — rdap.punktum.dk NXDOMAIN; WHOIS via whois.punktum.dk works
+  // ee: removed — rdap.tld.ee NXDOMAIN; WHOIS via whois.tld.ee works
+  // es: removed — rdap.nic.es NXDOMAIN; WHOIS via whois.nic.es works
   fi: "https://rdap.fi/rdap/rdap/",
   fo: "https://rdap.centralnic.com/fo/",          // IANA: CentralNIC
   fr: "https://rdap.nic.fr/",
   gr: "https://rdap.gr/",
-  hr: "https://rdap.dns.hr/",
+  // hr: removed — rdap.dns.hr NXDOMAIN; WHOIS via whois.dns.hr works
   // hu: removed — rdap.hu ENODATA (no A record, endpoint is permanently dead); WHOIS via whois.nic.hu works
-  ie: "https://rdap.iedr.ie/",
+  // ie: removed — rdap.iedr.ie NXDOMAIN; WHOIS via whois.iedr.ie works
   is: "https://rdap.isnic.is/rdap/",              // IANA: /rdap/ suffix
-  it: "https://rdap.nic.it/",
+  // it: removed — rdap.nic.it NXDOMAIN; WHOIS via whois.nic.it works
   li: "https://rdap.nic.li/",
-  lt: "https://rdap.domreg.lt/",
-  lu: "https://rdap.dns.lu/",
-  lv: "https://rdap.nic.lv/",
-  me: "https://rdap.nic.me/",
+  // lt: removed — rdap.domreg.lt NXDOMAIN; WHOIS via whois.domreg.lt works
+  // lu: removed — rdap.dns.lu NXDOMAIN; WHOIS via whois.dns.lu works
+  // lv: removed — rdap.nic.lv NXDOMAIN; WHOIS via whois.nic.lv works
+  // me: removed — rdap.nic.me NXDOMAIN; WHOIS via whois.nic.me works
   nl: "https://rdap.sidn.nl/",
   no: "https://rdap.norid.no/",
   pl: "https://rdap.dns.pl/",
-  pt: "https://rdap.dns.pt/",
-  ro: "https://rdap.rotld.ro/",
-  rs: "https://rdap.rnids.rs/",
-  se: "https://rdap.iis.se/",
+  // pt: removed — rdap.dns.pt NXDOMAIN; WHOIS via whois.dns.pt works
+  // ro: removed — rdap.rotld.ro NXDOMAIN; WHOIS via whois.rotld.ro works
+  // rs: removed — rdap.rnids.rs NXDOMAIN; WHOIS via whois.rnids.rs works
+  // se: removed — rdap.iis.se NXDOMAIN; WHOIS via whois.iis.se works
   si: "https://rdap.register.si/",
   sk: "https://rdap.sk-nic.sk/",
   uk: "https://rdap.nominet.uk/uk/",
   // ── Eastern Europe / CIS ────────────────────────────────────────────────
-  al: "https://rdap.nic.al/",
-  am: "https://rdap.nic.am/",
-  az: "https://rdap.nic.az/",
-  ba: "https://rdap.nic.ba/",
+  // al: removed — rdap.nic.al NXDOMAIN; WHOIS via whoiser/IANA fallback
+  // am: removed — rdap.nic.am NXDOMAIN; WHOIS via whois.amnic.net works
+  // az: removed — rdap.nic.az NXDOMAIN; WHOIS via whois.ripe.net works
+  // ba: removed — rdap.nic.ba NXDOMAIN; WHOIS via whoiser/IANA fallback
   by: "https://rdap.cctld.by/",                   // confirmed: rdap.cctld.by
-  cy: "https://rdap.nic.cy/",
+  // cy: removed — rdap.nic.cy NXDOMAIN; WHOIS via whois.ripe.net works
   cz: "https://rdap.nic.cz/",
-  ge: "https://rdap.nic.ge/",
+  // ge: removed — rdap.nic.ge NXDOMAIN; WHOIS via whois.nic.ge works
   kg: "http://rdap.cctld.kg/",                    // IANA: http only (no TLS)
   kz: "https://rdap.nic.kz/",                     // confirmed: rdap.nic.kz
-  md: "https://rdap.nic.md/",
-  mk: "https://rdap.nic.mk/",
-  mt: "https://rdap.nic.mt/",
+  // md: removed — rdap.nic.md NXDOMAIN; WHOIS via whois.nic.md works
+  // mk: removed — rdap.nic.mk NXDOMAIN; WHOIS via whois.marnet.mk works
+  // mt: removed — rdap.nic.mt NXDOMAIN; WHOIS via whois.ripe.net works
   ru: "https://rdap.nic.ru/",                     // confirmed: rdap.nic.ru
   // su: removed — rdap.tcinet.ru ENOTFOUND (not in IANA bootstrap); WHOIS via whois.tcinet.ru still works
   // tj: removed — rdap.nic.tj ENOTFOUND (not in IANA bootstrap)
@@ -276,19 +276,19 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   yt: "https://rdap.nic.yt/",
   // ── IDN ccTLDs (Internationalised Country-Code TLDs) ────────────────────
   // Chinese-script
-  "xn--j6w193g":       "https://rdap.hkirc.hk/",              // .香港 Hong Kong
+  // xn--j6w193g: removed — rdap.hkirc.hk NXDOMAIN (.香港 Hong Kong); WHOIS via whois.hkirc.hk works
   "xn--kprw13d":       "https://ccrdap.twnic.tw/taiwan/",     // .台灣 Taiwan (traditional)
   // Cyrillic
   "xn--p1ai":          "https://rdap.nic.ru/",                // .рф Russia
-  "xn--90a3ac":        "https://rdap.rnids.rs/",              // .срб Serbia
+  // xn--90a3ac: removed — rdap.rnids.rs NXDOMAIN (.срб Serbia); WHOIS via whois.rnids.rs works
   "xn--j1amh":         "https://rdap.hostmaster.ua/",         // .укр Ukraine
   "xn--90ais":         "https://rdap.cctld.by/",              // .бел Belarus
-  "xn--y9a3aq":        "https://rdap.nic.am/",                // .հայ Armenia
-  "xn--node":          "https://rdap.nic.ge/",                // .გე Georgia
+  // xn--y9a3aq: removed — rdap.nic.am NXDOMAIN (.հայ Armenia); WHOIS via whois.amnic.net works
+  // xn--node: removed — rdap.nic.ge NXDOMAIN (.გე Georgia); WHOIS via whois.nic.ge works
   // Arabic-script
   "xn--mgbah1a3hjkrd": "https://rdap.aeda.net.ae/",           // .الإمارات UAE
   // Korean
-  "xn--3e0b707e":      "https://rdap.kr/",                    // .한국 South Korea
+  // xn--3e0b707e: removed — rdap.kr NXDOMAIN (.한국 South Korea); WHOIS via whois.kr works
   // Indian-script
   "xn--h2brj9c":       "https://rdap.nixiregistry.in/rdap/",  // .भारत India (Devanagari)
   "xn--h2breg3eve":    "https://rdap.nixiregistry.in/rdap/",  // .भारतम् India (Sanskrit)
@@ -297,8 +297,8 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   "xn--xkc2al3hye2a":  "https://rdap.nixiregistry.in/rdap/",  // .இந்தியா India (Tamil)
   "xn--mgbai9azgqp6j": "https://rdap.nixiregistry.in/rdap/",  // .بھارت India (Urdu)
   // Sinhala/Tamil
-  "xn--xkc2dl3a5ee0h": "https://rdap.nic.lk/",               // .இலங்கை Sri Lanka (Tamil)
-  "xn--fzc2c9e2c":     "https://rdap.nic.lk/",               // .ශ්‍රී ලංකා Sri Lanka (Sinhala)
+  // xn--xkc2dl3a5ee0h: removed — rdap.nic.lk NXDOMAIN (.இலங்கை Sri Lanka Tamil); WHOIS fallback
+  // xn--fzc2c9e2c: removed — rdap.nic.lk NXDOMAIN (.ශ්‍රී ලංකා Sri Lanka Sinhala); WHOIS fallback
   // Greek
   "xn--qxam":          "https://rdap.gr/",                   // .ελ Greece
 };
