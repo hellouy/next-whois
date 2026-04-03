@@ -687,7 +687,7 @@ export function Navbar() {
             href="/"
             className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 transition-colors flex items-center touch-manipulation select-none"
           >
-            {logoText}
+            <span suppressHydrationWarning>{logoText}</span>
             <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
           </Link>
         </motion.div>

@@ -36,11 +36,11 @@ interface HomeSeo {
 
 function XRWDisplay({ heroTitle, tagline }: { heroTitle: string; tagline: string }) {
   const settings = useSiteSettings();
-  const displayTitle = settings.home_hero_title || heroTitle || settings.site_logo_text || "X.RW";
+  const displayTitle = settings.home_hero_title || heroTitle;
   const displayTagline = settings.home_hero_subtitle || tagline;
   return (
     <div className="w-full flex flex-col items-center justify-center select-none gap-2">
-      <span className="text-shimmer text-4xl font-bold tracking-[0.22em]">
+      <span className="text-shimmer text-5xl sm:text-6xl font-bold tracking-[0.22em]" suppressHydrationWarning>
         {displayTitle}
       </span>
       {displayTagline && (
@@ -240,7 +240,7 @@ export const getStaticProps: GetStaticProps = async () => {
 
   const logoText   = siteLogo   || DEFAULT_LOGO;
   const tagline    = homeHeroSubtitle || siteSubtitle || DEFAULT_TAGLINE;
-  const heroTitle  = homeHeroTitle || logoText;
+  const heroTitle  = homeHeroTitle || DEFAULT_LOGO;
   const title      = siteTitle  || DEFAULT_TITLE;
   const desc       = siteDesc   || DEFAULT_DESC;
   const keywords   = siteKeywords || DEFAULT_KEYWORDS;

@@ -295,11 +295,14 @@ export function SiteSettingsProvider({
   initialSettings?: Partial<SiteSettings>;
 }) {
   // initialSettings may come from SSR props (e.g. the homepage passes them).
-  // The useState initializer runs on both server and client, so both start with
-  // the same value — no hydration mismatch.
-  const [settings, setSettings] = React.useState<SiteSettings>({
-    ...DEFAULT_SETTINGS,
-    ...(initialSettings || {}),
+  // The lazy initializer runs synchronously on the client before the first
+  // render, so it can read sessionStorage immediately.  On the server,
+  // readSessionCache() returns null (window guard), so server HTML is still
+  // rendered with DEFAULT_SETTINGS + initialSettings — suppressHydrationWarning
+  // on affected leaf nodes handles the client/server mismatch silently.
+  const [settings, setSettings] = React.useState<SiteSettings>(() => {
+    const cache = readSessionCache(); // null on server
+    return { ...DEFAULT_SETTINGS, ...(initialSettings || {}), ...(cache || {}) };
   });
 
   const fetchSettings = React.useCallback(() => {
