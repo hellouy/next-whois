@@ -5011,8 +5011,8 @@ export default function LookupPage({
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeIn" } }}
-              transition={{ duration: 0.12 }}
+              exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
+              transition={{ duration: 0.05 }}
               className="grid grid-cols-1 gap-6"
             >
               {/* Main domain info card */}
@@ -5023,10 +5023,7 @@ export default function LookupPage({
                     <div className="h-11 w-11 rounded-full bg-muted/40 animate-pulse shrink-0" />
                     <div className="flex-1 min-w-0">
                       {target ? (
-                        <div className="flex items-center gap-2">
-                          <p className="text-lg font-semibold font-mono truncate">{target}</p>
-                          <RiLoader4Line className="w-4 h-4 text-muted-foreground/60 animate-spin shrink-0" />
-                        </div>
+                        <p className="text-lg font-semibold font-mono truncate">{target}</p>
                       ) : (
                         <div className="h-5 w-40 rounded bg-muted/40 animate-pulse" />
                       )}
