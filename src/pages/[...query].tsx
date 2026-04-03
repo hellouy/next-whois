@@ -952,9 +952,9 @@ function parseWhoisDate(dateStr: string): Date | null {
     .trim();
   d = new Date(stripped);
   if (!isNaN(d.getTime())) return d;
-  // 3. Replace first space separator with T for strict ISO parsing.
-  // Use regex to replace the first whitespace run (handles multiple spaces).
-  const isoLike = stripped.replace(/\s+/, "T") + "Z";
+  // 3. Replace whitespace separator(s) with T for strict ISO parsing.
+  // Global replace handles any whitespace run (e.g. "2020-01-15  10:30:00").
+  const isoLike = stripped.replace(/\s+/g, "T") + "Z";
   d = new Date(isoLike);
   if (!isNaN(d.getTime())) return d;
   return null;
