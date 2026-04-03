@@ -8,11 +8,13 @@ export default function Document() {
         {/* Baseline identity — overridden per-page by AppHead in _app.tsx */}
         <meta name="application-name" content="Next Whois" />
 
-        {/* DNS prefetch for third-party APIs used client-side */}
+        {/* Theme color for mobile browser chrome / PWA */}
+        <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+
+        {/* Preconnect to third-party APIs actually called from the browser */}
         <link rel="preconnect" href="https://api.frankfurter.dev" />
         <link rel="dns-prefetch" href="https://api.frankfurter.dev" />
-        <link rel="dns-prefetch" href="https://rdap.iana.org" />
-        <link rel="dns-prefetch" href="https://data.iana.org" />
       </Head>
       <body>
         <Main />

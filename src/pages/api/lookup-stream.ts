@@ -134,9 +134,14 @@ export default async function handler(
   };
 
   // If a partial result arrived during the session check, send it now.
-  if (_bufferedPartial && !partialSent && !finalSent) {
+  // TypeScript 5.9's narrowing is too aggressive here: after _onPartial is
+  // reassigned (above) it concludes _bufferedPartial can never be non-null,
+  // even though the original closure ran before the reassignment.  The double
+  // cast bypasses that over-eager narrowing while keeping the runtime guard.
+  const bufferedPartial = _bufferedPartial as unknown as WhoisResult | null;
+  if (bufferedPartial !== null && !partialSent && !finalSent) {
     partialSent = true;
-    writeChunk({ ..._bufferedPartial, result: _bufferedPartial.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
+    writeChunk({ ...bufferedPartial, result: bufferedPartial.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
   }
 
   try {
