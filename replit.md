@@ -1,5 +1,33 @@
 # Next Whois UI — v3.35
 
+## Task #8 — ccTLD RDAP Endpoint Audit & Cleanup (2026-04-03)
+
+**Scope:** Full live connectivity audit of all 103 active ccTLD RDAP endpoints in `CCTLD_RDAP_OVERRIDES`. Probe script run against all entries with 7-second timeout. Results: 98 alive, 5 dead (TLS failures).
+
+### Dead endpoints removed (5)
+
+| TLD | URL | Reason |
+|-----|-----|--------|
+| `.cr` | `rdap.nic.cr` | Self-signed TLS certificate (`DEPTH_ZERO_SELF_SIGNED_CERT`); WHOIS via `whois.nic.cr` works |
+| `.fj` | `www.rdap.fj` | TLS leaf signature invalid (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`); WHOIS via IANA fallback |
+| `.gs` | `rdap.nic.gs` | TLS cert altname mismatch — cert covers other COCCA-hosted TLDs but not `.gs` |
+| `.la` | `rdap.nic.la` | TLS cert altname mismatch — cert has `whois.nic.la` but not `rdap.nic.la`; WHOIS via `whois.nic.la` works |
+| `.sr` | `whois.sr/rdap/` | TLS certificate expired (`CERT_HAS_EXPIRED`); no reliable WHOIS server for Suriname |
+
+### Newly re-added (1)
+
+| TLD | URL | Note |
+|-----|-----|------|
+| `.cv` | `https://rdap.nic.cv/` | Re-confirmed working 2026-04-03 (HTTP 404 for test domain); registry fixed RDAP server that was broken throughout 2025 |
+
+### Other changes
+- `RDAP_TLD_TIMEOUT_MS`: removed `.la: 6000` entry (TLD removed from overrides)
+- `getCctldRdapOverrides()` JSDoc: updated count 168 → 99 active entries
+- Net result: 103 → 99 active ccTLD RDAP overrides (-5 removed, +1 re-added)
+- Probe script saved at `scripts/probe-rdap-cctld.mjs` for future audits
+
+---
+
 ## Task #7 — Dashboard & Admin UX Improvements (2026-04-03)
 
 ### i18n — dashboard.tsx

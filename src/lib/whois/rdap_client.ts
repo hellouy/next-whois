@@ -201,9 +201,9 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // bt: removed — rdap.nic.bt ENOTFOUND; WHOIS whois.netnames.net is wrong server
   cc: "https://tld-rdap.verisign.com/cc/v1/",
   cx: "https://rdap.nic.cx/",
-  fj: "https://www.rdap.fj/",                      // IANA: www.rdap.fj
+  // fj: removed — www.rdap.fj TLS chain invalid (UNABLE_TO_VERIFY_LEAF_SIGNATURE); WHOIS via IANA fallback
   fm: "https://rdap.centralnic.com/fm/",
-  gs: "https://rdap.nic.gs/",
+  // gs: removed — rdap.nic.gs TLS cert altname mismatch (cert covers other COCCA TLDs but not .gs); no reliable WHOIS server
   // hk: removed — rdap.hkirc.hk ENOTFOUND; WHOIS via whois.hkirc.hk works
   id: "https://rdap.pandi.id/rdap/",
   in: "https://rdap.nixiregistry.in/rdap/",
@@ -211,7 +211,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   jp: "https://jprs.jp/rdap/",                     // fixed: rdap.jprs.jp ENOTFOUND; jprs.jp/rdap/ works
   // kh: removed — rdap.nic.kh ENOTFOUND; WHOIS whois.nic.kh also ENOTFOUND
   // kr: removed — rdap.kr ENOTFOUND; WHOIS via whois.kr works
-  la: "https://rdap.nic.la/",
+  // la: removed — rdap.nic.la TLS cert altname mismatch (cert has whois.nic.la but not rdap.nic.la); WHOIS via whois.nic.la works
   // mm: removed — rdap.nic.mm ENOTFOUND; no known working WHOIS server
   // mn: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   ms: "https://rdap.nic.ms/",
@@ -245,12 +245,9 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // bz: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; rdap.nic.bz ECONNREFUSED
   ca: "https://rdap.ca.fury.ca/rdap/",
   // co: removed — rdap.cctld.co SSL/TLS error (unrecognized SNI); not in IANA bootstrap
-  cr: "https://rdap.nic.cr/",
+  // cr: removed — rdap.nic.cr TLS self-signed cert (DEPTH_ZERO_SELF_SIGNED_CERT); WHOIS via whois.nic.cr works
   // cu: removed — rdap.nic.cu ENOTFOUND; .cu also in STATIC_ALWAYS_FALLBACK (political restriction)
-  // cv: removed — rdap.nic.cv returns HTTP 404 for ALL paths (server broken/unconfigured as of 2025).
-  //   Port 43 WHOIS (whois.nic.cv) also returns ECONNREFUSED.  Registry moved to ola.cv with no
-  //   public machine-readable WHOIS.  Keeping cv in the override would make rdapIsDirect=true,
-  //   delaying the WHOIS fallback by RDAP_DIRECT_WHOIS_SHADOW_MS for every query unnecessarily.
+  cv: "https://rdap.nic.cv/",          // re-confirmed 2026-04-03: HTTP 404 for test domain (registry fixed; was broken 2025)
   // dm: removed — rdap.nic.dm ENOTFOUND; WHOIS via whois.nic.dm works
   ec: "https://rdap.registry.ec/",
   gd: "https://rdap.centralnic.com/gd/",           // IANA: CentralNIC
@@ -265,7 +262,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // pe: removed — rdap.nic.pe ENOTFOUND; WHOIS now fixed to whois.nic.pe
   pm: "https://rdap.nic.pm/",
   re: "https://rdap.nic.re/",
-  sr: "https://whois.sr/rdap/",                    // IANA: whois.sr/rdap/
+  // sr: removed — whois.sr TLS cert expired (CERT_HAS_EXPIRED); no reliable WHOIS server for Suriname
   tf: "https://rdap.nic.tf/",
   // tt: removed — rdap.nic.tt ENOTFOUND; WHOIS whois.nic.tt also ENOTFOUND
   // vc: moved to GTLD_RDAP_BOOTSTRAP — RDAP is complete, WHOIS blocked from our net
@@ -311,7 +308,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
 export const RDAP_DIRECT_CCTLDS = new Set<string>(Object.keys(CCTLD_RDAP_OVERRIDES));
 
 /**
- * Returns the hand-curated ccTLD RDAP override map (168 entries).
+ * Returns the hand-curated ccTLD RDAP override map (99 entries as of 2026-04-03).
  * Used by the admin built-in server viewer.
  */
 export function getCctldRdapOverrides(): Record<string, string> {
@@ -334,7 +331,7 @@ const RDAP_TLD_TIMEOUT_MS: Record<string, number> = {
   // Americas — Argentina is genuinely slow from global infra
   ar: 10000,
   // Asia / Pacific — some have higher latency
-  la: 6000, bn: 6000, pg: 6000, sb: 6000, tl: 6000,
+  bn: 6000, pg: 6000, sb: 6000, tl: 6000,
 };
 
 /**
