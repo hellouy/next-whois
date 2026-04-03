@@ -1,5 +1,31 @@
 # Next Whois UI — v3.35
 
+## Task #6 — UX Polish & Code Quality (2026-04-03)
+
+### UX Improvements
+- **Cache age indicator** (`src/pages/[...query].tsx`): When `cachedAt` timestamp is present, shows "cached Nm ago" or "cached Nh ago" instead of just "cached"; falls back to `t("cached")` if no timestamp. Shows exact datetime on hover title. Bilingual (EN/ZH via `isChinese`).
+- **Domain copy icon button**: Added explicit `<RiFileCopyLine>` icon button alongside the clickable domain h2, wrapped in `flex items-start gap-2` container. Subtle opacity by default, full opacity on hover.
+- **Retry button on error**: Already existed (`<Button onClick={handleRefresh}>{t("try_again")}</Button>`), no change needed.
+
+### Code Extraction (1,328 lines removed from `[...query].tsx`)
+**Data files** created in `src/data/query-page/`:
+- `registrar-icons.ts` — `REGISTRAR_ICONS` record (~110 lines)
+- `ns-brands.ts` — `NS_BRANDS` array (~560 lines)
+- `globe-coords.ts` — `GLOBE_COUNTRY_COORDS` record (~50 lines)
+- `mainstream-domains.ts` — `MAINSTREAM_DOMAINS` Set (~55 lines)
+- `official-domain-desc.ts` — `OFFICIAL_DOMAIN_DESC` record (~100 lines)
+
+**Component files** created in `src/components/query/`:
+- `query-progress-bar.tsx` — `QueryProgressBar` component
+- `css-globe.tsx` — `CssGlobe` component (imports `GLOBE_COUNTRY_COORDS`)
+- `response-panel.tsx` — `ResponsePanel` + co-located `WhoisHighlight` + `RdapJsonHighlight`
+
+Helper functions `getNsBrand` + `getRegistrarIcon` remain in the query page since they reference imported data.
+
+Main query page reduced from **6,711 → 5,383 lines** (~20% reduction).
+
+---
+
 ## Pre-Launch Security & Quality Audit (2026-04-02, v3.35 patch)
 
 ### Security Hardening
