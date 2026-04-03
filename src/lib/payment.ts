@@ -2,7 +2,7 @@ import { randomBytes, createHash, createHmac } from "crypto";
 import { run, one, many } from "@/lib/db-query";
 import { sendEmail, paymentConfirmHtml, getSiteLabel } from "@/lib/email";
 
-export type PaymentProvider = "stripe" | "xunhupay" | "alipay" | "paypal";
+export type PaymentProvider = "stripe" | "xunhupay" | "alipay" | "paypal" | "wechat";
 export type OrderStatus = "pending" | "paid" | "failed" | "expired" | "refunded";
 
 export interface PaymentPlan {

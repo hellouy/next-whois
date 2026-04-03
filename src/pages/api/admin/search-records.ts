@@ -193,7 +193,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       allCount, todayCount, availableCount, expiringCount,
       highValueCount, registeredCount, totalEventsCount,
       uniqueUsersCount, anonCount, loggedCount,
-      dailyStats, topQueries, topByType, topUsers,
+      dailyStats, topQueries, topByType, topUsers, topTlds,
     ] = await Promise.all([
       one<{ count: string }>("SELECT COUNT(DISTINCT LOWER(query)) AS count FROM search_history"),
       one<{ count: string }>("SELECT COUNT(DISTINCT LOWER(query)) AS count FROM search_history WHERE created_at >= NOW() - INTERVAL '1 day'"),
@@ -231,6 +231,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          JOIN users u ON sh.user_id = u.id
          WHERE sh.created_at >= NOW() - INTERVAL '30 days'
          GROUP BY u.email, u.name ORDER BY count DESC LIMIT 10`,
+      ),
+      many<{ tld: string; count: string }>(
+        `SELECT split_part(query, '.', -1) AS tld, COUNT(*) AS count
+         FROM search_history
+         WHERE query_type = 'domain'
+           AND char_length(split_part(query, '.', -1)) >= 2
+           AND split_part(query, '.', -1) ~ '^[a-zA-Z]'
+         GROUP BY tld ORDER BY count DESC LIMIT 12`,
       ),
     ]);
 
@@ -281,6 +289,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       topByType:  topByType.map(r  => ({ type: r.query_type, count: parseInt(r.count) })),
       topQueries: topQueries.map(r => ({ query: r.query, type: r.query_type, count: parseInt(r.count) })),
       topUsers:   topUsers.map(r   => ({ email: r.user_email, name: r.user_name ?? null, count: parseInt(r.count) })),
+      topTlds:    topTlds.map(r    => ({ tld: r.tld, count: parseInt(r.count) })),
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

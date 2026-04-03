@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   RiLoader4Line, RiBankCardLine, RiAlipayLine, RiArrowLeftSLine,
   RiCheckLine, RiShieldCheckLine, RiPriceTag3Line, RiCalendarLine,
-  RiLockLine, RiExternalLinkLine, RiPaypalLine,
+  RiLockLine, RiExternalLinkLine, RiPaypalLine, RiQrCodeLine,
 } from "@remixicon/react";
 
 type Plan = {
@@ -33,6 +33,7 @@ export default function PaymentCheckout() {
     xunhupay: { label: t("payment.provider_xunhupay_label"), icon: RiAlipayLine,   color: "text-blue-600 dark:text-blue-400",   hint: t("payment.provider_xunhupay_hint") },
     alipay:   { label: t("payment.provider_alipay_label"),   icon: RiAlipayLine,   color: "text-sky-600 dark:text-sky-400",     hint: t("payment.provider_alipay_hint") },
     paypal:   { label: t("payment.provider_paypal_label"),   icon: RiPaypalLine,   color: "text-[#003087] dark:text-blue-400",  hint: t("payment.provider_paypal_hint") },
+    wechat:   { label: "微信支付",                           icon: RiQrCodeLine,   color: "text-green-600 dark:text-green-400", hint: "微信扫码支付" },
   };
 
   const planFromUrl = typeof router.query.plan === "string" ? router.query.plan : null;
@@ -51,6 +52,7 @@ export default function PaymentCheckout() {
     if (settings.payment_xunhupay_enabled) p.push("xunhupay");
     if (settings.payment_alipay_enabled) p.push("alipay");
     if (settings.payment_paypal_enabled) p.push("paypal");
+    if (settings.payment_wechat_enabled) p.push("wechat");
     return p;
   }, [settings]);
 
@@ -92,7 +94,7 @@ export default function PaymentCheckout() {
 
       if (d.provider === "stripe" || d.provider === "alipay") {
         window.location.href = d.url;
-      } else if (d.provider === "xunhupay") {
+      } else if (d.provider === "xunhupay" || d.provider === "wechat") {
         setXunhupayForm({ params: d.params, endpoint: d.endpoint });
       } else if (d.provider === "paypal") {
         window.location.href = d.url;

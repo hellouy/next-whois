@@ -43,6 +43,7 @@ type PageData = {
   topByType: { type: string; count: number }[];
   topQueries: { query: string; type: string; count: number }[];
   topUsers: { email: string; name: string | null; count: number }[];
+  topTlds: { tld: string; count: number }[];
 };
 
 type FilterType = "all" | "available" | "expiring" | "high_value" | "anonymous" | "logged";
@@ -405,6 +406,30 @@ export default function AdminSearchRecordsPage() {
                           <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{u.count}次</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top TLDs */}
+                {data.topTlds && data.topTlds.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <RiGlobalLine className="w-3 h-3" />热门后缀（域名查询 Top 12，已过滤无效后缀）
+                    </p>
+                    <div className="space-y-1.5">
+                      {data.topTlds.map(t => {
+                        const maxCount = data.topTlds[0]?.count ?? 1;
+                        const pct = maxCount > 0 ? Math.round((t.count / maxCount) * 100) : 0;
+                        return (
+                          <div key={t.tld} className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono w-14 text-muted-foreground">.{t.tld}</span>
+                            <div className="flex-1 bg-muted rounded-full h-1.5">
+                              <div className="bg-sky-500/60 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">{t.count.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

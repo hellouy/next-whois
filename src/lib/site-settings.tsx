@@ -134,6 +134,7 @@ export interface SiteSettings {
   payment_paypal_client_secret: string;
   payment_paypal_webhook_id: string;
   payment_paypal_env: string;
+  payment_wechat_enabled: string;
   payment_currency: string;
   payment_success_url: string;
   // Email / Resend config
@@ -256,6 +257,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   payment_paypal_client_secret: "",
   payment_paypal_webhook_id: "",
   payment_paypal_env: "live",
+  payment_wechat_enabled: "",
   payment_currency: "CNY",
   payment_success_url: "",
   resend_api_key: "",

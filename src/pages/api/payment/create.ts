@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { planId, provider } = req.body as { planId: string; provider: PaymentProvider };
   if (!planId || !provider) return res.status(400).json({ error: "缺少参数" });
 
-  const validProviders = ["stripe", "xunhupay", "alipay", "paypal"];
+  const validProviders = ["stripe", "xunhupay", "alipay", "paypal", "wechat"];
   if (!validProviders.includes(provider)) return res.status(400).json({ error: "不支持的支付方式" });
 
   const providerEnabled = await getSetting(`payment_${provider}_enabled`);
@@ -155,6 +155,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         new URLSearchParams(commonParams).toString()}`;
 
       return res.json({ ok: true, provider: "alipay", url: alipayUrl, orderId: order.id });
+    }
+
+    if (provider === "wechat") {
+      // WeChat Pay via Xunhupay gateway — reuses xunhupay credentials with type="wechat"
+      const appId = await getSetting("payment_xunhupay_appid");
+      const appSecret = (await getSetting("payment_xunhupay_secret")) || process.env.XUNHUPAY_APP_SECRET || "";
+      if (!appId || !appSecret) return res.status(500).json({ error: "微信支付未配置（需在设置中配置虎皮椒 AppID/AppSecret）" });
+
+      const { xunhupaySign } = await import("@/lib/payment");
+      const params: Record<string, string> = {
+        version:        "1.1",
+        appid:          appId,
+        trade_order_id: order.id,
+        total_fee:      plan.price.toFixed(2),
+        title:          plan.name,
+        time:           Math.floor(Date.now() / 1000).toString(),
+        notify_url:     `${baseUrl}/api/payment/webhook/xunhupay`,
+        return_url:     `${baseUrl}/payment/result?order=${order.id}&status=success`,
+        type:           "wechat",
+        nonce_str:      Math.random().toString(36).slice(2),
+      };
+      params.sign = xunhupaySign(params, appSecret);
+      params.sign_type = "MD5";
+
+      return res.json({ ok: true, provider: "wechat", params, orderId: order.id,
+        endpoint: "https://api.xunhupay.com/payment/do.html" });
     }
 
     if (provider === "paypal") {

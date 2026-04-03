@@ -659,7 +659,8 @@ export async function recordTldLookupFailure(
   domain: string,
   errorMsg?: string,
 ): Promise<void> {
-  if (!tld) return;
+  // Skip recording for obviously invalid TLDs (single char, non-alphabetic start, or purely numeric)
+  if (!tld || tld.length < 2 || !/^[a-zA-Z]/.test(tld) || /^\d+$/.test(tld)) return;
   const db = await getDbReady().catch(() => null);
   if (!db) return;
   const client = await db.connect().catch(() => null);

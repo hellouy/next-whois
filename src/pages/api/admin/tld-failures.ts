@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const search   = req.query.search as string | undefined;
     const client = await db.connect();
     try {
-      let where = `WHERE f.fail_count >= $1`;
+      let where = `WHERE f.fail_count >= $1 AND char_length(f.tld) >= 2 AND f.tld ~ '^[a-zA-Z]'`;
       const params: any[] = [minFails];
       if (reason) { params.push(reason); where += ` AND f.fail_reason = $${params.length}`; }
       if (search) { params.push(`%${search}%`); where += ` AND f.tld ILIKE $${params.length}`; }

@@ -701,14 +701,20 @@ function PaymentTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, 
       </div>
 
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="虎皮椒 (XunhuPay)" />
-        <Toggle label="启用虎皮椒支付" checked={s.payment_xunhupay_enabled === "1"} onChange={v => set("payment_xunhupay_enabled", v ? "1" : "")} />
+        <SectionTitle icon={RiBankCardLine} title="虎皮椒 (XunhuPay · 支付宝渠道)" />
+        <Toggle label="启用虎皮椒支付宝" checked={s.payment_xunhupay_enabled === "1"} onChange={v => set("payment_xunhupay_enabled", v ? "1" : "")} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="AppID">
             <Input value={s.payment_xunhupay_appid} onChange={e => set("payment_xunhupay_appid", e.target.value)} placeholder="AppID" className="text-xs" />
           </Field>
           <PasswordField label="AppSecret" value={s.payment_xunhupay_secret} onChange={v => set("payment_xunhupay_secret", v)} />
         </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBankCardLine} title="微信支付 (WeChat Pay · 虎皮椒网关)" />
+        <Toggle label="启用微信支付" checked={s.payment_wechat_enabled === "1"} onChange={v => set("payment_wechat_enabled", v ? "1" : "")} />
+        <p className="text-xs text-muted-foreground">微信支付通过虎皮椒网关处理，复用上方配置的虎皮椒 AppID 和 AppSecret，无需重复填写。启用前请确保虎皮椒账户已开通微信支付渠道。</p>
       </div>
 
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
