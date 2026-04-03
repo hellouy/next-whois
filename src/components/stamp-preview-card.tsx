@@ -431,18 +431,18 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
         {/* Left black panel */}
         <div className="relative flex flex-col items-center justify-center w-[38%] shrink-0 overflow-hidden gap-2 py-5" style={{ background: "#000" }}>
           <div className="absolute top-0 right-0 w-[2.5px] h-full" style={{ animation: "split-bar 2.5s ease-in-out infinite" }} />
-          <span className="relative z-10 font-bold text-center px-2 py-1 rounded-lg" style={{ ...badgeAnim, fontSize: 11, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.75)" }}>{tagLabel}</span>
-          <p className="relative z-10 font-mono text-center px-2 truncate" style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em" }}>{domain}</p>
+          <span className="relative z-10 font-bold text-center px-2 py-1 rounded-lg" style={{ ...badgeAnim, fontSize: SZ.badgeFs, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.75)" }}>{tagLabel}</span>
+          <p className="relative z-10 font-mono text-center px-2 truncate" style={{ fontSize: SZ.domainFs - 2, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em" }}>{domain}</p>
         </div>
         {/* Right white panel */}
         <div className="flex-1 flex flex-col justify-between px-4 py-4" style={{ background: "#FAFAFA" }}>
           <div>
-            <p className="font-black text-gray-900 leading-none tracking-tight mb-2" style={{ ...{ background: "linear-gradient(90deg,#111 25%,#555 50%,#111 75%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "card-sheen 3s linear infinite" }, fontSize: 22 }}>{tagName}</p>
-            {desc && <p className="leading-relaxed line-clamp-2" style={{ fontSize: 12, color: "#9ca3af" }}>{desc}</p>}
+            <p className="font-black text-gray-900 leading-none tracking-tight mb-2" style={{ ...{ background: "linear-gradient(90deg,#111 25%,#555 50%,#111 75%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "card-sheen 3s linear infinite" }, fontSize: SZ.titleFs - 2 }}>{tagName}</p>
+            {desc && <p className="leading-relaxed line-clamp-2" style={{ fontSize: SZ.descFs, color: "#9ca3af" }}>{desc}</p>}
           </div>
-          {link ? <a href={link} className="flex items-center justify-between mt-3 px-3 py-2.5 rounded-[10px] text-white font-bold shrink-0" style={{ fontSize: 12, background: "#111" }}>
+          {link ? <a href={link} className="flex items-center justify-between mt-3 rounded-[10px] text-white font-bold shrink-0" style={{ fontSize: SZ.btnFs, padding: SZ.btnPad, background: "#111" }}>
             <span>{ctaText}</span>
-            <RiArrowRightSLine style={{ width: 14, height: 14, opacity: .8 }} />
+            <RiArrowRightSLine style={{ width: SZ.btnIconSz, height: SZ.btnIconSz, opacity: .8 }} />
           </a> : <p style={{ fontSize: SZ.noLinkFs, textAlign: "center", margin: "12px 0 0", opacity: 0.4, color: "#6b7280" }}>{noLinkText}</p>}
         </div>
       </div>
@@ -462,7 +462,7 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
       <div className="rounded-2xl overflow-hidden shadow-lg">
         {/* Top bar */}
         <div className="px-4 py-2.5 flex items-center" style={{ background: "#FF3800" }}>
-          <p className="font-mono flex-1 truncate" style={{ fontSize: 11, color: "rgba(255,255,255,0.85)" }}>{domain}</p>
+          <p className="font-mono flex-1 truncate" style={{ fontSize: SZ.domainFs - 2, color: "rgba(255,255,255,0.85)" }}>{domain}</p>
         </div>
         <div className="flex">
           {/* Left yellow panel */}
@@ -470,16 +470,16 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
             <svg className="absolute top-2 right-2 pointer-events-none opacity-30" width={14} height={22} viewBox="0 0 10 18" fill="rgba(255,80,0,0.7)">
               <path d="M7 0L1 10h5L3 18l8-11H6L7 0Z" />
             </svg>
-            <span className="relative z-10 font-bold text-center px-2 py-1 rounded-lg" style={{ ...badgeAnim, fontSize: 11, background: "rgba(255,56,0,0.12)", border: "1.5px solid rgba(255,56,0,0.3)", color: "#c2410c" }}>{tagLabel}</span>
+            <span className="relative z-10 font-bold text-center px-2 py-1 rounded-lg" style={{ ...badgeAnim, fontSize: SZ.badgeFs, background: "rgba(255,56,0,0.12)", border: "1.5px solid rgba(255,56,0,0.3)", color: "#c2410c" }}>{tagLabel}</span>
           </div>
           {/* Right white */}
           <div className="flex-1 flex flex-col justify-between px-4 py-4 bg-white">
             <div>
-              <p className="font-black text-gray-900 leading-none tracking-tight mb-2" style={{ ...{ background: "linear-gradient(90deg,#111 25%,#c2410c 50%,#111 75%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "card-sheen 3s linear infinite" }, fontSize: 22 }}>{tagName}</p>
-              {desc && <p className="leading-relaxed line-clamp-2" style={{ fontSize: 12, color: "#9ca3af" }}>{desc}</p>}
+              <p className="font-black text-gray-900 leading-none tracking-tight mb-2" style={{ ...{ background: "linear-gradient(90deg,#111 25%,#c2410c 50%,#111 75%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "card-sheen 3s linear infinite" }, fontSize: SZ.titleFs - 2 }}>{tagName}</p>
+              {desc && <p className="leading-relaxed line-clamp-2" style={{ fontSize: SZ.descFs, color: "#9ca3af" }}>{desc}</p>}
             </div>
-            {link ? <a href={link} className="inline-flex items-center gap-1 mt-3 px-4 py-2.5 rounded-full font-bold text-white shrink-0" style={{ fontSize: 12, background: "linear-gradient(135deg,#FF3800,#FF6800)", animation: "flash-cta 2s ease-in-out infinite" }}>
-              {ctaText} <RiArrowRightSLine style={{ width: 14, height: 14, opacity: .85 }} />
+            {link ? <a href={link} className="inline-flex items-center gap-1.5 mt-3 rounded-full font-bold text-white shrink-0" style={{ fontSize: SZ.btnFs, padding: SZ.btnPad, background: "linear-gradient(135deg,#FF3800,#FF6800)", animation: "flash-cta 2s ease-in-out infinite" }}>
+              {ctaText} <RiArrowRightSLine style={{ width: SZ.btnIconSz, height: SZ.btnIconSz, opacity: .85 }} />
             </a> : <p style={{ fontSize: SZ.noLinkFs, textAlign: "center", margin: "12px 0 0", opacity: 0.4, color: "#6b7280" }}>{noLinkText}</p>}
           </div>
         </div>
