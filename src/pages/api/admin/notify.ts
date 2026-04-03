@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
-import { isAdmin } from "@/lib/admin";
+import { isAdminEmail } from "@/lib/admin-server";
 import { many, isDbReady } from "@/lib/db-query";
 import { sendEmail, adminBroadcastHtml, getSiteLabel } from "@/lib/email";
 
@@ -10,7 +10,7 @@ export const config = { maxDuration: 300 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email))
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email)))
     return res.status(403).json({ error: "无权限" });
 
   if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });

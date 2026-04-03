@@ -16,7 +16,7 @@ import { getEmailStrings } from "@/lib/email-strings";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { isAdmin } from "@/lib/admin";
+import { isAdminEmail } from "@/lib/admin-server";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 
 /** Stale threshold: refresh WHOIS if older than 7 days for near-expiry domains */
@@ -103,18 +103,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Auth: accept CRON_SECRET (from Vercel cron) OR an admin session (from the dashboard UI)
   const cronSecret = process.env.CRON_SECRET;
+  let authed = false;
   if (cronSecret) {
     const authHeader = req.headers.authorization;
     const legacyHeader = req.headers["x-cron-secret"] as string | undefined;
     const querySecret = req.query.secret as string | undefined;
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
     const provided = bearerToken || legacyHeader || querySecret;
-    if (provided !== cronSecret) {
-      // Fall back to admin session auth
-      const session = await getServerSession(req, res, authOptions);
-      if (!session?.user?.email || !isAdmin(session.user.email)) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+    if (provided === cronSecret) authed = true;
+  }
+  if (!authed) {
+    // Fall back to admin session auth (always required when cron secret not matched)
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
   }
 
