@@ -52,11 +52,6 @@ import {
   RiSearchLine,
   RiCheckboxCircleLine,
   RiCheckboxBlankCircleLine,
-  RiIdCardLine,
-  RiBuildingLine,
-  RiAwardLine,
-  RiShakeHandsLine,
-  RiCodeSLine,
   RiVipCrownLine,
   RiAlertLine,
   RiArrowRightSLine,
@@ -4559,18 +4554,6 @@ export default function LookupPage({
     premium:  "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white border-0",
   };
 
-  const STAMP_ICON_MAP: Record<string, React.ElementType> = {
-    personal: RiIdCardLine,
-    official: RiBuildingLine,
-    brand:    RiAwardLine,
-    verified: RiShieldCheckLine,
-    partner:  RiShakeHandsLine,
-    dev:      RiCodeSLine,
-    warning:  RiAlertLine,
-    premium:  RiVipCrownLine,
-    default:  RiShieldCheckLine,
-  };
-
   const STAMP_CARD_MAP: Record<string, { border: string; bg: string; iconColor: string }> = {
     personal: { border: "border-l-teal-500",    bg: "bg-teal-50   dark:bg-teal-900/20",     iconColor: "text-teal-500" },
     official: { border: "border-l-blue-500",    bg: "bg-blue-50   dark:bg-blue-900/20",     iconColor: "text-blue-500" },
@@ -6098,7 +6081,6 @@ export default function LookupPage({
                         <div className="divide-y divide-border/30">
                           {verifiedStamps.map((stamp) => {
                             const theme     = CARD_THEMES[stamp.cardTheme] || CARD_THEMES.app;
-                            const StampIcon = STAMP_ICON_MAP[stamp.tagStyle] || STAMP_ICON_MAP.default;
                             const labelMap: Record<string, { zh: string; en: string }> = {
                               personal: { zh: "个人认领", en: "Personal"  },
                               official: { zh: "官方认证", en: "Official"  },
@@ -6234,11 +6216,14 @@ export default function LookupPage({
                                       {isChinese ? lbl.zh : lbl.en}
                                     </span>
                                   </div>
-                                  {/* icon in pulsing ring */}
+                                  {/* tagName — replaces old icon ring */}
                                   <div className="relative z-10 w-[110px] h-[110px] rounded-full flex items-center justify-center"
                                     style={{background:"rgba(0,210,255,0.06)",border:"2px solid rgba(0,210,255,0.45)",
                                       boxShadow:"0 0 30px rgba(0,210,255,0.22), 0 0 60px rgba(0,210,255,0.08)"}}>
-                                    <StampIcon className="w-12 h-12 text-cyan-400"/>
+                                    <span className="font-black leading-none tracking-tight text-center px-2 select-none"
+                                      style={{fontSize:26,color:"#00D2FF",textShadow:"0 0 24px rgba(0,210,255,0.7)",wordBreak:"break-all",lineHeight:1.1}}>
+                                      {(stamp.tagName || "X").replace(/[•·\s]/g, "").slice(0, 2).toUpperCase()}
+                                    </span>
                                   </div>
                                   {/* domain */}
                                   <p className="relative z-10 text-[10px] font-mono tracking-[0.25em] uppercase mt-3"
@@ -6350,12 +6335,12 @@ export default function LookupPage({
                                   {/* Electric blue accent line at right edge */}
                                   <div className="absolute top-0 right-0 w-[3px] h-full"
                                     style={{background:"linear-gradient(to bottom,#3B82F6,#6366F1)"}}/>
-                                  {/* Icon */}
+                                  {/* tagLabel badge + domain — replaces old icon box */}
                                   <div className="relative z-10 flex flex-col items-center gap-2 px-4 py-6 w-full overflow-hidden">
-                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                                      style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)"}}>
-                                      <StampIcon className="w-6 h-6 text-white/70"/>
-                                    </div>
+                                    <span className="text-[8px] font-bold text-center px-2 py-1 rounded-lg"
+                                      style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.14)",color:"rgba(255,255,255,0.75)"}}>
+                                      {isChinese ? lbl.zh : lbl.en}
+                                    </span>
                                     <p className="font-mono tracking-widest uppercase text-center"
                                       style={{fontSize:8,color:"rgba(255,255,255,0.18)"}}>
                                       {result.domain || target}
@@ -6410,10 +6395,7 @@ export default function LookupPage({
                                 {/* ── Orange-red header ── */}
                                 <div className="flex items-center justify-between px-4 py-3" style={{background:"#FF3800"}}>
                                   <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{background:"rgba(255,255,255,0.22)"}}>
-                                      <StampIcon className="w-3 h-3 text-white"/>
-                                    </div>
-                                    <p className="text-[11px] font-semibold tracking-wide" style={{color:"rgba(255,255,255,0.88)"}}>{result.domain || target}</p>
+                                    <p className="text-[11px] font-mono font-semibold tracking-wide" style={{color:"rgba(255,255,255,0.88)"}}>{result.domain || target}</p>
                                   </div>
                                   <button onClick={() => setStampDetailOpen(false)} className="transition-colors" style={{color:"rgba(255,255,255,0.6)"}} aria-label="Close">
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
