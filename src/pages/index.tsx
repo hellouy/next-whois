@@ -72,9 +72,35 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const DEFAULT_TITLE       = "RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具";
+const DEFAULT_DESC        = "免费在线 WHOIS / RDAP 域名查询工具，支持查询域名注册信息、注册商、注册日期、到期时间、DNS、状态等，支持国际域名和 IP 地址查询。";
+const DEFAULT_KEYWORDS    = "whois查询, rdap, 域名查询, 域名注册信息, 域名到期, whois工具, 域名信息, ip查询, 域名状态";
+const DEFAULT_LOGO        = "X.RW";
+const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
+
+const DEFAULT_SEO: HomeSeo = {
+  title:             DEFAULT_TITLE,
+  description:       DEFAULT_DESC,
+  keywords:          DEFAULT_KEYWORDS,
+  ogTitle:           DEFAULT_TITLE,
+  ogImage:           "",
+  ogSiteName:        DEFAULT_LOGO,
+  ogUrl:             "",
+  twitterCard:       "summary_large_image",
+  logoText:          DEFAULT_LOGO,
+  tagline:           DEFAULT_TAGLINE,
+  heroTitle:         DEFAULT_LOGO,
+  heroSubtitle:      "",
+  searchPlaceholder: "",
+  showStats:         false,
+};
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function HomePage({ seo }: { seo: HomeSeo }) {
+export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
+  const seo = seoProp ?? DEFAULT_SEO;
   const router = useRouter();
   const { t } = useTranslation();
   const settings = useSiteSettings();
@@ -189,14 +215,6 @@ export default function HomePage({ seo }: { seo: HomeSeo }) {
     </>
   );
 }
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const DEFAULT_TITLE       = "RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具";
-const DEFAULT_DESC        = "免费在线 WHOIS / RDAP 域名查询工具，支持查询域名注册信息、注册商、注册日期、到期时间、DNS、状态等，支持国际域名和 IP 地址查询。";
-const DEFAULT_KEYWORDS    = "whois查询, rdap, 域名查询, 域名注册信息, 域名到期, whois工具, 域名信息, ip查询, 域名状态";
-const DEFAULT_LOGO        = "X.RW";
-const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
 
 // ── ISR: revalidate every 60 s — avoids SSR cold-start on every request ───────
 // The homepage only needs SEO metadata from the DB; using ISR means the page is

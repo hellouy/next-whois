@@ -1,5 +1,6 @@
 import "@/styles/globals.css";
 import React from "react";
+import NextApp from "next/app";
 import type { AppProps, AppContext } from "next/app";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -578,11 +579,15 @@ App.getInitialProps = async (appCtx: AppContext) => {
     }
   }
 
-  // Collect page-level props (without triggering getInitialProps on the page
-  // itself — pages with getServerSideProps handle their own data fetching).
-  const pageProps = appCtx.Component.getInitialProps
-    ? await appCtx.Component.getInitialProps(appCtx.ctx)
-    : {};
+  // Use the built-in Next.js App.getInitialProps so that getStaticProps and
+  // getServerSideProps data is correctly fetched on client-side navigation.
+  // The previous manual Component.getInitialProps call skipped getStaticProps
+  // pages (like the homepage), causing their props to be undefined after
+  // client-side navigation and rendering a blank page.
+  const appProps = await NextApp.getInitialProps(appCtx);
 
-  return { pageProps: { ...pageProps, initialLocale } };
+  return {
+    ...appProps,
+    pageProps: { ...appProps.pageProps, initialLocale },
+  };
 };
