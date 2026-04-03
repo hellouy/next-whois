@@ -6029,11 +6029,11 @@ export default function LookupPage({
                               <div key={stamp.id} className="relative">
                                 <button
                                   onClick={() => setStampDetailOpen(false)}
-                                  className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-xl backdrop-blur-sm border bg-black/25 hover:bg-black/40 border-white/20 text-white transition-all active:scale-95 z-20"
+                                  className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/45 text-white transition-all hover:scale-110 active:scale-95 z-20"
                                   aria-label="Close"
                                 >
-                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                                   </svg>
                                 </button>
                                 <StampPreviewCard
