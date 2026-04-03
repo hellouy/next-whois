@@ -24,7 +24,8 @@
 - `RDAP_TLD_TIMEOUT_MS`: removed `.la: 6000` entry (TLD removed from overrides)
 - `getCctldRdapOverrides()` JSDoc: updated count 168 → 99 active entries
 - Net result: 103 → 99 active ccTLD RDAP overrides (-5 removed, +1 re-added)
-- Probe script saved at `scripts/probe-rdap-cctld.mjs` for future audits
+- Probe script saved at `scripts/probe-rdap-cctld.mjs` for future audits (5s timeout; 2xx/4xx = alive, 5xx = degraded, network/TLS fail = dead)
+- **Count clarification:** The task planning phase estimated 128 active entries from a broad `grep "^  [a-z\"']"` that inadvertently matched non-map lines in the file (type definitions, function parameters, etc.). The actual count extracted by key-matching the `CCTLD_RDAP_OVERRIDES` object was 103 entries, which the probe confirmed by running exactly 103 TLD probes.
 
 ---
 

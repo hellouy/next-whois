@@ -119,7 +119,7 @@ const ENDPOINTS = {
   "xn--qxam":          "https://rdap.gr/",
 };
 
-const TIMEOUT_MS = 7000;
+const TIMEOUT_MS = 5000;
 const CONCURRENCY = 10;
 
 async function probe(tld, baseUrl) {
@@ -133,7 +133,10 @@ async function probe(tld, baseUrl) {
       redirect: "follow",
     });
     clearTimeout(timer);
-    return { tld, baseUrl, status: res.status, result: "alive" };
+    // 2xx/4xx = alive (4xx means server up but domain not found — expected for "test")
+    // 5xx = degraded (server reachable but erroring)
+    const result = res.status >= 500 ? "degraded" : "alive";
+    return { tld, baseUrl, status: res.status, result };
   } catch (err) {
     clearTimeout(timer);
     const msg = err.message || String(err);
@@ -141,7 +144,7 @@ async function probe(tld, baseUrl) {
     if (err.name === "AbortError") result = "timeout";
     else if (msg.includes("ENOTFOUND") || msg.includes("NXDOMAIN")) result = "nxdomain";
     else if (msg.includes("ECONNREFUSED")) result = "connrefused";
-    else if (msg.includes("certificate") || msg.includes("TLS") || msg.includes("SSL") || msg.includes("ERR_CERT")) result = "tls_error";
+    else if (msg.includes("certificate") || msg.includes("TLS") || msg.includes("SSL") || msg.includes("ERR_CERT") || msg.includes("CERT_") || msg.includes("DEPTH_ZERO")) result = "tls_error";
     return { tld, baseUrl, status: null, result, error: msg };
   }
 }
@@ -163,11 +166,19 @@ for (let i = 0; i < all.length; i += CONCURRENCY) {
 console.log("\n\n=== RESULTS ===\n");
 
 const alive = results.filter(r => r.result === "alive");
-const dead = results.filter(r => r.result !== "alive");
+const degraded = results.filter(r => r.result === "degraded");
+const dead = results.filter(r => r.result !== "alive" && r.result !== "degraded");
 
 console.log(`ALIVE (${alive.length}):`);
 for (const r of alive.sort((a,b) => a.tld.localeCompare(b.tld))) {
   console.log(`  ✓ .${r.tld.padEnd(20)} HTTP ${r.status}  ${r.baseUrl}`);
+}
+
+if (degraded.length > 0) {
+  console.log(`\nDEGRADED / 5xx (${degraded.length}):`);
+  for (const r of degraded.sort((a,b) => a.tld.localeCompare(b.tld))) {
+    console.log(`  ~ .${r.tld.padEnd(20)} HTTP ${r.status}  ${r.baseUrl}`);
+  }
 }
 
 console.log(`\nDEAD/TIMEOUT (${dead.length}):`);
@@ -176,4 +187,4 @@ for (const r of dead.sort((a,b) => a.tld.localeCompare(b.tld))) {
   if (r.error) console.log(`      ${r.error.substring(0, 120)}`);
 }
 
-console.log(`\nSUMMARY: ${alive.length} alive, ${dead.length} dead/timeout out of ${results.length} total`);
+console.log(`\nSUMMARY: ${alive.length} alive, ${degraded.length} degraded, ${dead.length} dead/timeout out of ${results.length} total`);
