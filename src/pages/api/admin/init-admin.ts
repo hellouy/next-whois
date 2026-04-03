@@ -21,7 +21,7 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { hash } from "bcryptjs";
-import { randomUUID } from "crypto";
+import { randomBytes } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { getAdminEmail } from "@/lib/admin-server";
 
@@ -68,13 +68,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ error: "SETUP_SECRET 不匹配，拒绝访问。" });
   }
 
-  const id           = randomUUID();
+  const id           = randomBytes(8).toString("hex");
   const passwordHash = await hash(password, 12);
 
   try {
     await run(
-      `INSERT INTO users (id, email, password_hash, name, subscription_access, locale)
-       VALUES ($1, $2, $3, $4, false, 'zh')`,
+      `INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4)`,
       [id, adminEmail, passwordHash, "管理员"],
     );
     return res.json({ ok: true, action: "created", email: adminEmail });
