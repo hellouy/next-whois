@@ -9,10 +9,11 @@ import {
   RiLoader4Line, RiUserLine, RiLogoutBoxLine, RiAlertLine,
   RiPencilLine, RiCheckLine, RiCloseLine, RiMailLine,
   RiEyeLine, RiEyeOffLine, RiPaletteLine, RiLockLine,
-  RiDeleteBinLine,
+  RiDeleteBinLine, RiSearchLine,
 } from "@remixicon/react";
 import type { Subscription, Stamp, DashboardUser, TFunction } from "./types";
 import { AVATAR_COLORS } from "./types";
+import type { SearchStats } from "@/lib/dashboard-cache";
 
 interface StrengthResult { score: number; label: string; color: string; }
 
@@ -62,6 +63,7 @@ export type AccountTabProps = {
   contactSent: boolean;
   subscriptions: Subscription[];
   stamps: Stamp[];
+  searchStats: SearchStats | null;
   t: TFunction;
   setEditingAvatar: (v: boolean | ((prev: boolean) => boolean)) => void;
   onSaveAvatarColor: (color: string) => void;
@@ -98,7 +100,7 @@ export function AccountTab({
   emailChangeCode, sendingChangeCode, changeCodeCooldown,
   showDeleteConfirm, deleteConfirmEmail, deletingAccount,
   contactMsg, contactCategory, contactSending, contactSent,
-  subscriptions, stamps, t,
+  subscriptions, stamps, searchStats, t,
   setEditingAvatar, onSaveAvatarColor,
   setEditingName, setNameValue, onSaveName,
   setEditingEmail, setEmailValue, setEmailChangeCode, onSaveEmail, onSendEmailChangeCode, setChangeCodeCooldown,
@@ -106,6 +108,7 @@ export function AccountTab({
   setContactMsg, setContactCategory, setContactSending, setContactSent,
   setShowDeleteConfirm, setDeleteConfirmEmail, onDeleteAccount,
 }: AccountTabProps) {
+  const [contactError, setContactError] = React.useState(false);
   const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
   const initial = (user.name || user.email || "U").charAt(0).toUpperCase();
 
@@ -266,6 +269,46 @@ export function AccountTab({
         ))}
       </div>
 
+      {/* Search stats */}
+      {searchStats && searchStats.total > 0 && (
+        <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-border/60 flex items-center gap-2">
+            <RiSearchLine className="w-3.5 h-3.5 text-muted-foreground" />
+            <p className="text-xs font-semibold">{t("dashboard.search_stats_title")}</p>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-border/50">
+            <div className="px-3 py-3 text-center">
+              <p className="text-base font-bold leading-none">{searchStats.total}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{t("dashboard.ss_total")}</p>
+            </div>
+            <div className="px-3 py-3 text-center">
+              <p className="text-base font-bold leading-none">{searchStats.today}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{t("dashboard.ss_today")}</p>
+            </div>
+            <div className="px-3 py-3 text-center">
+              <p className="text-base font-bold leading-none">{searchStats.thisWeek}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{t("dashboard.ss_week")}</p>
+            </div>
+          </div>
+          {(searchStats.available > 0 || searchStats.highValue > 0) && (
+            <div className="px-4 py-2.5 border-t border-border/50 flex items-center gap-3 text-[11px] text-muted-foreground">
+              {searchStats.available > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                  {searchStats.available} {t("dashboard.ss_available")}
+                </span>
+              )}
+              {searchStats.highValue > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                  {searchStats.highValue} {t("dashboard.ss_high_value")}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Change password */}
       <div className="glass-panel border border-border rounded-2xl overflow-hidden">
         <button
@@ -370,7 +413,7 @@ export function AccountTab({
           <div className="px-4 py-5 flex flex-col items-center gap-2 text-center">
             <RiCheckLine className="w-8 h-8 text-emerald-500" />
             <p className="text-xs font-semibold">{t("contact.sent_title")}</p>
-            <button onClick={() => { setContactSent(false); setContactMsg(""); }} className="text-[10px] text-muted-foreground hover:text-foreground mt-1">{t("contact.resend")}</button>
+            <button onClick={() => { setContactSent(false); setContactMsg(""); setContactError(false); }} className="text-[10px] text-muted-foreground hover:text-foreground mt-1">{t("contact.resend")}</button>
           </div>
         ) : (
           <div className="px-4 py-3 space-y-2.5">
@@ -389,19 +432,26 @@ export function AccountTab({
                 </button>
               ))}
             </div>
-            <textarea value={contactMsg} onChange={e => setContactMsg(e.target.value)} placeholder={t("contact.placeholder")} rows={3} maxLength={500}
+            <textarea value={contactMsg} onChange={e => { setContactMsg(e.target.value); setContactError(false); }} placeholder={t("contact.placeholder")} rows={3} maxLength={500}
               className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/40" />
+            {contactError && (
+              <div className="flex items-center gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                <RiAlertLine className="w-3.5 h-3.5 shrink-0" />
+                {t("dashboard.send_failed")}
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] text-muted-foreground/60">{t("contact.char_count", { count: contactMsg.length })}</p>
               <Button size="sm" className="h-8 rounded-xl text-xs gap-1.5 shrink-0" disabled={!contactMsg.trim() || contactSending}
                 onClick={async () => {
                   if (!contactMsg.trim()) return;
+                  setContactError(false);
                   setContactSending(true);
                   try {
                     const r = await fetch("/api/user/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: contactCategory, message: contactMsg }) });
-                    if (!r.ok) { return; }
+                    if (!r.ok) { setContactError(true); return; }
                     setContactSent(true);
-                  } catch { } finally { setContactSending(false); }
+                  } catch { setContactError(true); } finally { setContactSending(false); }
                 }}>
                 {contactSending ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiMailLine className="w-3.5 h-3.5" />}
                 {t("contact.send")}

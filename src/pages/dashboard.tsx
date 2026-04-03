@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   RiLoader4Line, RiCalendarLine, RiShieldCheckLine,
   RiUserLine, RiLogoutBoxLine, RiFireLine,
-  RiVipCrownLine, RiShieldUserLine,
+  RiVipCrownLine, RiShieldUserLine, RiSearchLine,
 } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useSiteSettings } from "@/lib/site-settings";
@@ -79,6 +79,7 @@ export default function DashboardPage() {
     avatarColor,
     editingAvatar, setEditingAvatar,
     savingAvatar,
+    searchStats,
     refreshData, retryLoad,
     cancelSubscription, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
@@ -190,7 +191,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats overview bar */}
-        {!loadingData && (activeSubs.length > 0 || stamps.length > 0) && (
+        {!loadingData && (activeSubs.length > 0 || stamps.length > 0 || !!searchStats) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               type="button"
@@ -231,7 +232,11 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_expiring_30")}</p>
               </div>
             </button>
-            <div className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setTab("stamps")}
+              className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left hover:border-emerald-400/40 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10 transition-colors"
+            >
               <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
                 <RiShieldCheckLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               </div>
@@ -239,7 +244,20 @@ export default function DashboardPage() {
                 <p className="text-base font-bold leading-none">{verifiedStamps.length}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_verified_brands")}</p>
               </div>
-            </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("account")}
+              className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left hover:border-sky-400/40 hover:bg-sky-50/20 dark:hover:bg-sky-950/10 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/40 flex items-center justify-center shrink-0">
+                <RiSearchLine className="w-3.5 h-3.5 text-sky-500" />
+              </div>
+              <div>
+                <p className="text-base font-bold leading-none">{searchStats?.total ?? 0}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_history")}</p>
+              </div>
+            </button>
           </div>
         )}
 
@@ -382,6 +400,7 @@ export default function DashboardPage() {
               contactSent={contactSent}
               subscriptions={subscriptions}
               stamps={stamps}
+              searchStats={searchStats ?? null}
               t={t}
               setEditingAvatar={setEditingAvatar}
               onSaveAvatarColor={saveAvatarColor}

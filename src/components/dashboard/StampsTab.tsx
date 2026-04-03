@@ -100,10 +100,12 @@ export function StampsTab({
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {!stamp.verified && (
-                <Link href={`/stamp?domain=${stamp.domain}`}>
-                  <button className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 text-muted-foreground hover:text-violet-500 transition-colors" title={t("dashboard.go_verify")}>
-                    <RiFlashlightLine className="w-3.5 h-3.5" />
-                  </button>
+                <Link
+                  href={`/stamp?domain=${stamp.domain}`}
+                  className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 text-muted-foreground hover:text-violet-500 transition-colors"
+                  title={t("dashboard.go_verify")}
+                >
+                  <RiFlashlightLine className="w-3.5 h-3.5" />
                 </Link>
               )}
               <button onClick={() => onEditStamp(stamp)}
