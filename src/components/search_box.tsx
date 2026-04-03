@@ -424,9 +424,27 @@ export function SearchBox({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.slice(0, MAX_INPUT_LENGTH);
     setInputValue(value);
-    if (validationError) setValidationError(null);
     computeDropdownPos();
     const cleaned = sanitizeInput(value);
+
+    // Real-time TLD validation: check as soon as the suffix has ≥ 2 chars
+    const lastDot = value.lastIndexOf(".");
+    const tldPart = lastDot > 0 ? value.slice(lastDot + 1) : "";
+    if (tldPart.length >= 2) {
+      const result = validateAndSanitizeInput(cleaned || value);
+      if (
+        !result.valid &&
+        (result.errorKey === "validation.unknown_tld_suggest" ||
+          result.errorKey === "validation.unknown_tld_gibberish")
+      ) {
+        setValidationError({ message: t(result.errorKey as any, result.errorArgs as any) });
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+        return;
+      }
+    }
+    setValidationError(null);
+
     const newSuggestions = generateSuggestions(cleaned || value);
     setShowSuggestions(newSuggestions.length > 0);
     setSelectedIndex(-1);
@@ -586,7 +604,7 @@ export function SearchBox({
       </AnimatePresence>
 
       <AnimatePresence>
-        {validationError && !(showSuggestions && suggestions.length > 0) && (
+        {validationError && (
           <motion.div
             key="validation-error"
             initial={{ opacity: 0, height: 0 }}
