@@ -1,6 +1,6 @@
 import { cn, toSearchURI, isSearchRoute, cleanDomain } from "@/lib/utils";
 import { prefetchLookup } from "@/lib/lookup-prefetch";
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/lib/i18n";
 import Head from "next/head";
@@ -116,10 +116,24 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
 
   useSearchHotkeys({});
 
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Reset loading state when navigation finishes or errors (e.g. user presses back)
+  useEffect(() => {
+    const reset = () => setIsSearching(false);
+    router.events.on("routeChangeComplete", reset);
+    router.events.on("routeChangeError", reset);
+    return () => {
+      router.events.off("routeChangeComplete", reset);
+      router.events.off("routeChangeError", reset);
+    };
+  }, [router]);
+
   const handleSearch = useCallback(
     (query: string) => {
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
       if (cleaned) prefetchLookup(cleaned);
+      setIsSearching(true);
       router.push(toSearchURI(query));
     },
     [router],
@@ -178,7 +192,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         {/* Search box */}
         <div className="mb-3">
           <div className="relative group">
-            <SearchBox onSearch={handleSearch} placeholder={seo.searchPlaceholder || undefined} />
+            <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
               <KeyboardShortcut k="/" />
             </div>
