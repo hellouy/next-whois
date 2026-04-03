@@ -432,17 +432,20 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
               )}
             </AnimatePresence>
           </motion.button>
-          <Link href="/">
-            <motion.button
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border/60 text-foreground/70 hover:bg-muted/50 hover:text-foreground transition-all duration-150 active:scale-[0.97]"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          <motion.div
+            className="w-full sm:w-auto"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 w-full text-sm font-medium px-4 py-2.5 rounded-lg border border-border/60 text-foreground/70 hover:bg-muted/50 hover:text-foreground transition-all duration-150"
             >
               <RiSearchLine className="w-4 h-4 shrink-0" />
               {isZh ? "新查询" : "New Search"}
-            </motion.button>
-          </Link>
+            </Link>
+          </motion.div>
         </div>
       </motion.div>
 

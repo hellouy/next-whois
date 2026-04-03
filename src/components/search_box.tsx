@@ -612,10 +612,14 @@ export function SearchBox({
         )}
       </AnimatePresence>
 
-      {/* Portal: suggestions rendered directly on document.body to escape all stacking contexts */}
-      {mounted && showSuggestions && suggestions.length > 0 && dropdownPos &&
+      {/* Portal: always mounted (when client-side) so AnimatePresence can run
+          exit animations before the dropdown disappears. Only the inner
+          motion.div is conditionally shown to avoid instant DOM removal that
+          would break Framer Motion's insertBefore during exit. */}
+      {mounted &&
         ReactDOM.createPortal(
           <AnimatePresence mode="wait">
+            {showSuggestions && suggestions.length > 0 && dropdownPos && (
             <motion.div
               key="suggestions-portal"
               ref={suggestionsRef}
@@ -685,6 +689,7 @@ export function SearchBox({
                 </div>
               ))}
             </motion.div>
+            )}
           </AnimatePresence>,
           document.body,
         )
