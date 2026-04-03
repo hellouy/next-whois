@@ -340,7 +340,7 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
           </Button>
           {confirmReset ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-amber-600 dark:text-amber-400">确认发送？</span>
+              <span className="text-xs text-amber-600 dark:text-amber-400">发送至 {user.email}？</span>
               <Button
                 variant="outline"
                 onClick={sendPasswordReset}
@@ -364,7 +364,7 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
               onClick={sendPasswordReset}
               disabled={saving || sendingReset}
               className="rounded-xl h-10 gap-1.5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-              title="向该用户邮箱发送密码重置链接"
+              title={`向 ${user.email} 发送密码重置链接`}
             >
               <RiLockPasswordLine className="w-3.5 h-3.5" />重置密码
             </Button>
