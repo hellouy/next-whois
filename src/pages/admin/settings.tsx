@@ -1,0 +1,754 @@
+import React from "react";
+import { AdminLayout } from "@/components/admin-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { DEFAULT_SETTINGS, type SiteSettings, notifySettingsUpdated } from "@/lib/site-settings";
+import {
+  RiLoader4Line, RiCheckLine, RiToggleLine, RiToggleFill,
+  RiGlobalLine, RiShieldCheckLine, RiSettings4Line,
+  RiHomeLine, RiMailLine, RiBarChartLine, RiLockLine,
+  RiMoneyDollarCircleLine, RiBankCardLine, RiImageLine,
+  RiEyeLine, RiEyeOffLine, RiSaveLine, RiRefreshLine,
+  RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
+  RiPaletteLine,
+} from "@remixicon/react";
+
+type TabKey =
+  | "branding"
+  | "access"
+  | "features"
+  | "home"
+  | "analytics"
+  | "captcha"
+  | "email"
+  | "payment";
+
+const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: "branding",  label: "品牌外观",  icon: RiPaletteLine },
+  { key: "access",    label: "访问控制",  icon: RiLockLine },
+  { key: "features",  label: "功能开关",  icon: RiSettings4Line },
+  { key: "home",      label: "首页内容",  icon: RiHomeLine },
+  { key: "analytics", label: "统计分析",  icon: RiBarChartLine },
+  { key: "captcha",   label: "验证码",    icon: RiShieldCheckLine },
+  { key: "email",     label: "邮件配置",  icon: RiMailLine },
+  { key: "payment",   label: "支付配置",  icon: RiBankCardLine },
+];
+
+function SectionTitle({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc?: string }) {
+  return (
+    <div className="flex items-start gap-3 mb-5">
+      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-sm font-bold">{title}</h3>
+        {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-semibold text-foreground">{label}</Label>
+      {desc && <p className="text-[11px] text-muted-foreground -mt-0.5">{desc}</p>}
+      {children}
+    </div>
+  );
+}
+
+function Toggle({
+  label, desc, checked, onChange,
+}: { label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-all group"
+    >
+      <div className="text-left min-w-0">
+        <p className="text-xs font-semibold">{label}</p>
+        {desc && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{desc}</p>}
+      </div>
+      {checked
+        ? <RiToggleFill className="w-8 h-8 text-primary shrink-0" />
+        : <RiToggleLine className="w-8 h-8 text-muted-foreground/40 shrink-0" />}
+    </button>
+  );
+}
+
+function PasswordField({ label, desc, value, onChange, placeholder }: {
+  label: string; desc?: string; value: string;
+  onChange: (v: string) => void; placeholder?: string;
+}) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <Field label={label} desc={desc}>
+      <div className="relative">
+        <Input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder || "留空表示未配置"}
+          className="text-xs pr-9"
+        />
+        <button
+          type="button"
+          onClick={() => setShow(v => !v)}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        >
+          {show ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+    </Field>
+  );
+}
+
+function TextareaField({ label, desc, value, onChange, rows = 3, placeholder }: {
+  label: string; desc?: string; value: string;
+  onChange: (v: string) => void; rows?: number; placeholder?: string;
+}) {
+  return (
+    <Field label={label} desc={desc}>
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        rows={rows}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-y min-h-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      />
+    </Field>
+  );
+}
+
+function SelectField({ label, desc, value, onChange, options }: {
+  label: string; desc?: string; value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <Field label={label} desc={desc}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiGlobalLine} title="基本信息" desc="站点名称、标题、描述等基础信息" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="站点标题">
+            <Input value={s.site_title} onChange={e => set("site_title", e.target.value)} placeholder="X.RW · RDAP+WHOIS" className="text-xs" />
+          </Field>
+          <Field label="站点副标题">
+            <Input value={s.site_subtitle} onChange={e => set("site_subtitle", e.target.value)} placeholder="专业的 WHOIS / RDAP 查询工具" className="text-xs" />
+          </Field>
+          <Field label="Logo 文字">
+            <Input value={s.site_logo_text} onChange={e => set("site_logo_text", e.target.value)} placeholder="X.RW" className="text-xs" />
+          </Field>
+          <Field label="图标 URL" desc="浏览器标签页图标">
+            <Input value={s.site_icon_url} onChange={e => set("site_icon_url", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+        </div>
+        <TextareaField label="站点描述" desc="用于 SEO meta description" value={s.site_description} onChange={v => set("site_description", v)} placeholder="快速查询域名、IP、ASN 的 WHOIS / RDAP 信息..." />
+        <Field label="关键词" desc="用于 SEO meta keywords，逗号分隔">
+          <Input value={s.site_keywords} onChange={e => set("site_keywords", e.target.value)} placeholder="Whois, RDAP, Domain..." className="text-xs" />
+        </Field>
+        <Field label="页脚文字">
+          <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 X.RW" className="text-xs" />
+        </Field>
+        <Field label="全局公告" desc="显示在站点顶部的公告文字（留空则不显示）">
+          <Input value={s.site_announcement} onChange={e => set("site_announcement", e.target.value)} placeholder="站点公告内容..." className="text-xs" />
+        </Field>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiImageLine} title="OG / Social 分享" desc="社交媒体分享时的预览信息" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="OG 站点名称">
+            <Input value={s.og_site_name} onChange={e => set("og_site_name", e.target.value)} placeholder="X.RW" className="text-xs" />
+          </Field>
+          <Field label="站点 URL">
+            <Input value={s.og_url} onChange={e => set("og_url", e.target.value)} placeholder="https://x.rw" className="text-xs" />
+          </Field>
+          <Field label="OG 封面图" desc="默认分享封面图 URL">
+            <Input value={s.og_image} onChange={e => set("og_image", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+          <Field label="Twitter 封面图">
+            <Input value={s.og_image_twitter} onChange={e => set("og_image_twitter", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+          <Field label="微信封面图">
+            <Input value={s.og_image_wechat} onChange={e => set("og_image_wechat", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+          <Field label="Facebook 封面图">
+            <Input value={s.og_image_facebook} onChange={e => set("og_image_facebook", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+        </div>
+        <SelectField
+          label="Twitter Card 类型"
+          value={s.twitter_card}
+          onChange={v => set("twitter_card", v)}
+          options={[
+            { value: "summary", label: "summary — 小卡片" },
+            { value: "summary_large_image", label: "summary_large_image — 大图卡片" },
+          ]}
+        />
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiUserLine} title="管理员" desc="管理员邮箱配置" />
+        <Field label="管理员邮箱" desc="拥有后台管理权限的邮箱地址（修改后需重新登录）">
+          <Input value={s.admin_email} onChange={e => set("admin_email", e.target.value)} placeholder="admin@example.com" type="email" className="text-xs" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+        <SectionTitle icon={RiUserLine} title="注册与登录" desc="控制用户注册和访问方式" />
+        <Toggle
+          label="开放注册"
+          desc="允许新用户通过邮箱注册账号"
+          checked={s.allow_registration === "1"}
+          onChange={v => set("allow_registration", v ? "1" : "")}
+        />
+        <Toggle
+          label="需要邀请码注册"
+          desc="开启后注册时需要填写有效的邀请码"
+          checked={s.require_invite_code === "1"}
+          onChange={v => set("require_invite_code", v ? "1" : "")}
+        />
+        <Toggle
+          label="登录后才能查询"
+          desc="未登录用户无法进行任何查询"
+          checked={s.require_login === "1"}
+          onChange={v => set("require_login", v ? "1" : "")}
+        />
+        <Toggle
+          label="禁用登录入口"
+          desc="隐藏登录按钮，阻止用户登录（已登录用户不受影响）"
+          checked={s.disable_login === "1"}
+          onChange={v => set("disable_login", v ? "1" : "")}
+        />
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+        <SectionTitle icon={RiLockLine} title="站点状态" desc="紧急管控与维护模式" />
+        <Toggle
+          label="维护模式"
+          desc="开启后所有访问者将看到维护提示页面"
+          checked={s.maintenance_mode === "1"}
+          onChange={v => set("maintenance_mode", v ? "1" : "")}
+        />
+        <Field label="维护提示文字" desc="维护模式下显示给访问者的说明文字">
+          <Input value={s.maintenance_message} onChange={e => set("maintenance_message", e.target.value)} placeholder="站点维护中，请稍后再来..." className="text-xs" />
+        </Field>
+        <Toggle
+          label="只读查询模式"
+          desc="开启后用户只能进行查询，无法使用任何需要写入的功能（注册、订阅等）"
+          checked={s.query_only_mode === "1"}
+          onChange={v => set("query_only_mode", v ? "1" : "")}
+        />
+        <Toggle
+          label="隐藏原始 WHOIS"
+          desc="在查询结果页隐藏原始 WHOIS 文本，只显示结构化数据"
+          checked={s.hide_raw_whois === "1"}
+          onChange={v => set("hide_raw_whois", v ? "1" : "")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  const FEATURES: { key: keyof SiteSettings; label: string; desc: string }[] = [
+    { key: "enable_search_links",  label: "查询结果外链",    desc: "在查询结果页显示跳转到注册商等外部链接" },
+    { key: "enable_feedback",      label: "用户反馈",        desc: "允许用户在查询结果页提交反馈报告" },
+    { key: "enable_stamps",        label: "品牌徽章 (Stamps)", desc: "开启域名所有权认证徽章功能" },
+    { key: "enable_sponsor",       label: "赞助页面",        desc: "在导航中显示赞助/打赏入口" },
+    { key: "enable_share",         label: "分享功能",        desc: "在查询结果页显示分享按钮" },
+    { key: "enable_dns",           label: "DNS 查询",        desc: "在结果页显示 DNS 记录标签页" },
+    { key: "enable_ip",            label: "IP 地理定位",     desc: "在结果页显示 IP 地理信息" },
+    { key: "enable_ssl",           label: "SSL 证书检测",    desc: "在结果页显示 SSL 证书信息" },
+    { key: "enable_icp",           label: "ICP 备案查询",    desc: "在结果页显示 ICP 备案信息" },
+    { key: "enable_http",          label: "HTTP 状态检测",   desc: "在结果页显示网站 HTTP 状态" },
+    { key: "enable_tools",         label: "工具页面",        desc: "在导航中显示在线工具入口" },
+    { key: "enable_remind",        label: "域名到期提醒",    desc: "允许用户设置域名到期邮件提醒" },
+    { key: "enable_links",         label: "友情链接页面",    desc: "在导航中显示友情链接页面" },
+    { key: "enable_about",         label: "关于页面",        desc: "在导航中显示关于/介绍页面" },
+    { key: "enable_changelog",     label: "更新日志页面",    desc: "在导航中显示版本更新日志" },
+    { key: "enable_docs",          label: "文档/API 页面",   desc: "在导航中显示 API 文档入口" },
+  ];
+
+  return (
+    <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+      <SectionTitle icon={RiSettings4Line} title="功能模块开关" desc="按需开启或关闭各功能模块" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {FEATURES.map(f => (
+          <Toggle
+            key={f.key}
+            label={f.label}
+            desc={f.desc}
+            checked={s[f.key] === "1"}
+            onChange={v => set(f.key, v ? "1" : "")}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HomeTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiHomeLine} title="Hero 区域" desc="首页顶部大标题区域的文案" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="主标题" desc="留空使用默认文字">
+            <Input value={s.home_hero_title} onChange={e => set("home_hero_title", e.target.value)} placeholder="（使用默认）" className="text-xs" />
+          </Field>
+          <Field label="副标题">
+            <Input value={s.home_hero_subtitle} onChange={e => set("home_hero_subtitle", e.target.value)} placeholder="（使用默认）" className="text-xs" />
+          </Field>
+          <Field label="搜索框占位文字">
+            <Input value={s.home_placeholder} onChange={e => set("home_placeholder", e.target.value)} placeholder="（使用默认）" className="text-xs" />
+          </Field>
+        </div>
+        <Toggle
+          label="显示统计数据"
+          desc="在首页 Hero 区域显示查询次数等统计信息"
+          checked={s.home_show_stats === "1"}
+          onChange={v => set("home_show_stats", v ? "1" : "")}
+        />
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBellLine} title="首页公告横幅" desc="在首页搜索框上方显示可关闭的公告横幅" />
+        <Toggle
+          label="启用首页公告"
+          checked={s.home_announcement_enabled === "1"}
+          onChange={v => set("home_announcement_enabled", v ? "1" : "")}
+        />
+        <Field label="公告内容">
+          <Input value={s.home_announcement_text} onChange={e => set("home_announcement_text", e.target.value)} placeholder="公告文字内容..." className="text-xs" />
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <SelectField
+            label="公告类型"
+            value={s.home_announcement_type}
+            onChange={v => set("home_announcement_type", v)}
+            options={[
+              { value: "info",    label: "info — 蓝色信息" },
+              { value: "success", label: "success — 绿色成功" },
+              { value: "warning", label: "warning — 黄色警告" },
+              { value: "error",   label: "error — 红色错误" },
+            ]}
+          />
+          <Field label="点击链接（可选）">
+            <Input value={s.home_announcement_url} onChange={e => set("home_announcement_url", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiLinksLine} title="结果页广告条" desc="在查询结果页顶部显示广告/推广链接" />
+        <Toggle
+          label="启用结果页广告条"
+          checked={s.result_ad_enabled === "1"}
+          onChange={v => set("result_ad_enabled", v ? "1" : "")}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="广告文字">
+            <Input value={s.result_ad_text} onChange={e => set("result_ad_text", e.target.value)} placeholder="查询结果页广告文字..." className="text-xs" />
+          </Field>
+          <Field label="广告链接">
+            <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+          <Field label="广告标签" desc="显示在广告条左侧的小标签">
+            <Input value={s.result_ad_label} onChange={e => set("result_ad_label", e.target.value)} placeholder="广告" className="text-xs" />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBarChartLine} title="统计分析" desc="集成第三方统计服务" />
+        <Field label="Google Analytics ID" desc="格式：G-XXXXXXXXXX">
+          <Input value={s.analytics_google} onChange={e => set("analytics_google", e.target.value)} placeholder="G-XXXXXXXXXX" className="text-xs" />
+        </Field>
+        <Field label="Umami Website ID">
+          <Input value={s.analytics_umami} onChange={e => set("analytics_umami", e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="text-xs" />
+        </Field>
+        <Field label="Umami Script URL" desc="自托管 Umami 的脚本地址">
+          <Input value={s.analytics_umami_src} onChange={e => set("analytics_umami_src", e.target.value)} placeholder="https://umami.yourdomain.com/script.js" className="text-xs" />
+        </Field>
+      </div>
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiCodeBoxLine} title="自定义 Head 脚本" desc="会被注入到每个页面 <head> 中的自定义代码（请谨慎填写）" />
+        <TextareaField
+          label="自定义脚本"
+          desc='支持 <script>、<link>、<meta> 等任何 HTML 标签'
+          value={s.custom_head_script}
+          onChange={v => set("custom_head_script", v)}
+          rows={5}
+          placeholder='<script>/* 自定义代码 */</script>'
+        />
+      </div>
+    </div>
+  );
+}
+
+function CaptchaTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  const provider = s.captcha_provider;
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiShieldCheckLine} title="验证码提供商" desc="选择用于防止机器人的验证码服务" />
+        <SelectField
+          label="验证码提供商"
+          value={provider}
+          onChange={v => set("captcha_provider", v)}
+          options={[
+            { value: "",             label: "不启用验证码" },
+            { value: "turnstile",    label: "Cloudflare Turnstile（推荐）" },
+            { value: "hcaptcha",     label: "hCaptcha" },
+            { value: "mtcaptcha",    label: "MTCaptcha" },
+          ]}
+        />
+      </div>
+
+      {provider === "turnstile" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="Cloudflare Turnstile" />
+          <Field label="Site Key">
+            <Input value={s.captcha_turnstile_site_key} onChange={e => set("captcha_turnstile_site_key", e.target.value)} placeholder="0x..." className="text-xs" />
+          </Field>
+          <PasswordField label="Secret Key" value={s.captcha_turnstile_secret_key} onChange={v => set("captcha_turnstile_secret_key", v)} />
+        </div>
+      )}
+
+      {provider === "hcaptcha" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="hCaptcha" />
+          <Field label="Site Key">
+            <Input value={s.captcha_hcaptcha_site_key} onChange={e => set("captcha_hcaptcha_site_key", e.target.value)} placeholder="your-site-key" className="text-xs" />
+          </Field>
+          <PasswordField label="Secret Key" value={s.captcha_hcaptcha_secret_key} onChange={v => set("captcha_hcaptcha_secret_key", v)} />
+        </div>
+      )}
+
+      {provider === "mtcaptcha" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="MTCaptcha" />
+          <Field label="Site Key">
+            <Input value={s.captcha_mtcaptcha_site_key} onChange={e => set("captcha_mtcaptcha_site_key", e.target.value)} placeholder="MTPublic-..." className="text-xs" />
+          </Field>
+          <PasswordField label="Secret Key" value={s.captcha_mtcaptcha_secret_key} onChange={v => set("captcha_mtcaptcha_secret_key", v)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmailTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiMailLine} title="SMTP 邮件配置" desc="用于发送注册验证、密码重置等系统邮件" />
+        <Toggle
+          label="启用 SMTP"
+          checked={s.smtp_enabled === "1"}
+          onChange={v => set("smtp_enabled", v ? "1" : "")}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="SMTP 主机">
+            <Input value={s.smtp_host} onChange={e => set("smtp_host", e.target.value)} placeholder="smtp.example.com" className="text-xs" />
+          </Field>
+          <Field label="SMTP 端口">
+            <Input value={s.smtp_port} onChange={e => set("smtp_port", e.target.value)} placeholder="465" type="number" className="text-xs" />
+          </Field>
+          <Field label="SMTP 用户名">
+            <Input value={s.smtp_user} onChange={e => set("smtp_user", e.target.value)} placeholder="noreply@example.com" className="text-xs" />
+          </Field>
+          <PasswordField label="SMTP 密码" value={s.smtp_pass} onChange={v => set("smtp_pass", v)} />
+          <Field label="发件人地址">
+            <Input value={s.smtp_from} onChange={e => set("smtp_from", e.target.value)} placeholder="X.RW <noreply@example.com>" className="text-xs" />
+          </Field>
+          <SelectField
+            label="加密方式"
+            value={s.smtp_secure}
+            onChange={v => set("smtp_secure", v)}
+            options={[
+              { value: "ssl",      label: "SSL/TLS（端口 465）" },
+              { value: "starttls", label: "STARTTLS（端口 587）" },
+              { value: "none",     label: "不加密（不推荐）" },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiMailLine} title="Resend 邮件配置" desc="使用 Resend 服务发送邮件（与 SMTP 二选一）" />
+        <PasswordField label="Resend API Key" desc="从 resend.com 后台获取" value={s.resend_api_key} onChange={v => set("resend_api_key", v)} placeholder="re_..." />
+        <Field label="发件人地址">
+          <Input value={s.resend_from_email} onChange={e => set("resend_from_email", e.target.value)} placeholder="X.RW <noreply@example.com>" className="text-xs" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function PaymentTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiMoneyDollarCircleLine} title="通用支付设置" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <SelectField
+            label="支付货币"
+            value={s.payment_currency}
+            onChange={v => set("payment_currency", v)}
+            options={[
+              { value: "CNY", label: "CNY — 人民币" },
+              { value: "USD", label: "USD — 美元" },
+              { value: "EUR", label: "EUR — 欧元" },
+              { value: "HKD", label: "HKD — 港币" },
+            ]}
+          />
+          <Field label="支付成功跳转 URL">
+            <Input value={s.payment_success_url} onChange={e => set("payment_success_url", e.target.value)} placeholder="https://yourdomain.com/dashboard" className="text-xs" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBankCardLine} title="Stripe" />
+        <Toggle label="启用 Stripe 支付" checked={s.payment_stripe_enabled === "1"} onChange={v => set("payment_stripe_enabled", v ? "1" : "")} />
+        <Field label="Publishable Key (pk_)">
+          <Input value={s.payment_stripe_pk} onChange={e => set("payment_stripe_pk", e.target.value)} placeholder="pk_live_..." className="text-xs" />
+        </Field>
+        <PasswordField label="Secret Key (sk_)" value={s.payment_stripe_sk} onChange={v => set("payment_stripe_sk", v)} placeholder="sk_live_..." />
+        <PasswordField label="Webhook Secret" value={s.payment_stripe_webhook_secret} onChange={v => set("payment_stripe_webhook_secret", v)} placeholder="whsec_..." />
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBankCardLine} title="PayPal" />
+        <Toggle label="启用 PayPal 支付" checked={s.payment_paypal_enabled === "1"} onChange={v => set("payment_paypal_enabled", v ? "1" : "")} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Client ID">
+            <Input value={s.payment_paypal_client_id} onChange={e => set("payment_paypal_client_id", e.target.value)} placeholder="AXxx..." className="text-xs" />
+          </Field>
+          <PasswordField label="Client Secret" value={s.payment_paypal_client_secret} onChange={v => set("payment_paypal_client_secret", v)} />
+          <Field label="Webhook ID">
+            <Input value={s.payment_paypal_webhook_id} onChange={e => set("payment_paypal_webhook_id", e.target.value)} placeholder="Webhook ID" className="text-xs" />
+          </Field>
+          <SelectField
+            label="环境"
+            value={s.payment_paypal_env}
+            onChange={v => set("payment_paypal_env", v)}
+            options={[
+              { value: "live",    label: "live — 生产环境" },
+              { value: "sandbox", label: "sandbox — 沙盒测试" },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBankCardLine} title="虎皮椒 (XunhuPay)" />
+        <Toggle label="启用虎皮椒支付" checked={s.payment_xunhupay_enabled === "1"} onChange={v => set("payment_xunhupay_enabled", v ? "1" : "")} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="AppID">
+            <Input value={s.payment_xunhupay_appid} onChange={e => set("payment_xunhupay_appid", e.target.value)} placeholder="AppID" className="text-xs" />
+          </Field>
+          <PasswordField label="AppSecret" value={s.payment_xunhupay_secret} onChange={v => set("payment_xunhupay_secret", v)} />
+        </div>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiBankCardLine} title="支付宝 (Alipay)" />
+        <Toggle label="启用支付宝支付" checked={s.payment_alipay_enabled === "1"} onChange={v => set("payment_alipay_enabled", v ? "1" : "")} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="AppID">
+            <Input value={s.payment_alipay_appid} onChange={e => set("payment_alipay_appid", e.target.value)} placeholder="2021000000..." className="text-xs" />
+          </Field>
+          <Field label="异步通知 URL">
+            <Input value={s.payment_alipay_notify_url} onChange={e => set("payment_alipay_notify_url", e.target.value)} placeholder="https://yourdomain.com/api/payment/alipay/notify" className="text-xs" />
+          </Field>
+          <div className="sm:col-span-2">
+            <TextareaField label="支付宝公钥" value={s.payment_alipay_public_key} onChange={v => set("payment_alipay_public_key", v)} placeholder="-----BEGIN PUBLIC KEY-----..." rows={3} />
+          </div>
+          <div className="sm:col-span-2">
+            <PasswordField label="应用私钥" value={s.payment_alipay_private_key} onChange={v => set("payment_alipay_private_key", v)} placeholder="-----BEGIN PRIVATE KEY-----..." />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminSettingsPage() {
+  const [settings, setSettings] = React.useState<SiteSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [dirty, setDirty] = React.useState(false);
+  const [tab, setTab] = React.useState<TabKey>("branding");
+
+  React.useEffect(() => {
+    setLoading(true);
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data.settings) {
+          setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+        }
+      })
+      .catch(() => toast.error("加载设置失败"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function set(key: keyof SiteSettings, value: string) {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setDirty(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "保存失败");
+        return;
+      }
+      toast.success("设置已保存");
+      setDirty(false);
+      notifySettingsUpdated();
+    } catch {
+      toast.error("保存失败，请重试");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/settings");
+      const data = await res.json();
+      if (data.settings) {
+        setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+        setDirty(false);
+        toast.success("已重新加载");
+      }
+    } catch {
+      toast.error("加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tabProps = { s: settings, set };
+
+  return (
+    <AdminLayout title="网站设置">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-lg font-bold">网站设置</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">管理站点品牌、功能开关、第三方服务集成等全局配置</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={reload} disabled={loading} className="gap-1.5 text-xs">
+            <RiRefreshLine className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+            刷新
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving || loading || !dirty} className="gap-1.5 text-xs">
+            {saving ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiSaveLine className="w-3.5 h-3.5" />}
+            {dirty ? "保存更改" : "已保存"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Unsaved changes banner */}
+      {dirty && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+          <RiCheckLine className="w-4 h-4 shrink-0" />
+          <p className="text-xs font-medium">有未保存的更改，请记得点击「保存更改」</p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1.5 mb-6 pb-4 border-b border-border">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all",
+              tab === key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <RiLoader4Line className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          {tab === "branding"  && <BrandingTab {...tabProps} />}
+          {tab === "access"    && <AccessTab {...tabProps} />}
+          {tab === "features"  && <FeaturesTab {...tabProps} />}
+          {tab === "home"      && <HomeTab {...tabProps} />}
+          {tab === "analytics" && <AnalyticsTab {...tabProps} />}
+          {tab === "captcha"   && <CaptchaTab {...tabProps} />}
+          {tab === "email"     && <EmailTab {...tabProps} />}
+          {tab === "payment"   && <PaymentTab {...tabProps} />}
+        </>
+      )}
+
+      {/* Sticky save footer */}
+      {dirty && (
+        <div className="sticky bottom-6 mt-8 flex justify-end">
+          <Button onClick={save} disabled={saving} className="gap-2 shadow-lg">
+            {saving ? <RiLoader4Line className="w-4 h-4 animate-spin" /> : <RiSaveLine className="w-4 h-4" />}
+            保存所有更改
+          </Button>
+        </div>
+      )}
+    </AdminLayout>
+  );
+}

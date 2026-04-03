@@ -22,7 +22,11 @@ export function useDashboard() {
     siteSettings.payment_paypal_enabled
   );
 
-  const [tab, setTab] = React.useState<"subscriptions" | "stamps" | "account" | "membership">("stamps");
+  const VALID_TABS: ReadonlyArray<"subscriptions" | "stamps" | "account" | "membership"> = ["subscriptions", "stamps", "account", "membership"];
+  const urlTab = router.query.tab as string | undefined;
+  const urlTabValue = (VALID_TABS as ReadonlyArray<string>).includes(urlTab ?? "") ? (urlTab as "subscriptions" | "stamps" | "account" | "membership") : null;
+
+  const [tab, setTab] = React.useState<"subscriptions" | "stamps" | "account" | "membership">(urlTabValue ?? "stamps");
   const [subFilter, setSubFilter] = React.useState<"all" | "expiring" | "urgent" | "expired">("all");
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
   const [stamps, setStamps] = React.useState<Stamp[]>([]);
@@ -85,7 +89,9 @@ export function useDashboard() {
 
   React.useEffect(() => {
     if (status !== "authenticated") return;
+    if (urlTabValue) return;
     if ((session?.user as DashboardUser)?.subscriptionAccess) setTab("subscriptions");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session]);
 
   const applyDashData = React.useCallback((d: DashData) => {

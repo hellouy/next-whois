@@ -153,8 +153,8 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
 
   function isActive(href: string, exact?: boolean): boolean {
     const p = router.pathname;
-    if (exact) return p === href || p.endsWith(href);
-    return p === href || p.startsWith(href) || p.endsWith(href);
+    if (exact) return p === href;
+    return p === href || p.startsWith(href + "/");
   }
 
   function navigate(href: string) {

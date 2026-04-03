@@ -1,5 +1,31 @@
 # Next Whois UI — v3.35
 
+## Bug Fixes & Improvements (2026-04-03)
+
+### Admin Panel — 网站设置页面 (`/admin/settings`)
+- **Root cause:** `src/pages/admin/settings.tsx` 从未创建，导致导航到 `/admin/settings` 时 404 → 跳回首页
+- **Fix:** 新建完整的 `src/pages/admin/settings.tsx` 页面，涵盖所有 `SiteSettings` 字段，分 8 个标签：
+  - **品牌外观**：站点标题、Logo、图标、OG/Social 信息、管理员邮箱
+  - **访问控制**：注册开关、邀请码、维护模式、登录限制
+  - **功能开关**：16 个功能模块的开/关（DNS、SSL、ICP、Stamps 等）
+  - **首页内容**：Hero 文案、公告横幅、结果页广告条
+  - **统计分析**：Google Analytics、Umami、自定义 Head 脚本
+  - **验证码**：Cloudflare Turnstile / hCaptcha / MTCaptcha 动态配置
+  - **邮件配置**：SMTP + Resend 双方案
+  - **支付配置**：Stripe、PayPal、虎皮椒、支付宝
+- 支持密码字段显示/隐藏切换；未保存更改时顶部橙色横幅提示 + 底部悬浮保存按钮
+
+### Admin Layout — `isActive` 逻辑修复
+- **Bug:** `p.endsWith(href)` 可能导致路径误匹配（如 `/super-admin` 匹配 `/admin`）
+- **Fix:** 改为 `p === href || p.startsWith(href + "/")` 精确匹配
+
+### 用户中心 (`/dashboard`) — URL Tab 参数支持
+- **Bug:** `/account` 重定向到 `/dashboard?tab=account` 但 dashboard 不读取 `?tab=` 参数
+- **Fix:** `useDashboard.ts` 从 `router.query.tab` 读取初始 tab 值
+- **Fix:** 若 URL 明确指定了 tab，则不被 `subscriptionAccess` 的 useEffect 覆盖
+
+---
+
 ## Task #8 — ccTLD RDAP Endpoint Audit & Cleanup (2026-04-03)
 
 **Scope:** Full live connectivity audit of all 103 active ccTLD RDAP endpoints in `CCTLD_RDAP_OVERRIDES`. Probe script run against all entries with 7-second timeout. Results: 98 alive, 5 dead (TLS failures).
