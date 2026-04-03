@@ -388,7 +388,8 @@
     "downloaded": "Скачано",
     "download_failed": "Ошибка скачивания",
     "copied_to_clipboard": "Скопировано в буфер обмена",
-    "copy_to_clipboard_failed": "Не удалось скопировать"
+    "copy_to_clipboard_failed": "Не удалось скопировать",
+    "generating": "Генерация…"
   },
   "validation": {
     "empty": "Введите домен, IP-адрес или ASN",
@@ -1204,6 +1205,7 @@
     "soa_expire": "Время истечения",
     "has_record": "{{n}} записей · {{ms}}ms",
     "copy": "Копировать",
+    "copy_all": "Копировать всё",
     "preset_ptr": "PTR Обратный",
     "spf_analysis": "Анализ SPF",
     "spf_mechanisms": "Авторизованные механизмы",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "Оплата успешна",
     "result_title_cancelled": "Отменено",
     "result_title_result": "Результат оплаты",
-    "result_order_id_label": "Номер заказа"
+    "result_order_id_label": "Номер заказа",
+    "result_timeout_hint": "Подтверждение платежа занимает больше времени, чем ожидалось. Подождите несколько минут, затем обновите вручную.",
+    "result_refresh_status": "Обновить статус"
   },
   "dashboard": {
     "phase_active": "Активный",

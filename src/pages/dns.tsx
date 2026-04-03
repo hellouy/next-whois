@@ -153,13 +153,36 @@ function SoaRow({ records, labels }: {
   );
 }
 
+function CopyAllButton({ flats, copyAllLabel }: { flats: string[]; copyAllLabel: string }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(flats.join("\n"))
+          .then(() => {
+            toast.success(copyAllLabel);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+          .catch(() => {});
+      }}
+      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium border border-border/60 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0 touch-manipulation"
+      title={copyAllLabel}
+    >
+      {copied ? <RiCheckLine className="w-3 h-3 text-emerald-500" /> : <RiFileCopyLine className="w-3 h-3" />}
+      {copyAllLabel}
+    </button>
+  );
+}
+
 function ResultCard({
-  result, noRecordLabel, hasRecordTemplate, copyLabel, soaLabels,
+  result, noRecordLabel, hasRecordTemplate, copyLabel, copyAllLabel, soaLabels,
 }: {
   result: DnsResult;
   noRecordLabel: string;
   hasRecordTemplate: string;
   copyLabel: string;
+  copyAllLabel: string;
   soaLabels: { primaryNs: string; adminEmail: string; serial: string; refresh: string; retry: string; expire: string };
 }) {
   if (!result.found) {
@@ -195,6 +218,9 @@ function ResultCard({
         <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
           {hasRecordTemplate.replace("{{n}}", String(result.flat.length)).replace("{{ms}}", String(result.latencyMs))}
         </span>
+        {result.type === "TXT" && result.flat.length > 1 && (
+          <CopyAllButton flats={result.flat} copyAllLabel={copyAllLabel} />
+        )}
       </div>
       {result.type === "SOA" ? (
         <div className="px-4 py-3">
@@ -464,6 +490,7 @@ export default function DnsPage() {
     noRecordLabel: t("dns.no_record"),
     hasRecordTemplate: t("dns.has_record"),
     copyLabel,
+    copyAllLabel: t("dns.copy_all"),
     soaLabels,
   };
 

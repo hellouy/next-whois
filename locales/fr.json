@@ -388,7 +388,8 @@
     "downloaded": "Téléchargé",
     "download_failed": "Échec du téléchargement",
     "copied_to_clipboard": "Copié dans le presse-papiers",
-    "copy_to_clipboard_failed": "Échec de la copie"
+    "copy_to_clipboard_failed": "Échec de la copie",
+    "generating": "Génération en cours…"
   },
   "validation": {
     "empty": "Saisissez un domaine, une adresse IP ou un ASN",
@@ -1204,6 +1205,7 @@
     "soa_expire": "Temps d'expiration",
     "has_record": "{{n}} enregistrements · {{ms}}ms",
     "copy": "Copier",
+    "copy_all": "Tout copier",
     "preset_ptr": "PTR Inverse",
     "spf_analysis": "Analyse SPF",
     "spf_mechanisms": "Mécanismes autorisés",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "Paiement réussi",
     "result_title_cancelled": "Annulé",
     "result_title_result": "Résultat du paiement",
-    "result_order_id_label": "Numéro de commande"
+    "result_order_id_label": "Numéro de commande",
+    "result_timeout_hint": "La confirmation du paiement prend plus de temps que prévu. Veuillez patienter quelques minutes, puis actualiser manuellement.",
+    "result_refresh_status": "Actualiser le statut"
   },
   "dashboard": {
     "phase_active": "Actif",

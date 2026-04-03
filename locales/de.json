@@ -388,7 +388,8 @@
     "downloaded": "Heruntergeladen",
     "download_failed": "Herunterladen fehlgeschlagen",
     "copied_to_clipboard": "In die Zwischenablage kopiert",
-    "copy_to_clipboard_failed": "Kopieren in die Zwischenablage fehlgeschlagen"
+    "copy_to_clipboard_failed": "Kopieren in die Zwischenablage fehlgeschlagen",
+    "generating": "Wird generiert…"
   },
   "validation": {
     "empty": "Bitte Domain, IP-Adresse oder ASN eingeben",
@@ -1204,6 +1205,7 @@
     "soa_expire": "Ablaufzeit",
     "has_record": "{{n}} Einträge · {{ms}}ms",
     "copy": "Kopieren",
+    "copy_all": "Alle kopieren",
     "preset_ptr": "PTR Reverse",
     "spf_analysis": "SPF-Analyse",
     "spf_mechanisms": "Autorisierte Mechanismen",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "Zahlung erfolgreich",
     "result_title_cancelled": "Abgebrochen",
     "result_title_result": "Zahlungsergebnis",
-    "result_order_id_label": "Bestellnummer"
+    "result_order_id_label": "Bestellnummer",
+    "result_timeout_hint": "Die Zahlungsbestätigung dauert länger als erwartet. Bitte warten Sie einige Minuten und aktualisieren Sie dann manuell.",
+    "result_refresh_status": "Status aktualisieren"
   },
   "dashboard": {
     "phase_active": "Aktiv",

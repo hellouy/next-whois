@@ -388,7 +388,8 @@
     "downloaded": "ダウンロードしました",
     "download_failed": "ダウンロードに失敗しました",
     "copied_to_clipboard": "クリップボードにコピーしました",
-    "copy_to_clipboard_failed": "コピーに失敗しました"
+    "copy_to_clipboard_failed": "コピーに失敗しました",
+    "generating": "生成中…"
   },
   "validation": {
     "empty": "ドメイン、IPアドレス、またはASNを入力してください",
@@ -1204,6 +1205,7 @@
     "soa_expire": "期限切れ時間",
     "has_record": "{{n}} 件 · {{ms}}ms",
     "copy": "コピー",
+    "copy_all": "すべてコピー",
     "preset_ptr": "PTR 逆引き",
     "spf_analysis": "SPF 分析",
     "spf_mechanisms": "認可メカニズム",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "お支払い完了",
     "result_title_cancelled": "キャンセル済み",
     "result_title_result": "支払い結果",
-    "result_order_id_label": "注文番号"
+    "result_order_id_label": "注文番号",
+    "result_timeout_hint": "支払い確認に予想以上の時間がかかっています。数分お待ちいただいてから、手動でリフレッシュしてください。",
+    "result_refresh_status": "ステータスを更新"
   },
   "dashboard": {
     "phase_active": "有効",

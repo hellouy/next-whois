@@ -388,7 +388,8 @@
     "downloaded": "Downloaded",
     "download_failed": "Failed to download",
     "copied_to_clipboard": "Copied to clipboard",
-    "copy_to_clipboard_failed": "Failed to copy"
+    "copy_to_clipboard_failed": "Failed to copy",
+    "generating": "Generating…"
   },
   "validation": {
     "empty": "Type a domain, IP address, or ASN to get started",
@@ -1205,6 +1206,7 @@
     "soa_expire": "Expire Time",
     "has_record": "{{n}} records · {{ms}}ms",
     "copy": "Copy",
+    "copy_all": "Copy All",
     "spf_analysis": "SPF Analysis",
     "spf_mechanisms": "Authorized Mechanisms",
     "spf_all_directive": "Default Policy",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "Payment Successful",
     "result_title_cancelled": "Cancelled",
     "result_title_result": "Payment Result",
-    "result_order_id_label": "Order ID"
+    "result_order_id_label": "Order ID",
+    "result_timeout_hint": "Payment is taking longer than expected. Please wait a few minutes, then refresh manually.",
+    "result_refresh_status": "Refresh Status"
   },
   "dashboard": {
     "phase_active": "Active",

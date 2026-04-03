@@ -1,5 +1,5 @@
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,23 @@ import {
 } from "@remixicon/react";
 import type { Subscription, Stamp } from "./types";
 import { AVATAR_COLORS } from "./types";
+
+interface StrengthResult { score: number; label: string; color: string; }
+
+function getPwdStrength(pwd: string, labels: string[]): StrengthResult {
+  if (!pwd) return { score: 0, label: "", color: "bg-muted" };
+  let s = 0;
+  if (pwd.length >= 8) s++;
+  if (pwd.length >= 12) s++;
+  if (/[A-Z]/.test(pwd)) s++;
+  if (/[0-9]/.test(pwd)) s++;
+  if (/[^A-Za-z0-9]/.test(pwd)) s++;
+  if (s <= 1) return { score: 1, label: labels[0], color: "bg-red-500" };
+  if (s <= 2) return { score: 2, label: labels[1], color: "bg-amber-500" };
+  if (s <= 3) return { score: 3, label: labels[2], color: "bg-yellow-500" };
+  if (s <= 4) return { score: 4, label: labels[3], color: "bg-emerald-500" };
+  return { score: 5, label: labels[4], color: "bg-emerald-600" };
+}
 
 export type AccountTabProps = {
   user: any;
@@ -263,30 +280,76 @@ export function AccountTab({
         </button>
         {showPwdSection && (
           <div className="border-t border-border px-4 py-4 space-y-3">
-            {[
-              { label: t("dashboard.current_password"), value: currentPwd, onChange: setCurrentPwd, show: showCurrent, toggle: () => setShowCurrent(v => !v) },
-              { label: t("dashboard.new_password_min"), value: newPwd, onChange: setNewPwd, show: showNew, toggle: () => setShowNew(v => !v) },
-              { label: t("dashboard.confirm_new_password"), value: confirmPwd, onChange: setConfirmPwd, show: showNew, toggle: () => {} },
-            ].map((f, i) => (
-              <div key={i} className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">{f.label}</Label>
-                <div className="relative">
-                  <RiLockLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-                  <Input
-                    type={f.show ? "text" : "password"}
-                    value={f.value}
-                    onChange={e => f.onChange(e.target.value)}
-                    className="pl-8 pr-8 h-9 rounded-xl text-xs"
-                  />
-                  {i < 2 && (
-                    <button type="button" onClick={f.toggle}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors">
-                      {f.show ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
-                    </button>
+            {(() => {
+              const strengthLabels = [
+                t("auth.register_strength_weak"),
+                t("auth.register_strength_fair"),
+                t("auth.register_strength_medium"),
+                t("auth.register_strength_strong"),
+                t("auth.register_strength_very_strong"),
+              ];
+              const strength = getPwdStrength(newPwd, strengthLabels);
+              const fields = [
+                { label: t("dashboard.current_password"), value: currentPwd, onChange: setCurrentPwd, show: showCurrent, toggle: () => setShowCurrent(v => !v) },
+                { label: t("dashboard.new_password_min"), value: newPwd, onChange: setNewPwd, show: showNew, toggle: () => setShowNew(v => !v) },
+                { label: t("dashboard.confirm_new_password"), value: confirmPwd, onChange: setConfirmPwd, show: showNew, toggle: () => {} },
+              ];
+              return fields.map((f, i) => (
+                <div key={i} className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">{f.label}</Label>
+                  <div className="relative">
+                    <RiLockLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+                    <Input
+                      type={f.show ? "text" : "password"}
+                      value={f.value}
+                      onChange={e => f.onChange(e.target.value)}
+                      className="pl-8 pr-8 h-9 rounded-xl text-xs"
+                    />
+                    {i < 2 && (
+                      <button type="button" onClick={f.toggle}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors">
+                        {f.show ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                  {i === 1 && (
+                    <AnimatePresence>
+                      {newPwd && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-1 space-y-1">
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map(n => (
+                                <div
+                                  key={n}
+                                  className={cn(
+                                    "h-1 flex-1 rounded-full transition-all duration-300",
+                                    n <= strength.score ? strength.color : "bg-muted"
+                                  )}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {t("auth.register_strength")}<span className={cn(
+                                "font-semibold",
+                                strength.score <= 1 ? "text-red-500" :
+                                strength.score <= 2 ? "text-amber-500" :
+                                strength.score <= 3 ? "text-yellow-600" :
+                                "text-emerald-600"
+                              )}>{strength.label}</span>
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   )}
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
             <div className="flex gap-2 pt-1">
               <Button onClick={onChangePassword} disabled={savingPwd} className="flex-1 h-9 rounded-xl text-xs gap-1.5">
                 {savingPwd ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.changing")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.confirm_modify")}</>}

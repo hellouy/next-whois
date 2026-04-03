@@ -388,7 +388,8 @@
     "downloaded": "已下载",
     "download_failed": "下载失败",
     "copied_to_clipboard": "已复制到剪贴板",
-    "copy_to_clipboard_failed": "复制失败"
+    "copy_to_clipboard_failed": "复制失败",
+    "generating": "生成中…"
   },
   "validation": {
     "empty": "输个域名、IP 或 ASN 才能开始查询",
@@ -1205,6 +1206,7 @@
     "soa_expire": "过期时间",
     "has_record": "{{n}} 条 · {{ms}}ms",
     "copy": "复制",
+    "copy_all": "复制全部",
     "spf_analysis": "SPF 分析",
     "spf_mechanisms": "授权机制",
     "spf_all_directive": "默认策略",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "支付成功",
     "result_title_cancelled": "已取消",
     "result_title_result": "支付结果",
-    "result_order_id_label": "订单号"
+    "result_order_id_label": "订单号",
+    "result_timeout_hint": "支付确认时间超出预期，如已付款请等待几分钟后手动刷新。",
+    "result_refresh_status": "刷新状态"
   },
   "dashboard": {
     "phase_active": "有效",

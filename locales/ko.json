@@ -388,7 +388,8 @@
     "downloaded": "다운로드 완료",
     "download_failed": "다운로드 실패",
     "copied_to_clipboard": "클립보드에 복사됨",
-    "copy_to_clipboard_failed": "복사 실패"
+    "copy_to_clipboard_failed": "복사 실패",
+    "generating": "생성 중…"
   },
   "validation": {
     "empty": "도메인, IP 주소 또는 ASN을 입력하세요",
@@ -1204,6 +1205,7 @@
     "soa_expire": "만료 시간",
     "has_record": "{{n}}개 · {{ms}}ms",
     "copy": "복사",
+    "copy_all": "모두 복사",
     "preset_ptr": "PTR 역방향",
     "spf_analysis": "SPF 분석",
     "spf_mechanisms": "승인된 메커니즘",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "결제 완료",
     "result_title_cancelled": "취소됨",
     "result_title_result": "결제 결과",
-    "result_order_id_label": "주문 번호"
+    "result_order_id_label": "주문 번호",
+    "result_timeout_hint": "결제 확인이 예상보다 오래 걸리고 있습니다. 몇 분 기다린 후 수동으로 새로고침해 주세요.",
+    "result_refresh_status": "상태 새로고침"
   },
   "dashboard": {
     "phase_active": "활성",

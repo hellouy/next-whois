@@ -388,7 +388,8 @@
     "downloaded": "已下載",
     "download_failed": "下載失敗",
     "copied_to_clipboard": "已複製到剪貼簿",
-    "copy_to_clipboard_failed": "複製失敗"
+    "copy_to_clipboard_failed": "複製失敗",
+    "generating": "生成中…"
   },
   "validation": {
     "empty": "請輸入域名、IP 位址或 ASN",
@@ -1204,6 +1205,7 @@
     "soa_expire": "過期時間",
     "has_record": "{{n}} 條 · {{ms}}ms",
     "copy": "複製",
+    "copy_all": "複製全部",
     "preset_ptr": "PTR 反向解析",
     "spf_analysis": "SPF 分析",
     "spf_mechanisms": "授權機制",
@@ -1265,7 +1267,9 @@
     "result_title_paid": "付款成功",
     "result_title_cancelled": "已取消",
     "result_title_result": "付款結果",
-    "result_order_id_label": "訂單號"
+    "result_order_id_label": "訂單號",
+    "result_timeout_hint": "付款確認時間超出預期，如已付款請等待幾分鐘後手動重新整理。",
+    "result_refresh_status": "重新整理狀態"
   },
   "dashboard": {
     "phase_active": "有效",

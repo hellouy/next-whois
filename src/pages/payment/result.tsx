@@ -9,7 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import {
   RiLoader4Line, RiCheckLine, RiCloseLine, RiArrowRightLine,
-  RiShieldCheckLine,
+  RiShieldCheckLine, RiRefreshLine,
 } from "@remixicon/react";
 
 type Order = {
@@ -54,10 +54,10 @@ export default function PaymentResult() {
     fetchOrder();
   }, [orderId, authStatus]);
 
-  // Poll for payment confirmation (max 8 × 2.5s = 20s)
+  // Poll for payment confirmation (max 16 × 2.5s = 40s)
   React.useEffect(() => {
     if (!order || order.status === "paid" || urlStatus === "cancel") return;
-    if (pollCount >= 8) return;
+    if (pollCount >= 16) return;
     const timer = setTimeout(async () => {
       try {
         const r = await fetch(`/api/payment/status?order=${orderId}`);
@@ -183,8 +183,27 @@ export default function PaymentResult() {
                   {t("payment.result_waiting_desc")}
                 </p>
               </div>
-              {pollCount >= 8 && (
+              {pollCount >= 16 && (
                 <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {t("payment.result_timeout_hint")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl text-xs gap-1.5"
+                    onClick={async () => {
+                      try {
+                        const r = await fetch(`/api/payment/status?order=${orderId}`);
+                        const d = await r.json();
+                        if (d.order) setOrder(d.order);
+                      } catch {}
+                      setPollCount(0);
+                    }}
+                  >
+                    <RiRefreshLine className="w-3.5 h-3.5" />
+                    {t("payment.result_refresh_status")}
+                  </Button>
                   <p className="text-xs text-muted-foreground">
                     {t("payment.result_contact_support")}
                   </p>

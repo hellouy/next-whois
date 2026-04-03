@@ -5325,7 +5325,7 @@ export default function LookupPage({
                 }}
               >
                 {imgActing === "download"
-                  ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1.5 animate-spin" />{isZh ? "生成中…" : "Generating…"}</>
+                  ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1.5 animate-spin" />{t("toast.generating")}</>
                   : <><RiDownloadLine className="w-3.5 h-3.5 mr-1.5" />{t("download")}</>
                 }
               </Button>
@@ -5355,7 +5355,7 @@ export default function LookupPage({
                 }}
               >
                 {imgActing === "copy"
-                  ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1.5 animate-spin" />{isZh ? "生成中…" : "Generating…"}</>
+                  ? <><RiLoader4Line className="w-3.5 h-3.5 mr-1.5 animate-spin" />{t("toast.generating")}</>
                   : <><RiFileCopyLine className="w-3.5 h-3.5 mr-1.5" />{t("copy")}</>
                 }
               </Button>
