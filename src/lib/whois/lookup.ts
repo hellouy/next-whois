@@ -27,10 +27,16 @@ import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { recordTldLookupFailure } from "@/lib/db";
 
 warmupDnsCache([
+  // gTLD / IANA / RIR
   "whois.verisign-grs.com", "whois.pir.org", "whois.iana.org",
-  "whois.afilias.net", "whois.nic.fr", "whois.denic.de",
-  "whois.cnnic.cn", "whois.nic.uk", "whois.apnic.net",
+  "whois.afilias.net", "whois.apnic.net",
   "whois.arin.net", "whois.ripe.net", "whois.lacnic.net", "whois.afrinic.net",
+  // High-traffic ccTLD WHOIS servers
+  "whois.nic.hu", "whois.jprs.jp", "whois.registro.br",
+  "whois.nic.fr", "whois.denic.de", "whois.nic.uk",
+  "whois.cnnic.cn", "whois.nic.it", "whois.tcinet.ru",
+  "whois.dns.pl", "whois.dnsbelgium.be", "whois.domreg.lt",
+  "whois.nic.au", "whois.srs.net.nz", "whois.teleinfo.cn",
 ]);
 
 // ── L1 in-process cache (30 s / 500 entries) ─────────────────────────────────
@@ -172,12 +178,34 @@ function intEnv(name: string, def: number): number {
 }
 
 // ── Core lookup: custom server → RDAP → generic WHOIS → merge/error ──────────
-// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 5 s).
-// Reduced RDAP: 3500 → 2500 ms — RDAP servers are fast; extra budget was wasted.
-// Reduced WHOIS: 8000 → 7000 → 5000 ms — covers slow ccTLDs (.cn, .de) while
-// shaving 2 s off the worst-case path when RDAP unavailable.
+// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 8 s).
+// RDAP: 3500 → 2500 ms — RDAP servers are fast; extra budget was wasted.
+// WHOIS: restored to 8000 ms (was reduced 8000→7000→5000, but this broke slow
+// ccTLD servers like whois.nic.hu which can take 4-8 s to respond).
 const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  2_500);
-const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 5_000);
+const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
+
+/**
+ * Per-TLD WHOIS timeout overrides (milliseconds).
+ * Used for registries whose WHOIS servers consistently respond slowly.
+ * When set, the inner TCP timeout AND the outer withTimeout wrapper are
+ * both extended beyond the global WHOIS_TIMEOUT for that TLD.
+ */
+const SLOW_WHOIS_TLDS: Readonly<Record<string, number>> = {
+  // Known slow ccTLD WHOIS servers (anecdotally 4-10 s from global infra)
+  hu: 12_000,  // whois.nic.hu — 4-8 s typical
+  jp:  9_000,  // whois.jprs.jp — 3-6 s typical
+  br:  9_000,  // whois.registro.br — 3-6 s typical
+  ar: 12_000,  // whois.nic.ar — 5-10 s typical
+  kr:  9_000,  // whois.kr — 3-6 s typical
+  au:  9_000,  // whois.auda.org.au — 3-6 s typical
+  nz:  9_000,  // whois.srs.net.nz — 3-5 s typical
+  tw:  9_000,  // whois.twnic.net.tw — 3-6 s typical
+  id:  9_000,  // whois.pandi.or.id — variable
+  vn:  9_000,  // whois.vnnic.vn — variable
+  ir: 10_000,  // whois.nic.ir — slow
+  pk:  9_000,  // whois.pknic.net.pk — slow
+};
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
 
 /**
@@ -295,21 +323,24 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   ) {
     recordTldLookupFailure(tldSuffix, reason, domainToQuery, errorMsg).catch(() => {});
   }
-  const innerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
+  const baseInnerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
+  // Per-TLD extended timeout for known-slow WHOIS servers.
+  // Both the inner TCP timeout and the outer withTimeout wrapper are extended.
+  const tldExtraMs = SLOW_WHOIS_TLDS[tldSuffix] ?? 0;
+  const innerTimeout = Math.max(baseInnerTimeout, tldExtraMs);
+  const effectiveWhoisTimeout = innerTimeout > WHOIS_TIMEOUT ? innerTimeout + 300 : WHOIS_TIMEOUT;
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
 
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
-  // This avoids waiting the full WHOIS_TIMEOUT for TLDs where RDAP is fast
-  // but the WHOIS server is slow or deprecated (e.g. .ai, .io).
-  // Reduced from 2500 → 800 → 400 ms: RDAP already provides complete data;
-  // WHOIS enrichment (raw text) is useful but not worth a long wait.
-  const RDAP_WIN_WHOIS_GRACE_MS = 400;
+  // Increased from 400 → 1200 ms so ccTLD WHOIS enrichment (raw text) has time
+  // to arrive after a fast RDAP response, giving more complete merged results.
+  const RDAP_WIN_WHOIS_GRACE_MS = 1_200;
 
   // Start RDAP + WHOIS in parallel.
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>;
   const whoisPromise = withTimeout(
     tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-    WHOIS_TIMEOUT,
+    effectiveWhoisTimeout,
   );
 
   // When RDAP finishes first with good data, only wait an additional grace period
