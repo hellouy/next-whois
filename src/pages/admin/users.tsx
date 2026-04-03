@@ -519,7 +519,7 @@ export default function AdminUsersPage() {
   }
 
   async function toggleSubscription(user: User) {
-    setToggling(user.id);
+    setToggling(`sub_${user.id}`);
     try {
       const res = await fetch(`/api/admin/users?id=${user.id}`, {
         method: "PATCH",
@@ -730,7 +730,7 @@ export default function AdminUsersPage() {
                     {/* Subscription toggle */}
                     <button
                       onClick={() => toggleSubscription(user)}
-                      disabled={toggling === user.id}
+                      disabled={toggling === user.id || toggling === `sub_${user.id}`}
                       className={cn(
                         "p-2 rounded-lg transition-colors text-muted-foreground",
                         user.subscription_access
@@ -747,7 +747,7 @@ export default function AdminUsersPage() {
                     {/* Disable/enable toggle */}
                     <button
                       onClick={() => toggleDisabled(user)}
-                      disabled={toggling === user.id}
+                      disabled={toggling === user.id || toggling === `sub_${user.id}`}
                       className={cn(
                         "p-2 rounded-lg transition-colors text-muted-foreground",
                         user.disabled

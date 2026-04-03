@@ -10,6 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const search = typeof req.query.search === "string" ? req.query.search : "";
       const issueType = typeof req.query.issue_type === "string" ? req.query.issue_type : "";
+      const handledFilter = typeof req.query.handled === "string" ? req.query.handled : "";
       const limit = Math.min(parseInt(String(req.query.limit || "50")), 200);
       const offset = parseInt(String(req.query.offset || "0"));
 
@@ -23,6 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (issueType) {
         params.push(`%"${issueType}"%`);
         conditions.push(`issue_types ILIKE $${params.length}`);
+      }
+      if (handledFilter === "false") {
+        conditions.push(`(handled = false OR handled IS NULL)`);
+      } else if (handledFilter === "true") {
+        conditions.push(`handled = true`);
       }
 
       const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";

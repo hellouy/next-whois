@@ -47,6 +47,7 @@ export default function AdminFeedbackPage() {
   const [typeCounts, setTypeCounts] = React.useState<Record<string, number>>({});
   const [search, setSearch] = React.useState("");
   const [activeType, setActiveType] = React.useState("");
+  const [activeHandled, setActiveHandled] = React.useState<"" | "false" | "true">("");
   const [loading, setLoading] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
@@ -57,11 +58,12 @@ export default function AdminFeedbackPage() {
   const [offset, setOffset] = React.useState(0);
   const [loadingMore, setLoadingMore] = React.useState(false);
 
-  function load(q: string, type: string, append = false, off = 0) {
+  function load(q: string, type: string, append = false, off = 0, handled: "" | "false" | "true" = "") {
     if (append) setLoadingMore(true); else setLoading(true);
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(off) });
     if (q) params.set("search", q);
     if (type) params.set("issue_type", type);
+    if (handled) params.set("handled", handled);
     fetch(`/api/admin/feedback?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -85,19 +87,25 @@ export default function AdminFeedbackPage() {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setOffset(0);
-    load(search, activeType, false, 0);
+    load(search, activeType, false, 0, activeHandled);
   }
 
   function selectType(type: string) {
     setActiveType(type);
     setOffset(0);
-    load(search, type, false, 0);
+    load(search, type, false, 0, activeHandled);
+  }
+
+  function selectHandled(h: "" | "false" | "true") {
+    setActiveHandled(h);
+    setOffset(0);
+    load(search, activeType, false, 0, h);
   }
 
   function loadMore() {
     const newOffset = offset + PAGE_SIZE;
     setOffset(newOffset);
-    load(search, activeType, true, newOffset);
+    load(search, activeType, true, newOffset, activeHandled);
   }
 
   function requestDelete(id: string) {
@@ -221,7 +229,7 @@ export default function AdminFeedbackPage() {
           </div>
         )}
 
-        {/* Filter tabs */}
+        {/* Filter tabs — issue type */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <RiFilterLine className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
           {FILTER_TABS.map(tab => (
@@ -247,6 +255,32 @@ export default function AdminFeedbackPage() {
           ))}
         </div>
 
+        {/* Filter row — handled status */}
+        <div className="flex items-center gap-1.5">
+          {([ 
+            { key: "" as const,       label: "全部状态" },
+            { key: "false" as const,  label: "未处理" },
+            { key: "true" as const,   label: "已处理" },
+          ]).map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => selectHandled(opt.key)}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-full font-medium transition-all",
+                activeHandled === opt.key
+                  ? opt.key === "false"
+                    ? "bg-amber-500 text-white"
+                    : opt.key === "true"
+                      ? "bg-emerald-500 text-white"
+                      : "bg-primary text-primary-foreground"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         {/* List */}
         {loading ? (
           <div className="flex justify-center py-12">
@@ -256,7 +290,7 @@ export default function AdminFeedbackPage() {
           <div className="text-center py-12 space-y-2">
             <RiFeedbackLine className="w-10 h-10 text-muted-foreground/30 mx-auto" />
             <p className="text-sm text-muted-foreground">
-              {activeType ? "该分类暂无反馈记录" : "暂无反馈记录"}
+              {activeHandled === "false" ? "没有待处理的反馈" : activeHandled === "true" ? "没有已处理的反馈" : activeType ? "该分类暂无反馈记录" : "暂无反馈记录"}
             </p>
           </div>
         ) : (
