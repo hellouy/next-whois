@@ -12,7 +12,8 @@ import {
   RiCloseLine,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn, isEnter, validateAndSanitizeInput, sanitizeInput } from "@/lib/utils";
+import { cn, isEnter, validateAndSanitizeInput, sanitizeInput, cleanDomain } from "@/lib/utils";
+import { prefetchLookup } from "@/lib/lookup-prefetch";
 import { listHistory, HistoryItem } from "@/lib/history";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
@@ -168,6 +169,7 @@ export function SearchBox({
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -429,6 +431,19 @@ export function SearchBox({
     const newSuggestions = generateSuggestions(cleaned || value);
     setShowSuggestions(newSuggestions.length > 0);
     setSelectedIndex(-1);
+
+    // Debounced prefetch: if the input looks like a complete query (has a dot
+    // and at least 2 chars after it), start the lookup 600 ms after the user
+    // stops typing so the response is already in-flight when they press Enter.
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    const trimmed = value.trim();
+    const dotIdx = trimmed.lastIndexOf(".");
+    if (dotIdx > 0 && trimmed.length - dotIdx >= 2) {
+      prefetchTimerRef.current = setTimeout(() => {
+        const target = cleanDomain(trimmed.replace(/\s+/g, ""));
+        if (target) prefetchLookup(target);
+      }, 600);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

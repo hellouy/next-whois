@@ -1,5 +1,8 @@
-// node-rdap is ESM-only; use dynamic import() so CJS serverless can load it
-const getRdap = () => import("node-rdap");
+// node-rdap is ESM-only; use dynamic import() so CJS serverless can load it.
+// Pre-warm at module load time so the first request doesn't pay import cost.
+let _rdapModuleCache: typeof import("node-rdap") | null = null;
+void import("node-rdap").then(m => { _rdapModuleCache = m; }).catch(() => {});
+const getRdap = () => _rdapModuleCache ? Promise.resolve(_rdapModuleCache) : import("node-rdap");
 import { WhoisAnalyzeResult, DomainStatusProps } from "./types";
 import { extractDomain } from "@/lib/utils";
 import { applyParams } from "./common_parser";
