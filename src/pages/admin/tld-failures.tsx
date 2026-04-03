@@ -58,6 +58,7 @@ export default function TldFailuresPage() {
   const [clearingAll, setClearingAll] = React.useState(false);
   const [patchingStatus, setPatchingStatus] = React.useState<string | null>(null);
   const [resettingBypass, setResettingBypass] = React.useState<string | null>(null);
+  const [resettingAllBypasses, setResettingAllBypasses] = React.useState(false);
 
   function load() {
     setLoading(true);
@@ -101,6 +102,20 @@ export default function TldFailuresPage() {
       if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`); load(); }
       else toast.error("操作失败");
     } finally { setClearingAll(false); }
+  }
+
+  async function resetAllBypasses() {
+    if (!confirm("重置所有 TLD 的 whoiser 旁路标记？此操作不可撤销。")) return;
+    setResettingAllBypasses(true);
+    try {
+      const r = await fetch("/api/admin/whoiser-bypass", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear_all: true }),
+      });
+      if (r.ok) { toast.success("所有旁路已重置"); load(); }
+      else toast.error("重置失败");
+    } finally { setResettingAllBypasses(false); }
   }
 
   async function resetBypass(tld: string) {
@@ -161,6 +176,16 @@ export default function TldFailuresPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {rows.some(r => r.whoiser_bypass) && (
+              <button
+                onClick={resetAllBypasses}
+                disabled={resettingAllBypasses}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200/60 dark:border-orange-800/40 text-orange-600 dark:text-orange-400 text-xs font-semibold hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+              >
+                {resettingAllBypasses ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiProhibitedLine className="w-3.5 h-3.5" />}
+                全部重置旁路
+              </button>
+            )}
             {rows.length > 0 && (
               <button
                 onClick={clearAll}

@@ -213,6 +213,21 @@ export async function getBypassedTlds(): Promise<string[]> {
 }
 
 /**
+ * Reset only the rolling failure counter for a TLD (does NOT clear the bypass
+ * flag if one is already set). Call this when whoiser succeeds for a TLD so
+ * that transient failures don't accumulate toward the bypass threshold.
+ *
+ * Called fire-and-forget from the query path — never awaited in the hot path.
+ */
+export async function resetWhoiserFailureCounter(tld: string): Promise<void> {
+  const t = tld.toLowerCase().replace(/^\./, "");
+  _inMemFailCounts.delete(t);
+  if (isRedisAvailable()) {
+    await deleteRedisValue(failKey(t)).catch(() => {});
+  }
+}
+
+/**
  * Manually mark a TLD as bypassed (admin panel override).
  * Behaves identically to auto-bypass triggered by BYPASS_FAIL_THRESHOLD.
  */

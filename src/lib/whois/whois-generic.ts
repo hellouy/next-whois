@@ -6,7 +6,7 @@ import {
   tryManualServerForDomain,
   getStaticWhoisServer,
 } from "@/lib/whois/custom-servers";
-import { isWhoiserBypassed, recordWhoiserFailure } from "@/lib/whois/whoiser-bypass";
+import { isWhoiserBypassed, recordWhoiserFailure, resetWhoiserFailureCounter } from "@/lib/whois/whoiser-bypass";
 
 let _whoiserPromise: Promise<typeof import("whoiser")> | null = null;
 const getWhoiser = () => {
@@ -170,7 +170,12 @@ export async function tryGenericWhoisForDomain(
       }
     }
 
-    if (winner) return winner;
+    if (winner) {
+      // Reset rolling failure counter so that transient errors don't accumulate
+      // toward the bypass threshold. Fire-and-forget.
+      resetWhoiserFailureCounter(tldSuffix).catch(() => {});
+      return winner;
+    }
 
     // whoiser (and static-map) failed — record the failure.
     // recordWhoiserFailure is fire-and-forget; never awaited on the hot path.

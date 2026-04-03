@@ -586,10 +586,12 @@ let _manualServersCacheShadow: CustomServerMap | null = null;
 let _manualServersCacheShadowAt = 0;
 
 /**
- * Step 4 of the new priority chain: try only admin-manually-configured
- * WHOIS servers (source='manual' in DB, or file fallback if DB empty).
- * Called after whoiser has already failed.
- * BUILTIN TLDs are excluded — they are handled in step 1.
+ * Step ③ of the new priority chain: try only admin-manually-configured
+ * WHOIS servers — strictly those with source='manual' in the DB.
+ * File-based fallback is intentionally excluded; this path is for admin
+ * overrides only and must not silently query unrelated file entries.
+ * Called after whoiser has already failed (or been bypassed).
+ * BUILTIN TLDs are excluded — they are handled in step ①.
  */
 export async function tryManualServerForDomain(
   domainToQuery: string,
@@ -603,10 +605,12 @@ export async function tryManualServerForDomain(
   // BUILTIN TLDs are handled before whoiser — don't double-process them here.
   if (BUILTIN_SERVER_TLDS.has(n1) || BUILTIN_SERVER_TLDS.has(n2)) return null;
 
-  // Use the shared user-managed cache (same TTL as _allServersCache).
+  // Use the dedicated manual-server cache (strict DB source='manual' only).
+  // This intentionally does NOT fall back to file-based servers so that only
+  // admin-configured overrides are used in this fallback step.
   const now = Date.now();
   if (!_manualServersCacheShadow || now - _manualServersCacheShadowAt >= ALL_SERVERS_TTL_MS) {
-    _manualServersCacheShadow = await readUserManagedServers();
+    _manualServersCacheShadow = await readManualDbServers();
     _manualServersCacheShadowAt = now;
   }
   const manualMap = _manualServersCacheShadow;
