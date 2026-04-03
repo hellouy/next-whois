@@ -103,7 +103,7 @@ function CenteredHeader({
 /* ─────────────────────────────────────────────────────────────
    Component
 ───────────────────────────────────────────────────────────── */
-export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: StampPreviewData }) {
+export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: string; data?: StampPreviewData; locale?: "zh" | "en" }) {
   const t = STAMP_CARD_THEMES[themeKey] ?? STAMP_CARD_THEMES.app;
   if (!t) return null;
 
@@ -112,6 +112,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
   const desc     = data?.description || DEMO.description;
   const link     = data !== undefined ? (data?.link || null) : DEMO.link;
   const tagLabel = data?.tagLabel   || DEMO.tagLabel;
+  const ctaText  = locale === "en" ? "Visit Profile" : "访问主页";
+  const noLinkText = locale === "en" ? "No profile link" : "未设置主页链接";
 
   /* ═══ app — 极简·黑白 ═══════════════════════════════════════════════ */
   if (themeKey === "app") return (
@@ -127,8 +129,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "11px 14px 13px" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "#888", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#1c1c1e", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -150,8 +152,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "11px 14px 13px" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "#6b7280", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#1D4ED8", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -173,8 +175,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "11px 14px 13px", background: "rgba(0,0,0,0.28)" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "rgba(200,180,255,0.7)", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "linear-gradient(135deg,#7c3aed,#c026d3)", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none", boxShadow: "0 0 16px rgba(124,58,237,0.4)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -194,8 +196,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ margin: "0 10px 10px", background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: 12, padding: "10px 12px 12px", border: "1px solid rgba(255,255,255,0.2)" }}>
           {desc && <p style={{ margin: "0 0 8px", fontSize: 10, color: "rgba(255,255,255,0.75)", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "rgba(0,0,0,0.4)", color: "#fff", borderRadius: 9, padding: "8px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.7 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -218,8 +220,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "11px 14px 13px" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "#78350f", lineHeight: 1.6, opacity: 0.7, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none", boxShadow: "0 3px 12px rgba(249,115,22,0.38)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -254,8 +256,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         </div>
         <div style={{ padding: "0 14px 13px" }}>
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#238636", color: "#fff", borderRadius: 8, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "monospace", border: "1px solid #2ea043" }}>
-            <span style={{ color: "#56d364" }}>→</span> 访问主页
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            <span style={{ color: "#56d364" }}>→</span> {ctaText}
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -276,8 +278,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "11px 14px 13px" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "#6b7280", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "#d97706", color: "#fff", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -301,8 +303,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div style={{ padding: "9px 14px 13px", borderTop: "1px solid rgba(212,175,55,0.14)" }}>
           {desc && <p style={{ margin: "0 0 9px", fontSize: 10, color: "rgba(212,175,55,0.5)", lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{desc}</p>}
           {link ? <a href={link} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, background: "linear-gradient(135deg,#D4AF37,#B8860B)", color: "#1a0a2e", borderRadius: 10, padding: "9px 14px", fontSize: 11, fontWeight: 900, textDecoration: "none", boxShadow: "0 0 18px rgba(212,175,55,0.35)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 13, height: 13, opacity: 0.8 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -334,8 +336,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div className="px-4 pt-3 pb-4 text-center" style={{ animation: "cel-glow 2.5s ease-in-out infinite" }}>
           {desc && <p className="text-[7.5px] text-gray-400 mb-3 leading-relaxed line-clamp-2">{desc}</p>}
           {link ? <a href={link} className="inline-flex items-center gap-1 px-5 py-2 rounded-full text-white text-[8.5px] font-bold" style={{ background: "linear-gradient(135deg,#D4AF37,#B8860B)", boxShadow: "0 3px 12px rgba(180,140,30,0.35)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .9 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .9 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -366,8 +368,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         <div className="px-4 pt-1.5 pb-4 text-center">
           {desc && <p className="text-[7.5px] leading-relaxed mb-3.5 line-clamp-2" style={{ color: "rgba(100,130,160,0.85)" }}>{desc}</p>}
           {link ? <a href={link} className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-[8.5px] font-bold text-white" style={{ background: "linear-gradient(135deg,#00D2FF,#7B2FBE)", boxShadow: "0 0 18px rgba(0,210,255,0.4)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .9 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .9 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -389,8 +391,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
         </div>
         <div className="flex justify-center pb-4 pt-1">
           {link ? <a href={link} className="inline-flex items-center gap-1 px-5 py-2 rounded-full text-[8.5px] font-bold text-white" style={{ background: "rgba(10,10,20,0.82)", backdropFilter: "blur(8px)" }}>
-            访问主页 <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+            {ctaText} <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .8 }} />
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -419,9 +421,9 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
             {desc && <p className="text-[7px] leading-relaxed line-clamp-2" style={{ color: "#9ca3af" }}>{desc}</p>}
           </div>
           {link ? <a href={link} className="flex items-center justify-between mt-2 px-2.5 py-1.5 rounded-[10px] text-white text-[8px] font-bold shrink-0" style={{ background: "#111" }}>
-            <span>访问主页</span>
+            <span>{ctaText}</span>
             <RiArrowRightSLine style={{ width: 11, height: 11, opacity: .8 }} />
-          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+          </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
         </div>
       </div>
     </>
@@ -457,8 +459,8 @@ export function StampPreviewCard({ themeKey, data }: { themeKey: string; data?: 
               {desc && <p className="text-[7.5px] text-gray-400 leading-relaxed line-clamp-2">{desc}</p>}
             </div>
             {link ? <a href={link} className="inline-flex items-center gap-0.5 mt-2 px-3.5 py-1.5 rounded-full text-[8.5px] font-bold text-white shrink-0" style={{ background: "linear-gradient(135deg,#FF3800,#FF6800)", animation: "flash-cta 2s ease-in-out infinite" }}>
-              访问主页 <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .85 }} />
-            </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>未设置主页链接</p>}
+              {ctaText} <RiArrowRightSLine style={{ width: 10, height: 10, opacity: .85 }} />
+            </a> : <p style={{fontSize:10,textAlign:"center",margin:0,padding:"6px 0",opacity:0.4}}>{noLinkText}</p>}
           </div>
         </div>
       </div>

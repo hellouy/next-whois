@@ -6038,6 +6038,7 @@ export default function LookupPage({
                                 </button>
                                 <StampPreviewCard
                                   themeKey={stamp.cardTheme}
+                                  locale={isChinese ? "zh" : "en"}
                                   data={{
                                     tagName: stamp.tagName,
                                     domain: result.domain || target,
