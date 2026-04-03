@@ -14,6 +14,10 @@
     {
       "path": "/api/admin/process-email-queue",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/tld-scrape",
+      "schedule": "0 */2 * * *"
     }
   ],
   "functions": {
@@ -52,6 +56,9 @@
     },
     "src/pages/api/cron/ping.ts": {
       "maxDuration": 10
+    },
+    "src/pages/api/cron/tld-scrape.ts": {
+      "maxDuration": 300
     }
   },
   "headers": [

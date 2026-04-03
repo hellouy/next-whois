@@ -610,6 +610,10 @@ async function extractWithAI(
   }
 }
 
+// ─── Exported for use by cron/tld-scrape ─────────────────────────────────────
+export { fetchPageText, extractWithAI, hasLifecycleInfo };
+export type { ExtractedLifecycle };
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export default async function handler(
   req: NextApiRequest,
