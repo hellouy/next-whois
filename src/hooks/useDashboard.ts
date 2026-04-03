@@ -410,7 +410,7 @@ export function useDashboard() {
       const data = await res.json();
       if (!res.ok) {
         const errMsg = data.error || t("dashboard.invite_code_invalid");
-        if (errMsg === "你已拥有订阅权限") {
+        if (data.code === "ALREADY_HAS_ACCESS") {
           setSubscriptionAccessDB(true);
           await updateSession({ refreshSubscription: true });
           setInviteCodeInput("");

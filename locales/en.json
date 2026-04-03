@@ -1438,6 +1438,7 @@
     "plan_lifetime_period": "Unlimited",
     "plan_badge_recommended": "Recommended",
     "plan_badge_best_value": "Best Value",
+    "plan_balance": "balance",
     "member_active_label": "Member Active",
     "non_member": "Free User",
     "lifetime_member": "Lifetime Member",

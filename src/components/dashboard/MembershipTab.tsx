@@ -246,7 +246,7 @@ export function MembershipTab({
           };
           const fmtDur = (p: Plan) => {
             if (!p.duration_days) return t("dashboard.plan_lifetime_period");
-            return `${p.duration_days}天`;
+            return t("payment.checkout_days", { n: p.duration_days });
           };
           const fmtPrice = (p: Plan) => {
             const sym = p.currency?.toUpperCase() === "CNY" ? "¥" : p.currency?.toUpperCase() === "USD" ? "$" : (p.currency ?? "¥");
@@ -277,7 +277,7 @@ export function MembershipTab({
                       : <RiVipCrownLine className={cn("w-4 h-4", isHighlight ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />}
                     <p className="text-[10px] font-semibold leading-tight line-clamp-1">{p.name}</p>
                     {p.balance_grant_cents > 0 ? (
-                      <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">+¥{(p.balance_grant_cents / 100).toFixed(0)} 余额</p>
+                      <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">+¥{(p.balance_grant_cents / 100).toFixed(0)} {t("dashboard.plan_balance")}</p>
                     ) : (
                       <p className="text-[9px] text-muted-foreground">{fmtDur(p)}</p>
                     )}

@@ -1438,6 +1438,7 @@
     "plan_lifetime_period": "无限期",
     "plan_badge_recommended": "推荐",
     "plan_badge_best_value": "最划算",
+    "plan_balance": "余额",
     "member_active_label": "会员已激活",
     "non_member": "普通用户",
     "lifetime_member": "永久会员",

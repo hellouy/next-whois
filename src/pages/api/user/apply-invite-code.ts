@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isActiveSubscriber = user.subscription_access && (
     !user.subscription_expires_at || new Date(user.subscription_expires_at) > new Date()
   );
-  if (isActiveSubscriber) return res.status(400).json({ error: "你已拥有订阅权限" });
+  if (isActiveSubscriber) return res.status(400).json({ error: "你已拥有订阅权限", code: "ALREADY_HAS_ACCESS" });
 
   const { inviteCode } = req.body;
   if (!inviteCode?.trim()) return res.status(400).json({ error: "请输入邀请码" });
