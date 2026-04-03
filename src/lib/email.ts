@@ -1019,7 +1019,7 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
     );
     const map: Record<string, string> = {};
     for (const r of rows) map[r.key] = r.value;
-    if (!map.smtp_enabled || map.smtp_enabled === "") return null;
+    if (map.smtp_enabled !== "1") return null;
     if (!map.smtp_host || !map.smtp_user || !map.smtp_pass) return null;
     return {
       host: map.smtp_host,
