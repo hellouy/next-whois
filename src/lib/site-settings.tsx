@@ -146,7 +146,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   site_subtitle: "专业的 WHOIS / RDAP 查询工具",
   site_description: "快速查询域名、IP、ASN、CIDR 的 WHOIS / RDAP 信息，支持多节点并行查询。",
   site_keywords: "Whois, RDAP, Lookup, Domain, IPv4, IPv6, ASN, CIDR, X.RW",
-  site_footer: "© 2025 X.RW · WHOIS & RDAP Lookup Service",
+  site_footer: "© 2026 X.RW · WHOIS & RDAP Lookup Service",
   site_logo_text: "X.RW",
   site_icon_url: "",
   site_announcement: "",
@@ -295,14 +295,12 @@ export function SiteSettingsProvider({
   initialSettings?: Partial<SiteSettings>;
 }) {
   // initialSettings may come from SSR props (e.g. the homepage passes them).
-  // The lazy initializer runs synchronously on the client before the first
-  // render, so it can read sessionStorage immediately.  On the server,
-  // readSessionCache() returns null (window guard), so server HTML is still
-  // rendered with DEFAULT_SETTINGS + initialSettings — suppressHydrationWarning
-  // on affected leaf nodes handles the client/server mismatch silently.
-  const [settings, setSettings] = React.useState<SiteSettings>(() => {
-    const cache = readSessionCache(); // null on server
-    return { ...DEFAULT_SETTINGS, ...(initialSettings || {}), ...(cache || {}) };
+  // The useState initializer runs on both server and client with the same value
+  // so there is no hydration mismatch.  sessionStorage is applied afterward in
+  // useLayoutEffect (which fires before the browser paints but after hydration).
+  const [settings, setSettings] = React.useState<SiteSettings>({
+    ...DEFAULT_SETTINGS,
+    ...(initialSettings || {}),
   });
 
   const fetchSettings = React.useCallback(() => {

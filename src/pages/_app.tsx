@@ -168,7 +168,7 @@ function SiteFooter() {
           </Link>
         ))}
       </div>
-      {footerText && <p className="text-xs text-muted-foreground/40">{footerText}</p>}
+      {footerText && <p className="text-xs text-muted-foreground/40" suppressHydrationWarning>{footerText}</p>}
     </footer>
   );
 }
