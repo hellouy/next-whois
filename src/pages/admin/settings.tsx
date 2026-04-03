@@ -13,7 +13,7 @@ import {
   RiMoneyDollarCircleLine, RiBankCardLine, RiImageLine,
   RiEyeLine, RiEyeOffLine, RiSaveLine, RiRefreshLine,
   RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
-  RiPaletteLine,
+  RiPaletteLine, RiSendPlane2Line, RiAlertLine, RiInformationLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -471,9 +471,134 @@ function CaptchaTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, 
   );
 }
 
+type EmailConfigStatus = {
+  status: "ok" | "partial" | "unconfigured";
+  provider: string;
+  hint: string;
+  smtpEnabled: boolean;
+  smtpHost: string;
+  smtpUser: string;
+  smtpPass: boolean;
+  resendApiKey: boolean;
+};
+
+type TestEmailResult = { key: string; subject: string; ok: boolean; error?: string };
+
 function EmailTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  const [configStatus, setConfigStatus] = React.useState<EmailConfigStatus | null>(null);
+  const [checking, setChecking] = React.useState(false);
+  const [testTo, setTestTo] = React.useState("");
+  const [testing, setTesting] = React.useState(false);
+  const [testResults, setTestResults] = React.useState<TestEmailResult[] | null>(null);
+
+  const checkConfig = React.useCallback(async () => {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/admin/test-email");
+      if (res.ok) {
+        const data = await res.json();
+        setConfigStatus(data);
+      } else {
+        toast.error("检查邮件配置失败");
+      }
+    } catch {
+      toast.error("网络错误，请重试");
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  React.useEffect(() => { checkConfig(); }, [checkConfig]);
+
+  const sendTestEmail = async () => {
+    if (!testTo.trim()) { toast.error("请输入收件人邮箱"); return; }
+    setTesting(true);
+    setTestResults(null);
+    try {
+      const res = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testTo.trim(), template: "welcome" }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`测试邮件已发送至 ${testTo.trim()}`);
+      } else {
+        toast.error("发送失败：" + (data.results?.[0]?.error || data.error || "未知错误"));
+      }
+      if (data.results) setTestResults(data.results);
+    } catch {
+      toast.error("网络错误，请重试");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const statusColor = configStatus?.status === "ok"
+    ? "text-green-600 bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800/40"
+    : configStatus?.status === "partial"
+      ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40"
+      : "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800/40";
+
+  const StatusIcon = configStatus?.status === "ok" ? RiCheckLine
+    : configStatus?.status === "partial" ? RiInformationLine
+    : RiAlertLine;
+
   return (
     <div className="space-y-6">
+      {/* Config status panel */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <SectionTitle icon={RiMailLine} title="邮件发送状态" desc="当前邮件服务配置诊断" />
+          <Button size="sm" variant="outline" onClick={checkConfig} disabled={checking} className="shrink-0 text-xs h-7 px-2.5">
+            {checking ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}
+            <span className="ml-1">{checking ? "检查中…" : "刷新"}</span>
+          </Button>
+        </div>
+        {configStatus ? (
+          <div className={cn("flex items-start gap-3 p-3 rounded-xl border text-xs", statusColor)}>
+            <StatusIcon className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">{configStatus.provider}</p>
+              <p className="mt-0.5 opacity-80">{configStatus.hint}</p>
+            </div>
+          </div>
+        ) : checking ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground p-3">
+            <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> 检查中…
+          </div>
+        ) : null}
+
+        {/* Send test email */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <p className="text-xs font-semibold">发送测试邮件</p>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              value={testTo}
+              onChange={e => setTestTo(e.target.value)}
+              placeholder="收件邮箱（默认发送 Welcome 模板）"
+              className="text-xs flex-1"
+              onKeyDown={e => { if (e.key === "Enter") sendTestEmail(); }}
+            />
+            <Button size="sm" onClick={sendTestEmail} disabled={testing || !testTo.trim()} className="shrink-0 text-xs">
+              {testing ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiSendPlane2Line className="w-3.5 h-3.5 mr-1" />}
+              {testing ? "发送中…" : "发送"}
+            </Button>
+          </div>
+          {testResults && (
+            <div className="space-y-1">
+              {testResults.map(r => (
+                <div key={r.key} className={cn("flex items-start gap-2 text-[11px] p-2 rounded-lg border", r.ok ? "border-green-200 bg-green-50 text-green-700 dark:bg-green-950/30 dark:border-green-800/40 dark:text-green-400" : "border-red-200 bg-red-50 text-red-700 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-400")}>
+                  {r.ok ? <RiCheckLine className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <RiAlertLine className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+                  <span>{r.ok ? `已发送：${r.subject}` : `失败：${r.error}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
         <SectionTitle icon={RiMailLine} title="SMTP 邮件配置" desc="用于发送注册验证、密码重置等系统邮件" />
         <Toggle

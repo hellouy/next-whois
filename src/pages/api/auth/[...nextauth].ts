@@ -91,15 +91,21 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         rememberMe: { label: "Remember Me", type: "text" },
+        captchaToken: { label: "Captcha Token", type: "text" },
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // If disable_login is enabled, block all credential logins
-        const disableLogin = await getSetting("disable_login");
-        if (disableLogin === "1") return null;
-
         const email = credentials.email.toLowerCase().trim();
+
+        // Resolve admin email early — used for bypass decisions below
+        const { isAdminEmail } = await import("@/lib/admin-server");
+        const isAdm = await isAdminEmail(email);
+
+        // If disable_login is enabled, block all logins except the admin account
+        const disableLogin = await getSetting("disable_login");
+        if (disableLogin === "1" && !isAdm) return null;
+
         const ip = String(
           (req as any)?.headers?.["x-forwarded-for"] ||
           (req as any)?.socket?.remoteAddress ||
@@ -113,6 +119,18 @@ export const authOptions: NextAuthOptions = {
         // ── Rate-limit by email (per-account brute-force, Redis-backed) ───────
         const emailKey = `login:email:${email}`;
         if (await isLockedOut(emailKey)) return null;
+
+        // ── Captcha verification (admin bypasses to prevent lockout) ──────────
+        if (!isAdm) {
+          const { getCaptchaConfig, verifyCaptchaToken } = await import("@/lib/server/captcha");
+          const captchaConfig = await getCaptchaConfig();
+          if (captchaConfig.provider && captchaConfig.secretKey) {
+            const captchaToken = (credentials as any).captchaToken?.trim() ?? "";
+            if (!captchaToken) return null;
+            const captchaOk = await verifyCaptchaToken(captchaToken, captchaConfig.provider, captchaConfig.secretKey);
+            if (!captchaOk) return null;
+          }
+        }
 
         const user = await one<{
           id: string;
