@@ -5,7 +5,6 @@ import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { useTranslation, TranslationKey } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
-import en from "../../locales/en.json";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,7 +158,8 @@ const stepVariants = {
 const POLL_SCHEDULE = [30, 60, 120, 300, 600, 900, 1200] as const;
 const AUTO_POLL_SEC = POLL_SCHEDULE[0];
 
-type StampKey = keyof (typeof en)["stamp"];
+type _ExtractStampKey<T extends string> = T extends `stamp.${infer K}` ? K : never;
+type StampKey = _ExtractStampKey<TranslationKey>;
 
 const HOW_STEP_TITLE_KEYS: StampKey[] = ["how_step1_title", "how_step2_title", "how_step3_title"];
 const HOW_STEP_DESC_KEYS: StampKey[] = ["how_step1_desc", "how_step2_desc", "how_step3_desc"];

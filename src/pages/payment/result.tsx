@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
+import { CURRENCY_SYMBOL } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
   RiLoader4Line, RiCheckLine, RiCloseLine, RiArrowRightLine,
@@ -16,8 +17,6 @@ type Order = {
   id: string; status: string; amount: number; currency: string;
   plan_name: string; provider: string; paid_at: string | null;
 };
-
-const CURRENCY_SYMBOL: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", HKD: "HK$", GBP: "£", JPY: "¥" };
 
 export default function PaymentResult() {
   const router = useRouter();

@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, CURRENCY_SYMBOL } from "@/lib/utils";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,10 +20,6 @@ type Plan = {
   price: number; currency: string; duration_days: number | null;
   is_recurring: boolean; grants_subscription: boolean;
   balance_grant_cents: number;
-};
-
-const CURRENCY_SYMBOL: Record<string, string> = {
-  CNY: "¥", USD: "$", EUR: "€", HKD: "HK$",
 };
 
 export default function PaymentCheckout() {

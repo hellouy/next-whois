@@ -1051,6 +1051,61 @@ export function fmtCountdown(targetDate: Date, isZh = true): string {
   return isZh ? `${mins}分钟` : `${mins}min`;
 }
 
+/**
+ * Format a nullable date string for locale-aware display.
+ * Returns "—" for null/invalid/"Unknown" values.
+ * Used in the remind page and other UI that shows subscription dates.
+ */
+export function fmtLocalDate(raw: string | null, locale: string): string {
+  if (!raw || raw === "Unknown") return "—";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+/**
+ * Format a nullable date string as a relative time description using i18n keys.
+ * Returns null for null/invalid/"Unknown" values.
+ * Used in the remind page to show "3 days ago", "2 months ago", etc.
+ */
+export function fmtRelativeDate(raw: string | null, t: (k: string) => string): string | null {
+  if (!raw || raw === "Unknown") return null;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  const diffDays = Math.round((Date.now() - d.getTime()) / 86_400_000);
+  if (diffDays < 1) return t("remind.today");
+  if (diffDays < 30) return t("remind.days_ago").replace("{{n}}", String(diffDays));
+  const months = Math.round(diffDays / 30);
+  if (months < 12) return t("remind.months_ago").replace("{{n}}", String(months));
+  const years = Math.floor(diffDays / 365);
+  const remMonths = Math.round((diffDays % 365) / 30);
+  return remMonths > 0
+    ? t("remind.years_months_ago").replace("{{n}}", String(years)).replace("{{m}}", String(remMonths))
+    : t("remind.years_ago").replace("{{n}}", String(years));
+}
+
+/**
+ * Format a days-remaining count as a human-readable string using i18n keys.
+ * Handles expired (negative), days, months, and years.
+ * Used in the remind page subscription cards.
+ */
+export function fmtDaysRemainingText(days: number, t: (k: string) => string): string {
+  if (days <= 0) return t("remind.expired_n_days").replace("{{n}}", String(Math.abs(days)));
+  if (days < 30) return t("remind.expires_in_days").replace("{{n}}", String(days));
+  if (days < 365) {
+    const months = Math.floor(days / 30);
+    const rem = days % 30;
+    return rem > 0
+      ? t("remind.expires_in_months_days").replace("{{n}}", String(months)).replace("{{d}}", String(rem))
+      : t("remind.expires_in_months").replace("{{n}}", String(months));
+  }
+  const years = Math.floor(days / 365);
+  const remDays = days % 365;
+  const months = Math.floor(remDays / 30);
+  if (months > 0) return t("remind.expires_in_years_months").replace("{{n}}", String(years)).replace("{{m}}", String(months));
+  return t("remind.expires_in_years").replace("{{n}}", String(years));
+}
+
 export const PHASE_META = {
   active:        { zh: "正常有效", en: "Active",         color: "#059669", bg: "#ecfdf5" },
   grace:         { zh: "宽限期",   en: "Grace Period",   color: "#d97706", bg: "#fffbeb" },

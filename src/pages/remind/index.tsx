@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
+import { Subscription } from "@/components/dashboard/types";
+import { fmtLocalDate, fmtDaysRemainingText } from "@/lib/lifecycle";
 import {
   RiCalendarLine, RiMailLine, RiSearchLine, RiShieldCheckLine,
   RiArrowRightLine, RiGlobalLine, RiTimeLine, RiTimerLine,
@@ -17,26 +19,6 @@ import {
   RiCheckLine, RiRefreshLine, RiInformationLine,
   RiCheckboxCircleLine,
 } from "@remixicon/react";
-
-type Subscription = {
-  id: string;
-  domain: string;
-  expiration_date: string | null;
-  active: boolean;
-  created_at: string;
-  days_before: number | null;
-  phase: string | null;
-  days_to_expiry: number | null;
-  days_to_drop: number | null;
-  sent_keys: number[];
-  last_reminded_at: string | null;
-  next_reminder_at: string | null;
-  next_reminder_days: number | null;
-  tld_confidence: string | null;
-  drop_date: string | null;
-  grace_end: string | null;
-  redemption_end: string | null;
-};
 
 type FilterKey = "all" | "expiring" | "expired" | "inactive";
 
@@ -128,45 +110,7 @@ type WhoisInfo = {
   hasData: boolean;
 };
 
-function fmtDate(raw: string | null, locale: string): string {
-  if (!raw || raw === "Unknown") return "—";
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" });
-}
 
-function fmtRelative(raw: string | null, t: (k: string) => string): string | null {
-  if (!raw || raw === "Unknown") return null;
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return null;
-  const diffDays = Math.round((Date.now() - d.getTime()) / 86_400_000);
-  if (diffDays < 1) return t("remind.today");
-  if (diffDays < 30) return t("remind.days_ago").replace("{{n}}", String(diffDays));
-  const months = Math.round(diffDays / 30);
-  if (months < 12) return t("remind.months_ago").replace("{{n}}", String(months));
-  const years = Math.floor(diffDays / 365);
-  const remMonths = Math.round((diffDays % 365) / 30);
-  return remMonths > 0
-    ? t("remind.years_months_ago").replace("{{n}}", String(years)).replace("{{m}}", String(remMonths))
-    : t("remind.years_ago").replace("{{n}}", String(years));
-}
-
-function fmtDaysRemaining(days: number, t: (k: string) => string): string {
-  if (days <= 0) return t("remind.expired_n_days").replace("{{n}}", String(Math.abs(days)));
-  if (days < 30) return t("remind.expires_in_days").replace("{{n}}", String(days));
-  if (days < 365) {
-    const months = Math.floor(days / 30);
-    const rem = days % 30;
-    return rem > 0
-      ? t("remind.expires_in_months_days").replace("{{n}}", String(months)).replace("{{d}}", String(rem))
-      : t("remind.expires_in_months").replace("{{n}}", String(months));
-  }
-  const years = Math.floor(days / 365);
-  const remDays = days % 365;
-  const months = Math.floor(remDays / 30);
-  if (months > 0) return t("remind.expires_in_years_months").replace("{{n}}", String(years)).replace("{{m}}", String(months));
-  return t("remind.expires_in_years").replace("{{n}}", String(years));
-}
 
 function DaysRemainingBar({ days }: { days: number }) {
   const { t } = useTranslation();
@@ -192,7 +136,7 @@ function DaysRemainingBar({ days }: { days: number }) {
             : "text-emerald-700 dark:text-emerald-400"
         )}>
           <RiTimerLine className="w-3 h-3" />
-          {fmtDaysRemaining(days, t as (k: string) => string)}
+          {fmtDaysRemainingText(days, t as (k: string) => string)}
         </span>
         <span className={cn(
           "text-[10px] font-bold tabular-nums",
@@ -404,7 +348,7 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
                   <div className="w-full space-y-1.5">
                     <div className="bg-muted/40 rounded-xl px-4 py-2.5 text-[11px] text-muted-foreground flex items-center justify-between gap-2">
                       <span>{t("remind.expiration_date_label")}</span>
-                      <span className="font-semibold text-foreground font-mono">{fmtDate(whois.expirationDate, locale)}</span>
+                      <span className="font-semibold text-foreground font-mono">{fmtLocalDate(whois.expirationDate, locale)}</span>
                     </div>
                     {whois.remainingDays !== null && <DaysRemainingBar days={whois.remainingDays} />}
                   </div>
@@ -536,7 +480,7 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
                           <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-medium uppercase tracking-wide">
                             <RiTimeLine className="w-2.5 h-2.5" /> {t("remind.reg_date")}
                           </div>
-                          <div className="text-[11px] font-mono font-semibold text-foreground">{fmtDate(whois.creationDate, locale)}</div>
+                          <div className="text-[11px] font-mono font-semibold text-foreground">{fmtLocalDate(whois.creationDate, locale)}</div>
                           {whois.domainAge !== null && (
                             <div className="text-[9px] text-muted-foreground">{t("remind.days_registered").replace("{{n}}", String(whois.domainAge))}</div>
                           )}
@@ -557,9 +501,9 @@ function DirectSubscribeForm({ domain }: { domain: string }) {
                           )}>
                             <RiCalendarLine className="w-2.5 h-2.5" /> {t("remind.exp_date")}
                           </div>
-                          <div className="text-[11px] font-mono font-semibold text-foreground">{fmtDate(whois.expirationDate, locale)}</div>
+                          <div className="text-[11px] font-mono font-semibold text-foreground">{fmtLocalDate(whois.expirationDate, locale)}</div>
                           {whois.updatedDate && (
-                            <div className="text-[9px] text-muted-foreground">{t("remind.updated_date").replace("{{date}}", fmtDate(whois.updatedDate, locale))}</div>
+                            <div className="text-[9px] text-muted-foreground">{t("remind.updated_date").replace("{{date}}", fmtLocalDate(whois.updatedDate, locale))}</div>
                           )}
                         </div>
                       )}

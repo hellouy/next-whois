@@ -394,3 +394,7 @@ export function isSearchRoute(url: string): boolean {
   const clean = url.split("?")[0].replace(/^\/(en|zh|zh-tw|de|ru|ja|fr|ko)(\/|$)/, "/");
   return !STATIC_PAGE_PREFIXES.some((p) => clean === p || clean.startsWith(p + "/"));
 }
+
+export const CURRENCY_SYMBOL: Record<string, string> = {
+  CNY: "¥", USD: "$", EUR: "€", HKD: "HK$", GBP: "£", JPY: "¥",
+};
