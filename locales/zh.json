@@ -1670,6 +1670,7 @@
     "nav_api": "API 集成",
     "nav_db_export": "数据导出",
     "nav_settings": "网站设置",
+    "nav_server_test": "服务器测试",
     "nav_git_fix": "仓库工具"
   },
   "common": {

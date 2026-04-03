@@ -27,6 +27,7 @@ import {
   RiDownloadLine,
   RiCodeBoxLine,
   RiBillLine,
+  RiWifiLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -80,10 +81,11 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: "admin.nav_system",
     items: [
-      { href: "/admin/system",    labelKey: "admin.nav_system_label", icon: RiServerLine,    activeIcon: RiServerFill },
-      { href: "/admin/db-export", labelKey: "admin.nav_db_export",    icon: RiDownloadLine,  activeIcon: RiDownloadLine },
-      { href: "/admin/git-fix",   labelKey: "admin.nav_git_fix",      icon: RiGithubLine,    activeIcon: RiGithubLine },
-      { href: "/admin/settings",  labelKey: "admin.nav_settings",     icon: RiSettings4Line, activeIcon: RiSettings4Fill },
+      { href: "/admin/system",      labelKey: "admin.nav_system_label",  icon: RiServerLine,    activeIcon: RiServerFill },
+      { href: "/admin/server-test", labelKey: "admin.nav_server_test",   icon: RiWifiLine,      activeIcon: RiWifiLine },
+      { href: "/admin/db-export",   labelKey: "admin.nav_db_export",     icon: RiDownloadLine,  activeIcon: RiDownloadLine },
+      { href: "/admin/git-fix",     labelKey: "admin.nav_git_fix",       icon: RiGithubLine,    activeIcon: RiGithubLine },
+      { href: "/admin/settings",    labelKey: "admin.nav_settings",      icon: RiSettings4Line, activeIcon: RiSettings4Fill },
     ],
   },
 ];
