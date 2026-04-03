@@ -127,7 +127,8 @@ export function DomainReminderDialog({
       if (res.ok) {
         setDone(true);
       } else {
-        toast.error(isZh ? "提交失败，请重试" : "Submission failed");
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || (isZh ? "提交失败，请重试" : "Submission failed"));
       }
     } catch {
       toast.error(isZh ? "网络错误" : "Network error");
