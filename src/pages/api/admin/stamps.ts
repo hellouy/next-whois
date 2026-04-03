@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes } from "crypto";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
+import { invalidateStampCache } from "@/lib/stamp-cache";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -103,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { verified, tag_name, tag_style, card_theme, link, description } = req.body;
 
     const ALLOWED_TAG_STYLES  = ["personal","official","brand","verified","partner","dev","warning","premium"];
-    const ALLOWED_CARD_THEMES = ["app","gradient","celebrate","split","flash","neon"];
+    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","celebrate","neon","gradient","split","flash"];
 
     try {
       if (verified === true) {
@@ -130,7 +131,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         params.push(id);
         await run(`UPDATE stamps SET ${sets.join(", ")} WHERE id = $${params.length}`, params);
       }
-      const updated = await one("SELECT * FROM stamps WHERE id = $1", [id]);
+      const updated = await one<{ domain: string }>("SELECT * FROM stamps WHERE id = $1", [id]);
+      if (updated?.domain) invalidateStampCache(updated.domain);
       return res.json({ ok: true, stamp: updated });
     } catch (err: any) {
       console.error("[admin/stamps] PATCH error:", err.message);
