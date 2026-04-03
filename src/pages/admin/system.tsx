@@ -53,6 +53,8 @@ export default function AdminSystemPage() {
   const [optPreviewLoading, setOptPreviewLoading] = React.useState(false);
   const [optimizing, setOptimizing] = React.useState(false);
   const [optReport, setOptReport] = React.useState<OptimizeItem[] | null>(null);
+  const [confirmTrigger, setConfirmTrigger] = React.useState(false);
+  const [confirmClear, setConfirmClear] = React.useState(false);
 
   function load() {
     setLoading(true);
@@ -69,7 +71,7 @@ export default function AdminSystemPage() {
   React.useEffect(() => { load(); }, []);
 
   async function triggerReminder() {
-    if (!confirm("手动触发今日提醒处理？\n系统将查询到期域名并发送邮件通知。")) return;
+    setConfirmTrigger(false);
     setTriggering(true);
     try {
       const r = await fetch("/api/remind/process", { method: "POST" });
@@ -84,7 +86,7 @@ export default function AdminSystemPage() {
   }
 
   async function clearRateLimits() {
-    if (!confirm("清理已过期的频率限制记录？\n这不会影响仍在冷却期内的限制。")) return;
+    setConfirmClear(false);
     setClearingRateLimit(true);
     try {
       const r = await fetch("/api/admin/system", {
@@ -122,7 +124,6 @@ export default function AdminSystemPage() {
   }
 
   async function runOptimize() {
-    if (!confirm("确认执行数据库优化？\n\n将删除所有过期/孤立数据，刷新查询统计信息。此操作不可撤销。")) return;
     setOptimizing(true);
     setOptPreview(null);
     setOptReport(null);
@@ -347,16 +348,23 @@ export default function AdminSystemPage() {
                     <p className="text-sm font-semibold">手动触发提醒</p>
                   </div>
                   <p className="text-xs text-muted-foreground">立即执行今日域名到期提醒任务，发送邮件通知给所有监控用户</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={triggerReminder}
-                    disabled={triggering}
-                    className="w-full h-8 rounded-lg text-xs gap-2 mt-1"
-                  >
-                    {triggering ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiBellLine className="w-3.5 h-3.5" />}
-                    {triggering ? "执行中…" : "立即触发"}
-                  </Button>
+                  {confirmTrigger ? (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">确认触发？将立即发送邮件通知</span>
+                      <Button size="sm" variant="outline" onClick={triggerReminder} disabled={triggering}
+                        className="h-7 px-2.5 rounded-lg text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                        {triggering ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : "确认"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmTrigger(false)} disabled={triggering}
+                        className="h-7 px-2.5 rounded-lg text-xs">取消</Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setConfirmTrigger(true)} disabled={triggering}
+                      className="w-full h-8 rounded-lg text-xs gap-2 mt-1">
+                      {triggering ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiBellLine className="w-3.5 h-3.5" />}
+                      {triggering ? "执行中…" : "立即触发"}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Clear rate limits */}
@@ -368,16 +376,23 @@ export default function AdminSystemPage() {
                   <p className="text-xs text-muted-foreground">
                     删除已过期的频率限制记录（当前活跃 {data.stats.rateLimits.active} 条）
                   </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={clearRateLimits}
-                    disabled={clearingRateLimit}
-                    className="w-full h-8 rounded-lg text-xs gap-2 mt-1"
-                  >
-                    {clearingRateLimit ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
-                    {clearingRateLimit ? "清理中…" : "清理过期记录"}
-                  </Button>
+                  {confirmClear ? (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">确认清理？不影响冷却中的限制</span>
+                      <Button size="sm" variant="outline" onClick={clearRateLimits} disabled={clearingRateLimit}
+                        className="h-7 px-2.5 rounded-lg text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                        {clearingRateLimit ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : "确认"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmClear(false)} disabled={clearingRateLimit}
+                        className="h-7 px-2.5 rounded-lg text-xs">取消</Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setConfirmClear(true)} disabled={clearingRateLimit}
+                      className="w-full h-8 rounded-lg text-xs gap-2 mt-1">
+                      {clearingRateLimit ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
+                      {clearingRateLimit ? "清理中…" : "清理过期记录"}
+                    </Button>
+                  )}
                 </div>
 
                 {/* DB one-click optimize */}

@@ -1,5 +1,28 @@
 # Next Whois UI — v3.35
 
+## Task #7 — Dashboard & Admin UX Improvements (2026-04-03)
+
+### i18n — dashboard.tsx
+- **17 new locale keys** added to `locales/en.json`, `locales/zh.json`, `locales/zh-tw.json` (dashboard section): `code_sent`, `send_failed`, `code_required`, `email_confirm_mismatch`, `account_deleted`, `delete_account_failed`, `sub_search_placeholder`, `code_placeholder`, `send_code`, `delete_account`, `confirm_delete_title/prefix/irreversible/suffix/email_placeholder/btn`, `activation_code_redeemable`
+- **6 hardcoded Chinese toast messages** replaced with `t()` calls in dashboard.tsx
+- **Delete account UI strings** fully internationalised: button label, dialog title, warning paragraph (with red span), email placeholder, confirm and cancel buttons
+- **Subscription search placeholder** and **activation code label** fixed to use `t()`
+- **Email change** code placeholder and "Send Code" button text fixed to use `t()`
+
+### Duplicate contact form removed
+- Removed ~80-line duplicate contact form from the Membership tab (kept only the one in Account tab)
+
+### Unauthenticated redirect
+- Changed loading state: when `status === "unauthenticated"`, return `null` immediately (redirect fires via `router.replace("/login")`); spinner only shown during `"loading"` state
+
+### Admin system.tsx — inline confirmations
+- Replaced `window.confirm()` with two state flags (`confirmTrigger`, `confirmClear`)
+- **Trigger Reminders** button: first click shows inline amber confirmation row; second click executes; cancel dismisses
+- **Clear Rate Limits** button: same pattern
+- **DB Optimize** button: already had 2-step preview flow; removed stale `window.confirm()` guard
+
+---
+
 ## Task #6 — UX Polish & Code Quality (2026-04-03)
 
 ### UX Improvements

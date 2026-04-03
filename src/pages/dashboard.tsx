@@ -1049,7 +1049,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("验证码已发送到新邮箱");
+      toast.success(t("dashboard.code_sent"));
       let countdown = 60;
       setChangeCodeCooldown(countdown);
       const timer = setInterval(() => {
@@ -1058,7 +1058,7 @@ export default function DashboardPage() {
         if (countdown <= 0) clearInterval(timer);
       }, 1000);
     } catch (e: any) {
-      toast.error(e.message || "发送失败");
+      toast.error(e.message || t("dashboard.send_failed"));
     } finally {
       setSendingChangeCode(false);
     }
@@ -1066,7 +1066,7 @@ export default function DashboardPage() {
 
   async function saveEmail() {
     if (!emailValue.trim()) { toast.error(t("dashboard.enter_email")); return; }
-    if (!emailChangeCode.trim()) { toast.error("请填写发送到新邮箱的验证码"); return; }
+    if (!emailChangeCode.trim()) { toast.error(t("dashboard.code_required")); return; }
     setSavingEmail(true);
     try {
       const res = await fetch("/api/user/profile", {
@@ -1090,7 +1090,7 @@ export default function DashboardPage() {
 
   async function deleteAccount() {
     if (deleteConfirmEmail.toLowerCase().trim() !== user?.email?.toLowerCase()) {
-      toast.error("确认邮箱不匹配");
+      toast.error(t("dashboard.email_confirm_mismatch"));
       return;
     }
     setDeletingAccount(true);
@@ -1102,10 +1102,10 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("账户已注销");
+      toast.success(t("dashboard.account_deleted"));
       await signOut({ callbackUrl: "/" });
     } catch (e: any) {
-      toast.error(e.message || "注销失败，请稍后再试");
+      toast.error(e.message || t("dashboard.delete_account_failed"));
     } finally {
       setDeletingAccount(false);
     }
@@ -1187,7 +1187,9 @@ export default function DashboardPage() {
     }
   }
 
-  if (status === "loading" || status === "unauthenticated") {
+  if (status === "unauthenticated") return null;
+
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <RiLoader4Line className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -1458,7 +1460,7 @@ export default function DashboardPage() {
                     type="text"
                     value={subSearch}
                     onChange={e => setSubSearch(e.target.value)}
-                    placeholder="搜索域名…"
+                    placeholder={t("dashboard.sub_search_placeholder")}
                     className="w-full h-9 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
                   />
                   {subSearch && (
@@ -2145,7 +2147,7 @@ export default function DashboardPage() {
                     <RiStarLine className="w-3.5 h-3.5 text-violet-500" />
                     <p className="text-xs font-semibold">{t("dashboard.buy_membership")}</p>
                     {plans.length > 0 && !paymentEnabled && (
-                      <span className="text-[10px] text-muted-foreground/60 ml-auto">激活码可兑换</span>
+                      <span className="text-[10px] text-muted-foreground/60 ml-auto">{t("dashboard.activation_code_redeemable")}</span>
                     )}
                   </div>
 
@@ -2319,86 +2321,6 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* ── 联系客服 ── */}
-                <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                  <div className="px-4 pt-3 pb-2 border-b border-border/60 flex items-center gap-2">
-                    <RiMailLine className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-xs font-semibold">{t("contact.title")}</p>
-                  </div>
-                  {contactSent ? (
-                    <div className="px-4 py-5 flex flex-col items-center gap-2 text-center">
-                      <RiCheckboxCircleLine className="w-8 h-8 text-emerald-500" />
-                      <p className="text-xs font-semibold">{t("contact.sent_title")}</p>
-                      <button onClick={() => { setContactSent(false); setContactMsg(""); setContactCategory(t("contact.cat_payment")); }} className="text-[10px] text-muted-foreground hover:text-foreground mt-1">{t("contact.resend")}</button>
-                    </div>
-                  ) : (
-                    <div className="px-4 py-3 space-y-2.5">
-                      {/* Category selector */}
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-medium text-muted-foreground">{t("contact.category_label")}</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {([
-                            [t("contact.cat_payment"), "cat_payment"],
-                            [t("contact.cat_membership"), "cat_membership"],
-                            [t("contact.cat_feature"), "cat_feature"],
-                            [t("contact.cat_other"), "cat_other"],
-                          ] as [string, string][]).map(([label]) => (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => setContactCategory(label)}
-                              className={cn(
-                                "h-8 rounded-xl text-[11px] font-medium border transition-all",
-                                contactCategory === label
-                                  ? "bg-foreground text-background border-foreground"
-                                  : "bg-muted/30 text-muted-foreground border-border hover:border-muted-foreground/40"
-                              )}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <textarea
-                        value={contactMsg}
-                        onChange={e => setContactMsg(e.target.value)}
-                        placeholder={t("contact.placeholder")}
-                        rows={3}
-                        maxLength={500}
-                        className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/40"
-                      />
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] text-muted-foreground/60">{t("contact.char_count", { count: contactMsg.length })}</p>
-                        <Button
-                          size="sm"
-                          className="h-8 rounded-xl text-xs gap-1.5 shrink-0"
-                          disabled={!contactMsg.trim() || contactSending}
-                          onClick={async () => {
-                            if (!contactMsg.trim()) return;
-                            setContactSending(true);
-                            try {
-                              const r = await fetch("/api/user/contact", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ category: contactCategory, message: contactMsg }),
-                              });
-                              if (!r.ok) { toast.error(t("contact.send_failed")); return; }
-                              setContactSent(true);
-                            } catch {
-                              toast.error(t("contact.send_failed"));
-                            } finally {
-                              setContactSending(false);
-                            }
-                          }}
-                        >
-                          {contactSending ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiMailLine className="w-3.5 h-3.5" />}
-                          {t("contact.send")}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* ── 支付说明 ── */}
                 <div className="px-1 text-[10px] text-muted-foreground/60 text-center leading-relaxed">
                   {t("dashboard.payment_methods")}
@@ -2531,7 +2453,7 @@ export default function DashboardPage() {
                           type="text"
                           value={emailChangeCode}
                           onChange={e => setEmailChangeCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                          placeholder="6 位验证码"
+                          placeholder={t("dashboard.code_placeholder")}
                           className="h-8 rounded-xl text-xs flex-1 font-mono tracking-widest"
                           maxLength={6}
                         />
@@ -2542,7 +2464,7 @@ export default function DashboardPage() {
                           onClick={sendEmailChangeCode}
                           className="h-8 text-xs rounded-lg shrink-0 whitespace-nowrap"
                         >
-                          {sendingChangeCode ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : "发送验证码"}
+                          {sendingChangeCode ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : t("dashboard.send_code")}
                         </Button>
                       </div>
                       <p className="text-[10px] text-amber-600 dark:text-amber-400">{t("dashboard.email_change_warn")}</p>
@@ -2682,20 +2604,22 @@ export default function DashboardPage() {
                   className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs text-muted-foreground/60 hover:text-red-500 transition-colors"
                 >
                   <RiDeleteBinLine className="w-3.5 h-3.5" />
-                  注销账户
+                  {t("dashboard.delete_account")}
                 </button>
               ) : (
                 <div className="glass-panel border border-red-200/50 dark:border-red-800/40 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <RiAlertLine className="w-4 h-4 text-red-500 shrink-0" />
-                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">确认注销账户</p>
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">{t("dashboard.confirm_delete_title")}</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">此操作<span className="font-semibold text-red-500">不可撤销</span>，将永久删除您的账户和所有数据（包括订阅、品牌印章等）。请输入您的邮箱地址确认：</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {t("dashboard.confirm_delete_prefix")}<span className="font-semibold text-red-500">{t("dashboard.confirm_delete_irreversible")}</span>{t("dashboard.confirm_delete_suffix")}
+                  </p>
                   <Input
                     type="email"
                     value={deleteConfirmEmail}
                     onChange={e => setDeleteConfirmEmail(e.target.value)}
-                    placeholder={user?.email || "输入您的邮箱地址"}
+                    placeholder={user?.email || t("dashboard.confirm_delete_email_placeholder")}
                     className="h-9 rounded-xl text-xs"
                     autoComplete="off"
                   />
@@ -2708,10 +2632,10 @@ export default function DashboardPage() {
                       onClick={deleteAccount}
                     >
                       {deletingAccount ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiDeleteBinLine className="w-3.5 h-3.5 mr-1" />}
-                      确认注销
+                      {t("dashboard.confirm_delete_btn")}
                     </Button>
                     <Button variant="outline" size="sm" className="h-8 text-xs rounded-lg" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(""); }}>
-                      取消
+                      {t("dashboard.cancel")}
                     </Button>
                   </div>
                 </div>
