@@ -399,7 +399,8 @@
     "invalid_chars": "域名里有奇怪的字符，只能用字母、数字和连字符（-）",
     "invalid_domain": "域名格式不对，两端不能用连字符",
     "invalid_tld": "'{{tld}}' 太短了 — 真实的域名后缀至少 2 个字母",
-    "unknown_tld": "'{{tld}}' 不在 ICANN 后缀列表里，可能打错了？（如 .com、.net、.io）"
+    "unknown_tld_suggest": "嗯……'{{tld}}' 不是真实后缀，你是不是想输入 '{{suggestion}}'？",
+    "unknown_tld_gibberish": "'{{tld}}' 不是真实的域名后缀，请查看 /tlds 页面了解支持的后缀"
   },
   "stamp": {
     "title": "品牌认领",

@@ -399,7 +399,8 @@
     "invalid_chars": "잘못된 문자 — 영문자, 숫자, 하이픈만 사용 가능",
     "invalid_domain": "잘못된 도메인 형식",
     "invalid_tld": "TLD '{{tld}}'가 너무 짧습니다 — 최소 2자 이상",
-    "unknown_tld": "알 수 없는 확장자 '{{tld}}' — 오타를 확인하세요 (.com, .comm 아님)"
+    "unknown_tld_suggest": "음, '{{tld}}'는 존재하지 않습니다 — '{{suggestion}}'을 입력하려 하셨나요?",
+    "unknown_tld_gibberish": "'{{tld}}'는 유효한 TLD가 아닙니다 — 지원되는 확장자는 /tlds 에서 확인하세요"
   },
   "stamp": {
     "title": "브랜드 인증",

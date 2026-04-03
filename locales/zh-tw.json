@@ -399,7 +399,8 @@
     "invalid_chars": "包含無效字元，僅支援字母、數字和連字號",
     "invalid_domain": "域名格式無效",
     "invalid_tld": "頂級域 '{{tld}}' 太短，至少需要 2 個字母",
-    "unknown_tld": "未知域名後綴 '{{tld}}'，請檢查拼字（如 .com 而非 .comm）"
+    "unknown_tld_suggest": "嗯……'{{tld}}' 不是真實後綴，你是不是想輸入 '{{suggestion}}'？",
+    "unknown_tld_gibberish": "'{{tld}}' 不是真實的網域後綴，請查看 /tlds 頁面了解支援的後綴"
   },
   "stamp": {
     "title": "品牌認領",

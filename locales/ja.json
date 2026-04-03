@@ -399,7 +399,8 @@
     "invalid_chars": "無効な文字が含まれています — 英数字とハイフンのみ使用可能",
     "invalid_domain": "無効なドメイン形式",
     "invalid_tld": "TLD '{{tld}}' が短すぎます — 2文字以上必要",
-    "unknown_tld": "不明な拡張子 '{{tld}}' — タイポを確認してください（例：.com、.commではなく）"
+    "unknown_tld_suggest": "んー、'{{tld}}' は存在しません — '{{suggestion}}' の間違いでしょうか？",
+    "unknown_tld_gibberish": "'{{tld}}' は有効な TLD ではありません — 対応する拡張子は /tlds でご確認ください"
   },
   "stamp": {
     "title": "ブランド申請",

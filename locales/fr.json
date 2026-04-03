@@ -399,7 +399,8 @@
     "invalid_chars": "Caractères invalides — utilisez uniquement des lettres, chiffres et tirets",
     "invalid_domain": "Format de domaine invalide",
     "invalid_tld": "Le TLD '{{tld}}' est trop court — minimum 2 lettres",
-    "unknown_tld": "Extension inconnue '{{tld}}' — vérifiez les fautes de frappe (ex. .com et non .comm)"
+    "unknown_tld_suggest": "Hmm, '{{tld}}' n'existe pas — vouliez-vous dire '{{suggestion}}' ?",
+    "unknown_tld_gibberish": "'{{tld}}' n'est pas une extension valide — consultez /tlds pour les extensions supportées"
   },
   "stamp": {
     "title": "Revendication de marque",

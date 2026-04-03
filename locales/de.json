@@ -399,7 +399,8 @@
     "invalid_chars": "Ungültige Zeichen — nur Buchstaben, Ziffern und Bindestriche erlaubt",
     "invalid_domain": "Ungültiges Domain-Format",
     "invalid_tld": "TLD '{{tld}}' zu kurz — mindestens 2 Buchstaben erforderlich",
-    "unknown_tld": "Unbekannte Endung '{{tld}}' — bitte auf Tippfehler prüfen (z. B. .com statt .comm)"
+    "unknown_tld_suggest": "Hmm, '{{tld}}' existiert nicht — meinten Sie '{{suggestion}}'?",
+    "unknown_tld_gibberish": "'{{tld}}' ist keine gültige TLD — unterstützte Endungen finden Sie unter /tlds"
   },
   "stamp": {
     "title": "Markenregistrierung",

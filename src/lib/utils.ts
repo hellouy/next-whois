@@ -177,8 +177,6 @@ export type SearchValidationResult = {
   cleaned: string;
   errorKey?: string;
   errorArgs?: Record<string, string>;
-  /** true = show as amber warning but still allow the search to proceed */
-  isWarning?: boolean;
 };
 
 /**
@@ -263,20 +261,73 @@ export function validateAndSanitizeInput(raw: string): SearchValidationResult {
   const parsed = parse(cleaned, { allowPrivateDomains: false });
   const hasNonAsciiTld = /[^\x00-\x7F]/.test(tld); // IDN TLD — be lenient
   if (!parsed.isIcann && !hasNonAsciiTld) {
-    // Soft warning: show the amber notice but still allow the search to proceed.
-    // The WHOIS/RDAP server will give the authoritative answer if the TLD truly
-    // doesn't exist, and this avoids false-blocking newly-delegated gTLDs that
-    // haven't propagated to the tldts PSL snapshot yet.
+    // Hard rejection: unknown TLD is invalid input. Find best similar TLD
+    // suggestion using Levenshtein distance for a smarter error message.
+    const suggestion = findClosestTld(tld);
+    const errorKey = suggestion
+      ? "validation.unknown_tld_suggest"
+      : "validation.unknown_tld_gibberish";
     return {
-      valid: true,
+      valid: false,
       cleaned,
-      errorKey: "validation.unknown_tld",
-      errorArgs: { tld: `.${tld}` },
-      isWarning: true,
+      errorKey,
+      errorArgs: suggestion
+        ? { tld: `.${tld}`, suggestion: `.${suggestion}` }
+        : { tld: `.${tld}` },
     };
   }
 
   return { valid: true, cleaned };
+}
+
+// ── TLD suggestion helpers ──────────────────────────────────────────────────
+
+/**
+ * A compact list of the most common ICANN TLDs used for closest-match
+ * suggestions when the user enters an unknown TLD.
+ */
+const COMMON_TLDS = [
+  "com","net","org","io","dev","app","ai","co","xyz","online","site","tech",
+  "info","biz","mobi","pro","name","me","cc","tv","us","uk","ca","au","de",
+  "fr","jp","cn","ru","br","in","it","es","nl","se","no","fi","dk","pl","cz",
+  "at","ch","be","pt","ie","nz","sg","hk","tw","kr","th","my","id","ph","vn",
+  "tr","za","mx","ar","cl","eu","edu","gov","mil","int","museum","blog","live",
+  "life","world","today","inc","ltd","group","agency","studio","cloud","code",
+  "sh","so","run","link","click","one","moe","fun","space","vip","top","gg",
+];
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Find the closest known TLD to the input. Returns the suggestion string
+ * (without dot) if distance <= 2, or null if nothing is close enough.
+ */
+function findClosestTld(input: string): string | null {
+  const lower = input.toLowerCase();
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const tld of COMMON_TLDS) {
+    const dist = levenshtein(lower, tld);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = tld;
+    }
+  }
+  // Only suggest if reasonably close (distance ≤ 2)
+  return bestDist <= 2 ? best : null;
 }
 
 export function smartCleanDomain(input: string): string {

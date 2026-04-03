@@ -399,7 +399,8 @@
     "invalid_chars": "Odd characters detected — stick to letters, digits, and hyphens",
     "invalid_domain": "Invalid format — labels can't start or end with a hyphen",
     "invalid_tld": "'{{tld}}' is too short to be a real TLD — must be at least 2 letters",
-    "unknown_tld": "'{{tld}}' isn't in the ICANN TLD registry — typo? (try .com, .net, .io)"
+    "unknown_tld_suggest": "Hmm, '{{tld}}' doesn't exist — did you mean '{{suggestion}}'?",
+    "unknown_tld_gibberish": "'{{tld}}' isn't a real TLD — check the /tlds page for supported extensions"
   },
   "stamp": {
     "title": "Brand Claim",
