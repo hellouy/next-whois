@@ -31,6 +31,10 @@ import type { HistoryItem } from "@/lib/history";
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
 import { StampPreviewCard, STAMP_CARD_THEMES } from "@/components/stamp-preview-card";
+import { SubscriptionsTab } from "@/components/dashboard/SubscriptionsTab";
+import { StampsTab } from "@/components/dashboard/StampsTab";
+import { MembershipTab } from "@/components/dashboard/MembershipTab";
+import { AccountTab } from "@/components/dashboard/AccountTab";
 
 type Subscription = {
   id: string; domain: string; expiration_date: string | null;
@@ -816,7 +820,7 @@ export default function DashboardPage() {
   const [searchStats, setSearchStats] = React.useState<SearchStats | null>(null);
 
   React.useEffect(() => {
-    if (status === "unauthenticated") router.replace("/login");
+    if (status === "unauthenticated") router.replace("/login?callbackUrl=/dashboard");
   }, [status, router]);
 
   React.useEffect(() => {
@@ -1187,6 +1191,12 @@ export default function DashboardPage() {
     }
   }
 
+  function retryLoad() {
+    setDashError(false);
+    setLoadingData(true);
+    fetchDashData().then(applyDashData).catch(() => setDashError(true)).finally(() => setLoadingData(false));
+  }
+
   if (status === "unauthenticated") return null;
 
   if (status === "loading") {
@@ -1378,1271 +1388,145 @@ export default function DashboardPage() {
         <AnimatePresence mode="wait">
           {/* ── Subscriptions ── */}
           {tab === "subscriptions" && (
-            <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
-              {!(subscriptionAccessDB ?? (user as any).subscriptionAccess) && (
-                <div className="space-y-5 py-4">
-                  <div className="flex flex-col items-center text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center">
-                      <RiLockLine className="w-6 h-6 text-amber-500" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold">{t("dashboard.needs_invite")}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px] mx-auto">
-                        {t("dashboard.needs_invite_desc")}
-                      </p>
-                    </div>
-                  </div>
-                  {paymentEnabled && (
-                    <Link href="/payment/checkout">
-                      <Button className="w-full h-9 rounded-xl gap-1.5 text-xs bg-violet-600 hover:bg-violet-700 text-white">
-                        <RiBankCardLine className="w-3.5 h-3.5" />{t("dashboard.buy_plan_unlock")}
-                      </Button>
-                    </Link>
-                  )}
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50 justify-center select-none">
-                    <span>{t("dashboard.or_invite_code")}</span>
-                  </div>
-                  <form onSubmit={handleApplyInviteCode} className="space-y-2">
-                    <div className="relative">
-                      <RiKeyLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                      <input
-                        type="text"
-                        placeholder={t("dashboard.invite_code_placeholder")}
-                        value={inviteCodeInput}
-                        onChange={e => setInviteCodeInput(e.target.value.toUpperCase())}
-                        disabled={applyingCode}
-                        maxLength={24}
-                        autoComplete="off"
-                        className="w-full h-10 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs font-mono font-semibold tracking-wider focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition disabled:opacity-50"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={applyingCode || !inviteCodeInput.trim()}
-                      size="sm"
-                      className="w-full h-9 rounded-xl gap-1.5 text-xs"
-                    >
-                      {applyingCode
-                        ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.verifying")}</>
-                        : <><RiKeyLine className="w-3.5 h-3.5" />{t("dashboard.verify_unlock")}</>
-                      }
-                    </Button>
-                  </form>
-                </div>
-              )}
-              {(subscriptionAccessDB ?? (user as any).subscriptionAccess) && <>
-              {/* Header */}
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.sub_section_title")}</p>
-                <div className="flex items-center gap-2">
-                  {activeSubs.length > 0 && (
-                    <button
-                      onClick={exportSubscriptionsCSV}
-                      className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
-                    >
-                      <RiDownloadLine className="w-3 h-3" />{t("dashboard.export_csv")}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowSubscribeGuide(true)}
-                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
-                  >
-                    <RiCalendarLine className="w-3 h-3" />{t("dashboard.new_sub")}
-                  </button>
-                </div>
-              </div>
-
-              {/* Subscription search */}
-              {subscriptions.length > 4 && (
-                <div className="relative">
-                  <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-                  <input
-                    type="text"
-                    value={subSearch}
-                    onChange={e => setSubSearch(e.target.value)}
-                    placeholder={t("dashboard.sub_search_placeholder")}
-                    className="w-full h-9 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
-                  />
-                  {subSearch && (
-                    <button onClick={() => setSubSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground">
-                      <RiCloseLine className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Subscription membership expiry */}
-              {subscriptionExpiresAt && (
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-700/30 text-[11px] text-violet-700 dark:text-violet-400">
-                  <RiVipCrownLine className="w-3 h-3 shrink-0" />
-                  <span>{t("dashboard.member_until")} <span className="font-semibold font-mono">{new Date(subscriptionExpiresAt).toLocaleDateString()}</span></span>
-                </div>
-              )}
-
-              {/* In-tab filter chips */}
-              {activeSubs.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSubFilter("all")}
-                    className={cn(
-                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
-                      subFilter === "all"
-                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border-emerald-400/60"
-                        : "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-700/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                    )}
-                  >
-                    <RiCheckLine className="w-2.5 h-2.5" />{activeSubs.length} {t("dashboard.chip_active")}
-                  </button>
-                  {expiringSoon.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSubFilter(subFilter === "expiring" ? "all" : "expiring")}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
-                        subFilter === "expiring"
-                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border-amber-400/60"
-                          : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200/50 dark:border-amber-700/30 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                      )}
-                    >
-                      <RiTimerLine className="w-2.5 h-2.5" />{expiringSoon.length} {t("dashboard.chip_expiring")}
-                    </button>
-                  )}
-                  {urgentSubs.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSubFilter(subFilter === "urgent" ? "all" : "urgent")}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
-                        subFilter === "urgent"
-                          ? "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 border-red-400/60"
-                          : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-700/30 hover:bg-red-100 dark:hover:bg-red-900/40"
-                      )}
-                    >
-                      <RiFireLine className="w-2.5 h-2.5" />{urgentSubs.length} {t("dashboard.chip_urgent")}
-                    </button>
-                  )}
-                  {postExpirySubs.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSubFilter(subFilter === "expired" ? "all" : "expired")}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
-                        subFilter === "expired"
-                          ? "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 border-orange-400/60"
-                          : "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-700/30 hover:bg-orange-100 dark:hover:bg-orange-900/40"
-                      )}
-                    >
-                      <RiAlertLine className="w-2.5 h-2.5" />{postExpirySubs.length} {t("dashboard.chip_expired")}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Urgent alert banner */}
-              {urgentSubs.length > 0 && (
-                <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40">
-                  <RiFireLine className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-red-700 dark:text-red-300 font-semibold">
-                      {t("dashboard.urgent_domains", { count: urgentSubs.length })}
-                    </p>
-                    <p className="text-[11px] text-red-600/80 dark:text-red-400/80 mt-0.5">
-                      {urgentSubs.map(s => s.domain).join(", ")}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Post-expiry phase alert */}
-              {postExpirySubs.length > 0 && urgentSubs.length === 0 && (
-                <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200/60 dark:border-orange-800/40">
-                  <RiAlertLine className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-orange-700 dark:text-orange-300 font-semibold">
-                      {t("dashboard.post_expiry_domains", { count: postExpirySubs.length })}
-                    </p>
-                    <p className="text-[11px] text-orange-600/80 dark:text-orange-400/80 mt-0.5">
-                      {postExpirySubs.map(s => s.domain).join(", ")}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {loadingData ? (
-                <div className="flex justify-center py-8"><RiLoader4Line className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-              ) : dashError ? (
-                <div className="flex flex-col items-center py-10 gap-3 text-center">
-                  <RiAlertLine className="w-7 h-7 text-destructive/60" />
-                  <p className="text-sm text-muted-foreground">{t("dashboard.load_failed")}</p>
-                  <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5" onClick={() => {
-                    setDashError(false); setLoadingData(true);
-                    fetchDashData().then(applyDashData).catch(() => setDashError(true)).finally(() => setLoadingData(false));
-                  }}>{t("dashboard.reload")}</Button>
-                </div>
-              ) : subscriptions.length === 0 ? (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/8 border border-dashed border-border flex items-center justify-center mx-auto">
-                    <RiCalendarLine className="w-7 h-7 text-muted-foreground/40" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-sm font-semibold">{t("dashboard.no_subs")}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {t("dashboard.no_subs_desc")}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 items-center">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="rounded-xl text-xs gap-1.5"
-                      onClick={() => setShowSubscribeGuide(true)}
-                    >
-                      <RiBellLine className="w-3.5 h-3.5" />{t("dashboard.how_to_sub")}
-                    </Button>
-                    <Link href="/remind" className="text-[11px] text-muted-foreground hover:text-primary underline underline-offset-2">
-                      {t("dashboard.go_sub_mgmt")}
-                    </Link>
-                  </div>
-                </div>
-              ) : filteredSubscriptions.length === 0 ? (
-                <div className="flex flex-col items-center py-8 gap-2 text-center">
-                  <RiSearchLine className="w-6 h-6 text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">{t("dashboard.no_filter_results")}</p>
-                  <button type="button" onClick={() => setSubFilter("all")} className="text-[11px] text-primary hover:underline">{t("dashboard.clear_filter")}</button>
-                </div>
-              ) : filteredSubscriptions.map(sub => {
-                const phase = sub.phase;
-                const phaseInfo = phase ? PHASE_LABEL[phase] : null;
-                const days = daysUntilExpiry(sub);
-                const daysDropping = sub.days_to_drop;
-                const isDropSoon = sub.active && daysDropping !== null && daysDropping >= 0 && daysDropping <= 7 && phase !== "active";
-                const isUrgent = sub.active && ((days !== null && days >= 0 && days <= 7) || isDropSoon);
-                const isWarn = sub.active && days !== null && days >= 0 && days <= 30 && !isUrgent;
-                const isPostExpiry = sub.active && phase && phase !== "active";
-
-                // Lifecycle progress bar (days remaining / 365)
-                const barPct = (days !== null && days > 0 && phase === "active")
-                  ? Math.min(100, Math.round((days / 365) * 100))
-                  : 0;
-                const barColor = isUrgent ? "bg-red-500" : isWarn ? "bg-amber-500" : days !== null && days <= 90 ? "bg-yellow-500" : "bg-emerald-500";
-
-                // Reminder info
-                const nextReminderDate = sub.next_reminder_at ? new Date(sub.next_reminder_at) : null;
-                const lastReminderDate = sub.last_reminded_at ? new Date(sub.last_reminded_at) : null;
-                const daysSinceLastReminder = lastReminderDate
-                  ? Math.floor((Date.now() - lastReminderDate.getTime()) / 86400000)
-                  : null;
-                const nextReminderIsUpcoming = nextReminderDate && nextReminderDate > new Date();
-
-                // Phase guidance text
-                const phaseGuidance: Record<string, string> = {
-                  grace: t("dashboard.phase_guidance_grace"),
-                  redemption: t("dashboard.phase_guidance_redemption"),
-                  pendingDelete: t("dashboard.phase_guidance_pendingDelete"),
-                  dropped: t("dashboard.phase_guidance_dropped"),
-                };
-
-                return (
-                  <div key={sub.id} className={cn(
-                    "glass-panel border rounded-2xl p-4 space-y-3 transition-all",
-                    !sub.active ? "border-border/40 opacity-60" :
-                    isUrgent ? "border-red-300/60 dark:border-red-700/50" :
-                    isPostExpiry ? "border-orange-300/60 dark:border-orange-700/50" :
-                    isWarn ? "border-amber-300/60 dark:border-amber-700/50" : "border-border"
-                  )}>
-                    {/* Card header: icon + domain name + badges + actions */}
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-                        isUrgent ? "bg-red-100 dark:bg-red-950/40" :
-                        isPostExpiry ? "bg-orange-100 dark:bg-orange-950/40" :
-                        isWarn ? "bg-amber-100 dark:bg-amber-950/40" : "bg-primary/10"
-                      )}>
-                        {isUrgent ? <RiFireLine className="w-4 h-4 text-red-500" /> :
-                         isPostExpiry ? <RiAlertLine className="w-4 h-4 text-orange-500" /> :
-                         isWarn ? <RiTimerLine className="w-4 h-4 text-amber-500" /> :
-                         <RiGlobalLine className="w-4 h-4 text-primary" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold truncate">{sub.domain}</p>
-                          {!sub.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("dashboard.cancelled")}</span>}
-                          {isUrgent && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
-                              {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
-                            </span>
-                          )}
-                          {isWarn && !isUrgent && !isPostExpiry && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50">
-                              {t("dashboard.expires_in_days", { n: days ?? 0 })}
-                            </span>
-                          )}
-                          {isDropSoon && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold border border-purple-300/50">
-                              {daysDropping === 0 ? t("dashboard.drop_today") : t("dashboard.drop_in_days", { n: daysDropping })}
-                            </span>
-                          )}
-                          {phaseInfo && phase !== "active" && (
-                            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-md border", phaseInfo.color,
-                              phase === "grace" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300/50" :
-                              phase === "redemption" ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300/50" :
-                              phase === "pendingDelete" ? "bg-purple-50 dark:bg-purple-950/30 border-purple-300/50" :
-                              "bg-muted border-border/50"
-                            )}>{t(("dashboard.phase_" + phase) as any)}</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                          <RiTimeLine className="w-3 h-3 shrink-0" />
-                          {sub.expiration_date
-                            ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date), locale) })
-                            : t("dashboard.expiry_not_set")}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => setEditingSubscription(sub)}
-                          title={t("dashboard.edit_expiry_title")}
-                          className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                          <RiEdit2Line className="w-3.5 h-3.5" />
-                        </button>
-                        <Link href={`/${sub.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                          <RiExternalLinkLine className="w-3.5 h-3.5" />
-                        </Link>
-                        {sub.active && (
-                          <button onClick={() => cancelSubscription(sub.id)} disabled={cancelling === sub.id}
-                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">
-                            {cancelling === sub.id
-                              ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
-                              : <RiDeleteBinLine className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Lifecycle progress bar */}
-                    {sub.active && sub.expiration_date && phase === "active" && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] text-muted-foreground">{t("dashboard.remaining_validity")}</span>
-                          <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                            {days !== null && days > 0 ? t("dashboard.n_days", { n: days }) : days === 0 ? t("dashboard.expires_today") : t("dashboard.expired")}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full transition-all", barColor)}
-                            style={{ width: `${barPct}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Phase-specific guidance for post-expiry domains */}
-                    {isPostExpiry && phase && phaseGuidance[phase] && (
-                      <div className="px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-700/30">
-                        <p className="text-[11px] text-orange-700 dark:text-orange-300 leading-relaxed">
-                          {phaseGuidance[phase]}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Domain WHOIS info: registrar / creation date / nameservers */}
-                    {(sub.registrar || sub.creation_date || sub.nameservers?.length > 0) && (
-                      <div className="pt-2 border-t border-border/40 space-y-1.5">
-                        {(sub.registrar || sub.creation_date) && (
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {sub.registrar && (
-                              <div className="flex items-center gap-1 min-w-0">
-                                <RiInformationLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[160px]" title={sub.registrar}>{sub.registrar}</span>
-                              </div>
-                            )}
-                            {sub.creation_date && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <RiTimeLine className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-[10px] text-muted-foreground">{t("dashboard.registered_on")} {fmt(new Date(sub.creation_date), locale)}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {sub.nameservers?.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {sub.nameservers.slice(0, 4).map((ns, i) => (
-                              <span key={i} className="text-[9px] font-mono bg-muted/50 rounded-md px-1.5 py-0.5 text-muted-foreground lowercase">{ns}</span>
-                            ))}
-                          </div>
-                        )}
-                        {sub.whois_synced_at && (
-                          <div className="flex items-center gap-1">
-                            <RiShieldCheckLine className="w-2.5 h-2.5 text-emerald-500" />
-                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400">{t("dashboard.whois_synced")} {fmt(new Date(sub.whois_synced_at), locale)}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Reminder info section */}
-                    {sub.active && (
-                      <div className="pt-2 border-t border-border/40 space-y-2">
-                        {/* Next reminder */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <RiCalendarLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                            <span className="text-[11px] text-muted-foreground truncate">
-                              {nextReminderIsUpcoming
-                                ? <>{t("dashboard.next_reminder")} <span className="font-medium text-foreground">{fmt(nextReminderDate!, locale)}</span></>
-                                : phase === "dropped"
-                                  ? t("dashboard.no_pending_reminder")
-                                  : t("dashboard.no_reminder")
-                              }
-                            </span>
-                          </div>
-                          {sub.next_reminder_days !== null && sub.next_reminder_days !== undefined && nextReminderIsUpcoming && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-semibold shrink-0 tabular-nums">
-                              {t("dashboard.advance_days", { n: sub.next_reminder_days })}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Last reminded */}
-                        <div className="flex items-center gap-1.5">
-                          <RiMailLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                          <span className="text-[11px] text-muted-foreground">
-                            {daysSinceLastReminder !== null
-                              ? daysSinceLastReminder === 0
-                                ? <>{t("dashboard.last_reminded_today")}</>
-                                : <>{t("dashboard.last_reminded_days_ago", { n: daysSinceLastReminder })}</>
-                              : t("dashboard.never_reminded")}
-                          </span>
-                        </div>
-
-                        {/* Configured reminder thresholds */}
-                        <div className="flex items-start gap-2 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground mt-0.5 shrink-0">{t("dashboard.reminder_threshold")}</span>
-                          <div className="flex flex-wrap gap-1">
-                            {(sub.thresholds?.length ? sub.thresholds : [60, 30, 1]).map(d => (
-                              <span
-                                key={d}
-                                className="text-[9px] px-1.5 py-0.5 rounded-full border bg-sky-50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800 font-semibold tabular-nums"
-                              >
-                                {t("dashboard.n_days_abbr", { days: d })}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Lifecycle dates (server-computed) */}
-                    {sub.drop_date && sub.expiration_date && (
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/40">
-                        <div className="text-center">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.grace_end")}</p>
-                          <p className={cn("text-[11px] font-semibold tabular-nums", phase === "grace" ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
-                            {sub.grace_end ? fmt(new Date(sub.grace_end), locale) : "—"}
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.redemption_end")}</p>
-                          <p className={cn("text-[11px] font-semibold tabular-nums", phase === "redemption" ? "text-orange-600 dark:text-orange-400" : "text-foreground")}>
-                            {sub.redemption_end ? fmt(new Date(sub.redemption_end), locale) : "—"}
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.estimated_drop")}</p>
-                          <p className={cn("text-[11px] font-semibold tabular-nums", phase === "pendingDelete" || isDropSoon ? "text-purple-600 dark:text-purple-400" : "text-foreground")}>
-                            {fmt(new Date(sub.drop_date), locale)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              </>}
-            </motion.div>
+            <SubscriptionsTab
+              subscriptionAccessDB={subscriptionAccessDB}
+              subscriptions={subscriptions}
+              filteredSubscriptions={filteredSubscriptions}
+              loadingData={loadingData}
+              dashError={dashError}
+              subSearch={subSearch}
+              subFilter={subFilter}
+              subscriptionExpiresAt={subscriptionExpiresAt}
+              activeSubs={activeSubs}
+              expiringSoon={expiringSoon}
+              urgentSubs={urgentSubs}
+              postExpirySubs={postExpirySubs}
+              cancelling={cancelling}
+              inviteCodeInput={inviteCodeInput}
+              applyingCode={applyingCode}
+              paymentEnabled={paymentEnabled}
+              user={user}
+              locale={locale}
+              t={t}
+              setSubSearch={setSubSearch}
+              setSubFilter={setSubFilter}
+              onShowSubscribeGuide={() => setShowSubscribeGuide(true)}
+              onExportCSV={exportSubscriptionsCSV}
+              onCancelSubscription={cancelSubscription}
+              onEditSubscription={setEditingSubscription}
+              onApplyInviteCode={handleApplyInviteCode}
+              setInviteCodeInput={setInviteCodeInput}
+              onRetryLoad={retryLoad}
+            />
           )}
 
           {/* ── Stamps ── */}
           {tab === "stamps" && (
-            <motion.div key="stamps" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.stamps_section_title")}</p>
-                <button
-                  onClick={() => setShowClaimGuide(true)}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  <RiShieldCheckLine className="w-3 h-3" />{t("dashboard.claim_new_domain")}
-                </button>
-              </div>
-              {loadingData ? (
-                <div className="flex justify-center py-8"><RiLoader4Line className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-              ) : dashError ? (
-                <div className="flex flex-col items-center py-10 gap-3 text-center">
-                  <RiAlertLine className="w-7 h-7 text-destructive/60" />
-                  <p className="text-sm text-muted-foreground">{t("dashboard.load_failed")}</p>
-                  <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5" onClick={() => {
-                    setDashError(false); setLoadingData(true);
-                    fetchDashData().then(applyDashData).catch(() => setDashError(true)).finally(() => setLoadingData(false));
-                  }}>{t("dashboard.reload")}</Button>
-                </div>
-              ) : stamps.length === 0 ? (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-violet-500/8 border border-dashed border-border flex items-center justify-center mx-auto">
-                    <RiShieldCheckLine className="w-7 h-7 text-muted-foreground/40" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-sm font-semibold">{t("dashboard.no_stamps")}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {t("dashboard.no_stamps_desc")}
-                    </p>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="rounded-xl text-xs gap-1.5"
-                    onClick={() => setShowClaimGuide(true)}
-                  >
-                    <RiShieldCheckLine className="w-3.5 h-3.5" />{t("dashboard.how_to_claim")}
-                  </Button>
-                </div>
-              ) : stamps.map(stamp => (
-                <div key={stamp.id} className="glass-panel border border-border rounded-2xl p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold">{stamp.domain}</p>
-                        <TagBadge style={stamp.tag_style} name={stamp.tag_name} />
-                        {stamp.verified
-                          ? <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                              <RiCheckLine className="w-3 h-3" />{t("dashboard.verified")}
-                            </span>
-                          : <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                              <RiTimeLine className="w-3 h-3" />{t("dashboard.pending_verify")}
-                            </span>
-                        }
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        {t("dashboard.nickname_prefix")}{stamp.nickname}
-                        {stamp.link && <> · <a href={stamp.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{stamp.link}</a></>}
-                      </p>
-                      {stamp.description && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{stamp.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {!stamp.verified && (
-                        <Link href={`/stamp?domain=${stamp.domain}`}>
-                          <button className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 text-muted-foreground hover:text-violet-500 transition-colors" title={t("dashboard.go_verify")}>
-                            <RiFlashlightLine className="w-3.5 h-3.5" />
-                          </button>
-                        </Link>
-                      )}
-                      <button onClick={() => setEditingStamp(stamp)}
-                        className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                        <RiPencilLine className="w-3.5 h-3.5" />
-                      </button>
-                      <Link href={`/${stamp.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                        <RiExternalLinkLine className="w-3.5 h-3.5" />
-                      </Link>
-                      <button
-                        onClick={() => deleteStamp(stamp.id)}
-                        disabled={deletingStamp === stamp.id}
-                        title={t("dashboard.delete_stamp_title")}
-                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">
-                        {deletingStamp === stamp.id
-                          ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
-                          : <RiDeleteBinLine className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  {!stamp.verified && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/40">
-                      <RiAlertLine className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <p className="text-[11px] text-muted-foreground">{t("dashboard.stamp_unverified_hint")}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </motion.div>
+            <StampsTab
+              stamps={stamps}
+              loadingData={loadingData}
+              dashError={dashError}
+              deletingStamp={deletingStamp}
+              t={t}
+              onShowClaimGuide={() => setShowClaimGuide(true)}
+              onEditStamp={setEditingStamp}
+              onDeleteStamp={deleteStamp}
+              onRetryLoad={retryLoad}
+            />
           )}
 
           {/* ── Membership ── */}
-          {tab === "membership" && (() => {
-            // While dashboard data is still loading, show a skeleton to prevent flash
-            if (subscriptionAccessDB === null && loadingData) {
-              return (
-                <motion.div key="membership-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 animate-pulse">
-                  <div className="h-28 rounded-2xl bg-muted/50" />
-                  <div className="h-36 rounded-2xl bg-muted/50" />
-                  <div className="h-24 rounded-2xl bg-muted/50" />
-                </motion.div>
-              );
-            }
-            const isLifetime = subscriptionAccessDB && !subscriptionExpiresAt;
-            const expiresDate = subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null;
-            const remainingDays = expiresDate ? Math.ceil((expiresDate.getTime() - Date.now()) / 86_400_000) : null;
-            const currencyCode = (siteSettings.payment_currency || "CNY").toUpperCase();
-            const CURRENCY_SYM: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", HKD: "HK$" };
-            const balanceSym = CURRENCY_SYM[currencyCode] ?? currencyCode + " ";
-            const STATUS_CLS: Record<string, string> = {
-              paid: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-700/40",
-              pending: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-700/40",
-              failed: "text-red-600 bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-700/40",
-              expired: "text-muted-foreground bg-muted border-border",
-            };
-            const PROVIDER_LABEL: Record<string, string> = {
-              stripe: t("dashboard.provider_stripe"), xunhupay: t("dashboard.provider_xunhupay"), alipay: t("dashboard.provider_alipay"), paypal: "PayPal",
-            };
-            return (
-              <motion.div key="membership" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
-
-                {/* ── 会员状态卡 ── */}
-                <div className={cn(
-                  "glass-panel border rounded-2xl overflow-hidden",
-                  subscriptionAccessDB ? "border-violet-200/60 dark:border-violet-700/30" : "border-border"
-                )}>
-                  {/* Header */}
-                  <div className={cn(
-                    "px-4 pt-4 pb-3 flex items-center gap-3",
-                    subscriptionAccessDB ? "bg-violet-50/60 dark:bg-violet-950/10" : ""
-                  )}>
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                      subscriptionAccessDB ? "bg-violet-100 dark:bg-violet-900/30" : "bg-muted"
-                    )}>
-                      <RiVipCrownLine className={cn("w-5 h-5", subscriptionAccessDB ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground")} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold">
-                        {subscriptionAccessDB
-                          ? (membershipPlan || t("dashboard.member_active_label"))
-                          : t("dashboard.non_member")}
-                      </p>
-                      {subscriptionAccessDB ? (
-                        <p className="text-[10px] text-muted-foreground">
-                          {isLifetime ? t("dashboard.lifetime_member") : expiresDate
-                            ? t("dashboard.valid_until_details", { date: expiresDate.toLocaleDateString(), days: remainingDays ?? 0 })
-                            : t("dashboard.in_membership")}
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground">{t("dashboard.upgrade_sub_desc")}</p>
-                      )}
-                    </div>
-                    {subscriptionAccessDB && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shrink-0">
-                        {isLifetime ? t("dashboard.lifetime_badge") : t("dashboard.active_badge")}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Balance row — click to expand transaction history */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !showBalanceTxs;
-                      setShowBalanceTxs(next);
-                      if (next && balanceTxs.length === 0) {
-                        setLoadingBalanceTxs(true);
-                        fetch("/api/user/balance-transactions")
-                          .then(r => r.json())
-                          .then(d => {
-                            if (d.transactions) setBalanceTxs(d.transactions);
-                            if (typeof d.balanceCents === "number") setBalanceCents(d.balanceCents);
-                          })
-                          .catch(() => {})
-                          .finally(() => setLoadingBalanceTxs(false));
-                      }
-                    }}
-                    className="px-4 py-3 border-t border-border/60 flex items-center justify-between w-full hover:bg-muted/30 transition-colors group"
-                  >
-                    <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                      <RiWalletLine className="w-3.5 h-3.5" /> {t("dashboard.balance")}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold font-mono">
-                        {balanceSym}{(balanceCents / 100).toFixed(2)}
-                      </span>
-                      <RiArrowDownSLine className={cn(
-                        "w-3.5 h-3.5 text-muted-foreground/50 transition-transform",
-                        showBalanceTxs ? "rotate-180" : ""
-                      )} />
-                    </div>
-                  </button>
-
-                  {/* Balance transaction history */}
-                  {showBalanceTxs && (
-                    <div className="border-t border-border/60">
-                      {loadingBalanceTxs ? (
-                        <div className="px-4 py-3 space-y-2 animate-pulse">
-                          {[1,2,3].map(i => <div key={i} className="h-8 rounded bg-muted/40" />)}
-                        </div>
-                      ) : balanceTxs.length === 0 ? (
-                        <div className="px-4 py-5 text-center text-[11px] text-muted-foreground/60">
-                          {t("dashboard.no_balance_history")}
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-border/40 max-h-48 overflow-y-auto">
-                          {balanceTxs.map(tx => (
-                            <div key={tx.id} className="px-4 py-2 flex items-center gap-2">
-                              <div className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                tx.amount_cents >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30"
-                              )}>
-                                {tx.amount_cents >= 0
-                                  ? <RiAddLine className="w-3 h-3 text-emerald-600" />
-                                  : <RiSubtractLine className="w-3 h-3 text-red-500" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] text-muted-foreground truncate">
-                                  {tx.description || tx.type}
-                                </p>
-                                <p className="text-[9px] text-muted-foreground/50">
-                                  {new Date(tx.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <span className={cn(
-                                "text-[11px] font-bold font-mono tabular-nums shrink-0",
-                                tx.amount_cents >= 0 ? "text-emerald-600" : "text-red-500"
-                              )}>
-                                {tx.amount_cents >= 0 ? "+" : ""}{balanceSym}{(tx.amount_cents / 100).toFixed(2)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── 会员权益说明 ── */}
-                {!subscriptionAccessDB && (
-                  <div className="glass-panel border border-violet-200/50 dark:border-violet-800/30 rounded-2xl overflow-hidden">
-                    <div className="px-4 pt-3 pb-2 bg-violet-50/50 dark:bg-violet-950/10 flex items-center gap-2 border-b border-violet-100/60 dark:border-violet-800/20">
-                      <RiVipCrownLine className="w-3.5 h-3.5 text-violet-500" />
-                      <p className="text-xs font-bold">{t("dashboard.upgrade_title")}</p>
-                    </div>
-                    <div className="px-4 py-3 grid grid-cols-1 gap-1.5">
-                      {[
-                        { icon: RiBellLine,         text: t("dashboard.benefit_subs") },
-                        { icon: RiShieldCheckLine,  text: t("dashboard.benefit_styles") },
-                        { icon: RiExternalLinkLine, text: t("dashboard.benefit_links") },
-                        { icon: RiEdit2Line,        text: t("dashboard.benefit_tag_len") },
-                        { icon: RiBarChartLine,     text: t("dashboard.benefit_history") },
-                        { icon: RiFlashlightLine,   text: t("dashboard.benefit_priority") },
-                      ].map((item, i) => (
-                        <div key={i} className="flex items-start gap-2.5">
-                          <item.icon className="w-3.5 h-3.5 text-violet-500 mt-0.5 shrink-0" />
-                          <p className="text-[11px] text-muted-foreground leading-snug">{item.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── 购买会员 ── */}
-                <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <RiStarLine className="w-3.5 h-3.5 text-violet-500" />
-                    <p className="text-xs font-semibold">{t("dashboard.buy_membership")}</p>
-                    {plans.length > 0 && !paymentEnabled && (
-                      <span className="text-[10px] text-muted-foreground/60 ml-auto">{t("dashboard.activation_code_redeemable")}</span>
-                    )}
-                  </div>
-
-                  {loadingPlans ? (
-                    <div className="grid grid-cols-3 gap-2 animate-pulse">
-                      {[1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-xl bg-muted/50" />)}
-                    </div>
-                  ) : plans.length > 0 ? (() => {
-                    const totalPlans = plans.length;
-                    const getBadge = (idx: number) => {
-                      if (totalPlans >= 3 && idx === totalPlans - 1) return t("dashboard.plan_badge_best_value");
-                      if (totalPlans >= 3 && idx === totalPlans - 2) return t("dashboard.plan_badge_recommended");
-                      if (totalPlans === 2 && idx === 1) return t("dashboard.plan_badge_best_value");
-                      return null;
-                    };
-                    const fmtDur = (p: Plan) => {
-                      if (!p.duration_days) return t("dashboard.plan_lifetime_period");
-                      return `${p.duration_days}天`;
-                    };
-                    const fmtPrice = (p: Plan) => {
-                      const sym = p.currency?.toUpperCase() === "CNY" ? "¥" : p.currency?.toUpperCase() === "USD" ? "$" : (p.currency ?? "¥");
-                      return `${sym}${p.price.toFixed(2).replace(/\.00$/, "")}`;
-                    };
-                    const cols = totalPlans <= 2 ? "grid-cols-2" : totalPlans === 4 ? "grid-cols-2" : "grid-cols-3";
-                    return (
-                      <div className={cn("grid gap-2", cols)}>
-                        {plans.map((p, idx) => {
-                          const badge = getBadge(idx);
-                          const isHighlight = !!badge;
-                          return (
-                            <Link
-                              key={p.id}
-                              href={`/payment/checkout?plan=${p.id}`}
-                              className={cn(
-                                "relative flex flex-col items-center gap-1 px-2 py-3 rounded-xl border text-center transition-all group hover:border-violet-400/60 hover:bg-violet-50/50 dark:hover:bg-violet-950/10",
-                                isHighlight ? "border-violet-300/70 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-950/10" : "border-border"
-                              )}
-                            >
-                              {badge && (
-                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white whitespace-nowrap">
-                                  {badge}
-                                </span>
-                              )}
-                              {p.balance_grant_cents > 0 && !p.grants_subscription
-                                ? <RiCoinLine className={cn("w-4 h-4", isHighlight ? "text-amber-500" : "text-muted-foreground group-hover:text-amber-500")} />
-                                : <RiVipCrownLine className={cn("w-4 h-4", isHighlight ? "text-violet-500" : "text-muted-foreground group-hover:text-violet-500")} />}
-                              <p className="text-[10px] font-semibold leading-tight line-clamp-1">{p.name}</p>
-                              {p.balance_grant_cents > 0 ? (
-                                <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">+¥{(p.balance_grant_cents / 100).toFixed(0)} 余额</p>
-                              ) : (
-                                <p className="text-[9px] text-muted-foreground">{fmtDur(p)}</p>
-                              )}
-                              <p className="text-[10px] font-bold text-violet-600 dark:text-violet-400 mt-0.5">{fmtPrice(p)}</p>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    );
-                  })() : (
-                    <div className="grid grid-cols-3 gap-2 opacity-40 pointer-events-none">
-                      {[
-                        { label: t("dashboard.plan_monthly"), sub: t("dashboard.plan_monthly_period"), badge: null },
-                        { label: t("dashboard.plan_yearly"), sub: t("dashboard.plan_yearly_period"), badge: t("dashboard.plan_badge_recommended") },
-                        { label: t("dashboard.plan_lifetime"), sub: t("dashboard.plan_lifetime_period"), badge: t("dashboard.plan_badge_best_value") },
-                      ].map(p => (
-                        <div key={p.label} className={cn(
-                          "relative flex flex-col items-center gap-1 px-2 py-3 rounded-xl border text-center",
-                          p.badge === t("dashboard.plan_badge_recommended") ? "border-violet-300/70 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-950/10" : "border-border"
-                        )}>
-                          {p.badge && (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white whitespace-nowrap">
-                              {p.badge}
-                            </span>
-                          )}
-                          <RiVipCrownLine className="w-4 h-4 text-muted-foreground" />
-                          <p className="text-[10px] font-semibold leading-tight">{p.label}</p>
-                          <p className="text-[9px] text-muted-foreground">{p.sub}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <Link href="/payment/checkout" className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1">
-                    {t("dashboard.view_all_plans")} <RiArrowRightLine className="w-3 h-3" />
-                  </Link>
-                  {!paymentEnabled && (
-                    <p className="text-[10px] text-muted-foreground/60 text-center -mt-1">{t("dashboard.payment_note")}</p>
-                  )}
-                </div>
-
-                {/* ── 激活码兑换 ── */}
-                <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <RiCoupon2Line className="w-3.5 h-3.5 text-amber-500" />
-                    <p className="text-xs font-semibold">{t("dashboard.activation_code")}</p>
-                  </div>
-                  <form onSubmit={handleRedeemCode} className="flex gap-2">
-                    <Input
-                      value={redeemCode}
-                      onChange={e => setRedeemCode(e.target.value.toUpperCase())}
-                      placeholder={t("dashboard.activation_placeholder")}
-                      className="h-9 rounded-xl text-sm font-mono flex-1"
-                    />
-                    <Button type="submit" disabled={redeeming || !redeemCode.trim()} size="sm" className="h-9 rounded-xl px-3 shrink-0">
-                      {redeeming ? <RiLoader4Line className="w-4 h-4 animate-spin" /> : <RiGiftLine className="w-4 h-4" />}
-                    </Button>
-                  </form>
-                  <p className="text-[10px] text-muted-foreground">{t("dashboard.activation_note")}</p>
-                </div>
-
-                {/* ── 购买记录 ── */}
-                <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <RiFileTextLine className="w-3.5 h-3.5 text-muted-foreground" />
-                      <p className="text-xs font-semibold">{t("dashboard.order_history")}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setLoadingOrders(true);
-                        fetch("/api/user/orders").then(r => r.json()).then(d => {
-                          if (d.orders) setOrders(d.orders);
-                        }).catch(() => {}).finally(() => setLoadingOrders(false));
-                      }}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                    >
-                      <RiRefreshLine className={cn("w-3 h-3", loadingOrders && "animate-spin")} />
-                      {t("dashboard.refresh")}
-                    </button>
-                  </div>
-
-                  {loadingOrders ? (
-                    <div className="p-4 space-y-3 animate-pulse">
-                      {[1,2].map(i => <div key={i} className="h-14 rounded-xl bg-muted/50" />)}
-                    </div>
-                  ) : orders.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-[11px] text-muted-foreground">
-                      <RiCoinLine className="w-7 h-7 mx-auto mb-2 text-muted-foreground/30" />
-                      {t("dashboard.no_orders")}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border/50">
-                      {orders.map(o => (
-                        <div key={o.id} className="px-4 py-3 flex items-center gap-3">
-                          <div className={cn(
-                            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                            o.status === "paid" ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-muted"
-                          )}>
-                            {o.status === "paid"
-                              ? <RiCheckboxCircleLine className="w-4 h-4 text-emerald-500" />
-                              : <RiCoinLine className="w-4 h-4 text-muted-foreground" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate">{o.plan_name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {PROVIDER_LABEL[o.provider] ?? o.provider} · {new Date(o.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs font-bold font-mono">{CURRENCY_SYM[o.currency] ?? ""}{o.amount.toFixed(2)}</p>
-                            <span className={cn(
-                              "inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded-full border",
-                              STATUS_CLS[o.status] ?? STATUS_CLS.expired
-                            )}>
-                              {o.status === "paid" ? t("dashboard.order_paid") : o.status === "pending" ? t("dashboard.order_pending") : o.status === "failed" ? t("dashboard.order_failed") : t("dashboard.order_expired")}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── 支付说明 ── */}
-                <div className="px-1 text-[10px] text-muted-foreground/60 text-center leading-relaxed">
-                  {t("dashboard.payment_methods")}
-                </div>
-              </motion.div>
-            );
-          })()}
-
+          {tab === "membership" && (
+            <MembershipTab
+              subscriptionAccessDB={subscriptionAccessDB}
+              subscriptionExpiresAt={subscriptionExpiresAt}
+              loadingData={loadingData}
+              balanceCents={balanceCents}
+              membershipPlan={membershipPlan}
+              orders={orders}
+              loadingOrders={loadingOrders}
+              balanceTxs={balanceTxs}
+              showBalanceTxs={showBalanceTxs}
+              loadingBalanceTxs={loadingBalanceTxs}
+              plans={plans}
+              loadingPlans={loadingPlans}
+              redeemCode={redeemCode}
+              redeeming={redeeming}
+              paymentEnabled={paymentEnabled}
+              siteSettings={siteSettings}
+              t={t}
+              setShowBalanceTxs={setShowBalanceTxs}
+              setLoadingBalanceTxs={setLoadingBalanceTxs}
+              setBalanceTxs={setBalanceTxs}
+              setBalanceCents={setBalanceCents}
+              setOrders={setOrders}
+              setLoadingOrders={setLoadingOrders}
+              onRedeemCode={handleRedeemCode}
+              setRedeemCode={setRedeemCode}
+            />
+          )}
 
           {/* ── Account ── */}
-          {tab === "account" && (() => {
-            const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
-            const initial = ((user as any).name || user.email || "U").charAt(0).toUpperCase();
-            return (
-            <motion.div key="account" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
-
-              {/* ── Avatar card ── */}
-              <div className="glass-panel border border-border rounded-2xl p-5 flex items-center gap-4">
-                <div className="relative shrink-0">
-                  <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-sm", ac.bg, ac.text)}>
-                    {initial}
-                  </div>
-                  <button
-                    onClick={() => setEditingAvatar(v => !v)}
-                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border border-border shadow flex items-center justify-center hover:bg-muted transition-colors"
-                  >
-                    <RiPaletteLine className="w-3 h-3 text-muted-foreground" />
-                  </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-base truncate">{(user as any).name || t("dashboard.nickname_not_set")}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  {isAdminUser && (
-                    <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300 font-bold border border-violet-200/50 dark:border-violet-700/30 uppercase tracking-wider">
-                      {t("founder")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Color picker */}
-              {editingAvatar && (
-                <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("dashboard.select_avatar_color")}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {AVATAR_COLORS.map(c => (
-                      <button
-                        key={c.key}
-                        onClick={() => saveAvatarColor(c.key)}
-                        disabled={savingAvatar}
-                        className={cn(
-                          "w-9 h-9 rounded-xl font-bold text-xs transition-all",
-                          c.bg, c.text,
-                          avatarColor === c.key ? "ring-2 ring-offset-2 ring-primary scale-110" : "opacity-70 hover:opacity-100 hover:scale-105"
-                        )}
-                      >
-                        {savingAvatar && avatarColor === c.key ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mx-auto" /> : c.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── Profile fields ── */}
-              <div className="glass-panel border border-border rounded-2xl divide-y divide-border/50">
-
-                {/* Name */}
-                <div className="px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <RiUserLine className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">{t("dashboard.nickname_field")}</p>
-                  </div>
-                  {editingName ? (
-                    <div className="flex items-center gap-2 flex-1 justify-end">
-                      <Input
-                        value={nameValue}
-                        onChange={e => setNameValue(e.target.value)}
-                        maxLength={50}
-                        className="h-7 rounded-lg text-xs w-36"
-                        autoFocus
-                        onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
-                      />
-                      <button onClick={saveName} disabled={savingName} className="p-1.5 rounded-lg hover:bg-muted text-emerald-600 transition-colors">
-                        {savingName ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiCheckLine className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                        <RiCloseLine className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold">{(user as any).name || t("dashboard.not_set")}</p>
-                      <button onClick={() => { setNameValue((user as any).name || ""); setEditingName(true); }}
-                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                        <RiPencilLine className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Email */}
-                <div className="px-4 py-3 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 shrink-0">
-                      <RiMailLine className="w-3.5 h-3.5 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground">{t("dashboard.email_field")}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold truncate max-w-[160px]">{user.email}</p>
-                      {!editingEmail && (
-                        <button onClick={() => { setEmailValue(user.email || ""); setEditingEmail(true); }}
-                          className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                          <RiPencilLine className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {editingEmail && (
-                    <div className="space-y-2 pt-1">
-                      <Input
-                        type="email"
-                        value={emailValue}
-                        onChange={e => { setEmailValue(e.target.value); setEmailChangeCode(""); }}
-                        placeholder={t("dashboard.new_email_placeholder")}
-                        className="h-8 rounded-xl text-xs"
-                        autoFocus
-                      />
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          type="text"
-                          value={emailChangeCode}
-                          onChange={e => setEmailChangeCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                          placeholder={t("dashboard.code_placeholder")}
-                          className="h-8 rounded-xl text-xs flex-1 font-mono tracking-widest"
-                          maxLength={6}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={sendingChangeCode || changeCodeCooldown > 0 || !emailValue.trim()}
-                          onClick={sendEmailChangeCode}
-                          className="h-8 text-xs rounded-lg shrink-0 whitespace-nowrap"
-                        >
-                          {sendingChangeCode ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : t("dashboard.send_code")}
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">{t("dashboard.email_change_warn")}</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={saveEmail} disabled={savingEmail || !emailChangeCode.trim()} className="h-7 text-xs rounded-lg gap-1 flex-1">
-                          {savingEmail ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiCheckLine className="w-3 h-3" />}
-                          {t("dashboard.confirm_change")}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setEditingEmail(false); setEmailChangeCode(""); setChangeCodeCooldown(0); }} className="h-7 text-xs rounded-lg">{t("dashboard.cancel")}</Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                {[
-                  { label: t("dashboard.domain_sub_count"), value: t("dashboard.active_count", { n: subscriptions.filter(s => s.active).length }) },
-                  { label: t("dashboard.brand_claim_count"), value: t("dashboard.brand_count", { n: stamps.length, v: stamps.filter(s => s.verified).length }) },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between px-4 py-3">
-                    <p className="text-xs text-muted-foreground">{row.label}</p>
-                    <p className="text-xs font-semibold">{row.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Change password ── */}
-              <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => { setShowPwdSection(v => !v); setCurrentPwd(""); setNewPwd(""); setConfirmPwd(""); }}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <RiLockLine className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-xs font-semibold">{t("dashboard.change_password")}</p>
-                  </div>
-                  <RiPencilLine className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-                {showPwdSection && (
-                  <div className="border-t border-border px-4 py-4 space-y-3">
-                    {[
-                      { label: t("dashboard.current_password"), value: currentPwd, onChange: setCurrentPwd, show: showCurrent, toggle: () => setShowCurrent(v => !v) },
-                      { label: t("dashboard.new_password_min"), value: newPwd, onChange: setNewPwd, show: showNew, toggle: () => setShowNew(v => !v) },
-                      { label: t("dashboard.confirm_new_password"), value: confirmPwd, onChange: setConfirmPwd, show: showNew, toggle: () => {} },
-                    ].map((f, i) => (
-                      <div key={i} className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">{f.label}</Label>
-                        <div className="relative">
-                          <RiLockLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-                          <Input
-                            type={f.show ? "text" : "password"}
-                            value={f.value}
-                            onChange={e => f.onChange(e.target.value)}
-                            className="pl-8 pr-8 h-9 rounded-xl text-xs"
-                          />
-                          {i < 2 && (
-                            <button type="button" onClick={f.toggle}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors">
-                              {f.show ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex gap-2 pt-1">
-                      <Button onClick={changePassword} disabled={savingPwd} className="flex-1 h-9 rounded-xl text-xs gap-1.5">
-                        {savingPwd ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.changing")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.confirm_modify")}</>}
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowPwdSection(false)} className="h-9 rounded-xl text-xs">{t("dashboard.cancel")}</Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Contact support ── */}
-              <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                <div className="px-4 pt-3 pb-2 border-b border-border/60 flex items-center gap-2">
-                  <RiMailLine className="w-3.5 h-3.5 text-muted-foreground" />
-                  <p className="text-xs font-semibold">{t("contact.title")}</p>
-                </div>
-                {contactSent ? (
-                  <div className="px-4 py-5 flex flex-col items-center gap-2 text-center">
-                    <RiCheckboxCircleLine className="w-8 h-8 text-emerald-500" />
-                    <p className="text-xs font-semibold">{t("contact.sent_title")}</p>
-                    <button onClick={() => { setContactSent(false); setContactMsg(""); }} className="text-[10px] text-muted-foreground hover:text-foreground mt-1">{t("contact.resend")}</button>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 space-y-2.5">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {([
-                        [t("contact.cat_payment"), "cat_payment"],
-                        [t("contact.cat_membership"), "cat_membership"],
-                        [t("contact.cat_feature"), "cat_feature"],
-                        [t("contact.cat_other"), "cat_other"],
-                      ] as [string, string][]).map(([label]) => (
-                        <button key={label} type="button" onClick={() => setContactCategory(label)}
-                          className={cn("h-8 rounded-xl text-[11px] font-medium border transition-all",
-                            contactCategory === label ? "bg-foreground text-background border-foreground" : "bg-muted/30 text-muted-foreground border-border hover:border-muted-foreground/40"
-                          )}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <textarea value={contactMsg} onChange={e => setContactMsg(e.target.value)} placeholder={t("contact.placeholder")} rows={3} maxLength={500}
-                      className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/40" />
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[10px] text-muted-foreground/60">{t("contact.char_count", { count: contactMsg.length })}</p>
-                      <Button size="sm" className="h-8 rounded-xl text-xs gap-1.5 shrink-0" disabled={!contactMsg.trim() || contactSending}
-                        onClick={async () => {
-                          if (!contactMsg.trim()) return;
-                          setContactSending(true);
-                          try {
-                            const r = await fetch("/api/user/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: contactCategory, message: contactMsg }) });
-                            if (!r.ok) { toast.error(t("contact.send_failed")); return; }
-                            setContactSent(true);
-                          } catch { toast.error(t("contact.send_failed")); } finally { setContactSending(false); }
-                        }}>
-                        {contactSending ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiMailLine className="w-3.5 h-3.5" />}
-                        {t("contact.send")}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Danger zone ── */}
-              <button onClick={() => signOut({ callbackUrl: "/" })}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
-                <RiLogoutBoxLine className="w-4 h-4" />
-                {t("sign_out")}
-              </button>
-
-              {/* Delete account */}
-              {!showDeleteConfirm ? (
-                <button
-                  onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmEmail(""); }}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs text-muted-foreground/60 hover:text-red-500 transition-colors"
-                >
-                  <RiDeleteBinLine className="w-3.5 h-3.5" />
-                  {t("dashboard.delete_account")}
-                </button>
-              ) : (
-                <div className="glass-panel border border-red-200/50 dark:border-red-800/40 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <RiAlertLine className="w-4 h-4 text-red-500 shrink-0" />
-                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">{t("dashboard.confirm_delete_title")}</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    {t("dashboard.confirm_delete_prefix")}<span className="font-semibold text-red-500">{t("dashboard.confirm_delete_irreversible")}</span>{t("dashboard.confirm_delete_suffix")}
-                  </p>
-                  <Input
-                    type="email"
-                    value={deleteConfirmEmail}
-                    onChange={e => setDeleteConfirmEmail(e.target.value)}
-                    placeholder={user?.email || t("dashboard.confirm_delete_email_placeholder")}
-                    className="h-9 rounded-xl text-xs"
-                    autoComplete="off"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 h-8 text-xs rounded-lg border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                      disabled={deletingAccount || deleteConfirmEmail.toLowerCase().trim() !== user?.email?.toLowerCase()}
-                      onClick={deleteAccount}
-                    >
-                      {deletingAccount ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiDeleteBinLine className="w-3.5 h-3.5 mr-1" />}
-                      {t("dashboard.confirm_delete_btn")}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-8 text-xs rounded-lg" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(""); }}>
-                      {t("dashboard.cancel")}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-            );
-          })()}
+          {tab === "account" && (
+            <AccountTab
+              user={user}
+              isAdminUser={isAdminUser}
+              avatarColor={avatarColor}
+              editingAvatar={editingAvatar}
+              savingAvatar={savingAvatar}
+              editingName={editingName}
+              nameValue={nameValue}
+              savingName={savingName}
+              editingEmail={editingEmail}
+              emailValue={emailValue}
+              savingEmail={savingEmail}
+              showPwdSection={showPwdSection}
+              currentPwd={currentPwd}
+              newPwd={newPwd}
+              confirmPwd={confirmPwd}
+              showCurrent={showCurrent}
+              showNew={showNew}
+              savingPwd={savingPwd}
+              emailChangeCode={emailChangeCode}
+              sendingChangeCode={sendingChangeCode}
+              changeCodeCooldown={changeCodeCooldown}
+              showDeleteConfirm={showDeleteConfirm}
+              deleteConfirmEmail={deleteConfirmEmail}
+              deletingAccount={deletingAccount}
+              contactMsg={contactMsg}
+              contactCategory={contactCategory}
+              contactSending={contactSending}
+              contactSent={contactSent}
+              subscriptions={subscriptions}
+              stamps={stamps}
+              t={t}
+              setEditingAvatar={setEditingAvatar}
+              onSaveAvatarColor={saveAvatarColor}
+              setEditingName={setEditingName}
+              setNameValue={setNameValue}
+              onSaveName={saveName}
+              setEditingEmail={setEditingEmail}
+              setEmailValue={setEmailValue}
+              setEmailChangeCode={setEmailChangeCode}
+              onSaveEmail={saveEmail}
+              onSendEmailChangeCode={sendEmailChangeCode}
+              setChangeCodeCooldown={setChangeCodeCooldown}
+              setShowPwdSection={setShowPwdSection}
+              setCurrentPwd={setCurrentPwd}
+              setNewPwd={setNewPwd}
+              setConfirmPwd={setConfirmPwd}
+              setShowCurrent={setShowCurrent}
+              setShowNew={setShowNew}
+              onChangePassword={changePassword}
+              setContactMsg={setContactMsg}
+              setContactCategory={setContactCategory}
+              setContactSending={setContactSending}
+              setContactSent={setContactSent}
+              setShowDeleteConfirm={setShowDeleteConfirm}
+              setDeleteConfirmEmail={setDeleteConfirmEmail}
+              onDeleteAccount={deleteAccount}
+            />
+          )}
         </AnimatePresence>
       </div>
     </>
