@@ -102,21 +102,28 @@ export async function tryGenericWhoisForDomain(
   let primaryError: unknown = null;
 
   // ①.5 Static map fast path + whoiser race
-  //   For TLDs in whois-servers.json: start a direct TCP query immediately and
-  //   run it in parallel with whoiser. The first non-empty response wins.
+  //   For TLDs in whois-servers.json: start a direct TCP query IMMEDIATELY
+  //   (before awaiting whoiser import so it gets a head-start while the module
+  //   loads). Both the TCP query and whoiser discovery run in parallel.
+  //   The first non-empty response wins.
   //   For TLDs NOT in the static map: fall through to whoiser-only.
   const staticServer = getStaticWhoisServer(tldSuffix);
+
+  // Kick off static TCP first (before awaiting whoiser), then load whoiser
+  // in parallel. On hot paths whoiser is already cached so the gap is ~0 ms;
+  // on cold starts (fresh deploy) it can shave 50-200 ms off .hu/.jp/.de etc.
+  const staticP: Promise<WhoisRawResult | null> = staticServer
+    ? queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
+        .then((raw): WhoisRawResult | null => {
+          if (!raw || raw.trim().length === 0) return null;
+          return { raw, structured: {}, server: staticServer };
+        })
+        .catch((): null => null)
+    : Promise.resolve(null);
+
   const { whoisDomain } = await getWhoiser();
 
   if (staticServer) {
-    // Both queries run simultaneously — first non-empty result wins.
-    const staticP = queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
-      .then((raw): WhoisRawResult | null => {
-        if (!raw || raw.trim().length === 0) return null;
-        return { raw, structured: {}, server: staticServer };
-      })
-      .catch((): null => null);
-
     const whoiserP = (async (): Promise<WhoisRawResult | null> => {
       try {
         const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
