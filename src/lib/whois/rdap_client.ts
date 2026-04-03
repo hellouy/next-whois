@@ -110,7 +110,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   fr: "https://rdap.nic.fr/",
   gr: "https://rdap.gr/",
   hr: "https://rdap.dns.hr/",
-  hu: "https://rdap.hu/",
+  // hu: removed — rdap.hu ENODATA (no A record, endpoint is permanently dead); WHOIS via whois.nic.hu works
   ie: "https://rdap.iedr.ie/",
   is: "https://rdap.isnic.is/rdap/",              // IANA: /rdap/ suffix
   it: "https://rdap.nic.it/",
