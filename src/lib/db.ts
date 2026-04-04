@@ -555,15 +555,16 @@ function makePool(connectionString: string): Pool {
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
+    application_name: "next-whois-ui",
     max: isServerless ? 2 : 8,
     min: 0,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: isServerless ? 5000 : 30000,
+    connectionTimeoutMillis: isServerless ? 8_000 : 5_000,
+    idleTimeoutMillis: isServerless ? 10_000 : 30_000,
     allowExitOnIdle: true,
     keepAlive: !isServerless,
-    keepAliveInitialDelayMillis: 30000,
-    query_timeout: 20000,
-    statement_timeout: 20000,
+    keepAliveInitialDelayMillis: 20_000,
+    query_timeout: 25_000,
+    statement_timeout: 25_000,
   } as any);
   p.on("error", (err) => console.error("[db] pool error:", err.message));
   return p;

@@ -109,18 +109,25 @@ function createIoredisConn(): import("ioredis").Redis | undefined {
   // Skip ioredis entirely if Upstash HTTP is available
   if (resolveUpstashEnv()) return undefined;
 
+  // Detect TLS requirement: rediss:// URLs (Aiven, Redis Cloud, etc.) need
+  // explicit TLS options. rejectUnauthorized:false handles self-signed certs
+  // that Aiven and similar managed services commonly use.
+  const isTlsUrl = REDIS_URL?.startsWith("rediss://") ?? false;
+  const tlsOpts = isTlsUrl ? { tls: { rejectUnauthorized: false } } : {};
+
   const opts = {
-    maxRetriesPerRequest: 1,
-    connectTimeout:       3_000,
-    commandTimeout:       2_000,
+    maxRetriesPerRequest: 2,
+    connectTimeout:       8_000,   // Aiven / cloud Redis can be slower to connect
+    commandTimeout:       5_000,
     lazyConnect:          false,
-    enableReadyCheck:     false,
-    enableOfflineQueue:   false,
-    keepAlive:            10_000,
+    enableReadyCheck:     true,    // confirm server is fully ready before marking available
+    enableOfflineQueue:   true,    // queue commands during brief reconnect windows
+    keepAlive:            15_000,  // send TCP keepalive every 15 s to prevent idle drops
     retryStrategy(times: number) {
-      if (times > 3) return null;
-      return Math.min(times * 500, 2_000);
+      if (times > 6) return null;  // give up after 6 attempts (~30 s total)
+      return Math.min(times * 1_000, 5_000);
     },
+    ...tlsOpts,
   } as const;
 
   let client: import("ioredis").Redis | undefined;

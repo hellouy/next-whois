@@ -11,7 +11,7 @@ import { siteTitle, siteDescription, siteKeywords } from "@/lib/seo";
 import { Navbar } from "@/components/navbar";
 import { useRouter } from "next/router";
 import { AnimatePresence, motion } from "framer-motion";
-import { SessionProvider } from "next-auth/react";
+import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
 import { RiMegaphoneLine, RiCloseLine, RiWrenchLine } from "@remixicon/react";
@@ -284,17 +284,12 @@ const MAINTENANCE_TIP_KEYS = [
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const settings = useSiteSettings();
   const { t } = useTranslation();
-  const [sessionEmail, setSessionEmail] = React.useState<string | null | undefined>(undefined);
+  // Use the NextAuth session hook (already provided by SessionProvider above)
+  // instead of a manual fetch so we never have a momentary undefined state
+  // that causes a blank-page flash when navigating back to the homepage.
+  const { data: session, status: sessionStatus } = useSession();
   const [tipIndex, setTipIndex] = React.useState(0);
   const [dots, setDots] = React.useState(".");
-
-  React.useEffect(() => {
-    if (settings.maintenance_mode !== "1") return;
-    fetch("/api/auth/session")
-      .then(r => r.json())
-      .then(s => setSessionEmail((s?.user?.email as string) || null))
-      .catch(() => setSessionEmail(null));
-  }, [settings.maintenance_mode]);
 
   React.useEffect(() => {
     if (settings.maintenance_mode !== "1") return;
@@ -304,7 +299,10 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   }, [settings.maintenance_mode]);
 
   if (settings.maintenance_mode !== "1") return <>{children}</>;
-  if (sessionEmail === undefined) return null;
+  // While auth status is resolving, render children so the page is never blank.
+  // The maintenance screen replaces them once we know the user is not an admin.
+  if (sessionStatus === "loading") return <>{children}</>;
+  const sessionEmail = (session?.user?.email as string | undefined) ?? null;
   if (sessionEmail && sessionEmail.toLowerCase().trim() === ADMIN_EMAIL) return <>{children}</>;
 
   const customMsg = settings.maintenance_message || settings.site_announcement;
