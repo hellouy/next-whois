@@ -684,6 +684,7 @@ export default function LookupPage({
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const [showBackToTop, setShowBackToTop] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
   // Track if the first client-side fetch has completed to avoid flicker:
   // On first load, if SSR already provided data, do a silent background refresh
@@ -709,6 +710,17 @@ export default function LookupPage({
       router.events.off("routeChangeError", handleError);
     };
   }, [router]);
+
+  // Back-to-top: track ScrollArea viewport scroll position
+  useEffect(() => {
+    const area = scrollAreaRef.current;
+    if (!area) return;
+    const vp = area.querySelector("[data-radix-scroll-area-viewport]");
+    if (!vp) return;
+    const onScroll = () => setShowBackToTop((vp as HTMLElement).scrollTop > 300);
+    vp.addEventListener("scroll", onScroll, { passive: true });
+    return () => vp.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Client-side WHOIS fetch — runs when target changes (shallow nav) or
   // refreshKey increments (re-query button forces a fresh lookup).
@@ -2640,6 +2652,27 @@ export default function LookupPage({
           </div>
         </main>
       </ScrollArea>
+
+      {/* Back-to-top button */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 8 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            aria-label="Back to top"
+            onClick={() => {
+              const vp = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]");
+              if (vp) vp.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="fixed bottom-6 right-5 z-50 w-9 h-9 rounded-full bg-background/90 backdrop-blur border border-border shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+          >
+            <RiArrowRightSLine className="w-4 h-4 -rotate-90" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <OgImageDialog
         open={showImagePreview}
         onOpenChange={setShowImagePreview}

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RiLoader4Line, RiCloseLine, RiCheckLine, RiCalendarLine } from "@remixicon/react";
+import { RiLoader4Line, RiCloseLine, RiCheckLine, RiCalendarLine, RiRefreshLine } from "@remixicon/react";
 import { useTranslation } from "@/lib/i18n";
 import type { Subscription } from "@/components/dashboard/types";
 
@@ -17,6 +17,7 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
     sub.expiration_date ? sub.expiration_date.slice(0, 10) : ""
   );
   const [saving, setSaving] = React.useState(false);
+  const [syncing, setSyncing] = React.useState(false);
   const { t } = useTranslation();
 
   React.useEffect(() => {
@@ -24,6 +25,26 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
+
+  async function handleSyncWhois() {
+    setSyncing(true);
+    try {
+      const res = await fetch(`/api/remind/whois?query=${encodeURIComponent(sub.domain)}`);
+      const data = await res.json();
+      const r = data?.result ?? data;
+      const expiry = r?.expirationDate;
+      if (expiry && expiry !== "Unknown" && expiry !== "N/A") {
+        setDateValue(expiry.slice(0, 10));
+        toast.success(t("dashboard.sync_from_whois_ok"));
+      } else {
+        toast.error(t("dashboard.no_expiry_whois"));
+      }
+    } catch {
+      toast.error(t("dashboard.sync_failed"));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function handleSave() {
     if (!dateValue) { toast.error(t("dashboard.date_required")); return; }
@@ -66,13 +87,26 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2 space-y-4" style={{ minHeight: 0 }}>
           <p className="text-xs text-muted-foreground">{t("dashboard.domain_label")}<span className="font-mono text-foreground">{sub.domain}</span></p>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">{t("dashboard.expiry_date")}</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">{t("dashboard.expiry_date")}</Label>
+              <button
+                type="button"
+                onClick={handleSyncWhois}
+                disabled={syncing || saving}
+                className="flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-50 disabled:no-underline transition-opacity"
+              >
+                {syncing
+                  ? <RiLoader4Line className="w-3 h-3 animate-spin" />
+                  : <RiRefreshLine className="w-3 h-3" />}
+                {syncing ? t("dashboard.syncing_whois") : t("dashboard.sync_from_whois")}
+              </button>
+            </div>
             <Input type="date" value={dateValue} onChange={e => setDateValue(e.target.value)} className="h-9 rounded-xl text-sm" />
           </div>
         </div>
         <div className="flex gap-2 px-6 py-4 border-t border-border/50 shrink-0">
           <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
-          <Button onClick={handleSave} disabled={saving} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
+          <Button onClick={handleSave} disabled={saving || syncing} className="flex-1 h-9 rounded-xl text-sm gap-1.5">
             {saving ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.saving")}</> : <><RiCheckLine className="w-3.5 h-3.5" />{t("dashboard.save")}</>}
           </Button>
         </div>

@@ -1621,7 +1621,12 @@
     "confirm_delete_suffix": "，將永久刪除您的帳戶和所有數據（包括訂閱、品牌印章等）。請輸入您的郵箱地址確認：",
     "confirm_delete_email_placeholder": "輸入您的郵箱地址",
     "confirm_delete_btn": "確認注銷",
-    "activation_code_redeemable": "啟用碼可兌換"
+    "activation_code_redeemable": "啟用碼可兌換",
+    "sync_from_whois": "從 WHOIS 同步",
+    "syncing_whois": "同步中…",
+    "sync_from_whois_ok": "已從 WHOIS 同步到期日期",
+    "sync_failed": "同步失敗，請重試",
+    "no_expiry_whois": "WHOIS 中無到期日期"
   },
   "admin": {
     "no_access_title": "無訪問權限",

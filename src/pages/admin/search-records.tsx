@@ -9,7 +9,7 @@ import {
   RiCalendarLine, RiArrowLeftLine, RiArrowRightLine, RiUserLine,
   RiFireLine, RiAlertLine, RiFlashlightLine, RiExternalLinkLine,
   RiGhostLine, RiDeleteBinLine, RiCloseLine, RiGroupLine, RiDatabase2Line,
-  RiRepeatLine,
+  RiRepeatLine, RiDownloadLine,
 } from "@remixicon/react";
 
 // One row = one UNIQUE domain (deduplicated across all users)
@@ -198,6 +198,32 @@ export default function AdminSearchRecordsPage() {
     ? Math.max(...data.dailyStats.map(d => d.count), 1)
     : 1;
 
+  function exportCsv() {
+    if (!data || data.records.length === 0) { toast.error("没有数据可导出"); return; }
+    const headers = ["域名", "类型", "注册状态", "到期日", "剩余天数", "价值级别", "最后搜索", "搜索次数", "独立登录用户", "最近用户邮箱"];
+    const rows = data.records.map(r => [
+      r.query,
+      r.queryType,
+      r.regStatus,
+      r.expirationDate ? new Date(r.expirationDate).toLocaleDateString("zh-CN") : "",
+      r.remainingDays ?? "",
+      r.valueTier,
+      new Date(r.lastSearchedAt).toLocaleString("zh-CN"),
+      r.searchCount,
+      r.uniqueLoggedUsers,
+      r.lastUserEmail ?? (r.lastWasAnon ? "匿名" : ""),
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `search-records_${filter}_p${page}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`已导出 ${data.records.length} 条记录`);
+  }
+
   return (
     <AdminLayout title="查询记录">
       <div className="space-y-5">
@@ -216,6 +242,14 @@ export default function AdminSearchRecordsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              disabled={!data || data.records.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-muted/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="导出当前页为 CSV"
+            >
+              <RiDownloadLine className="w-3.5 h-3.5" />导出 CSV
+            </button>
             <Button variant="outline" size="sm" onClick={() => setShowStats(s => !s)} className="rounded-xl h-9 gap-2">
               <RiBarChartLine className="w-3.5 h-3.5" />
               {showStats ? "收起统计" : "展开统计"}

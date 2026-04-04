@@ -44,7 +44,32 @@ type Stats = {
   recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null }[];
 };
 
-function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge }: {
+function Sparkline({ data, color = "#3b82f6", h = 28, w = 72 }: { data: number[]; color?: string; h?: number; w?: number }) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  }).join(" ");
+  const fill = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  });
+  const area = `M0,${h} L${fill.join(" L")} L${w},${h} Z`;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" className="shrink-0">
+      <path d={area} fill={color} fillOpacity={0.12} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={fill[fill.length - 1].split(",")[0]} cy={fill[fill.length - 1].split(",")[1]} r={2} fill={color} />
+    </svg>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge, sparkline }: {
   icon: React.ElementType;
   label: string;
   value: number | string | undefined;
@@ -53,6 +78,7 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge 
   href: string;
   color: string;
   badge?: { label: string; value: number; color: string };
+  sparkline?: number[];
 }) {
   const router = useRouter();
   return (
@@ -78,7 +104,12 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge 
           </span>
         )}
       </div>
-      <RiArrowRightLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors mt-1 shrink-0" />
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <RiArrowRightLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+        {sparkline && sparkline.length >= 2 && (
+          <Sparkline data={sparkline} color="#3b82f6" h={24} w={60} />
+        )}
+      </div>
     </button>
   );
 }
@@ -282,6 +313,7 @@ export default function AdminIndexPage() {
             sub="今日新增" subValue={stats?.todaySearches}
             href="/admin/search-records"
             color="bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
+            sparkline={stats?.dailyTrend?.map(d => d.count)}
           />
           <StatCard
             icon={RiBellLine} label="到期监控" value={stats?.activeReminders}

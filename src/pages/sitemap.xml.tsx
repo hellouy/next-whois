@@ -4,7 +4,10 @@ import { getOrigin } from "@/lib/seo";
 
 const STATIC_PAGES = [
   { path: "/",          changefreq: "daily",   priority: "1.0" },
+  { path: "/about",     changefreq: "monthly",  priority: "0.8" },
   { path: "/guide",     changefreq: "monthly",  priority: "0.7" },
+  { path: "/tlds",      changefreq: "weekly",   priority: "0.7" },
+  { path: "/links",     changefreq: "monthly",  priority: "0.6" },
   { path: "/changelog", changefreq: "weekly",   priority: "0.6" },
   { path: "/login",     changefreq: "monthly",  priority: "0.4" },
   { path: "/register",  changefreq: "monthly",  priority: "0.4" },

@@ -1621,7 +1621,12 @@
     "confirm_delete_suffix": " and will permanently delete your account and all data (including subscriptions, brand claims, etc.). Please enter your email address to confirm:",
     "confirm_delete_email_placeholder": "Enter your email address",
     "confirm_delete_btn": "Confirm Deletion",
-    "activation_code_redeemable": "Redeemable with activation code"
+    "activation_code_redeemable": "Redeemable with activation code",
+    "sync_from_whois": "Sync from WHOIS",
+    "syncing_whois": "Syncing…",
+    "sync_from_whois_ok": "Expiry date synced from WHOIS",
+    "sync_failed": "Sync failed, please try again",
+    "no_expiry_whois": "WHOIS has no expiry date"
   },
   "admin": {
     "no_access_title": "No Access",

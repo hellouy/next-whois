@@ -16,7 +16,8 @@ import {
   RiHistoryLine, RiStarLine, RiBellLine,
   RiDownloadLine, RiAlertLine, RiBankCardLine,
   RiTimeLine, RiCoinLine, RiAddCircleLine, RiSubtractLine,
-  RiSendPlaneLine, RiLockPasswordLine,
+  RiSendPlaneLine, RiLockPasswordLine, RiCheckboxLine, RiCheckboxBlankLine,
+  RiIndeterminateCircleLine,
 } from "@remixicon/react";
 
 type User = {
@@ -402,6 +403,8 @@ export default function AdminUsersPage() {
   const [offset, setOffset] = React.useState(0);
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const pendingDeleteTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = React.useState(false);
   const LIMIT = 50;
 
   function load(q: string, filter: FilterTab, off = 0) {
@@ -467,6 +470,7 @@ export default function AdminUsersPage() {
   function handleFilter(f: FilterTab) {
     setActiveFilter(f);
     setOffset(0);
+    setSelectedIds(new Set());
     load(search, f, 0);
   }
 
@@ -536,6 +540,54 @@ export default function AdminUsersPage() {
       toast.error(e.message || "操作失败");
     } finally {
       setToggling(null);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const selectableUsers = users.filter(u => u.email !== ADMIN_EMAIL);
+
+  function toggleSelectAll() {
+    if (selectedIds.size === selectableUsers.length && selectableUsers.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableUsers.map(u => u.id)));
+    }
+  }
+
+  async function bulkAction(action: "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete") {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const actionLabels: Record<string, string> = {
+      disable: "停用",
+      enable: "启用",
+      grant_subscription: "授予订阅",
+      revoke_subscription: "取消订阅",
+      delete: "删除",
+    };
+    if (action === "delete" && !confirm(`确定要永久删除选中的 ${ids.length} 名用户吗？此操作不可撤销！`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/admin/users-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "操作失败");
+      toast.success(`已${actionLabels[action]} ${data.affected} 名用户`);
+      setSelectedIds(new Set());
+      load(search, activeFilter, 0);
+    } catch (e: any) {
+      toast.error(e.message || "批量操作失败");
+    } finally {
+      setBulkLoading(false);
     }
   }
 
@@ -631,6 +683,73 @@ export default function AdminUsersPage() {
           ))}
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 flex-wrap p-3 glass-panel border border-primary/30 rounded-xl bg-primary/5">
+            <span className="text-xs font-semibold text-primary shrink-0">已选 {selectedIds.size} 人</span>
+            <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+              <button
+                onClick={() => bulkAction("enable")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/40 transition-colors disabled:opacity-50"
+              >
+                <RiUserFollowLine className="w-3.5 h-3.5" />启用
+              </button>
+              <button
+                onClick={() => bulkAction("disable")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/40 transition-colors disabled:opacity-50"
+              >
+                <RiUserForbidLine className="w-3.5 h-3.5" />停用
+              </button>
+              <button
+                onClick={() => bulkAction("grant_subscription")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/40 transition-colors disabled:opacity-50"
+              >
+                <RiVipCrownLine className="w-3.5 h-3.5" />授予订阅
+              </button>
+              <button
+                onClick={() => bulkAction("revoke_subscription")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+              >
+                <RiIndeterminateCircleLine className="w-3.5 h-3.5" />取消订阅
+              </button>
+              <button
+                onClick={() => bulkAction("delete")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50"
+              >
+                <RiDeleteBinLine className="w-3.5 h-3.5" />删除
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                title="取消选择"
+              >
+                <RiCloseLine className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Select-all bar — only show when list is loaded */}
+        {users.length > 0 && !loading && (
+          <div className="flex items-center gap-2 px-1">
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {selectedIds.size === selectableUsers.length && selectableUsers.length > 0
+                ? <RiCheckboxLine className="w-3.5 h-3.5 text-primary" />
+                : <RiCheckboxBlankLine className="w-3.5 h-3.5" />
+              }
+              全选当前页（{selectableUsers.length}）
+            </button>
+          </div>
+        )}
+
         {loading && offset === 0 ? (
           <div className="flex justify-center py-12">
             <RiLoader4Line className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -646,10 +765,23 @@ export default function AdminUsersPage() {
               <div key={user.id}
                 className={cn(
                   "glass-panel border rounded-xl p-4 flex items-center gap-3 group transition-colors",
+                  selectedIds.has(user.id) ? "border-primary/40 bg-primary/5" :
                   user.disabled
                     ? "border-red-200/50 dark:border-red-800/30 bg-red-50/20 dark:bg-red-950/10"
                     : "border-border"
                 )}>
+                {user.email !== ADMIN_EMAIL && (
+                  <button
+                    onClick={() => toggleSelect(user.id)}
+                    className="shrink-0 text-muted-foreground hover:text-primary transition-colors -mr-1"
+                    tabIndex={-1}
+                  >
+                    {selectedIds.has(user.id)
+                      ? <RiCheckboxLine className="w-4 h-4 text-primary" />
+                      : <RiCheckboxBlankLine className="w-4 h-4 opacity-40 group-hover:opacity-100" />
+                    }
+                  </button>
+                )}
                 <div className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
                   user.email === ADMIN_EMAIL
