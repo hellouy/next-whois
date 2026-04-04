@@ -35,10 +35,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const [rows, stampsRows, overrides, userRow, searchStats, recentSearchRows] = await Promise.all([
       many<{
         id: string; domain: string; expiration_date: string | null;
+        whois_expiry_date: string | null; whois_synced_at: string | null;
         active: boolean; cancel_token: string | null; created_at: string;
-        days_before: number | null;
+        days_before: number | null; thresholds_json: string | null;
+        phase_flags: string | null; registrar: string | null;
+        creation_date: string | null; nameservers_json: string | null;
       }>(
-        `SELECT id, domain, expiration_date, active, cancel_token, created_at, days_before
+        `SELECT id, domain, expiration_date, whois_expiry_date, whois_synced_at,
+                active, cancel_token, created_at, days_before,
+                thresholds_json, phase_flags, registrar, creation_date, nameservers_json
          FROM reminders WHERE email = $1 ORDER BY created_at DESC`,
         [email],
       ),
@@ -103,8 +108,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const nowMs = Date.now();
     const subscriptions = rows.map((r) => {
-      const lc = r.expiration_date
-        ? computeLifecycle(r.domain, r.expiration_date, undefined, overrides)
+      // whois_expiry_date is the WHOIS-verified expiry (authoritative when present),
+      // falling back to the user-provided expiration_date
+      const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
+      const lc = effectiveExpiry
+        ? computeLifecycle(r.domain, effectiveExpiry, undefined, overrides)
         : null;
 
       const reminderLogs = logsByReminder[r.id] ?? [];
@@ -113,13 +121,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? reminderLogs.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0]
         : null;
 
+      // Parse JSON fields
+      let thresholds: number[] = [];
+      try { if (r.thresholds_json) thresholds = JSON.parse(r.thresholds_json); } catch { /* ignore */ }
+      let phaseFlags: Record<string, boolean> = {};
+      try { if (r.phase_flags) phaseFlags = JSON.parse(r.phase_flags); } catch { /* ignore */ }
+      let nameservers: string[] = [];
+      try { if (r.nameservers_json) nameservers = JSON.parse(r.nameservers_json); } catch { /* ignore */ }
+
       const daysToExpiry = lc?.daysToExpiry ?? null;
+      const thresholdsToUse = thresholds.length > 0 ? thresholds : THRESHOLDS;
       let nextReminderAt: string | null = null;
       let nextReminderDays: number | null = null;
-      if (r.expiration_date && daysToExpiry !== null && daysToExpiry > 0) {
-        for (const t of THRESHOLDS) {
+      if (effectiveExpiry && daysToExpiry !== null && daysToExpiry > 0) {
+        for (const t of thresholdsToUse) {
           if (daysToExpiry > t && !sentKeys.includes(t)) {
-            const d = new Date(r.expiration_date);
+            const d = new Date(effectiveExpiry);
             d.setDate(d.getDate() - t);
             nextReminderAt = d.toISOString();
             nextReminderDays = t;
@@ -129,7 +146,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       return {
-        ...r,
+        id: r.id,
+        domain: r.domain,
+        // Always expose the effective (WHOIS-authoritative) expiry to the UI
+        expiration_date: effectiveExpiry,
+        active: r.active,
+        cancel_token: r.cancel_token,
+        created_at: r.created_at,
+        days_before: r.days_before,
+        whois_synced_at: r.whois_synced_at,
+        registrar: r.registrar,
+        creation_date: r.creation_date,
+        nameservers,
+        thresholds: thresholdsToUse,
+        phase_flags: phaseFlags,
         drop_date: lc ? lc.dropDate.toISOString() : null,
         grace_end: lc ? lc.graceEnd.toISOString() : null,
         redemption_end: lc ? lc.redemptionEnd.toISOString() : null,

@@ -297,6 +297,15 @@ export function SubscriptionsTab({
           dropped: t("dashboard.phase_guidance_dropped"),
         };
 
+        // WHOIS freshness: warn if within 30 days of expiry but synced >3 days ago (or never)
+        const daysSinceWhoisSync = sub.whois_synced_at
+          ? Math.floor((Date.now() - new Date(sub.whois_synced_at).getTime()) / 86400000)
+          : null;
+        const isWhoisStale = sub.active && (isWarn || isUrgent) && (daysSinceWhoisSync === null || daysSinceWhoisSync > 3);
+
+        // Lifecycle data confidence badge
+        const confidenceLabel = sub.tld_confidence === "high" ? "数据已核实" : sub.tld_confidence === "est" ? "AI估算" : null;
+
         return (
           <div key={sub.id} className={cn(
             "glass-panel border rounded-2xl p-4 space-y-3 transition-all",
@@ -350,7 +359,18 @@ export function SubscriptionsTab({
                   {sub.expiration_date
                     ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date), locale) })
                     : t("dashboard.expiry_not_set")}
+                  {sub.whois_synced_at && (
+                    <span className="ml-1 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      WHOIS✓
+                    </span>
+                  )}
                 </p>
+                {isWhoisStale && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
+                    <RiAlertLine className="w-2.5 h-2.5 shrink-0" />
+                    到期日待核实，点击编辑可手动同步 WHOIS
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
@@ -476,7 +496,16 @@ export function SubscriptionsTab({
 
             {/* Lifecycle dates */}
             {sub.drop_date && sub.expiration_date && (
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/40">
+              <div className="pt-2 border-t border-border/40 space-y-2">
+              {confidenceLabel && (
+                <div className="flex items-center gap-1">
+                  <RiShieldCheckLine className={cn("w-2.5 h-2.5 shrink-0", sub.tld_confidence === "high" ? "text-emerald-500" : "text-amber-500")} />
+                  <span className={cn("text-[9px] font-medium", sub.tld_confidence === "high" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                    {confidenceLabel}
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.grace_end")}</p>
                   <p className={cn("text-[11px] font-semibold tabular-nums", phase === "grace" ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
@@ -495,6 +524,7 @@ export function SubscriptionsTab({
                     {fmt(new Date(sub.drop_date), locale)}
                   </p>
                 </div>
+              </div>
               </div>
             )}
           </div>

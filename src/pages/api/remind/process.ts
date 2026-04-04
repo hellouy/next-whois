@@ -19,12 +19,14 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdminEmail } from "@/lib/admin-server";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 
-/** Stale threshold: refresh WHOIS if older than 7 days for near-expiry domains */
-const WHOIS_STALE_DAYS = 7;
+/** Stale thresholds: refresh WHOIS more frequently as expiry approaches */
+const WHOIS_STALE_CRITICAL_DAYS = 1;   // within 7 days of expiry → refresh every day
+const WHOIS_STALE_URGENT_DAYS = 2;     // within 30 days of expiry → refresh every 2 days
+const WHOIS_STALE_NORMAL_DAYS = 5;     // within 90 days of expiry → refresh every 5 days
 /** Only sync WHOIS for reminders within this many days of expiry */
 const WHOIS_SYNC_WINDOW_DAYS = 90;
 /** Max WHOIS lookups per cron run to avoid rate limits */
-const WHOIS_SYNC_LIMIT = 5;
+const WHOIS_SYNC_LIMIT = 20;
 
 /**
  * Refresh WHOIS expiry date for reminders that are approaching expiry and have
@@ -35,17 +37,21 @@ async function refreshStaleWhoisDates(
 ): Promise<Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>> {
   const now = Date.now();
   const msPerDay = 86_400_000;
-  const staleMs = WHOIS_STALE_DAYS * msPerDay;
-  const windowMs = WHOIS_SYNC_WINDOW_DAYS * msPerDay;
 
   // Pick candidates: within sync window, stale or never synced
+  // Stale threshold varies by urgency: critical (<7d) = 1d, urgent (<30d) = 2d, normal (<90d) = 5d
   const candidates = reminders.filter((r) => {
     if (!r.expiration_date) return false;
     const expMs = new Date(r.expiration_date).getTime();
     const daysToExpiry = (expMs - now) / msPerDay;
     if (daysToExpiry < -30 || daysToExpiry > WHOIS_SYNC_WINDOW_DAYS) return false;
     const lastSync = r.whois_synced_at ? new Date(r.whois_synced_at).getTime() : 0;
-    return now - lastSync > staleMs;
+    const staleDays = daysToExpiry <= 7
+      ? WHOIS_STALE_CRITICAL_DAYS
+      : daysToExpiry <= 30
+        ? WHOIS_STALE_URGENT_DAYS
+        : WHOIS_STALE_NORMAL_DAYS;
+    return now - lastSync > staleDays * msPerDay;
   }).slice(0, WHOIS_SYNC_LIMIT);
 
   const updated = new Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>();
@@ -87,8 +93,8 @@ async function refreshStaleWhoisDates(
       );
       updated.set(r.id, { date: dateStr, eppStatus: epp, registrar, creationDate, nameservers });
       console.log(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
-    } catch (e: any) {
-      console.warn(`[process] WHOIS refresh failed for ${r.domain}:`, e?.message ?? e);
+    } catch (err) {
+      console.warn(`[process] WHOIS refresh failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
     }
   }));
   return updated;

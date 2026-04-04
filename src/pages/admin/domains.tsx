@@ -95,6 +95,27 @@ function LifecycleTab() {
   const [fbFilter, setFbFilter] = React.useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [fbActing, setFbActing] = React.useState<string | null>(null);
 
+  const [syncTld, setSyncTld] = React.useState("");
+  const [syncing, setSyncing] = React.useState(false);
+  const [syncResult, setSyncResult] = React.useState<{ refreshed: number; skipped: number; failed: number } | null>(null);
+
+  async function handleSubSync(tld?: string) {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const body: Record<string, unknown> = { limit: 100 };
+      if (tld) body.tld = tld;
+      const res = await fetch("/api/admin/subscription-sync", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "同步失败");
+      setSyncResult({ refreshed: data.refreshed ?? 0, skipped: data.skipped ?? 0, failed: data.failed ?? 0 });
+      toast.success(`同步完成：已更新 ${data.refreshed} 条订阅`);
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "同步失败"); }
+    finally { setSyncing(false); }
+  }
+
   async function loadFb(status = fbFilter) {
     setFbLoading(true);
     try {
@@ -253,6 +274,37 @@ function LifecycleTab() {
         <Button size="sm" variant="outline" onClick={load} disabled={loading} className="h-8 rounded-xl">
           <RiRefreshLine className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} />刷新
         </Button>
+      </div>
+
+      {/* Subscription WHOIS bulk sync panel */}
+      <div className="rounded-xl border border-border bg-muted/20 p-3.5 space-y-2.5">
+        <div className="flex items-center gap-2">
+          <RiRefreshLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <p className="text-[12px] font-semibold">订阅 WHOIS 批量同步</p>
+          <span className="text-[10px] text-muted-foreground ml-auto">以最新 WHOIS 数据更新用户订阅的到期日</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            className="h-8 text-sm rounded-lg flex-1 max-w-[140px]"
+            placeholder="TLD（如 com）"
+            value={syncTld}
+            onChange={e => setSyncTld(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ""))}
+          />
+          <Button size="sm" className="h-8 rounded-lg shrink-0" variant="secondary"
+            onClick={() => handleSubSync(syncTld.trim() || undefined)} disabled={syncing}>
+            {syncing ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RiRefreshLine className="w-3.5 h-3.5 mr-1.5" />}
+            {syncTld.trim() ? `同步 .${syncTld}` : "全量同步"}
+          </Button>
+          {syncResult && (
+            <span className="text-[11px] text-muted-foreground">
+              更新 <span className="font-semibold text-emerald-600 dark:text-emerald-400">{syncResult.refreshed}</span>
+              {" · "}跳过 {syncResult.skipped}{" · "}失败 {syncResult.failed}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground/70">
+          留空 TLD 字段同步所有近期到期订阅（最多 100 条）；指定 TLD 仅同步该后缀的订阅。每域名每 24h 自动限频。
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
