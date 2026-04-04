@@ -110,6 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let offset = 0;
     let firstRow = true;
     let done = false;
+    let readError: string | undefined;
 
     while (!done) {
       try {
@@ -129,9 +130,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else {
           offset += PAGE_SIZE;
         }
-      } catch {
+      } catch (e: any) {
+        readError = (e as Error).message;
         done = true;
       }
+    }
+
+    // Record any mid-pagination error so the admin can see partial exports.
+    if (readError && !meta[t.name]?.error) {
+      meta[t.name] = { ...meta[t.name], error: `read error at offset ${offset}: ${readError}` };
     }
 
     res.write("]");
