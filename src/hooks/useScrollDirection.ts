@@ -2,14 +2,30 @@ import { useState, useEffect, useRef } from "react";
 
 export function useScrollDirection() {
   const [isVisible, setIsVisible] = useState(true);
-  // Use a ref so the scroll handler always reads the latest value without
-  // needing to be re-registered on every scroll (which caused stale-closure
-  // bugs and listener stacking on fast mobile/iOS momentum scrolling).
   const lastScrollY = useRef(0);
 
   useEffect(() => {
-    const controlNavbar = () => {
-      const currentScrollY = window.scrollY;
+    const controlNavbar = (e: Event) => {
+      const target = e.target as Element | null;
+
+      // Filter: only react to the window/document or large containers that
+      // cover the majority of the viewport (e.g. Radix ScrollArea, full-page
+      // divs). Skip small scrollable areas like dropdowns, modals, textareas.
+      const isMainScroll =
+        !target ||
+        target === document.documentElement ||
+        target === document.body ||
+        target.clientHeight > window.innerHeight * 0.5;
+
+      if (!isMainScroll) return;
+
+      // Read the correct Y position depending on the scroll source.
+      const currentScrollY =
+        target === document.documentElement ||
+        target === document.body ||
+        !target
+          ? window.scrollY
+          : (target as Element).scrollTop;
 
       if (currentScrollY < lastScrollY.current || currentScrollY < 10) {
         setIsVisible(true);
@@ -20,14 +36,18 @@ export function useScrollDirection() {
       lastScrollY.current = currentScrollY;
     };
 
-    // passive:true tells the browser this handler never calls preventDefault,
-    // allowing it to optimise scroll performance (especially on mobile).
-    window.addEventListener("scroll", controlNavbar, { passive: true });
+    // capture:true intercepts scroll events before they reach the target,
+    // so we catch scrolling inside any element (including Radix ScrollArea)
+    // not just window-level scrolling.
+    window.addEventListener("scroll", controlNavbar, {
+      capture: true,
+      passive: true,
+    });
 
     return () => {
-      window.removeEventListener("scroll", controlNavbar);
+      window.removeEventListener("scroll", controlNavbar, { capture: true });
     };
-  }, []); // register once — the ref keeps lastScrollY current
+  }, []);
 
   return isVisible;
 }
