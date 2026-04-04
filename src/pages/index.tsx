@@ -223,7 +223,15 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
       {/* ── Mobile layout (one viewport, no scroll) ──────────────────────── */}
       <div className="sm:hidden flex flex-col w-full px-4" style={{ height: "calc(100dvh - 4rem)", paddingTop: "1.25rem", paddingBottom: "1.5rem" }}>
 
-        {/* Brand: fills top flex space */}
+        {/* Search box — top of viewport */}
+        <div className="relative group mb-3">
+          <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
+            <KeyboardShortcut k="/" />
+          </div>
+        </div>
+
+        {/* Brand: fills remaining space in the middle */}
         <div className="flex flex-1 items-center justify-center">
           <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
         </div>
@@ -243,18 +251,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           </div>
         )}
 
-        {/* Search box */}
-        <div className="relative group mb-3">
-          <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
-            <KeyboardShortcut k="/" />
-          </div>
-        </div>
-
-        {/* Spacer — pushes quick links toward the bottom of the viewport */}
-        <div style={{ height: "clamp(0.75rem, 4dvh, 2.5rem)" }} />
-
-        {/* Quick-access tool links — pinned near bottom, above copyright */}
+        {/* Quick-access tool links — pinned at bottom, above footer copyright */}
         <div className="flex items-center justify-center gap-2 flex-wrap">
           {(isChinese
             ? [
