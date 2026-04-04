@@ -39,15 +39,17 @@ function XRWDisplay({ heroTitle, tagline }: { heroTitle: string; tagline: string
   const displayTitle = settings.home_hero_title || heroTitle;
   const displayTagline = settings.home_hero_subtitle || tagline;
   return (
-    <div className="w-full flex flex-col items-center justify-center select-none gap-2">
+    <div className="w-full flex flex-col items-center justify-center select-none gap-2" suppressHydrationWarning>
       <span className="text-shimmer text-5xl sm:text-6xl font-bold tracking-[0.22em]" suppressHydrationWarning>
         {displayTitle}
       </span>
-      {displayTagline && (
-        <span className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase">
-          {displayTagline}
-        </span>
-      )}
+      <span
+        className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase"
+        style={{ display: displayTagline ? undefined : "none" }}
+        suppressHydrationWarning
+      >
+        {displayTagline}
+      </span>
     </div>
   );
 }
