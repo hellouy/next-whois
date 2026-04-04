@@ -31,8 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const userId = (session.user as any)?.id ?? null;
 
-    // ── Phase 1: four DB queries in parallel ─────────────────────────────────
-    const [rows, stampsRows, overrides, userRow, searchStats] = await Promise.all([
+    // ── Phase 1: DB queries in parallel ──────────────────────────────────────
+    const [rows, stampsRows, overrides, userRow, searchStats, recentSearchRows] = await Promise.all([
       many<{
         id: string; domain: string; expiration_date: string | null;
         active: boolean; cancel_token: string | null; created_at: string;
@@ -75,6 +75,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          FROM search_history WHERE user_id = $1`,
         [userId],
       ).catch(() => null) : Promise.resolve(null),
+      // Recent searches for user dashboard
+      userId ? many<{ query: string; query_type: string; reg_status: string | null; created_at: string }>(
+        `SELECT query, query_type, reg_status, created_at
+         FROM search_history WHERE user_id = $1
+         ORDER BY created_at DESC LIMIT 5`,
+        [userId],
+      ).catch(() => []) : Promise.resolve([]),
     ]);
 
     // ── Phase 2: fetch reminder_logs (depends on reminder IDs) ──────────────
@@ -168,9 +175,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         highValue: parseInt(searchStats.high_value ?? "0"),
         topType: searchStats.top_type,
       } : null,
+      recentSearches: recentSearchRows ?? [],
     });
-  } catch (err: any) {
-    console.error("[dashboard] GET error:", err.message);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[dashboard] GET error:", msg);
     return res.status(500).json({ error: "获取数据失败" });
   }
 }

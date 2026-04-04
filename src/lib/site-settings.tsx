@@ -99,6 +99,8 @@ export interface SiteSettings {
   captcha_provider: string;
   captcha_site_key: string;
   captcha_secret_key: string;
+  captcha_on_login: string;
+  captcha_on_register: string;
   // Per-provider keys (independent, never overwrite each other)
   captcha_turnstile_site_key: string;
   captcha_turnstile_secret_key: string;
@@ -226,6 +228,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   captcha_provider: "",
   captcha_site_key: "",
   captcha_secret_key: "",
+  captcha_on_login: "1",
+  captcha_on_register: "1",
   captcha_turnstile_site_key: "",
   captcha_turnstile_secret_key: "",
   captcha_hcaptcha_site_key: "",

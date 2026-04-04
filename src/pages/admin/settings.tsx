@@ -421,10 +421,32 @@ function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings
 
 function CaptchaTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
   const provider = s.captcha_provider;
+  const isEnabled = !!provider;
+  const onLogin = (s.captcha_on_login ?? "1") !== "";
+  const onRegister = (s.captcha_on_register ?? "1") !== "";
+
   return (
     <div className="space-y-6">
+      {/* Status banner */}
+      <div className={cn(
+        "flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium",
+        isEnabled
+          ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-700/30 text-emerald-700 dark:text-emerald-300"
+          : "bg-muted/60 border-border text-muted-foreground"
+      )}>
+        <RiShieldCheckLine className={cn("w-4 h-4 shrink-0", isEnabled ? "text-emerald-500" : "text-muted-foreground/50")} />
+        <div className="flex-1 min-w-0">
+          <span className="font-bold">{isEnabled ? "验证码已启用" : "验证码未启用"}</span>
+          {isEnabled && <span className="text-xs ml-2 opacity-70">当前提供商：{provider}</span>}
+        </div>
+        <span className={cn(
+          "text-[11px] px-2 py-0.5 rounded-full font-bold",
+          isEnabled ? "bg-emerald-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
+        )}>{isEnabled ? "ON" : "OFF"}</span>
+      </div>
+
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiShieldCheckLine} title="验证码提供商" desc="选择用于防止机器人的验证码服务" />
+        <SectionTitle icon={RiShieldCheckLine} title="验证码提供商" desc={'选择用于防止机器人的验证码服务，选择"不启用"则关闭所有验证'} />
         <SelectField
           label="验证码提供商"
           value={provider}
@@ -437,6 +459,25 @@ function CaptchaTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, 
           ]}
         />
       </div>
+
+      {/* Scope toggles — only shown when CAPTCHA is enabled */}
+      {isEnabled && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="验证码生效范围" desc="控制哪些操作需要通过验证码验证" />
+          <Toggle
+            label="登录时验证"
+            desc="用户登录时需通过人机验证"
+            checked={onLogin}
+            onChange={v => set("captcha_on_login", v ? "1" : "")}
+          />
+          <Toggle
+            label="注册时验证"
+            desc="新用户注册时需通过人机验证"
+            checked={onRegister}
+            onChange={v => set("captcha_on_register", v ? "1" : "")}
+          />
+        </div>
+      )}
 
       {provider === "turnstile" && (
         <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">

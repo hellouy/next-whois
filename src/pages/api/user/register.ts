@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const allowReg = !regSetting || regSetting.value === "1";
   if (!allowReg) return res.status(403).json({ error: "注册已暂停，请联系管理员" });
 
-  const captchaConfig = await getCaptchaConfig();
+  const captchaConfig = await getCaptchaConfig("register");
   if (captchaConfig.provider && captchaConfig.secretKey) {
     if (!captchaToken?.trim()) return res.status(400).json({ error: "请完成人机验证" });
     const captchaOk = await verifyCaptchaToken(String(captchaToken), captchaConfig.provider, captchaConfig.secretKey);

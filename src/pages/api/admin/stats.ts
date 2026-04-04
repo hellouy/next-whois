@@ -18,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalOrders, paidOrders, paidRevenue,
       tldFailures, weeklySearches, domainSearches, ipSearches, asnSearches, cidrSearches,
       availableSearches, registeredSearches, highValueSearches,
+      failedDomainSearches, todayFailedSearches,
     ] = await Promise.all([
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM users WHERE disabled = true"),
@@ -48,14 +49,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE reg_status = 'unregistered'"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE reg_status = 'registered'"),
       one<{ count: string }>("SELECT COUNT(*) AS count FROM search_history WHERE value_tier = 'high'").catch(() => ({ count: "0" })),
+      // Failed domain queries: domain type with no reg_status resolved (older than 10 min, so lookup has settled)
+      one<{ count: string }>(
+        "SELECT COUNT(*) AS count FROM search_history WHERE query_type = 'domain' AND reg_status IS NULL AND created_at < NOW() - INTERVAL '10 minutes'"
+      ).catch(() => ({ count: "0" })),
+      // Today's failed domain queries
+      one<{ count: string }>(
+        "SELECT COUNT(*) AS count FROM search_history WHERE query_type = 'domain' AND reg_status IS NULL AND created_at >= NOW() - INTERVAL '1 day' AND created_at < NOW() - INTERVAL '10 minutes'"
+      ).catch(() => ({ count: "0" })),
     ]);
 
     const [recentUsers, recentSearches, topFailingTlds, dailyTrend] = await Promise.all([
       many<{ id: string; email: string; name: string | null; created_at: string; disabled: boolean }>(
         "SELECT id, email, name, created_at, disabled FROM users ORDER BY created_at DESC LIMIT 5"
       ),
-      many<{ id: string; query: string; query_type: string; created_at: string; user_id: string | null }>(
-        "SELECT id, query, query_type, created_at, user_id FROM search_history ORDER BY created_at DESC LIMIT 10"
+      many<{ id: string; query: string; query_type: string; created_at: string; user_id: string | null; reg_status: string | null }>(
+        "SELECT id, query, query_type, created_at, user_id, reg_status FROM search_history ORDER BY created_at DESC LIMIT 10"
       ),
       many<{ tld: string; fail_count: number; fail_reason: string | null; last_fail_at: string | null; has_custom_server: boolean }>(
         `SELECT f.tld, f.fail_count, f.fail_reason, f.last_fail_at::text,
@@ -73,13 +82,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ).catch(() => [] as any[]),
     ]);
 
+    const totalSearchesInt = parseInt(history?.count ?? "0");
+    const failedInt = parseInt(failedDomainSearches?.count ?? "0");
+    const domainInt = parseInt(domainSearches?.count ?? "0");
+    const failureRate = domainInt > 0 ? Math.round((failedInt / domainInt) * 1000) / 10 : 0;
+
     return res.json({
       users: parseInt(users?.count ?? "0"),
       disabledUsers: parseInt(disabledUsers?.count ?? "0"),
       stamps: parseInt(stamps?.count ?? "0"),
       verifiedStamps: parseInt(verifiedStamps?.count ?? "0"),
       activeReminders: parseInt(reminders?.count ?? "0"),
-      searches: parseInt(history?.count ?? "0"),
+      searches: totalSearchesInt,
       feedback: parseInt(feedback?.count ?? "0"),
       anonSearches: parseInt(anonSearches?.count ?? "0"),
       loggedSearches: parseInt(loggedSearches?.count ?? "0"),
@@ -93,8 +107,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       paidRevenue: parseFloat(paidRevenue?.sum ?? "0") || 0,
       tldFailures: parseInt(tldFailures?.count ?? "0"),
       weeklySearches: parseInt(weeklySearches?.count ?? "0"),
+      failedDomainSearches: failedInt,
+      todayFailedSearches: parseInt(todayFailedSearches?.count ?? "0"),
+      failureRate,
       queryTypeBreakdown: {
-        domain: parseInt(domainSearches?.count ?? "0"),
+        domain: domainInt,
         ip: parseInt(ipSearches?.count ?? "0"),
         asn: parseInt(asnSearches?.count ?? "0"),
         cidr: parseInt(cidrSearches?.count ?? "0"),
@@ -109,7 +126,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       recentUsers,
       recentSearches,
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ error: msg });
   }
 }

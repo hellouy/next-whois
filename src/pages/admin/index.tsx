@@ -36,12 +36,15 @@ type Stats = {
   paidRevenue: number;
   tldFailures: number;
   weeklySearches: number;
+  failedDomainSearches: number;
+  todayFailedSearches: number;
+  failureRate: number;
   queryTypeBreakdown: { domain: number; ip: number; asn: number; cidr: number };
   regStatusBreakdown: { available: number; registered: number; highValue: number };
   topFailingTlds: { tld: string; fail_count: number; fail_reason: string | null; has_custom_server: boolean }[];
   dailyTrend: { day: string; count: number }[];
   recentUsers: { id: string; email: string; name: string | null; created_at: string; disabled: boolean }[];
-  recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null }[];
+  recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null; reg_status: string | null }[];
 };
 
 function Sparkline({ data, color = "#3b82f6", h = 28, w = 72 }: { data: number[]; color?: string; h?: number; w?: number }) {
@@ -281,6 +284,16 @@ export default function AdminIndexPage() {
                 )}
               </span>
             )}
+            {(stats.todayFailedSearches ?? 0) > 0 && (
+              <button
+                onClick={() => router.push("/admin/tld-failures", undefined, { locale: false })}
+                className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <RiAlertLine className="w-3 h-3" />
+                今日失败 {stats.todayFailedSearches}
+                {stats.failureRate > 0 && <span className="text-muted-foreground font-normal">（{stats.failureRate}%）</span>}
+              </button>
+            )}
             {(stats.feedback ?? 0) > 0 && (
               <button
                 onClick={() => router.push("/admin/feedback", undefined, { locale: false })}
@@ -351,10 +364,11 @@ export default function AdminIndexPage() {
             />
           )}
           <StatCard
-            icon={RiAlertLine} label="后缀查询失败" value={stats?.tldFailures}
-            sub="本周查询" subValue={stats?.weeklySearches}
+            icon={RiAlertLine} label="查询失败域名" value={stats?.failedDomainSearches}
+            sub="今日失败" subValue={stats ? `${stats.todayFailedSearches}（${stats.failureRate}%）` : undefined}
             href="/admin/tld-failures"
             color="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
+            badge={stats?.tldFailures ? { label: "后缀异常", value: stats.tldFailures, color: "bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400" } : undefined}
           />
         </div>
 
@@ -405,6 +419,19 @@ export default function AdminIndexPage() {
                       {!s.user_id && <RiGhostLine className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />}
                       <span className="text-[9px] text-muted-foreground uppercase font-mono shrink-0 w-9">{s.query_type}</span>
                       <span className="text-[11px] font-mono font-semibold truncate flex-1">{s.query}</span>
+                      {s.reg_status && (
+                        <span className={cn(
+                          "text-[9px] px-1 py-0.5 rounded font-semibold shrink-0",
+                          s.reg_status === "registered" ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400" :
+                          s.reg_status === "unregistered" ? "bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" :
+                          "bg-muted text-muted-foreground"
+                        )}>
+                          {s.reg_status === "registered" ? "已注册" : s.reg_status === "unregistered" ? "可注册" : s.reg_status}
+                        </span>
+                      )}
+                      {!s.reg_status && s.query_type === "domain" && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 font-semibold shrink-0">失败</span>
+                      )}
                       <span className="text-[10px] text-muted-foreground shrink-0">{fmt(s.created_at)}</span>
                     </div>
                   ))}

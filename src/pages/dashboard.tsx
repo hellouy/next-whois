@@ -7,7 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   RiLoader4Line, RiCalendarLine, RiShieldCheckLine,
   RiUserLine, RiLogoutBoxLine, RiFireLine,
-  RiVipCrownLine, RiShieldUserLine, RiSearchLine,
+  RiVipCrownLine, RiShieldUserLine, RiSearchLine, RiHistoryLine,
+  RiExternalLinkLine,
 } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useSiteSettings } from "@/lib/site-settings";
@@ -80,6 +81,7 @@ export default function DashboardPage() {
     editingAvatar, setEditingAvatar,
     savingAvatar,
     searchStats,
+    recentSearches,
     refreshData, retryLoad,
     cancelSubscription, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
@@ -175,15 +177,20 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:scale-[0.96]">
+              <RiSearchLine className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">查询域名</span>
+            </Link>
             {isAdminUser && (
               <Link href="/admin"
-                className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors px-3 py-1.5 rounded-lg font-semibold">
+                className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors px-3 py-1.5 rounded-lg font-semibold active:scale-[0.96]">
                 <RiShieldUserLine className="w-3.5 h-3.5" />
                 {t("nav_admin")}
               </Link>
             )}
             <button onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted">
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted active:scale-[0.96]">
               <RiLogoutBoxLine className="w-3.5 h-3.5" />
               {t("sign_out")}
             </button>
@@ -258,6 +265,38 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_history")}</p>
               </div>
             </button>
+          </div>
+        )}
+
+        {/* Recent searches mini-list */}
+        {!loadingData && recentSearches.length > 0 && (
+          <div className="glass-panel border border-border rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-bold flex items-center gap-1.5 text-muted-foreground">
+                <RiHistoryLine className="w-3.5 h-3.5" />最近查询
+              </h3>
+              <Link href="/" className="text-[11px] text-primary hover:underline flex items-center gap-0.5">
+                搜索<RiExternalLinkLine className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {recentSearches.map((s, i) => (
+                <Link
+                  key={i}
+                  href={`/${encodeURIComponent(s.query)}`}
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-lg border transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.96]",
+                    s.reg_status === "registered" ? "border-emerald-200/60 dark:border-emerald-700/30 bg-emerald-50/40 dark:bg-emerald-950/10" :
+                    s.reg_status === "unregistered" ? "border-blue-200/60 dark:border-blue-700/30 bg-blue-50/40 dark:bg-blue-950/10" :
+                    "border-border bg-muted/30"
+                  )}
+                >
+                  <span className="font-semibold text-foreground">{s.query}</span>
+                  {s.reg_status === "registered" && <span className="text-[9px] text-emerald-600 dark:text-emerald-400">已注册</span>}
+                  {s.reg_status === "unregistered" && <span className="text-[9px] text-blue-500">可注册</span>}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

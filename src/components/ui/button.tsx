@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import Clickable from "@/components/motion/clickable";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-[transform,color,background-color,border-color,opacity] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 active:scale-[0.96] touch-manipulation select-none",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-[transform,color,background-color,border-color,opacity] duration-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 active:scale-[0.96] active:brightness-95 will-change-transform touch-manipulation select-none",
   {
     variants: {
       variant: {

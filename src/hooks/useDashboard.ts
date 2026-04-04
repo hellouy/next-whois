@@ -6,7 +6,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
 import {
   fetchDashData, invalidateDashCache, getDashCache,
-  type DashData, type SearchStats,
+  type DashData, type SearchStats, type RecentSearch,
 } from "@/lib/dashboard-cache";
 import type { Subscription, Stamp, Order, BalanceTx, Plan, DashboardUser } from "@/components/dashboard/types";
 
@@ -82,6 +82,7 @@ export function useDashboard() {
   const [editingAvatar, setEditingAvatar] = React.useState(false);
   const [savingAvatar, setSavingAvatar] = React.useState(false);
   const [searchStats, setSearchStats] = React.useState<SearchStats | null>(null);
+  const [recentSearches, setRecentSearches] = React.useState<RecentSearch[]>([]);
 
   React.useEffect(() => {
     if (status === "unauthenticated") router.replace("/auth/signin?callbackUrl=/dashboard");
@@ -102,6 +103,7 @@ export function useDashboard() {
     setBalanceCents(d.balanceCents ?? 0);
     setMembershipPlan(d.membershipPlan ?? null);
     setSearchStats(d.searchStats ?? null);
+    setRecentSearches(d.recentSearches ?? []);
     if (d.subscriptionAccess && !(session?.user as DashboardUser)?.subscriptionAccess) {
       updateSession({ refreshSubscription: true });
     }
@@ -193,8 +195,8 @@ export function useDashboard() {
       setSubscriptions(prev => prev.map(s => s.id === id ? { ...s, days_before: days } : s));
       invalidateDashCache();
       toast.success(t("dashboard.days_before_updated", { days }));
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.update_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.update_failed"));
     } finally {
       setSavingDaysBefore(null);
     }
@@ -208,8 +210,8 @@ export function useDashboard() {
       setStamps(prev => prev.filter(s => s.id !== id));
       invalidateDashCache();
       toast.success(t("dashboard.stamp_deleted"));
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.delete_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.delete_failed"));
     } finally {
       setDeletingStamp(null);
     }
@@ -252,8 +254,8 @@ export function useDashboard() {
       await updateSession({ name: nameValue.trim() || null });
       toast.success(t("dashboard.name_updated"));
       setEditingName(false);
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.update_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.update_failed"));
     } finally {
       setSavingName(false);
     }
@@ -278,8 +280,8 @@ export function useDashboard() {
         setChangeCodeCooldown(countdown);
         if (countdown <= 0) clearInterval(timer);
       }, 1000);
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.send_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.send_failed"));
     } finally {
       setSendingChangeCode(false);
     }
@@ -302,8 +304,8 @@ export function useDashboard() {
       setEditingEmail(false);
       setEmailChangeCode("");
       setChangeCodeCooldown(0);
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.update_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.update_failed"));
     } finally {
       setSavingEmail(false);
     }
@@ -326,8 +328,8 @@ export function useDashboard() {
       if (!res.ok) throw new Error(data.error);
       toast.success(t("dashboard.account_deleted"));
       await signOut({ callbackUrl: "/" });
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.delete_account_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.delete_account_failed"));
     } finally {
       setDeletingAccount(false);
     }
@@ -349,8 +351,8 @@ export function useDashboard() {
       toast.success(t("dashboard.pwd_updated"));
       setShowPwdSection(false);
       setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
-    } catch (e: any) {
-      toast.error(e.message || t("dashboard.change_failed"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.change_failed"));
     } finally {
       setSavingPwd(false);
     }
@@ -496,6 +498,7 @@ export function useDashboard() {
     editingAvatar, setEditingAvatar,
     savingAvatar,
     searchStats,
+    recentSearches,
     refreshData, retryLoad,
     cancelSubscription, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,

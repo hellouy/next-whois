@@ -1,9 +1,20 @@
 import { one } from "@/lib/db-query";
 
-export async function getCaptchaConfig(): Promise<{ provider: string; siteKey: string; secretKey: string }> {
+export async function getCaptchaConfig(
+  scope?: "login" | "register",
+): Promise<{ provider: string; siteKey: string; secretKey: string }> {
   try {
     const provider = (await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'captcha_provider'"))?.value ?? "";
     if (!provider) return { provider: "", siteKey: "", secretKey: "" };
+
+    // Check if CAPTCHA is enabled for this specific scope
+    if (scope) {
+      const scopeKey = scope === "login" ? "captcha_on_login" : "captcha_on_register";
+      const scopeRow = await one<{ value: string }>(`SELECT value FROM site_settings WHERE key = '${scopeKey}'`);
+      // Default: enabled (treat missing row as enabled)
+      const scopeEnabled = scopeRow === null || (scopeRow?.value ?? "1") !== "";
+      if (!scopeEnabled) return { provider: "", siteKey: "", secretKey: "" };
+    }
 
     // Read per-provider keys first, fall back to legacy shared keys
     const [perSiteKey, perSecretKey, legacySiteKey, legacySecretKey] = await Promise.all([

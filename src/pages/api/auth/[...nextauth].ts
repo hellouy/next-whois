@@ -129,7 +129,7 @@ export const authOptions: NextAuthOptions = {
         // ── Captcha verification — admin is exempt to prevent lockout ─────────
         if (!isAdm) {
           const { getCaptchaConfig, verifyCaptchaToken } = await import("@/lib/server/captcha");
-          const captchaConfig = await getCaptchaConfig();
+          const captchaConfig = await getCaptchaConfig("login");
           if (captchaConfig.provider && captchaConfig.secretKey) {
             const captchaToken = (credentials as any).captchaToken?.trim() ?? "";
             if (!captchaToken) return null;
