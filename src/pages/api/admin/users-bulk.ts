@@ -1,8 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { run } from "@/lib/db-query";
+import { many, run } from "@/lib/db-query";
 import { requireAdmin, ADMIN_EMAIL } from "@/lib/admin";
+import { randomBytes } from "crypto";
+import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 
-type Action = "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete";
+type Action = "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete" | "send_reset_email";
+
+const RESET_EXPIRES_MINUTES = 60;
+const SITE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXTAUTH_URL ||
+  "https://x.rw";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -17,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: "ids 不能为空" });
   }
-  if (!["disable", "enable", "grant_subscription", "revoke_subscription", "delete"].includes(action)) {
+  if (!["disable", "enable", "grant_subscription", "revoke_subscription", "delete", "send_reset_email"].includes(action)) {
     return res.status(400).json({ error: "无效操作" });
   }
   if (ids.length > 200) {
@@ -59,6 +67,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [...ids, ADMIN_EMAIL],
         );
         break;
+      case "send_reset_email": {
+        const rows = await many<{ id: string; email: string }>(
+          `SELECT id, email FROM users WHERE id IN (${placeholders}) AND email != $${ids.length + 1}`,
+          [...ids, ADMIN_EMAIL]
+        );
+        const siteName = await getSiteLabel().catch(() => "X.RW");
+        let sent = 0;
+        await Promise.allSettled(rows.map(async (row) => {
+          try {
+            await run(
+              "UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false",
+              [row.id]
+            );
+            const tokenId = randomBytes(8).toString("hex");
+            const rawToken = randomBytes(32).toString("hex");
+            const expiresAt = new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000).toISOString();
+            await run(
+              "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
+              [tokenId, row.id, rawToken, expiresAt]
+            );
+            const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
+            await sendEmail({
+              to: row.email,
+              subject: `重置你的 ${siteName} 密码（管理员触发）`,
+              html: passwordResetHtml({ resetUrl, siteName }),
+            });
+            sent++;
+          } catch { /* skip failed user */ }
+        }));
+        affected = sent;
+        break;
+      }
     }
     return res.status(200).json({ ok: true, affected });
   } catch (err) {

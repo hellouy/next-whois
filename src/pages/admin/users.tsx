@@ -561,7 +561,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function bulkAction(action: "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete") {
+  async function bulkAction(action: "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "send_reset_email" | "delete") {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     const actionLabels: Record<string, string> = {
@@ -569,8 +569,10 @@ export default function AdminUsersPage() {
       enable: "启用",
       grant_subscription: "授予订阅",
       revoke_subscription: "取消订阅",
+      send_reset_email: "发送重置密码邮件至",
       delete: "删除",
     };
+    if (action === "send_reset_email" && !confirm(`向选中的 ${ids.length} 名用户发送密码重置邮件？`)) return;
     if (action === "delete" && !confirm(`确定要永久删除选中的 ${ids.length} 名用户吗？此操作不可撤销！`)) return;
     setBulkLoading(true);
     try {
@@ -715,6 +717,13 @@ export default function AdminUsersPage() {
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
               >
                 <RiIndeterminateCircleLine className="w-3.5 h-3.5" />取消订阅
+              </button>
+              <button
+                onClick={() => bulkAction("send_reset_email")}
+                disabled={bulkLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50"
+              >
+                <RiSendPlaneLine className="w-3.5 h-3.5" />发送重置密码
               </button>
               <button
                 onClick={() => bulkAction("delete")}

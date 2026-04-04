@@ -2,12 +2,35 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { sendEmail, reminderHtml, getSiteLabel } from "@/lib/email";
+import { randomBytes } from "crypto";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
   if (!session) return;
 
   if (req.method === "GET") {
+    // ── Execution log tab ─────────────────────────────────────────────────────
+    if (req.query.tab === "log") {
+      try {
+        const logs = await many<{
+          id: string;
+          domain: string;
+          user_email: string;
+          days_before: number;
+          sent_at: string;
+        }>(
+          `SELECT rl.id, r.domain, r.email AS user_email, rl.days_before, rl.sent_at::text
+           FROM reminder_logs rl
+           JOIN reminders r ON r.id = rl.reminder_id
+           ORDER BY rl.sent_at DESC
+           LIMIT 50`
+        );
+        return res.json({ logs });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
     try {
       const search = typeof req.query.search === "string" ? req.query.search : "";
       const filter = typeof req.query.filter === "string" ? req.query.filter : "all";
@@ -107,6 +130,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             siteName,
           }),
         });
+
+        // Record in reminder_logs so the execution log tab reflects manual sends.
+        // Use a large unique negative days_before (epoch-based) so each manual
+        // dispatch creates a new append-only row, safe from conflict with real
+        // checkpoint values (positive) and lifecycle phases (-4, -5, etc.).
+        const logId = randomBytes(8).toString("hex");
+        const manualDaysBefore = -(Math.floor(Date.now() / 1000) % 100000 + 100000);
+        await run(
+          `INSERT INTO reminder_logs (id, reminder_id, days_before, sent_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (reminder_id, days_before) DO NOTHING`,
+          [logId, reminder.id, manualDaysBefore]
+        ).catch(() => { /* log write failure is non-fatal */ });
 
         return res.json({ ok: true, to: reminder.email });
       } catch (err: any) {

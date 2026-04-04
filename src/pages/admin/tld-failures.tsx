@@ -65,6 +65,7 @@ export default function TldFailuresPage() {
     const params = new URLSearchParams({ min_fails: String(minFails) });
     if (reasonFilter) params.set("reason", reasonFilter);
     if (search) params.set("search", search);
+    params.set("period_compare", "1");
     fetch(`/api/admin/tld-failures?${params}`)
       .then(r => r.json())
       .then(d => { setRows(d.rows ?? []); setSummary(d.summary ?? []); })
@@ -317,6 +318,23 @@ export default function TldFailuresPage() {
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[11px] font-bold text-red-500">{row.fail_count.toLocaleString()}</span>
                       <span className="text-[10px] text-muted-foreground">次失败</span>
+                      {/* Week-over-week failure delta badge (reg_status IS NULL searches per TLD) */}
+                      {row.this_week_count !== undefined && row.prev_week_count !== undefined && (row.this_week_count > 0 || row.prev_week_count > 0) && (() => {
+                        const delta = row.this_week_count - row.prev_week_count;
+                        if (delta === 0) return (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-muted text-muted-foreground ml-1" title={`本周 ${row.this_week_count} / 上周 ${row.prev_week_count}`}>→{row.this_week_count}</span>
+                        );
+                        return (
+                          <span className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded-full font-semibold ml-1",
+                            delta > 0
+                              ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                              : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
+                          )} title={`本周 ${row.this_week_count} / 上周 ${row.prev_week_count}`}>
+                            {delta > 0 ? `↑${delta}` : `↓${Math.abs(delta)}`}
+                          </span>
+                        );
+                      })()}
                       <span className="text-[10px] text-muted-foreground ml-2">{fmt(row.last_fail_at)}</span>
                     </div>
                   </div>

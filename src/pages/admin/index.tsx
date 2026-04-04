@@ -43,6 +43,8 @@ type Stats = {
   regStatusBreakdown: { available: number; registered: number; highValue: number };
   topFailingTlds: { tld: string; fail_count: number; fail_reason: string | null; has_custom_server: boolean }[];
   dailyTrend: { day: string; count: number }[];
+  dailySignups: { day: string; count: number }[];
+  dailyRevenue: { day: string; revenue: number }[];
   recentUsers: { id: string; email: string; name: string | null; created_at: string; disabled: boolean }[];
   recentSearches: { id: string; query: string; query_type: string; created_at: string; user_id: string | null; reg_status: string | null }[];
 };
@@ -72,7 +74,7 @@ function Sparkline({ data, color = "#3b82f6", h = 28, w = 72 }: { data: number[]
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge, sparkline }: {
+function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge, sparkline, sparklineColor }: {
   icon: React.ElementType;
   label: string;
   value: number | string | undefined;
@@ -82,6 +84,7 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge,
   color: string;
   badge?: { label: string; value: number; color: string };
   sparkline?: number[];
+  sparklineColor?: string;
 }) {
   const router = useRouter();
   return (
@@ -110,7 +113,7 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge,
       <div className="flex flex-col items-end gap-1 shrink-0">
         <RiArrowRightLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
         {sparkline && sparkline.length >= 2 && (
-          <Sparkline data={sparkline} color="#3b82f6" h={24} w={60} />
+          <Sparkline data={sparkline} color={sparklineColor ?? "#3b82f6"} h={24} w={60} />
         )}
       </div>
     </button>
@@ -314,6 +317,8 @@ export default function AdminIndexPage() {
             href="/admin/users"
             color="bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
             badge={stats?.subscribedUsers ? { label: "订阅", value: stats.subscribedUsers, color: "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400" } : undefined}
+            sparkline={stats?.dailySignups?.map(d => d.count)}
+            sparklineColor="#6366f1"
           />
           <StatCard
             icon={RiShieldCheckLine} label="品牌认领" value={stats?.stamps}
@@ -327,6 +332,7 @@ export default function AdminIndexPage() {
             href="/admin/search-records"
             color="bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
             sparkline={stats?.dailyTrend?.map(d => d.count)}
+            sparklineColor="#f97316"
           />
           <StatCard
             icon={RiBellLine} label="到期监控" value={stats?.activeReminders}
@@ -346,6 +352,8 @@ export default function AdminIndexPage() {
               sub="已付款" subValue={stats?.paidOrders}
               href="/admin/payment/orders"
               color="bg-lime-100 dark:bg-lime-950/40 text-lime-600 dark:text-lime-400"
+              sparkline={stats?.dailyRevenue?.map(d => d.revenue)}
+              sparklineColor="#84cc16"
             />
           ) : (
             <StatCard

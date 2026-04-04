@@ -2,6 +2,23 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 
+function zeroFillDays<T extends Record<string, any>>(
+  rows: T[],
+  valueKey: string,
+  days = 7
+): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) map.set(row.day, row);
+  const result: T[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const day = d.toISOString().slice(0, 10);
+    result.push(map.get(day) ?? ({ day, [valueKey]: 0 } as unknown as T));
+  }
+  return result;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -59,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ).catch(() => ({ count: "0" })),
     ]);
 
-    const [recentUsers, recentSearches, topFailingTlds, dailyTrend] = await Promise.all([
+    const [recentUsers, recentSearches, topFailingTlds, dailyTrend, dailySignups, dailyRevenue] = await Promise.all([
       many<{ id: string; email: string; name: string | null; created_at: string; disabled: boolean }>(
         "SELECT id, email, name, created_at, disabled FROM users ORDER BY created_at DESC LIMIT 5"
       ),
@@ -78,6 +95,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `SELECT DATE(created_at)::text AS day, COUNT(*) AS count
          FROM search_history
          WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY DATE(created_at) ORDER BY day`
+      ).catch(() => [] as any[]),
+      many<{ day: string; count: string }>(
+        `SELECT DATE(created_at)::text AS day, COUNT(*) AS count
+         FROM users
+         WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY DATE(created_at) ORDER BY day`
+      ).catch(() => [] as any[]),
+      many<{ day: string; revenue: string }>(
+        `SELECT DATE(created_at)::text AS day, SUM(amount)::text AS revenue
+         FROM payment_orders
+         WHERE status = 'paid' AND created_at >= NOW() - INTERVAL '7 days'
          GROUP BY DATE(created_at) ORDER BY day`
       ).catch(() => [] as any[]),
     ]);
@@ -122,7 +151,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         highValue: parseInt(highValueSearches?.count ?? "0"),
       },
       topFailingTlds,
-      dailyTrend: dailyTrend.map(d => ({ day: d.day, count: parseInt(d.count) })),
+      dailyTrend: zeroFillDays(dailyTrend.map(d => ({ day: d.day, count: parseInt(d.count) })), "count"),
+      dailySignups: zeroFillDays(dailySignups.map(d => ({ day: d.day, count: parseInt(d.count) })), "count"),
+      dailyRevenue: zeroFillDays(dailyRevenue.map(d => ({ day: d.day, revenue: parseFloat(d.revenue ?? "0") || 0 })), "revenue"),
       recentUsers,
       recentSearches,
     });

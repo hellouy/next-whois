@@ -15,6 +15,8 @@ export type TldFailureRow = {
   admin_notes: string | null;
   repaired_at: string | null;
   whoiser_bypass: boolean;
+  this_week_count?: number;
+  prev_week_count?: number;
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -60,7 +62,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          FROM tld_fallback_stats WHERE fail_count > 0
          GROUP BY fail_reason ORDER BY count DESC`
       );
-      return res.status(200).json({ rows, summary: summary.rows });
+
+      // Period comparison (period_compare=1 or always-on):
+      // Counts failed domain searches (reg_status IS NULL in search_history)
+      // per TLD for two consecutive 7-day windows to produce a real delta.
+      const doPeriodCompare = req.query.period_compare !== "0";
+      const tldList = rows.map(r => r.tld);
+      let periodMap: Record<string, { this_week: number; prev_week: number }> = {};
+      if (doPeriodCompare && tldList.length > 0) {
+        const periodRows = await client.query<{ tld: string; this_week: string; prev_week: string }>(
+          `SELECT
+             f.tld,
+             COALESCE(SUM(CASE WHEN h.created_at >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END), 0)::text AS this_week,
+             COALESCE(SUM(CASE WHEN h.created_at >= NOW() - INTERVAL '14 days'
+                               AND h.created_at <  NOW() - INTERVAL '7 days'  THEN 1 ELSE 0 END), 0)::text AS prev_week
+           FROM tld_fallback_stats f
+           LEFT JOIN search_history h
+             ON LOWER(REVERSE(SPLIT_PART(REVERSE(h.query), '.', 1))) = f.tld
+             AND h.query_type = 'domain'
+             AND h.reg_status IS NULL
+             AND h.created_at >= NOW() - INTERVAL '14 days'
+           WHERE f.tld = ANY($1::text[])
+           GROUP BY f.tld`,
+          [tldList]
+        ).catch(() => ({ rows: [] as { tld: string; this_week: string; prev_week: string }[] }));
+        for (const pr of periodRows.rows) {
+          periodMap[pr.tld] = { this_week: parseInt(pr.this_week), prev_week: parseInt(pr.prev_week) };
+        }
+      }
+
+      const rowsWithPeriod = rows.map(r => ({
+        ...r,
+        ...(doPeriodCompare ? {
+          this_week_count: periodMap[r.tld]?.this_week ?? 0,
+          prev_week_count: periodMap[r.tld]?.prev_week ?? 0,
+        } : {}),
+      }));
+
+      return res.status(200).json({ rows: rowsWithPeriod, summary: summary.rows });
     } finally {
       client.release();
     }
