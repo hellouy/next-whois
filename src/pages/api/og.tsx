@@ -178,7 +178,7 @@ export default async function handler(req: NextRequest) {
     if (crP)  created   = crP;
     if (exP)  expires   = exP;
     if (upP)  updated   = upP;
-    if (rdP !== null) remainingDays = parseInt(rdP, 10);
+    if (rdP !== null) { const _rd = parseInt(rdP, 10); remainingDays = isNaN(_rd) ? null : _rd; }
     if (ageP) age = ageP;
     if (nsP)  nsList    = nsP.split(",").filter(Boolean);
     if (stP)  statusList = stP.split(",").filter(Boolean).map(s => getEppStatusDisplayName(s));

@@ -717,7 +717,7 @@ export default function LookupPage({
     if (!area) return;
     const vp = area.querySelector("[data-radix-scroll-area-viewport]");
     if (!vp) return;
-    const onScroll = () => setShowBackToTop((vp as HTMLElement).scrollTop > 300);
+    const onScroll = () => setShowBackToTop((vp as HTMLElement).scrollTop > 400);
     vp.addEventListener("scroll", onScroll, { passive: true });
     return () => vp.removeEventListener("scroll", onScroll);
   }, []);
