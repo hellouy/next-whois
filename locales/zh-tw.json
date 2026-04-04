@@ -85,6 +85,7 @@
   "lookup_failed_description": "WHOIS/RDAP 查詢失敗",
   "lookup_failed_fallback": "伺服器可能暫時無法回應，請稍後再試。",
   "try_again": "重試",
+  "back_to_top": "返回頂部",
   "re_query": "重新查詢",
   "registry_lookup": "在注冊局查詢",
   "registered_no_whois": "已注冊",

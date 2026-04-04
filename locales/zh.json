@@ -85,6 +85,7 @@
   "lookup_failed_description": "WHOIS/RDAP 查询失败",
   "lookup_failed_fallback": "服务器可能临时无响应，请稍后重试。",
   "try_again": "重试",
+  "back_to_top": "返回顶部",
   "re_query": "重新查询",
   "registry_lookup": "在注册局查询",
   "registered_no_whois": "已注册",

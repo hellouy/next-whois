@@ -85,6 +85,7 @@
   "lookup_failed_description": "WHOIS/RDAP-Abfrage fehlgeschlagen für",
   "lookup_failed_fallback": "Der Server ist möglicherweise vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
   "try_again": "Erneut versuchen",
+  "back_to_top": "Zurück nach oben",
   "re_query": "Erneut abfragen",
   "registry_lookup": "In der Registry nachschlagen",
   "registered_no_whois": "Registriert",

@@ -2661,7 +2661,7 @@ export default function LookupPage({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 8 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            aria-label="Back to top"
+            aria-label={t("back_to_top")}
             onClick={() => {
               const vp = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]");
               if (vp) vp.scrollTo({ top: 0, behavior: "smooth" });
