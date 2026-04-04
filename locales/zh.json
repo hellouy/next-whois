@@ -1678,7 +1678,9 @@
     "nav_db_export": "数据导出",
     "nav_settings": "网站设置",
     "nav_server_test": "服务器测试",
-    "nav_git_fix": "仓库工具"
+    "nav_git_fix": "仓库工具",
+    "nav_notify_service": "推送渠道",
+    "nav_domain_access": "域名接入"
   },
   "common": {
     "retry": "重试",

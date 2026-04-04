@@ -142,6 +142,15 @@ export interface SiteSettings {
   // Email / Resend config
   resend_api_key: string;
   resend_from_email: string;
+  // Push notification channels
+  notify_bark_url: string;
+  notify_telegram_token: string;
+  notify_telegram_chat_id: string;
+  notify_dingding_webhook: string;
+  notify_feishu_webhook: string;
+  notify_wecom_webhook: string;
+  notify_generic_webhook: string;
+  notify_generic_webhook_method: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -266,6 +275,14 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   payment_success_url: "",
   resend_api_key: "",
   resend_from_email: "",
+  notify_bark_url: "",
+  notify_telegram_token: "",
+  notify_telegram_chat_id: "",
+  notify_dingding_webhook: "",
+  notify_feishu_webhook: "",
+  notify_wecom_webhook: "",
+  notify_generic_webhook: "",
+  notify_generic_webhook_method: "POST",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";

@@ -1655,6 +1655,8 @@
     "nav_api": "API",
     "nav_settings": "설정",
     "nav_git_fix": "Git 푸시 수정",
+    "nav_notify_service": "푸시 채널",
+    "nav_domain_access": "도메인 접속",
     "nav_db_export": "DB 내보내기"
   },
   "common": {

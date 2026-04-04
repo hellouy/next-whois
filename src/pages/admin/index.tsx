@@ -14,6 +14,7 @@ import {
   RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine,
   RiGlobalLine, RiMailSendLine, RiDownloadLine,
   RiBillLine, RiAlertLine, RiBarChartLine,
+  RiNotification3Line, RiNetworkLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -177,8 +178,9 @@ const ACTION_GROUPS: ActionGroup[] = [
     label: "通知与服务",
     accentColor: "text-cyan-500",
     items: [
-      { href: "/admin/reminders",        label: "到期提醒",    desc: "域名监控与续费订阅管理",     icon: RiBellLine,       color: "text-cyan-500" },
-      { href: "/admin/notify",           label: "邮件推送",    desc: "向用户发送群发通知邮件",     icon: RiMailSendLine,   color: "text-blue-400" },
+      { href: "/admin/reminders",        label: "到期提醒",    desc: "域名监控与续费订阅管理",     icon: RiBellLine,           color: "text-cyan-500" },
+      { href: "/admin/notify",           label: "邮件推送",    desc: "向用户发送群发通知邮件",     icon: RiMailSendLine,       color: "text-blue-400" },
+      { href: "/admin/notify-service",   label: "通知服务",    desc: "Bark·Telegram·钉钉·飞书·Webhook", icon: RiNotification3Line, color: "text-indigo-500" },
       { href: "/admin/feedback",         label: "用户反馈",    desc: "处理与回应用户反馈",         icon: RiFeedbackLine,   color: "text-rose-500" },
       { href: "/admin/search-records",   label: "查询记录",    desc: "浏览、统计、清理历史记录",   icon: RiSearchLine,     color: "text-emerald-500" },
     ],
@@ -187,6 +189,7 @@ const ACTION_GROUPS: ActionGroup[] = [
     label: "域名与接入",
     accentColor: "text-blue-500",
     items: [
+      { href: "/admin/domain-access",    label: "域名接入",     desc: "接入监控总览与 TLD 分布",   icon: RiNetworkLine,    color: "text-blue-500" },
       { href: "/admin/domains",          label: "域名生命周期", desc: "注册·宽限·赎回·删除节点",   icon: RiGlobalLine,     color: "text-blue-600" },
       { href: "/admin/tld-rules",        label: "后缀解析规则", desc: "WHOIS / RDAP 规则定制",     icon: RiCodeBoxLine,    color: "text-teal-500" },
       { href: "/admin/tld-failures",     label: "查询失败统计", desc: "后缀查询失败分析与修复",    icon: RiAlertLine,      color: "text-amber-500" },

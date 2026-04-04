@@ -1677,6 +1677,8 @@
     "nav_api": "API",
     "nav_settings": "設置",
     "nav_git_fix": "Git 推送修復",
+    "nav_notify_service": "推播渠道",
+    "nav_domain_access": "網域接入",
     "nav_db_export": "資料匯出"
   },
   "common": {

@@ -28,6 +28,8 @@ import {
   RiCodeBoxLine,
   RiBillLine,
   RiWifiLine,
+  RiNotification3Line,
+  RiNetworkLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -55,12 +57,14 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/search-records", labelKey: "admin.nav_search_records", icon: RiSearchLine,   activeIcon: RiSearchFill },
       { href: "/admin/feedback",       labelKey: "admin.nav_feedback",       icon: RiFeedbackLine, activeIcon: RiFeedbackFill },
       { href: "/admin/reminders",      labelKey: "admin.nav_reminders",      icon: RiBellLine,     activeIcon: RiBellFill },
-      { href: "/admin/notify",         labelKey: "admin.nav_notify",         icon: RiMailSendLine, activeIcon: RiMailSendLine },
+      { href: "/admin/notify",          labelKey: "admin.nav_notify",          icon: RiMailSendLine,      activeIcon: RiMailSendLine },
+      { href: "/admin/notify-service", labelKey: "admin.nav_notify_service", icon: RiNotification3Line, activeIcon: RiNotification3Line },
     ],
   },
   {
     titleKey: "admin.nav_config",
     items: [
+      { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
       { href: "/admin/domains",        labelKey: "admin.nav_domains",        icon: RiGlobalLine,     activeIcon: RiGlobalLine },
       { href: "/admin/tld-rules",      labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
       { href: "/admin/api",            labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },

@@ -26,6 +26,13 @@ const SERVER_ONLY_KEYS = new Set([
   "payment_xunhupay_secret",
   "payment_alipay_private_key",
   "payment_paypal_client_secret",
+  "notify_bark_url",
+  "notify_telegram_token",
+  "notify_telegram_chat_id",
+  "notify_dingding_webhook",
+  "notify_feishu_webhook",
+  "notify_wecom_webhook",
+  "notify_generic_webhook",
 ]);
 
 let _rowsCache: { rows: { key: string; value: string }[]; ts: number } | null = null;

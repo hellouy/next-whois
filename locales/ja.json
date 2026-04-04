@@ -1654,6 +1654,8 @@
     "nav_api": "API",
     "nav_settings": "設定",
     "nav_git_fix": "Git プッシュ修復",
+    "nav_notify_service": "プッシュチャンネル",
+    "nav_domain_access": "ドメインアクセス",
     "nav_db_export": "DBエクスポート"
   },
   "common": {
