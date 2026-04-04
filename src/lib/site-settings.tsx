@@ -338,9 +338,12 @@ export function SiteSettingsProvider({
   // These don't need to block the paint, so a regular useEffect is fine.
   React.useEffect(() => {
     const cache = readSessionCache();
-    // Delay first fetch: sessionStorage already hydrates the UI.
-    // Without cache we still fetch quickly (500 ms) so the first view isn't stale.
-    const initialDelay = setTimeout(fetchSettings, cache ? 1500 : 500);
+    // With cache: defer 1500 ms so sessionStorage-hydrated UI is already shown.
+    // Without cache: fetch immediately (0 ms delay) so the correct logo/settings
+    // replace the code-default "X.RW" as fast as possible — before the user
+    // has time to notice.  Previously this was 500 ms, which caused a visible
+    // flash on every new browser session.
+    const initialDelay = setTimeout(fetchSettings, cache ? 1500 : 0);
 
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY) fetchSettings();
