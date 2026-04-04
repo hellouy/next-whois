@@ -278,6 +278,7 @@ function KeysTab() {
         </div>
       ) : (
         <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
@@ -343,6 +344,7 @@ function KeysTab() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -524,6 +526,7 @@ function InviteTab() {
         <div className="text-center py-12 text-sm text-muted-foreground">{codes.length === 0 ? "暂无邀请码，点击右上角生成" : "该筛选条件下暂无记录"}</div>
       ) : (
         <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
@@ -585,6 +588,7 @@ function InviteTab() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

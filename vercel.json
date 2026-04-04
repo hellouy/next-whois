@@ -59,6 +59,9 @@
     },
     "src/pages/api/cron/tld-scrape.ts": {
       "maxDuration": 300
+    },
+    "src/pages/api/admin/subscription-sync.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [

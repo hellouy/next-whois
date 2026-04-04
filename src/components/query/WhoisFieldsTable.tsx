@@ -17,6 +17,8 @@ function CountryFlag({ code }: { code: string }) {
     <img
       src={`https://flagcdn.com/w40/${code.trim().toLowerCase()}.png`}
       alt=""
+      loading="lazy"
+      decoding="async"
       className="w-4 h-3 object-cover rounded-[2px]"
     />
   );

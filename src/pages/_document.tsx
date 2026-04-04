@@ -15,6 +15,8 @@ export default function Document() {
         {/* Preconnect to third-party APIs actually called from the browser */}
         <link rel="preconnect" href="https://api.frankfurter.dev" />
         <link rel="dns-prefetch" href="https://api.frankfurter.dev" />
+        <link rel="dns-prefetch" href="https://cdn.simpleicons.org" />
+        <link rel="dns-prefetch" href="https://flagcdn.com" />
       </Head>
       <body>
         <Main />

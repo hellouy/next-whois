@@ -58,7 +58,7 @@ function AppHead({ origin }: { origin: string }) {
       <meta name="description" content={description} />
       <meta name="tags" content={keywords} />
       <meta name="keywords" content={keywords} />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <meta name="format-detection" content="telephone=no" />
 
       {/* Open Graph */}

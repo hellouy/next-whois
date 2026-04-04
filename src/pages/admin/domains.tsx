@@ -685,6 +685,7 @@ function FailuresTab() {
         </div>
       ) : (
         <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-muted/40 text-muted-foreground border-b border-border">
@@ -762,6 +763,7 @@ function FailuresTab() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

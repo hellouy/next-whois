@@ -109,12 +109,12 @@ export function RegistrarCard({
           {registrarIcon && registrarIcon.slug ? (
             registrarIcon.slug.startsWith("/") ? (
               <div className="w-10 h-10 bg-white dark:bg-zinc-800 rounded-lg flex items-center justify-center p-1.5 border shrink-0">
-                <img src={registrarIcon.slug} alt="" className="w-full h-full object-contain rounded-md" />
+                <img src={registrarIcon.slug} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain rounded-md" />
               </div>
             ) : (
               <div className="w-10 h-10 bg-white dark:bg-zinc-800 rounded-lg flex items-center justify-center p-1.5 border shrink-0">
-                <img src={resolveIconUrl(registrarIcon.slug, registrarIcon.color, false)} alt="" className="w-full h-full object-contain dark:hidden" />
-                <img src={resolveIconUrl(registrarIcon.slug, registrarIcon.color, true)} alt="" className="w-full h-full object-contain hidden dark:block" />
+                <img src={resolveIconUrl(registrarIcon.slug, registrarIcon.color, false)} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain dark:hidden" />
+                <img src={resolveIconUrl(registrarIcon.slug, registrarIcon.color, true)} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain hidden dark:block" />
               </div>
             )
           ) : (

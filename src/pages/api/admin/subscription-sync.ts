@@ -15,6 +15,8 @@ import { requireAdmin } from "@/lib/admin";
 import { many, run, isDbReady } from "@/lib/db-query";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 
+export const config = { maxDuration: 60 };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
   const admin = await requireAdmin(req, res);

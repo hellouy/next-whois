@@ -140,7 +140,7 @@ function HistoryDrawer() {
       <DrawerTrigger asChild>
         <motion.button
           type="button"
-          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation"
+          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
           {...TAP}
           aria-label={t("nav_search_history")}
         >
@@ -262,7 +262,7 @@ export function ThemeToggle() {
   return (
     <motion.button
       type="button"
-      className="p-2 pr-0 touch-manipulation"
+      className="p-2 pr-0 touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
       onClick={toggleTheme}
       {...TAP}
     >
@@ -366,7 +366,7 @@ export function NavDrawer() {
       <DrawerTrigger asChild>
         <motion.button
           type="button"
-          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation"
+          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
           {...TAP}
         >
           <AnimatePresence mode="wait">

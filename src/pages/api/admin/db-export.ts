@@ -86,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const r = await db.query(`SELECT COUNT(*)::int AS n FROM ${t.name}`);
       meta[t.name] = { count: r.rows[0]?.n ?? 0 };
-    } catch (e: any) {
-      meta[t.name] = { count: 0, error: (e as Error).message };
+    } catch (err) {
+      meta[t.name] = { count: 0, error: err instanceof Error ? err.message : String(err) };
     }
   }
 
