@@ -679,9 +679,9 @@ export function Navbar() {
         // overflow:hidden clips the nav as it slides up so no ghost background
         // remains visible in the wrapper's area when the nav is off-screen.
         top: "var(--ann-h, 0px)",
-        // Add the nav's margin-top (mt-4 = 1rem) + nav height (h-10 = 2.5rem)
-        // so the wrapper is exactly tall enough to contain the nav pill.
-        height: "calc(1rem + 2.5rem)",
+        // margin-top (mt-4=1rem) + nav height (h-10=2.5rem) + 8px bottom
+        // clearance so shadow-sm and the border are not clipped.
+        height: "calc(1rem + 2.5rem + 8px)",
         transition: "top 0.22s cubic-bezier(0.25,0.46,0.45,0.94)",
         pointerEvents: isVisible ? "auto" : "none",
       }}
