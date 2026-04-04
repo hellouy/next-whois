@@ -55,25 +55,33 @@ const WHOIS_NOT_REGISTERED_PATTERNS = [
 ];
 
 export function isWhoisRateLimited(raw: string): boolean {
-  const lines = raw
+  const allLines = raw
     .split("\n")
     .map((l) => l.trim())
-    .filter(
-      (l) =>
-        l.length > 0 &&
-        !l.startsWith("%") &&
-        !l.startsWith("#") &&
-        !l.startsWith(">>>") &&
-        !l.startsWith("NOTICE") &&
-        !l.startsWith("TERMS OF USE") &&
-        !l.startsWith("Terms of Use") &&
-        !l.startsWith("By submitting") &&
-        !l.startsWith("This service") &&
-        !l.startsWith("Access to") &&
-        !l.startsWith("You agree"),
-    );
-  const filtered = lines.slice(0, 20).join("\n");
-  return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(filtered));
+    .filter((l) => l.length > 0);
+
+  // Check the full response (including % comment lines) — servers like
+  // whois.nic.hu put access-restriction messages inside % comment lines.
+  // Scan first 30 lines of the raw response for rate-limit signals.
+  const allContent = allLines.slice(0, 30).join("\n");
+
+  // Also check only non-boilerplate content lines for other servers.
+  const filteredLines = allLines.filter(
+    (l) =>
+      !l.startsWith("%") &&
+      !l.startsWith("#") &&
+      !l.startsWith(">>>") &&
+      !l.startsWith("NOTICE") &&
+      !l.startsWith("TERMS OF USE") &&
+      !l.startsWith("Terms of Use") &&
+      !l.startsWith("By submitting") &&
+      !l.startsWith("This service") &&
+      !l.startsWith("Access to") &&
+      !l.startsWith("You agree"),
+  );
+  const filtered = filteredLines.slice(0, 20).join("\n");
+
+  return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(filtered) || p.test(allContent));
 }
 
 export function isNotRegisteredWhoisResponse(whoisError: string): boolean {

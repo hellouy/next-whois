@@ -89,6 +89,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// ── Transient-failure detection ───────────────────────────────────────────────
+// Returns true when a failed lookup result is worth retrying (network blip,
+// empty response, timeout) vs. a definitive failure that retrying cannot fix.
+function isTransientLookupFailure(result: WhoisResult): boolean {
+  if (result.status) return false;
+  const err = (result.error ?? "").toLowerCase();
+  // Definitive: IANA fallback ("No WHOIS/RDAP server available for this TLD")
+  if (err.includes("no whois") && err.includes("available")) return false;
+  // Definitive: server reports TLD not supported ("WHOIS/RDAP not available for this TLD")
+  if (err.includes("not available for this tld") || err.includes("not supported")) return false;
+  // Definitive: DNS confirmed the domain is unregistered
+  if (result.dnsProbe?.registrationStatus === "unregistered") return false;
+  // Everything else (timeout, connection reset, empty response, rate-limited)
+  // is potentially transient — worth one automatic retry.
+  return true;
+}
+
 // ── Smart cache TTL ───────────────────────────────────────────────────────────
 export function computeSmartTtl(result: WhoisResult): number {
   if (!result.status || !result.result) return 0;
@@ -160,7 +177,14 @@ export async function lookupWhoisWithCache(
 
   if (options.cacheOnly) return { time: 0, status: false, cached: false };
 
-  const result = await lookupWhois(domain);
+  let result = await lookupWhois(domain);
+  // Retry once on transient failures (e.g., intermittent connectivity to
+  // slow ccTLD WHOIS servers like whois.nic.hu from cloud infrastructure).
+  if (isTransientLookupFailure(result)) {
+    await new Promise((r) => setTimeout(r, 600));
+    const retried = await lookupWhois(domain);
+    if (retried.status) result = retried;
+  }
   if (result.status) {
     const ttl = computeSmartTtl(result);
     const now = Date.now();
@@ -262,7 +286,13 @@ export async function lookupWhoisCacheStreaming(
     }
   }
 
-  const result = await lookupWhoisStreaming(domain, onPartialResult);
+  let result = await lookupWhoisStreaming(domain, onPartialResult);
+  // Retry once on transient failures (same logic as lookupWhoisWithCache).
+  if (isTransientLookupFailure(result)) {
+    await new Promise((r) => setTimeout(r, 600));
+    const retried = await lookupWhoisStreaming(domain);
+    if (retried.status) result = retried;
+  }
   if (result.status) {
     const ttl = computeSmartTtl(result);
     const now = Date.now();
