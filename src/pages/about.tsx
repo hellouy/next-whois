@@ -463,11 +463,6 @@ export default function AboutPage() {
             )}
           </div>
 
-          <div className="mt-10 pt-6 border-t border-border/40 text-center">
-            <p className="text-[11px] text-muted-foreground/50">
-              {siteName} · v{VERSION} · {isChinese ? "专业域名查询工具" : "Professional Domain Lookup Tool"}
-            </p>
-          </div>
         </main>
       </ScrollArea>
     </>

@@ -665,6 +665,13 @@ export function Navbar() {
   const logoText = settings.site_logo_text || "X.RW";
   const { t } = useTranslation();
 
+  // Publish current nav height as a CSS variable so the layout (paddingTop on
+  // <main>) can smoothly shrink/grow without requiring prop drilling or context.
+  const NAV_H = "calc(1rem + 2.5rem)"; // mt-4 + h-10
+  React.useEffect(() => {
+    document.documentElement.style.setProperty("--nav-h", isVisible ? NAV_H : "0px");
+  }, [isVisible]);
+
   return (
     <div
       className="fixed left-0 right-0 z-50 flex justify-center overflow-hidden"

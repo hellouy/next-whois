@@ -157,7 +157,7 @@ function SiteFooter() {
   if (router.pathname.startsWith("/admin")) return null;
   if (!footerText && footerLinks.length === 0) return null;
   return (
-    <footer className="mt-12 py-5 px-4 text-center">
+    <footer className="mt-4 py-4 px-4 text-center">
       <div className="flex items-center justify-center gap-5 mb-2">
         {footerLinks.map((link) => (
           <Link
@@ -515,7 +515,10 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
         <div className="relative w-full min-h-screen font-sans">
           {!isAdminPage && <AnnouncementBanner />}
           {!isAdminPage && <Navbar />}
-          <main style={!isAdminPage ? { paddingTop: "calc(4rem + var(--ann-h, 0px))" } : undefined}>
+          <main style={!isAdminPage ? {
+            paddingTop: "calc(var(--nav-h, calc(1rem + 2.5rem)) + var(--ann-h, 0px))",
+            transition: "padding-top 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+          } : undefined}>
             {isAdminPage ? (
               <ErrorBoundary>
                 <Component {...pageProps} />
