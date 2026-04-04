@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn, toSearchURI } from "@/lib/utils";
 import { VERSION } from "@/lib/env";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { LanguageSwitcher } from "./language-switcher";
 import {
@@ -657,19 +658,24 @@ function UserButton() {
 }
 
 export function Navbar() {
-  const isVisible = useScrollDirection();
+  const router = useRouter();
+  // Pass pathname so the hook resets to visible on every page navigation.
+  const isVisible = useScrollDirection(router.pathname);
   const settings = useSiteSettings();
   const logoText = settings.site_logo_text || "X.RW";
   const { t } = useTranslation();
 
   return (
     <div
-      className="fixed left-0 right-0 z-50 flex justify-center"
+      className="fixed left-0 right-0 z-50 flex justify-center overflow-hidden"
       style={{
+        // overflow:hidden clips the nav as it slides up so no ghost background
+        // remains visible in the wrapper's area when the nav is off-screen.
         top: "var(--ann-h, 0px)",
+        // Add the nav's margin-top (mt-4 = 1rem) + nav height (h-10 = 2.5rem)
+        // so the wrapper is exactly tall enough to contain the nav pill.
+        height: "calc(1rem + 2.5rem)",
         transition: "top 0.22s cubic-bezier(0.25,0.46,0.45,0.94)",
-        // When the nav is hidden (translated off-screen) the wrapper must not
-        // intercept taps on the content beneath it.
         pointerEvents: isVisible ? "auto" : "none",
       }}
     >

@@ -1,16 +1,30 @@
 import { useState, useEffect, useRef } from "react";
 
-export function useScrollDirection() {
+/**
+ * Returns true while the user is at the top or has scrolled UP.
+ * Returns false when the user scrolls DOWN past a small threshold.
+ *
+ * Pass `pathname` (from Next.js router) so the hook resets to visible
+ * whenever the user navigates to a new page.
+ */
+export function useScrollDirection(pathname?: string) {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
+
+  // Reset to visible whenever the route changes so the nav is never
+  // stuck hidden when landing on a fresh page.
+  useEffect(() => {
+    setIsVisible(true);
+    lastScrollY.current = 0;
+  }, [pathname]);
 
   useEffect(() => {
     const controlNavbar = (e: Event) => {
       const target = e.target as Element | null;
 
-      // Filter: only react to the window/document or large containers that
-      // cover the majority of the viewport (e.g. Radix ScrollArea, full-page
-      // divs). Skip small scrollable areas like dropdowns, modals, textareas.
+      // Ignore scroll events from small containers (dropdowns, textareas …).
+      // Only react to the window or large viewports that cover most of the screen
+      // (e.g. Radix ScrollArea used on about / faq / terms / etc.).
       const isMainScroll =
         !target ||
         target === document.documentElement ||
@@ -19,7 +33,6 @@ export function useScrollDirection() {
 
       if (!isMainScroll) return;
 
-      // Read the correct Y position depending on the scroll source.
       const currentScrollY =
         target === document.documentElement ||
         target === document.body ||
@@ -36,9 +49,6 @@ export function useScrollDirection() {
       lastScrollY.current = currentScrollY;
     };
 
-    // capture:true intercepts scroll events before they reach the target,
-    // so we catch scrolling inside any element (including Radix ScrollArea)
-    // not just window-level scrolling.
     window.addEventListener("scroll", controlNavbar, {
       capture: true,
       passive: true,

@@ -157,7 +157,7 @@ function SiteFooter() {
   if (router.pathname.startsWith("/admin")) return null;
   if (!footerText && footerLinks.length === 0) return null;
   return (
-    <footer className="border-t border-border/40 mt-12 py-5 px-4 text-center">
+    <footer className="mt-12 py-5 px-4 text-center">
       <div className="flex items-center justify-center gap-5 mb-2">
         {footerLinks.map((link) => (
           <Link
