@@ -153,9 +153,9 @@ export default function DashboardPage() {
         <EditExpiryModal
           sub={editingSubscription}
           onClose={() => setEditingSubscription(null)}
-          onSaved={(newDate) => {
+          onSaved={(update) => {
             setSubscriptions(prev => prev.map(s =>
-              s.id === editingSubscription.id ? { ...s, expiration_date: newDate } : s
+              s.id === editingSubscription.id ? { ...s, ...update } : s
             ));
             invalidateDashCache();
           }}

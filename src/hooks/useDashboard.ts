@@ -394,6 +394,7 @@ export function useDashboard() {
         setSubscriptionExpiresAt(data.subscriptionExpiresAt ?? subscriptionExpiresAt);
         setMembershipPlan(data.membershipPlan ?? membershipPlan);
         setBalanceCents(data.balanceCents ?? balanceCents);
+        invalidateDashCache();
         if (data.subscriptionAccess) updateSession({ refreshSubscription: true });
       } else {
         toast.error(data.error || t("dashboard.redeem_failed"));
@@ -431,6 +432,7 @@ export function useDashboard() {
       }
       toast.success(t("dashboard.invite_code_success"));
       setSubscriptionAccessDB(true);
+      invalidateDashCache();
       await updateSession({ refreshSubscription: true });
       setInviteCodeInput("");
       setTab("subscriptions");

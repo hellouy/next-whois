@@ -17,17 +17,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const rows = await many<{
         id: string; domain: string; expiration_date: string | null;
+        whois_expiry_date: string | null; whois_synced_at: string | null;
         active: boolean; cancel_token: string | null; created_at: string;
         days_before: number | null;
         thresholds_json: string | null;
         phase_flags: string | null;
-        whois_synced_at: string | null;
         registrar: string | null;
         creation_date: string | null;
         nameservers_json: string | null;
       }>(
-        `SELECT id, domain, expiration_date, active, cancel_token, created_at, days_before,
-                thresholds_json, phase_flags, whois_synced_at, registrar, creation_date, nameservers_json
+        `SELECT id, domain, expiration_date, whois_expiry_date, whois_synced_at,
+                active, cancel_token, created_at, days_before,
+                thresholds_json, phase_flags, registrar, creation_date, nameservers_json
          FROM reminders WHERE email = $1 ORDER BY created_at DESC`,
         [session.user.email],
       );
@@ -54,8 +55,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const nowMs = Date.now();
 
       const subscriptions = rows.map((r) => {
-        const lc = r.expiration_date
-          ? computeLifecycle(r.domain, r.expiration_date, undefined, overrides)
+        // Use WHOIS-verified date as authoritative source (same as dashboard.ts)
+        const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
+        const lc = effectiveExpiry
+          ? computeLifecycle(r.domain, effectiveExpiry, undefined, overrides)
           : null;
 
         // Reminder logs for this subscription
@@ -104,7 +107,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         return {
-          ...r,
+          id: r.id,
+          domain: r.domain,
+          expiration_date: effectiveExpiry,  // expose WHOIS-authoritative date to UI
+          active: r.active,
+          cancel_token: r.cancel_token,
+          created_at: r.created_at,
+          days_before: r.days_before,
+          whois_synced_at: r.whois_synced_at,
+          registrar: r.registrar,
+          creation_date: r.creation_date,
+          nameservers,
           drop_date: lc ? lc.dropDate.toISOString() : null,
           grace_end: lc ? lc.graceEnd.toISOString() : null,
           redemption_end: lc ? lc.redemptionEnd.toISOString() : null,
@@ -118,13 +131,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           next_reminder_days: nextReminderDays,
           thresholds: subThresholds,
           phase_flags: phaseFlags,
-          nameservers,
         };
       });
 
       return res.status(200).json({ subscriptions });
-    } catch (err: any) {
-      console.error("[subscriptions] GET error:", err.message);
+    } catch (err) {
+      console.error("[subscriptions] GET error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "获取数据失败" });
     }
   }
@@ -133,18 +145,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: "Missing id" });
 
-    const { expiration_date, days_before, active } = req.body ?? {};
+    const { expiration_date, days_before, active, whois_sync } = req.body ?? {};
 
+    // Full WHOIS sync: update expiry date + all WHOIS metadata atomically
+    if (whois_sync && typeof whois_sync === "object") {
+      const { expiry, registrar, creation_date, nameservers } = whois_sync as {
+        expiry: string; registrar?: string | null; creation_date?: string | null; nameservers?: string[];
+      };
+      const parsed = new Date(expiry);
+      if (isNaN(parsed.getTime())) return res.status(400).json({ error: "Invalid WHOIS date" });
+      const dateStr = parsed.toISOString().slice(0, 10);
+      const ns = Array.isArray(nameservers) && nameservers.length > 0 ? JSON.stringify(nameservers) : null;
+      try {
+        await run(
+          `UPDATE reminders
+           SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW(),
+               registrar = $3, creation_date = $4, nameservers_json = $5
+           WHERE id = $6 AND email = $7`,
+          [dateStr, dateStr, registrar ?? null, creation_date ?? null, ns, id as string, session.user.email],
+        );
+        return res.status(200).json({ ok: true, whois_synced_at: new Date().toISOString(), expiration_date: dateStr });
+      } catch (err) {
+        console.error("[subscriptions] PATCH whois_sync error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "WHOIS 同步失败" });
+      }
+    }
+
+    // Manual expiry date update (user typed a date — does NOT update whois_synced_at)
     if (expiration_date !== undefined) {
       const parsed = new Date(expiration_date);
       if (isNaN(parsed.getTime())) return res.status(400).json({ error: "Invalid date" });
       try {
         await run(
           "UPDATE reminders SET expiration_date = $1 WHERE id = $2 AND email = $3",
-          [parsed.toISOString(), id as string, session.user.email],
+          [parsed.toISOString().slice(0, 10), id as string, session.user.email],
         );
-      } catch (err: any) {
-        console.error("[subscriptions] PATCH expiration_date error:", err.message);
+      } catch (err) {
+        console.error("[subscriptions] PATCH expiration_date error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "更新到期日期失败" });
       }
     }
@@ -157,8 +194,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           "UPDATE reminders SET days_before = $1 WHERE id = $2 AND email = $3",
           [db, id as string, session.user.email],
         );
-      } catch (err: any) {
-        console.error("[subscriptions] PATCH days_before error:", err.message);
+      } catch (err) {
+        console.error("[subscriptions] PATCH days_before error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "更新提醒设置失败" });
       }
     }
@@ -170,8 +207,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           "UPDATE reminders SET active = $1 WHERE id = $2 AND email = $3",
           [activeVal, id as string, session.user.email],
         );
-      } catch (err: any) {
-        console.error("[subscriptions] PATCH active error:", err.message);
+      } catch (err) {
+        console.error("[subscriptions] PATCH active error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "更新状态失败" });
       }
     }
@@ -190,8 +227,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          WHERE id = $2 AND email = $3`,
         [new Date().toISOString(), id as string, session.user.email],
       );
-    } catch (err: any) {
-      console.error("[subscriptions] DELETE error:", err.message);
+    } catch (err) {
+      console.error("[subscriptions] DELETE error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "取消失败" });
     }
     return res.status(200).json({ ok: true });
