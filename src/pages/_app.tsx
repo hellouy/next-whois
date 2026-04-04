@@ -431,23 +431,31 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   const isAdminPage = router.pathname.startsWith("/admin");
 
   // ── Route-change progress bar ──────────────────────────────────────────────
-  // Only shown for navigations TO non-stable pages (login, about, etc.).
-  // Stable pages (homepage, result, DNS…) show their own skeleton/spinner, so
-  // the top bar would create a distracting double-loading signal.
-  // Derive the destination pathname from the URL passed to routeChangeStart.
+  // Shown for navigations TO non-stable pages (login, about, etc.) AND for
+  // cross-page navigations TO the result page (homepage → result).
+  // Skipped for result → result shallow navigation (QueryProgressBar handles it).
   const [npStatus, setNpStatus] = React.useState<"idle" | "start" | "done">("idle");
   const npResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the current pathname so event handlers can know where we came from.
+  const currentPathnameRef = React.useRef(router.pathname);
+  React.useEffect(() => { currentPathnameRef.current = router.pathname; }, [router.pathname]);
   React.useEffect(() => {
+    const isQueryPagePath = (p: string) =>
+      p !== "/" && !p.startsWith("/admin") && !p.startsWith("/api") && p.split("/").length >= 2;
+    const OTHER_STABLE = new Set(["/", "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback"]);
     const onStart = (url: string) => {
       // Extract pathname from url (may include query string / hash)
       const dest = url.split("?")[0].split("#")[0];
-      // Determine if destination matches any stable page pattern
-      const destIsStable = [...STABLE_KEY_PAGES].some(p => {
-        if (!p.includes("[")) return dest === p;           // exact match
-        if (p === "/[...query]") return dest !== "/" && !dest.startsWith("/admin") && dest.split("/").length >= 2;
-        return false;
-      });
-      if (destIsStable) return; // stable page handles its own loading feedback
+      const destIsQueryPage = isQueryPagePath(dest);
+      const sourceIsQueryPage = currentPathnameRef.current === "/[...query]";
+
+      // result → result: shallow routing — QueryProgressBar handles this
+      if (sourceIsQueryPage && destIsQueryPage) return;
+
+      // Other self-contained stable pages (DNS, IP, etc.) manage their own feedback
+      if (OTHER_STABLE.has(dest)) return;
+
+      // Everything else (including homepage → result, and non-stable pages): show bar
       if (npResetRef.current) clearTimeout(npResetRef.current);
       setNpStatus("start");
     };

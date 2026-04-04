@@ -146,16 +146,16 @@ const CARD_CONTAINER_VARIANTS = {
   hidden: { opacity: 1 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.04, delayChildren: 0.08 },
+    transition: { staggerChildren: 0.025, delayChildren: 0.03 },
   },
 };
 
 const CARD_ITEM_VARIANTS = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { opacity: 0, y: 5 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -1304,8 +1304,8 @@ export default function LookupPage({
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeIn" } }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, transition: { duration: 0.08, ease: "easeIn" } }}
+              transition={{ duration: 0.12 }}
               className="grid grid-cols-1 gap-5"
             >
               <style>{`
@@ -1414,9 +1414,9 @@ export default function LookupPage({
             return (
             <motion.div
               key={target}
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 3 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1], delay: 0.06 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
             >
             <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"

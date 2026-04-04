@@ -3,53 +3,55 @@ import React from "react";
 export function QueryProgressBar({ loading, refreshing }: { loading: boolean; refreshing?: boolean }) {
   const [width, setWidth] = React.useState(0);
   const [visible, setVisible] = React.useState(false);
-  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-  const doneRef  = React.useRef(false);
+  const [isDone, setIsDone] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
     if (loading) {
-      doneRef.current = false;
+      setIsDone(false);
+      setVisible(true);
+      // Reset to 0 first (no transition), then in the next paint jump to 18%
+      // so the CSS transition starts from a visible position.
       setWidth(0);
-      setVisible(true);
-      let w = 0;
-      timerRef.current = setInterval(() => {
-        if (doneRef.current) return;
-        w += w < 40 ? 12 : w < 65 ? 4 : w < 82 ? 1 : 0;
-        if (w > 85) w = 85;
-        setWidth(w);
-      }, 80);
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => {
+          setWidth(78);
+        });
+      });
     } else if (refreshing) {
-      doneRef.current = false;
-      setWidth(90);
+      setIsDone(false);
       setVisible(true);
-      let w = 90;
-      let direction = 1;
-      timerRef.current = setInterval(() => {
-        if (doneRef.current) return;
-        w += direction * 0.5;
-        if (w >= 95) direction = -1;
-        if (w <= 88) direction = 1;
-        setWidth(w);
-      }, 120);
+      setWidth(90);
     } else {
-      doneRef.current = true;
-      if (timerRef.current) clearInterval(timerRef.current);
+      // Done: snap to 100% with fast transition, then fade out
+      setIsDone(true);
       setWidth(100);
-      const t = setTimeout(() => setVisible(false), 400);
-      return () => clearTimeout(t);
+      timerRef.current = setTimeout(() => setVisible(false), 480);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, [loading, refreshing]);
 
   if (!visible) return null;
+
   return (
     <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden rounded-t z-20 pointer-events-none">
       <div
-        className={`h-full transition-all ${refreshing && !loading ? "bg-primary/40" : "bg-primary/70"}`}
+        className={`h-full ${refreshing && !loading ? "bg-primary/40" : "bg-primary/70"}`}
         style={{
           width: `${width}%`,
-          transitionDuration: width === 100 ? "200ms" : refreshing ? "500ms" : "120ms",
-          transitionTimingFunction: width === 100 ? "ease-out" : "linear",
+          transition: isDone
+            ? "width 0.22s ease-out, opacity 0.25s ease"
+            : width === 0
+            ? "none"
+            : "width 9s cubic-bezier(0.02, 0.6, 0.18, 1)",
         }}
       />
     </div>
