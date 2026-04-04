@@ -663,7 +663,16 @@ export function Navbar() {
   const { t } = useTranslation();
 
   return (
-    <div className="fixed left-0 right-0 z-50 flex justify-center" style={{ top: "var(--ann-h, 0px)", transition: "top 0.22s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+    <div
+      className="fixed left-0 right-0 z-50 flex justify-center"
+      style={{
+        top: "var(--ann-h, 0px)",
+        transition: "top 0.22s cubic-bezier(0.25,0.46,0.45,0.94)",
+        // When the nav is hidden (translated off-screen) the wrapper must not
+        // intercept taps on the content beneath it.
+        pointerEvents: isVisible ? "auto" : "none",
+      }}
+    >
       <motion.nav
         animate={{
           y: isVisible ? 0 : -56,
@@ -675,6 +684,7 @@ export function Navbar() {
           opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
           scale:   { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
         }}
+        style={{ pointerEvents: isVisible ? "auto" : "none" }}
         className={cn(
           "mt-4 px-2 h-10 rounded-full",
           "bg-background shadow-sm",

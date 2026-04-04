@@ -1,28 +1,33 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function useScrollDirection() {
   const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  // Use a ref so the scroll handler always reads the latest value without
+  // needing to be re-registered on every scroll (which caused stale-closure
+  // bugs and listener stacking on fast mobile/iOS momentum scrolling).
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
     const controlNavbar = () => {
       const currentScrollY = window.scrollY;
 
-      if (currentScrollY < lastScrollY || currentScrollY < 10) {
+      if (currentScrollY < lastScrollY.current || currentScrollY < 10) {
         setIsVisible(true);
-      } else if (currentScrollY > lastScrollY && currentScrollY > 10) {
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 10) {
         setIsVisible(false);
       }
 
-      setLastScrollY(currentScrollY);
+      lastScrollY.current = currentScrollY;
     };
 
-    window.addEventListener("scroll", controlNavbar);
+    // passive:true tells the browser this handler never calls preventDefault,
+    // allowing it to optimise scroll performance (especially on mobile).
+    window.addEventListener("scroll", controlNavbar, { passive: true });
 
     return () => {
       window.removeEventListener("scroll", controlNavbar);
     };
-  }, [lastScrollY]);
+  }, []); // register once — the ref keeps lastScrollY current
 
   return isVisible;
 }
