@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import { getDbReady } from "@/lib/db";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 const TABLES: { name: string; label: string; ephemeral?: boolean }[] = [
   { name: "users",                   label: "用户" },
@@ -36,6 +36,8 @@ const TABLES: { name: string; label: string; ephemeral?: boolean }[] = [
   { name: "rate_limit_records",      label: "频率限制记录", ephemeral: true },
 ];
 
+const PAGE_SIZE = 1_000;
+
 export async function getTableStats(db: Awaited<ReturnType<typeof getDbReady>>) {
   if (!db) return [];
   return Promise.all(
@@ -67,32 +69,74 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ tables: stats });
   }
 
-  const exportData: Record<string, any[]> = {};
-  const meta: Record<string, { count: number; error?: string }> = {};
   const exportTables = skipEphemeral ? TABLES.filter(t => !t.ephemeral) : TABLES;
-
-  await Promise.all(exportTables.map(async (t) => {
-    try {
-      const r = await db.query(`SELECT * FROM ${t.name} ORDER BY 1`);
-      exportData[t.name] = r.rows;
-      meta[t.name] = { count: r.rows.length };
-    } catch (e: any) {
-      exportData[t.name] = [];
-      meta[t.name] = { count: 0, error: (e as Error).message };
-    }
-  }));
-
-  const payload = {
-    exported_at: new Date().toISOString(),
-    schema_version: "1.0",
-    exported_by: (session.user as any)?.email ?? "admin",
-    meta,
-    tables: exportData,
-  };
-
   const filename = `db-export-${new Date().toISOString().slice(0, 10)}.json`;
+
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Cache-Control", "no-store");
-  return res.status(200).json(payload);
+  res.setHeader("Transfer-Encoding", "chunked");
+
+  const exportedAt = new Date().toISOString();
+  const exportedBy = (session.user as any)?.email ?? "admin";
+
+  // Collect table metadata first (just counts — no row data in memory)
+  const meta: Record<string, { count: number; error?: string }> = {};
+  for (const t of exportTables) {
+    try {
+      const r = await db.query(`SELECT COUNT(*)::int AS n FROM ${t.name}`);
+      meta[t.name] = { count: r.rows[0]?.n ?? 0 };
+    } catch (e: any) {
+      meta[t.name] = { count: 0, error: (e as Error).message };
+    }
+  }
+
+  // Stream the JSON body in chunks — never accumulate all rows in memory.
+  res.write(`{"exported_at":${JSON.stringify(exportedAt)},"schema_version":"1.0","exported_by":${JSON.stringify(exportedBy)},"meta":${JSON.stringify(meta)},"tables":{`);
+
+  let firstTable = true;
+  for (const t of exportTables) {
+    if (!firstTable) res.write(",");
+    firstTable = false;
+
+    res.write(`${JSON.stringify(t.name)}:[`);
+
+    // Skip tables that had errors during count
+    if (meta[t.name]?.error) {
+      res.write("]");
+      continue;
+    }
+
+    let offset = 0;
+    let firstRow = true;
+    let done = false;
+
+    while (!done) {
+      try {
+        const r = await db.query(
+          `SELECT * FROM ${t.name} ORDER BY 1 LIMIT $1 OFFSET $2`,
+          [PAGE_SIZE, offset],
+        );
+
+        for (const row of r.rows) {
+          if (!firstRow) res.write(",");
+          firstRow = false;
+          res.write(JSON.stringify(row));
+        }
+
+        if (r.rows.length < PAGE_SIZE) {
+          done = true;
+        } else {
+          offset += PAGE_SIZE;
+        }
+      } catch {
+        done = true;
+      }
+    }
+
+    res.write("]");
+  }
+
+  res.write("}}");
+  res.end();
 }

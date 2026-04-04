@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, run, isDbReady, withTransaction } from "@/lib/db-query";
 import { sendEmail, welcomeHtml, getSiteLabel } from "@/lib/email";
 import { localeFromCookieHeader, localeFromAcceptHeader, getEmailStrings } from "@/lib/email-strings";
 import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
@@ -86,27 +86,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                  localeFromAcceptHeader(req.headers["accept-language"]);
 
   try {
-    await run(
-      "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used, locale) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null, locale],
-    );
+    // Wrap user insert + invite-code update in a single transaction so a
+    // mid-flight failure never leaves an orphaned user or over-used invite code.
+    await withTransaction(async (tx) => {
+      await tx.run(
+        "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used, locale) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null, locale],
+      );
+
+      if (codeRow) {
+        const updated = await tx.run(
+          "UPDATE invite_codes SET use_count = use_count + 1 WHERE id = $1 AND use_count < max_uses",
+          [codeRow.id],
+        );
+        if (updated === 0) {
+          throw Object.assign(new Error("邀请码已达使用上限，注册失败"), { code: "INVITE_EXHAUSTED" });
+        }
+      }
+    });
   } catch (err: any) {
     if (err.code === "23505") {
       return res.status(409).json({ error: "该邮箱已注册" });
     }
-    console.error("[register] insert error:", err.message);
-    return res.status(500).json({ error: "注册失败，请稍后重试" });
-  }
-
-  if (codeRow) {
-    const updated = await run(
-      "UPDATE invite_codes SET use_count = use_count + 1 WHERE id = $1 AND use_count < max_uses",
-      [codeRow.id],
-    );
-    if (updated === 0) {
-      await run("DELETE FROM users WHERE id = $1", [id]);
-      return res.status(400).json({ error: "邀请码已达使用上限，注册失败" });
+    if (err.code === "INVITE_EXHAUSTED") {
+      return res.status(400).json({ error: err.message });
     }
+    console.error("[register] transaction error:", err.message);
+    return res.status(500).json({ error: "注册失败，请稍后重试" });
   }
 
   if (storedCode !== null) {

@@ -11,22 +11,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "./auth/[...nextauth]";
 import { analyzeDomainWithAi } from "@/lib/server/domain-value-ai";
 import { scoreDomain } from "@/lib/domain-value";
+import { checkRateLimit } from "@/lib/rate-limit";
 
-// Rate limit: 1 AI call per domain per user per session (Redis cache handles dedup)
-const RATE_LIMIT_MAP = new Map<string, number>();
-const RATE_LIMIT_WINDOW = 60_000; // 1 min
+// Rate limit: 5 AI calls per IP per minute, backed by Redis so it survives
+// lambda cold starts and is consistent across multiple function instances.
 const RATE_LIMIT_MAX = 5;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const key = ip;
-  const last = RATE_LIMIT_MAP.get(key);
-  if (!last || now - last > RATE_LIMIT_WINDOW) {
-    RATE_LIMIT_MAP.set(key, now);
-    return true;
-  }
-  return false;
-}
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -58,11 +48,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "域名价值过低，不建议进行 AI 深度分析" });
   }
 
-  // Simple in-memory rate limit (cached results bypass this)
+  // Redis-backed rate limit — persists across lambda restarts and instances.
+  // Key includes user email so each user has their own independent limit.
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
     ?? req.socket.remoteAddress
     ?? "unknown";
-  if (!checkRateLimit(ip)) {
+  const rateLimitKey = `domain-value-ai:${session.user.email}:${ip}`;
+  const rl = await checkRateLimit(rateLimitKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (!rl.ok) {
     return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
   }
 

@@ -46,3 +46,44 @@ export async function isDbReady(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Run a sequence of queries inside a single DB transaction.
+ * If the callback throws, the transaction is rolled back and the error re-thrown.
+ * Returns whatever the callback returns.
+ */
+export async function withTransaction<T>(
+  fn: (client: {
+    one: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R | null>;
+    many: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R[]>;
+    run: (sql: string, params?: any[]) => Promise<number>;
+  }) => Promise<T>,
+): Promise<T> {
+  const db = await getDbReady();
+  if (!db) throw new Error("Database unavailable");
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn({
+      one: async <R>(sql: string, params?: any[]) => {
+        const r = await client.query(sql, params);
+        return (r.rows[0] as R) ?? null;
+      },
+      many: async <R>(sql: string, params?: any[]) => {
+        const r = await client.query(sql, params);
+        return r.rows as R[];
+      },
+      run: async (sql: string, params?: any[]) => {
+        const r = await client.query(sql, params);
+        return r.rowCount ?? 0;
+      },
+    });
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}

@@ -6,8 +6,9 @@
  * Security model:
  *   - If SETUP_SECRET env var is set, the request body must include
  *     { secret, password } where secret === SETUP_SECRET.
- *   - If SETUP_SECRET is NOT set, this endpoint only works when NO admin
- *     account exists in the database yet (first-run bootstrap only).
+ *   - If SETUP_SECRET is NOT set AND no admin account exists, this endpoint
+ *     allows first-run bootstrap (one-time creation only). A server-side
+ *     warning is logged to alert operators of the open state.
  *   - Once an admin account exists AND no SETUP_SECRET is configured,
  *     this endpoint returns 403 to prevent abuse.
  *
@@ -66,6 +67,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Admin account does not exist — allow creation (first-run or with SETUP_SECRET)
   if (setupSecret && secret !== setupSecret) {
     return res.status(403).json({ error: "SETUP_SECRET 不匹配，拒绝访问。" });
+  }
+
+  // Warn operators when the endpoint is used without SETUP_SECRET protection.
+  // This is intentional for first-run bootstrap, but should be secured afterward.
+  if (!setupSecret) {
+    console.warn(
+      "[init-admin] WARNING: Creating admin account without SETUP_SECRET protection. " +
+      "Set the SETUP_SECRET environment variable to secure this endpoint after setup."
+    );
   }
 
   const id           = randomBytes(8).toString("hex");
