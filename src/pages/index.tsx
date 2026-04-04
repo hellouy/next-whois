@@ -244,14 +244,17 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         )}
 
         {/* Search box */}
-        <div className="relative group mb-4">
+        <div className="relative group mb-3">
           <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
           <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
             <KeyboardShortcut k="/" />
           </div>
         </div>
 
-        {/* Quick-access tool links */}
+        {/* Spacer — pushes quick links toward the bottom of the viewport */}
+        <div style={{ height: "clamp(0.75rem, 4dvh, 2.5rem)" }} />
+
+        {/* Quick-access tool links — pinned near bottom, above copyright */}
         <div className="flex items-center justify-center gap-2 flex-wrap">
           {(isChinese
             ? [

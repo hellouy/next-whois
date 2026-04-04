@@ -14,6 +14,7 @@ import {
   RiEyeLine, RiEyeOffLine, RiSaveLine, RiRefreshLine,
   RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
   RiPaletteLine, RiSendPlane2Line, RiAlertLine, RiInformationLine,
+  RiAddLine, RiDeleteBinLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -122,6 +123,69 @@ function TextareaField({ label, desc, value, onChange, rows = 3, placeholder }: 
         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-y min-h-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
     </Field>
+  );
+}
+
+function MultiItemInput({ value, onChange, placeholder }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  const [items, setItems] = React.useState<string[]>(() => {
+    const parsed = (value || "").split("|").map(s => s.trim()).filter(Boolean);
+    return parsed.length > 0 ? parsed : [""];
+  });
+
+  const prevVal = React.useRef(value);
+  React.useEffect(() => {
+    if (value === prevVal.current) return;
+    prevVal.current = value;
+    const parsed = (value || "").split("|").map(s => s.trim()).filter(Boolean);
+    setItems(parsed.length > 0 ? parsed : [""]);
+  }, [value]);
+
+  const propagate = (next: string[]) => {
+    setItems(next);
+    onChange(next.filter(s => s.trim()).join(" | "));
+  };
+
+  const update = (idx: number, v: string) => { const n = [...items]; n[idx] = v; propagate(n); };
+  const add = () => propagate([...items, ""]);
+  const remove = (idx: number) => { const n = items.filter((_, i) => i !== idx); propagate(n.length ? n : [""]); };
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md border border-border/60 bg-muted/30 flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 tabular-nums select-none">
+            {idx + 1}
+          </div>
+          <Input
+            value={item}
+            onChange={e => update(idx, e.target.value)}
+            placeholder={placeholder}
+            className="text-xs flex-1"
+          />
+          <button
+            type="button"
+            onClick={() => remove(idx)}
+            disabled={items.length === 1 && !items[0]}
+            className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:pointer-events-none shrink-0"
+          >
+            <RiDeleteBinLine className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted/50"
+      >
+        <RiAddLine className="w-3.5 h-3.5" />
+        添加一条
+      </button>
+      {items.filter(Boolean).length > 1 && (
+        <p className="text-[10px] text-muted-foreground/50 pl-8">多条内容将自动循环淡入淡出展示</p>
+      )}
+    </div>
   );
 }
 
@@ -345,8 +409,12 @@ function HomeTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: 
           checked={s.home_announcement_enabled === "1"}
           onChange={v => set("home_announcement_enabled", v ? "1" : "")}
         />
-        <Field label="公告内容">
-          <Input value={s.home_announcement_text} onChange={e => set("home_announcement_text", e.target.value)} placeholder="公告文字内容..." className="text-xs" />
+        <Field label="公告内容" desc="支持添加多条，自动循环淡入淡出播放">
+          <MultiItemInput
+            value={s.home_announcement_text}
+            onChange={v => set("home_announcement_text", v)}
+            placeholder="公告文字内容..."
+          />
         </Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <SelectField
@@ -373,10 +441,14 @@ function HomeTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: 
           checked={s.result_ad_enabled === "1"}
           onChange={v => set("result_ad_enabled", v ? "1" : "")}
         />
+        <Field label="广告文字" desc="支持添加多条，自动循环展示">
+          <MultiItemInput
+            value={s.result_ad_text}
+            onChange={v => set("result_ad_text", v)}
+            placeholder="查询结果页广告文字..."
+          />
+        </Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="广告文字">
-            <Input value={s.result_ad_text} onChange={e => set("result_ad_text", e.target.value)} placeholder="查询结果页广告文字..." className="text-xs" />
-          </Field>
           <Field label="广告链接">
             <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>

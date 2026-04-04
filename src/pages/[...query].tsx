@@ -599,32 +599,39 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   const text  = items[activeIdx];
 
   const inner = (
-    <div className="flex items-center gap-2 py-1 cursor-default">
-      <RiMegaphoneLine
-        className="w-3.5 h-3.5 shrink-0 text-primary/70"
-        style={{ animation: "ad-icon 2.4s ease-in-out infinite" }}
-      />
+    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all ${url ? "cursor-pointer hover:border-primary/25 hover:bg-primary/5" : "cursor-default"} border-border/40 bg-muted/15`}>
+      {/* Label badge */}
+      <span className="shrink-0 text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground/55 border border-border/50 rounded-md px-1.5 py-0.5 bg-background/60">
+        {label}
+      </span>
+
+      {/* Animated text */}
       <span
-        className="text-xs text-foreground/65 flex-1 leading-snug"
+        className="flex-1 text-xs text-foreground/65 leading-snug min-w-0 truncate"
         style={{ opacity: fading ? 0 : 1, transition: "opacity 0.35s ease" }}
       >
-        <span className="font-semibold text-primary/80 mr-1">{label}：</span>
         {text}
       </span>
-      {url && <RiExternalLinkLine className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
-      <style>{`
-        @keyframes ad-icon {
-          0%, 100% { transform: rotate(-8deg) scale(1);   opacity: 0.7; }
-          25%       { transform: rotate(8deg) scale(1.1);  opacity: 1;   }
-          50%       { transform: rotate(-6deg) scale(1);   opacity: 0.7; }
-          75%       { transform: rotate(6deg) scale(1.05); opacity: 1;   }
-        }
-      `}</style>
+
+      {/* Right side: dots + link icon */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {items.length > 1 && (
+          <div className="flex items-center gap-0.5">
+            {items.map((_, i) => (
+              <div
+                key={i}
+                className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1 bg-primary/50" : "w-1 h-1 bg-foreground/15"}`}
+              />
+            ))}
+          </div>
+        )}
+        {url && <RiExternalLinkLine className="w-3 h-3 text-muted-foreground/35" />}
+      </div>
     </div>
   );
 
   const wrapper = url ? (
-    <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block hover:opacity-80 transition-opacity">
+    <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block">
       {inner}
     </Link>
   ) : inner;

@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
-import { RiMegaphoneLine, RiCloseLine, RiWrenchLine } from "@remixicon/react";
+import { RiMegaphoneLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -239,36 +239,70 @@ function AnnouncementBanner() {
     return () => clearInterval(timer);
   }, [items.length, rawMsg]);
 
+  // Type-specific styling
+  const annType = (isHome && homeEnabled && homeMsg ? settings.home_announcement_type : "info") || "info";
+  const TYPE_CFG: Record<string, {
+    bar: string; accent: string; iconCls: string; prefixCls: string;
+    dotActive: string; Icon: React.ElementType;
+  }> = {
+    info:    { bar: "bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/50 dark:border-blue-800/30",    accent: "bg-blue-500",    iconCls: "text-blue-500 dark:text-blue-400",    prefixCls: "text-blue-600 dark:text-blue-400",    dotActive: "bg-blue-500",    Icon: RiInformationLine },
+    success: { bar: "bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200/50 dark:border-emerald-800/30", accent: "bg-emerald-500", iconCls: "text-emerald-500 dark:text-emerald-400", prefixCls: "text-emerald-600 dark:text-emerald-400", dotActive: "bg-emerald-500", Icon: RiCheckLine },
+    warning: { bar: "bg-amber-50/70 dark:bg-amber-950/25 border-amber-200/50 dark:border-amber-800/30",   accent: "bg-amber-500",   iconCls: "text-amber-500 dark:text-amber-400",   prefixCls: "text-amber-600 dark:text-amber-400",   dotActive: "bg-amber-500",   Icon: RiAlertLine },
+    error:   { bar: "bg-rose-50/70 dark:bg-rose-950/25 border-rose-200/50 dark:border-rose-800/30",    accent: "bg-rose-500",    iconCls: "text-rose-500 dark:text-rose-400",    prefixCls: "text-rose-600 dark:text-rose-400",    dotActive: "bg-rose-500",    Icon: RiAlertLine },
+  };
+  const cfg = TYPE_CFG[annType] ?? TYPE_CFG.info;
+  const { Icon } = cfg;
+
   if (!visible) return null;
 
+  const annUrl = isHome && homeEnabled ? (settings.home_announcement_url || "") : "";
+
+  const textContent = (
+    <span
+      className={`flex-1 text-center truncate text-foreground/75`}
+      style={{ opacity: fading ? 0 : 1, transition: "opacity 0.35s ease" }}
+    >
+      <span className={`font-bold mr-1.5 ${cfg.prefixCls}`}>公告</span>
+      <span className="text-foreground/50 mr-1.5">·</span>
+      {items[activeIdx]}
+    </span>
+  );
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-xs font-medium border-b border-border/30 bg-background/80 backdrop-blur-sm">
-      <RiMegaphoneLine
-        className="w-3.5 h-3.5 shrink-0 text-primary"
-        style={{ animation: "ann-horn 2.4s ease-in-out infinite" }}
-      />
-      <span
-        className="text-foreground/80 text-center truncate transition-opacity duration-300"
-        style={{ opacity: fading ? 0 : 1 }}
-      >
-        <span className="font-semibold text-primary mr-1">公告：</span>
-        {items[activeIdx]}
-      </span>
+    <div className={`fixed top-0 left-0 right-0 z-[60] flex items-center gap-2 px-3 h-8 text-xs font-medium border-b backdrop-blur-md ${cfg.bar}`}>
+      {/* Left accent stripe */}
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm ${cfg.accent}`} />
+
+      {/* Type icon */}
+      <Icon className={`w-3.5 h-3.5 shrink-0 ml-2 ${cfg.iconCls}`} />
+
+      {/* Clickable text (if URL set) or plain text */}
+      {annUrl ? (
+        <Link href={annUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 hover:opacity-75 transition-opacity">
+          {textContent}
+        </Link>
+      ) : textContent}
+
+      {/* Dots indicator for multiple items */}
+      {items.length > 1 && (
+        <div className="flex items-center gap-1 shrink-0">
+          {items.map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-300 ${i === activeIdx ? `w-3 h-1.5 ${cfg.dotActive}` : "w-1.5 h-1.5 bg-foreground/15"}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Close button */}
       <button
         onClick={handleDismiss}
-        className="ml-auto p-0.5 rounded hover:bg-muted/60 transition-colors shrink-0 text-muted-foreground hover:text-foreground"
+        className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-foreground/40 hover:text-foreground/80"
         aria-label={t("close_announcement")}
       >
         <RiCloseLine className="w-3.5 h-3.5" />
       </button>
-      <style>{`
-        @keyframes ann-horn {
-          0%, 100% { transform: rotate(-8deg) scale(1); }
-          25%       { transform: rotate(8deg) scale(1.1); }
-          50%       { transform: rotate(-6deg) scale(1); }
-          75%       { transform: rotate(6deg) scale(1.05); }
-        }
-      `}</style>
     </div>
   );
 }
