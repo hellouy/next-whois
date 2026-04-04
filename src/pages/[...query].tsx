@@ -566,16 +566,28 @@ function targetFromRouterQuery(query: NodeJS.Dict<string | string[]>): string {
 }
 
 /** Text ad banner — multi-item with 4s fade cycling, only shown after results load. */
+type AdRichItem = { text: string; color?: string; size?: "xs" | "sm" | "base"; bold?: boolean };
+function parseAdItems(raw: string): AdRichItem[] {
+  const trimmed = (raw || "").trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const p = JSON.parse(trimmed);
+      if (Array.isArray(p)) {
+        const r = p.filter((i: unknown) => i && typeof (i as AdRichItem).text === "string" && (i as AdRichItem).text.trim());
+        if (r.length > 0) return r as AdRichItem[];
+      }
+    } catch {}
+  }
+  return trimmed.split("|").map(s => s.trim()).filter(Boolean).map(t => ({ text: t }));
+}
+
 function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; inline?: boolean }) {
   const settings = useSiteSettings();
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
 
   const rawText = settings.result_ad_text || "";
-  const items = React.useMemo(
-    () => rawText.split("|").map(s => s.trim()).filter(Boolean),
-    [rawText],
-  );
+  const items = React.useMemo(() => parseAdItems(rawText), [rawText]);
 
   React.useEffect(() => {
     if (items.length <= 1) return;
@@ -596,36 +608,47 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
 
   const label = settings.result_ad_label || "广告";
   const url   = settings.result_ad_url;
-  const text  = items[activeIdx];
+  const current = items[activeIdx] ?? items[0];
 
   const inner = (
-    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all ${url ? "cursor-pointer hover:border-primary/25 hover:bg-primary/5" : "cursor-default"} border-border/40 bg-muted/15`}>
-      {/* Label badge */}
-      <span className="shrink-0 text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground/55 border border-border/50 rounded-md px-1.5 py-0.5 bg-background/60">
-        {label}
-      </span>
+    <div className={`flex items-center gap-1.5 text-xs ${url ? "cursor-pointer hover:opacity-75 transition-opacity" : ""}`}>
+      {/* Animated megaphone icon */}
+      <RiMegaphoneLine
+        className="w-3.5 h-3.5 shrink-0 text-foreground/35"
+        style={{ animation: "ad-float 3s ease-in-out infinite" }}
+      />
+
+      {/* Label */}
+      <span className="text-foreground/40 font-medium shrink-0 text-[10px] tracking-wide">{label}</span>
+      <span className="text-foreground/20 shrink-0">·</span>
 
       {/* Animated text */}
       <span
-        className="flex-1 text-xs text-foreground/65 leading-snug min-w-0 truncate"
-        style={{ opacity: fading ? 0 : 1, transition: "opacity 0.35s ease" }}
+        className="flex-1 min-w-0 truncate leading-snug text-foreground/60"
+        style={{
+          opacity: fading ? 0 : 1,
+          transition: "opacity 0.35s ease",
+          color: current.color || undefined,
+          fontWeight: current.bold ? "700" : undefined,
+          fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "13px" : "11px",
+        }}
       >
-        {text}
+        {current.text}
       </span>
 
-      {/* Right side: dots + link icon */}
+      {/* Dots + link icon */}
       <div className="flex items-center gap-1.5 shrink-0">
         {items.length > 1 && (
           <div className="flex items-center gap-0.5">
             {items.map((_, i) => (
               <div
                 key={i}
-                className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1 bg-primary/50" : "w-1 h-1 bg-foreground/15"}`}
+                className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1 bg-foreground/30" : "w-1 h-1 bg-foreground/12"}`}
               />
             ))}
           </div>
         )}
-        {url && <RiExternalLinkLine className="w-3 h-3 text-muted-foreground/35" />}
+        {url && <RiExternalLinkLine className="w-3 h-3 text-foreground/30" />}
       </div>
     </div>
   );

@@ -126,54 +126,141 @@ function TextareaField({ label, desc, value, onChange, rows = 3, placeholder }: 
   );
 }
 
+type RichItem = { text: string; color?: string; size?: "xs" | "sm" | "base"; bold?: boolean };
+function parseRichItems(raw: string): RichItem[] {
+  const trimmed = (raw || "").trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const p = JSON.parse(trimmed);
+      if (Array.isArray(p)) {
+        const r = p.filter((i: unknown) => i && typeof (i as RichItem).text === "string");
+        if (r.length > 0) return r as RichItem[];
+      }
+    } catch {}
+  }
+  const parts = trimmed.split("|").map(s => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.map(t => ({ text: t })) : [{ text: "" }];
+}
+
 function MultiItemInput({ value, onChange, placeholder }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
 }) {
-  const [items, setItems] = React.useState<string[]>(() => {
-    const parsed = (value || "").split("|").map(s => s.trim()).filter(Boolean);
-    return parsed.length > 0 ? parsed : [""];
-  });
-
+  const [items, setItems] = React.useState<RichItem[]>(() => parseRichItems(value));
   const prevVal = React.useRef(value);
+
   React.useEffect(() => {
     if (value === prevVal.current) return;
     prevVal.current = value;
-    const parsed = (value || "").split("|").map(s => s.trim()).filter(Boolean);
-    setItems(parsed.length > 0 ? parsed : [""]);
+    setItems(parseRichItems(value));
   }, [value]);
 
-  const propagate = (next: string[]) => {
+  const propagate = (next: RichItem[]) => {
     setItems(next);
-    onChange(next.filter(s => s.trim()).join(" | "));
+    const hasRich = next.some(i => i.color || i.size || i.bold);
+    const nonEmpty = next.filter(i => i.text.trim());
+    if (hasRich) {
+      onChange(nonEmpty.length > 0 ? JSON.stringify(nonEmpty) : "");
+    } else {
+      onChange(nonEmpty.map(i => i.text).join(" | "));
+    }
   };
 
-  const update = (idx: number, v: string) => { const n = [...items]; n[idx] = v; propagate(n); };
-  const add = () => propagate([...items, ""]);
-  const remove = (idx: number) => { const n = items.filter((_, i) => i !== idx); propagate(n.length ? n : [""]); };
+  const update = (idx: number, field: keyof RichItem, v: string | boolean | undefined) => {
+    const n = [...items];
+    n[idx] = { ...n[idx], [field]: v };
+    propagate(n);
+  };
+  const add = () => propagate([...items, { text: "" }]);
+  const remove = (idx: number) => {
+    const n = items.filter((_, i) => i !== idx);
+    propagate(n.length ? n : [{ text: "" }]);
+  };
 
   return (
     <div className="space-y-2">
       {items.map((item, idx) => (
-        <div key={idx} className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md border border-border/60 bg-muted/30 flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 tabular-nums select-none">
-            {idx + 1}
+        <div key={idx} className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            {/* Row number */}
+            <div className="w-6 h-6 rounded-md border border-border/60 bg-muted/30 flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 tabular-nums select-none">
+              {idx + 1}
+            </div>
+
+            {/* Text input */}
+            <Input
+              value={item.text}
+              onChange={e => update(idx, "text", e.target.value)}
+              placeholder={placeholder}
+              className="text-xs flex-1"
+              style={{
+                color: item.color || undefined,
+                fontWeight: item.bold ? "700" : undefined,
+                fontSize: item.size === "xs" ? "11px" : item.size === "base" ? "14px" : undefined,
+              }}
+            />
+
+            {/* Color swatch — click to open native color picker */}
+            <label className="relative shrink-0 cursor-pointer" title="文字颜色">
+              <div
+                className="w-6 h-6 rounded-md border border-border/60 overflow-hidden flex items-center justify-center"
+                style={{ background: item.color ? item.color + "33" : undefined }}
+              >
+                <RiPaletteLine
+                  className="w-3.5 h-3.5 transition-colors"
+                  style={{ color: item.color || "currentColor", opacity: item.color ? 1 : 0.4 }}
+                />
+              </div>
+              <input
+                type="color"
+                value={item.color || "#888888"}
+                onChange={e => update(idx, "color", e.target.value)}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              />
+            </label>
+
+            {/* Clear color */}
+            {item.color && (
+              <button
+                type="button"
+                onClick={() => update(idx, "color", undefined)}
+                title="清除颜色"
+                className="w-5 h-5 rounded border border-border/50 text-muted-foreground/60 hover:text-destructive hover:border-destructive/40 flex items-center justify-center text-xs transition-colors shrink-0"
+              >×</button>
+            )}
+
+            {/* Size selector */}
+            <select
+              value={item.size || "sm"}
+              onChange={e => update(idx, "size", e.target.value as "xs" | "sm" | "base")}
+              title="字体大小"
+              className="h-6 text-[10px] rounded-md border border-border/60 bg-background px-1 shrink-0 text-muted-foreground"
+            >
+              <option value="xs">小</option>
+              <option value="sm">中</option>
+              <option value="base">大</option>
+            </select>
+
+            {/* Bold toggle */}
+            <button
+              type="button"
+              onClick={() => update(idx, "bold", !item.bold)}
+              title="粗体"
+              className={`w-6 h-6 rounded-md border text-xs font-bold shrink-0 transition-colors ${item.bold ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:border-border"}`}
+            >B</button>
+
+            {/* Delete */}
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              disabled={items.length === 1 && !items[0].text}
+              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:pointer-events-none shrink-0"
+            >
+              <RiDeleteBinLine className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <Input
-            value={item}
-            onChange={e => update(idx, e.target.value)}
-            placeholder={placeholder}
-            className="text-xs flex-1"
-          />
-          <button
-            type="button"
-            onClick={() => remove(idx)}
-            disabled={items.length === 1 && !items[0]}
-            className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:pointer-events-none shrink-0"
-          >
-            <RiDeleteBinLine className="w-3.5 h-3.5" />
-          </button>
         </div>
       ))}
+
       <button
         type="button"
         onClick={add}
@@ -182,8 +269,8 @@ function MultiItemInput({ value, onChange, placeholder }: {
         <RiAddLine className="w-3.5 h-3.5" />
         添加一条
       </button>
-      {items.filter(Boolean).length > 1 && (
-        <p className="text-[10px] text-muted-foreground/50 pl-8">多条内容将自动循环淡入淡出展示</p>
+      {items.filter(i => i.text).length > 1 && (
+        <p className="text-[10px] text-muted-foreground/50 pl-8">多条内容将自动循环淡入淡出展示，每条可单独设置颜色、字号和粗体</p>
       )}
     </div>
   );

@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
-import { RiMegaphoneLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
+import { RiBellLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -176,30 +176,39 @@ function SiteFooter() {
 
 const HOME_ANN_DISMISS_KEY = "home_ann_dismissed_v2";
 
+type AnnRichItem = { text: string; color?: string; size?: "xs" | "sm" | "base"; bold?: boolean };
+function parseAnnItems(raw: string): AnnRichItem[] {
+  const trimmed = (raw || "").trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const p = JSON.parse(trimmed);
+      if (Array.isArray(p)) {
+        const r = p.filter((i: unknown) => i && typeof (i as AnnRichItem).text === "string" && (i as AnnRichItem).text.trim());
+        if (r.length > 0) return r as AnnRichItem[];
+      }
+    } catch {}
+  }
+  return trimmed.split("|").map(s => s.trim()).filter(Boolean).map(t => ({ text: t }));
+}
+
 function AnnouncementBanner() {
   const settings = useSiteSettings();
   const { t } = useTranslation();
   const router = useRouter();
   const isHome = router.pathname === "/";
 
-  // Pick announcement source: homepage-specific on "/", global elsewhere
   const homeEnabled = settings.home_announcement_enabled === "1";
   const homeMsg = settings.home_announcement_text || "";
   const globalMsg = settings.site_announcement || "";
-  const rawMsg = isHome && homeEnabled && homeMsg ? homeMsg : (!isHome ? globalMsg : globalMsg);
+  const rawMsg = isHome && homeEnabled && homeMsg ? homeMsg : globalMsg;
 
   const [dismissed, setDismissed] = React.useState(false);
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
 
-  const items = React.useMemo(
-    () => (rawMsg || "").split("|").map(s => s.trim()).filter(Boolean),
-    [rawMsg],
-  );
+  const items = React.useMemo(() => parseAnnItems(rawMsg), [rawMsg]);
   const visible = items.length > 0 && !dismissed;
 
-  // For homepage announcement: persist dismiss in localStorage keyed by text hash
-  // so changing the text auto-reappears the bar.
   React.useEffect(() => {
     if (!isHome || !homeEnabled || !homeMsg) return;
     const hash = homeMsg.slice(0, 40);
@@ -207,7 +216,6 @@ function AnnouncementBanner() {
     setDismissed(stored === hash);
   }, [isHome, homeEnabled, homeMsg]);
 
-  // For global announcement: reset dismissed when message changes
   React.useEffect(() => {
     if (isHome) return;
     setDismissed(false);
@@ -239,63 +247,58 @@ function AnnouncementBanner() {
     return () => clearInterval(timer);
   }, [items.length, rawMsg]);
 
-  // Type-specific styling
-  const annType = (isHome && homeEnabled && homeMsg ? settings.home_announcement_type : "info") || "info";
-  const TYPE_CFG: Record<string, {
-    bar: string; accent: string; iconCls: string; prefixCls: string;
-    dotActive: string; Icon: React.ElementType;
-  }> = {
-    info:    { bar: "bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/50 dark:border-blue-800/30",    accent: "bg-blue-500",    iconCls: "text-blue-500 dark:text-blue-400",    prefixCls: "text-blue-600 dark:text-blue-400",    dotActive: "bg-blue-500",    Icon: RiInformationLine },
-    success: { bar: "bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200/50 dark:border-emerald-800/30", accent: "bg-emerald-500", iconCls: "text-emerald-500 dark:text-emerald-400", prefixCls: "text-emerald-600 dark:text-emerald-400", dotActive: "bg-emerald-500", Icon: RiCheckLine },
-    warning: { bar: "bg-amber-50/70 dark:bg-amber-950/25 border-amber-200/50 dark:border-amber-800/30",   accent: "bg-amber-500",   iconCls: "text-amber-500 dark:text-amber-400",   prefixCls: "text-amber-600 dark:text-amber-400",   dotActive: "bg-amber-500",   Icon: RiAlertLine },
-    error:   { bar: "bg-rose-50/70 dark:bg-rose-950/25 border-rose-200/50 dark:border-rose-800/30",    accent: "bg-rose-500",    iconCls: "text-rose-500 dark:text-rose-400",    prefixCls: "text-rose-600 dark:text-rose-400",    dotActive: "bg-rose-500",    Icon: RiAlertLine },
-  };
-  const cfg = TYPE_CFG[annType] ?? TYPE_CFG.info;
-  const { Icon } = cfg;
-
   if (!visible) return null;
 
   const annUrl = isHome && homeEnabled ? (settings.home_announcement_url || "") : "";
+  const current = items[activeIdx] ?? items[0];
 
-  const textContent = (
+  const textSpan = (
     <span
-      className={`flex-1 text-center truncate text-foreground/75`}
-      style={{ opacity: fading ? 0 : 1, transition: "opacity 0.35s ease" }}
+      className="flex-1 min-w-0 truncate"
+      style={{
+        opacity: fading ? 0 : 1,
+        transition: "opacity 0.35s ease",
+        color: current.color || undefined,
+        fontWeight: current.bold ? "700" : undefined,
+        fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "13px" : undefined,
+      }}
     >
-      <span className={`font-bold mr-1.5 ${cfg.prefixCls}`}>公告</span>
-      <span className="text-foreground/50 mr-1.5">·</span>
-      {items[activeIdx]}
+      {current.text}
     </span>
   );
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-[60] flex items-center gap-2 px-3 h-8 text-xs font-medium border-b backdrop-blur-md ${cfg.bar}`}>
-      {/* Left accent stripe */}
-      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm ${cfg.accent}`} />
+    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center gap-2 px-3 h-8 text-xs font-medium border-b border-border/20 bg-background/80 backdrop-blur-md">
+      {/* Animated bell icon */}
+      <RiBellLine
+        className="w-3.5 h-3.5 shrink-0 text-foreground/40"
+        style={{ animation: "ann-bell 5s ease-in-out infinite" }}
+      />
 
-      {/* Type icon */}
-      <Icon className={`w-3.5 h-3.5 shrink-0 ml-2 ${cfg.iconCls}`} />
+      {/* "公告" label */}
+      <span className="font-semibold text-foreground/50 shrink-0">公告</span>
+      <span className="text-foreground/25 shrink-0">·</span>
 
-      {/* Clickable text (if URL set) or plain text */}
+      {/* Item text */}
       {annUrl ? (
-        <Link href={annUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 hover:opacity-75 transition-opacity">
-          {textContent}
+        <Link href={annUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 hover:opacity-75 transition-opacity flex items-center">
+          {textSpan}
         </Link>
-      ) : textContent}
+      ) : textSpan}
 
-      {/* Dots indicator for multiple items */}
+      {/* Dots for multiple items */}
       {items.length > 1 && (
         <div className="flex items-center gap-1 shrink-0">
           {items.map((_, i) => (
             <div
               key={i}
-              className={`rounded-full transition-all duration-300 ${i === activeIdx ? `w-3 h-1.5 ${cfg.dotActive}` : "w-1.5 h-1.5 bg-foreground/15"}`}
+              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1.5 bg-foreground/40" : "w-1.5 h-1.5 bg-foreground/15"}`}
             />
           ))}
         </div>
       )}
 
-      {/* Close button */}
+      {/* Close */}
       <button
         onClick={handleDismiss}
         className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-foreground/40 hover:text-foreground/80"
