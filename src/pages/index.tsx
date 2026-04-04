@@ -102,7 +102,8 @@ const DEFAULT_SEO: HomeSeo = {
 export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
   const seo = seoProp ?? DEFAULT_SEO;
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const isChinese = locale === "zh";
   const settings = useSiteSettings();
   const stats = usePublicStats(seo.showStats);
 
@@ -188,8 +189,8 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
       />
     </Head>
     <div className="w-full">
-      <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 min-h-[calc(100vh-4rem)]">
-        {/* Search box */}
+      {/* ── Desktop layout ───────────────────────────────────────────────── */}
+      <main className="hidden sm:block w-full max-w-5xl mx-auto px-6 py-6 min-h-[calc(100vh-4rem)]">
         <div className="mb-3">
           <div className="relative group">
             <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
@@ -197,14 +198,11 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               <KeyboardShortcut k="/" />
             </div>
           </div>
-          <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
+          <SearchHotkeysText className="flex mt-2 px-1 justify-end" />
         </div>
 
-        {/* Stats bar */}
         {seo.showStats && stats && (
-          <div
-            className="flex justify-center gap-6 mt-3 mb-1"
-          >
+          <div className="flex justify-center gap-6 mt-3 mb-1">
             <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
               <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
               {t("home.stats_total")}
@@ -217,14 +215,68 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           </div>
         )}
 
-        {/* Mobile: centered brand display */}
-        <div
-          className="sm:hidden flex items-center justify-center"
-          style={{ height: "calc(100vh - 22rem)" }}
-        >
+        <div className="flex items-center justify-center" style={{ height: "calc(100vh - 22rem)" }}>
           <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
         </div>
       </main>
+
+      {/* ── Mobile layout (one viewport, no scroll) ──────────────────────── */}
+      <div className="sm:hidden flex flex-col w-full px-4" style={{ height: "calc(100dvh - 4rem)", paddingTop: "1.25rem", paddingBottom: "1.5rem" }}>
+
+        {/* Brand: fills top flex space */}
+        <div className="flex flex-1 items-center justify-center">
+          <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
+        </div>
+
+        {/* Stats */}
+        {seo.showStats && stats && (
+          <div className="flex justify-center gap-5 mb-3">
+            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+              <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
+              {t("home.stats_total")}
+            </span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+              <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
+              {t("home.stats_today")}
+            </span>
+          </div>
+        )}
+
+        {/* Search box */}
+        <div className="relative group mb-4">
+          <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
+            <KeyboardShortcut k="/" />
+          </div>
+        </div>
+
+        {/* Quick-access tool links */}
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {(isChinese
+            ? [
+                { href: "/dns", label: "DNS 查询" },
+                { href: "/ip",  label: "IP 查询" },
+                { href: "/ssl", label: "SSL 证书" },
+                { href: "/icp", label: "ICP 备案" },
+              ]
+            : [
+                { href: "/dns", label: "DNS Lookup" },
+                { href: "/ip",  label: "IP Lookup" },
+                { href: "/ssl", label: "SSL Check" },
+                { href: "/icp", label: "ICP Query" },
+              ]
+          ).map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors bg-background/50"
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
     </>
   );
