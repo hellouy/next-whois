@@ -584,8 +584,8 @@ export default function AdminUsersPage() {
       toast.success(`已${actionLabels[action]} ${data.affected} 名用户`);
       setSelectedIds(new Set());
       load(search, activeFilter, 0);
-    } catch (e: any) {
-      toast.error(e.message || "批量操作失败");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "批量操作失败");
     } finally {
       setBulkLoading(false);
     }
