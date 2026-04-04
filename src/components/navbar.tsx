@@ -323,9 +323,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: "nav_section_tools",
     items: [
-      { labelKey: "nav_domain_lookup", descKey: "nav_domain_lookup_desc", href: "/",          icon: <RiGlobalLine className="h-6 w-6" /> },
-      { labelKey: "nav_tools",         descKey: "nav_tools_desc",         subPanel: "tools",  icon: <RiToolsLine className="h-6 w-6" /> },
-      { labelKey: "nav_directory",     descKey: "nav_directory_desc",     href: "/directory", icon: <RiCompassLine className="h-6 w-6" /> },
+      { labelKey: "nav_domain_lookup",  descKey: "nav_domain_lookup_desc",  href: "/",           icon: <RiGlobalLine className="h-6 w-6" /> },
+      { labelKey: "nav_tools",          descKey: "nav_tools_desc",           subPanel: "tools",   icon: <RiToolsLine className="h-6 w-6" /> },
+      { labelKey: "nav_directory",      descKey: "nav_directory_desc",       href: "/directory",  icon: <RiCompassLine className="h-6 w-6" /> },
+      { labelKey: "nav_search_history", descKey: "nav_search_history",       subPanel: "history", icon: <RiHistoryLine className="h-6 w-6" /> },
     ],
   },
   {
@@ -343,12 +344,59 @@ export function NavDrawer() {
   const [open, setOpen] = React.useState(false);
   const [subPanel, setSubPanel] = React.useState<string | null>(null);
   const settings = useSiteSettings();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const isChinese = locale === "zh" || locale === "zh-tw";
   const logoText = settings.site_logo_text || "X.RW";
 
+  // ── History sub-panel state ────────────────────────────────────────────
+  const [histMounted, setHistMounted] = React.useState(false);
+  const [histRefreshTick, setHistRefreshTick] = React.useState(0);
+
   React.useEffect(() => {
-    if (!open) setSubPanel(null);
+    if (!open) { setSubPanel(null); return; }
+    setHistMounted(true);
   }, [open]);
+
+  const allHistory = React.useMemo(() => {
+    if (!histMounted) return [];
+    return listHistory().sort((a, b) => b.timestamp - a.timestamp);
+  }, [histMounted, histRefreshTick, subPanel]);
+
+  const histGrouped = React.useMemo(() => {
+    const groups: { label: string; items: typeof allHistory }[] = [];
+    if (!allHistory.length) return groups;
+    let curLabel = "";
+    let curItems: typeof allHistory = [];
+    for (const item of allHistory) {
+      const date = new Date(item.timestamp);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today.getTime() - 86400000);
+      const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      let label: string;
+      if (d.getTime() === today.getTime()) label = t("today");
+      else if (d.getTime() === yesterday.getTime()) label = t("yesterday");
+      else if (isChinese) label = date.getFullYear() === now.getFullYear() ? format(date, "M月d日") : format(date, "yyyy年M月d日");
+      else label = date.getFullYear() === now.getFullYear() ? format(date, "MMM d") : format(date, "MMM d, yyyy");
+      if (label !== curLabel) {
+        if (curItems.length) groups.push({ label: curLabel, items: curItems });
+        curLabel = label;
+        curItems = [item];
+      } else {
+        curItems.push(item);
+      }
+    }
+    if (curItems.length) groups.push({ label: curLabel, items: curItems });
+    return groups;
+  }, [allHistory, isChinese, t]);
+
+  const handleHistDelete = React.useCallback((e: React.MouseEvent, query: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    removeHistory(query);
+    setHistRefreshTick(v => v + 1);
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────
 
   const visibleGroups = NAV_GROUPS.map(group => ({
     ...group,
@@ -476,7 +524,7 @@ export function NavDrawer() {
                 </p>
               </div>
             </motion.div>
-          ) : (
+          ) : subPanel === "tools" ? (
             <motion.div
               key="tools-sub"
               initial={{ x: "100%", opacity: 0 }}
@@ -545,6 +593,104 @@ export function NavDrawer() {
                 </DrawerClose>
               </div>
             </motion.div>
+          ) : (
+            /* ── History sub-panel ── */
+            <motion.div
+              key="history-sub"
+              initial={{ x: "100%", opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              className="px-4 pt-2 pb-8 flex flex-col"
+              style={{ maxHeight: "70vh" }}
+            >
+              <div className="flex items-center gap-2 mb-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSubPanel(null)}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors touch-manipulation text-muted-foreground hover:text-foreground"
+                >
+                  <RiArrowLeftSLine className="h-5 w-5" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <RiHistoryLine className="h-4 w-4" />
+                  </div>
+                  <p className="text-sm font-semibold leading-tight">{t("nav_search_history")}</p>
+                </div>
+                <div className="ml-auto">
+                  <DrawerClose asChild>
+                    <button className="rounded-full p-1.5 hover:bg-muted transition-colors touch-manipulation">
+                      <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DrawerClose>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1">
+                {allHistory.length > 0 ? (
+                  <div className="space-y-1">
+                    {histGrouped.map((group) => (
+                      <div key={group.label}>
+                        <div className="flex items-center gap-3 py-2 px-1">
+                          <div className="h-px flex-1 bg-border" />
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">{group.label}</span>
+                          <div className="h-px flex-1 bg-border" />
+                        </div>
+                        {group.items.map((item) => {
+                          const rs = item.regStatus ?? "unknown";
+                          const statusCfg: Record<string, { label: string; cls: string }> = {
+                            registered:   { label: t("history_registered"),   cls: "text-emerald-600 border-emerald-300/70 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-700/40" },
+                            unregistered: { label: t("history_unregistered"), cls: "text-sky-600 border-sky-300/70 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-700/40" },
+                            reserved:     { label: t("history_reserved"),     cls: "text-amber-600 border-amber-300/70 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700/40" },
+                            error:        { label: t("history_error"),        cls: "text-rose-600 border-rose-300/70 bg-rose-50 dark:bg-rose-950/30 dark:border-rose-700/40" },
+                            unknown:      { label: t("history_unknown"),      cls: "text-muted-foreground border-border bg-muted/50" },
+                          };
+                          const cfg = statusCfg[rs] ?? statusCfg.unknown;
+                          return (
+                            <DrawerClose asChild key={`${item.query}-${item.timestamp}`}>
+                              <Link
+                                href={item.query ? toSearchURI(item.query) : "/"}
+                                className="group flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted/50 active:bg-muted transition-colors touch-manipulation"
+                              >
+                                <div className="w-7 h-7 rounded-md grid place-items-center border border-border bg-muted/20 shrink-0">
+                                  <HistoryTypeIcon type={item.queryType} />
+                                </div>
+                                <span className="text-sm font-medium truncate flex-1 min-w-0 uppercase">{item.query}</span>
+                                {item.queryType === "domain" ? (
+                                  <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${cfg.cls}`}>
+                                    {cfg.label}
+                                  </span>
+                                ) : (
+                                  <Badge variant="outline" className="text-[8px] px-1.5 py-0 uppercase tracking-wider shrink-0">
+                                    {item.queryType}
+                                  </Badge>
+                                )}
+                                <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                                  {format(item.timestamp, "h:mm a")}
+                                </span>
+                                <button
+                                  className="opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-50 transition-opacity p-1.5 -mr-0.5 rounded-lg hover:bg-destructive/10 active:bg-destructive/20 shrink-0 touch-manipulation"
+                                  onClick={(e) => handleHistDelete(e, item.query)}
+                                >
+                                  <RiDeleteBinLine className="w-3.5 h-3.5 text-muted-foreground group-hover:text-destructive [@media(hover:none)]:text-muted-foreground/70" />
+                                </button>
+                              </Link>
+                            </DrawerClose>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <RiHistoryLine className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">{t("no_history_title")}</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">{t("no_history_description")}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </DrawerContent>
@@ -557,20 +703,42 @@ function UserButton() {
   const { t } = useTranslation();
   const settings = useSiteSettings();
   const [open, setOpen] = React.useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
   const email = (session?.user as any)?.email as string | undefined;
-  const userId = (session?.user as any)?.id as string | undefined;
   const isAdminUser = !!email && email.toLowerCase().trim() === ADMIN_EMAIL;
 
   const loginDisabled  = settings.disable_login   === "1";
   const queryOnlyMode  = settings.query_only_mode  === "1";
 
+  // Close on outside tap/click (works on both desktop and mobile)
   React.useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
+      setOpen(false);
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [open]);
+
+  const handleToggle = React.useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      // Position dropdown using fixed coords so it escapes the overflow:hidden navbar wrapper
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+        zIndex: 9999,
+        width: 192,
+      });
+    }
+    setOpen(v => !v);
   }, []);
 
 
@@ -599,10 +767,11 @@ function UserButton() {
   const initials = name.slice(0, 1).toUpperCase();
 
   return (
-    <div ref={ref} className="relative inline-flex">
+    <div className="relative inline-flex">
       <motion.button
         {...TAP}
-        onClick={() => setOpen(v => !v)}
+        ref={buttonRef}
+        onClick={handleToggle}
         className={cn(
           "w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center touch-manipulation",
           isAdminUser
@@ -620,7 +789,8 @@ function UserButton() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: -4 }}
             transition={{ duration: 0.14 }}
-            className="absolute right-0 top-8 w-48 bg-background border border-border rounded-xl shadow-lg overflow-hidden z-50"
+            style={dropdownStyle}
+            className="bg-background border border-border rounded-xl shadow-lg overflow-hidden"
           >
             <div className="px-3 py-2 border-b border-border/50">
               <p className="text-[10px] text-muted-foreground truncate">{email}</p>
@@ -720,7 +890,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <LanguageSwitcher />
-          <motion.div {...TAP} style={{ display: "inline-flex" }}>
+          <motion.div {...TAP} className="hidden sm:inline-flex">
             <Link
               href="/directory"
               className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation"
@@ -730,7 +900,9 @@ export function Navbar() {
             </Link>
           </motion.div>
           <UserButton />
-          <HistoryDrawer />
+          <div className="hidden sm:block">
+            <HistoryDrawer />
+          </div>
           <NavDrawer />
         </div>
       </motion.nav>
