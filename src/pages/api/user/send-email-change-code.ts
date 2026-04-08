@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { setRedisValue, getRedisValue } from "@/lib/server/redis";
+import { setRedisValue, getRedisValue, deleteRedisValue } from "@/lib/server/redis";
 import { sendEmail, verifyCodeHtml, getSiteLabel } from "@/lib/email";
 import { isDbReady, one } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -41,15 +41,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const storeKey = `email-change:${currentEmail}:${cleanNew}`;
+
   await setRedisValue(storeKey, code, 600);
   await setRedisValue(rateLimitKey, "1", 60);
 
   const siteName = await getSiteLabel().catch(() => "X.RW");
-  await sendEmail({
-    to: cleanNew,
-    subject: `${code} 是你的 ${siteName} 邮箱更换验证码`,
-    html: verifyCodeHtml({ code, email: cleanNew, siteName }),
-  });
+  try {
+    await sendEmail({
+      to: cleanNew,
+      subject: `${code} 是你的 ${siteName} 邮箱更换验证码`,
+      html: verifyCodeHtml({ code, email: cleanNew, siteName }),
+    });
+  } catch (e: any) {
+    // Roll back stored code and rate-limit key so the user can retry immediately
+    await deleteRedisValue(storeKey).catch(() => {});
+    await deleteRedisValue(rateLimitKey).catch(() => {});
+    console.error("[send-email-change-code] sendEmail failed:", e.message);
+    return res.status(500).json({ error: "验证码发送失败，请检查邮箱地址后重试" });
+  }
 
   return res.status(200).json({ ok: true });
 }

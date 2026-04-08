@@ -5119,3 +5119,55 @@ Added `expired_verify_codes` cleanup to the `db_optimize` action:
 ```sql
 DELETE FROM verify_codes WHERE expires_at < NOW()
 ```
+
+---
+
+## Session — 2026-04-08 (续): 竞态条件 + 安全修复
+
+### Bug 1 (Security): reset-password.ts — TOCTOU 竞态条件
+**原问题:** 先 SELECT 检查 `used = false`，再单独 `UPDATE SET used = true`。两步之间并发请求可重复使用同一密码重置令牌，双重执行密码重置。
+
+**修复:** 单条原子 SQL:
+```sql
+UPDATE password_reset_tokens SET used = true
+WHERE token = $1 AND used = false AND expires_at > NOW()
+RETURNING id, user_id
+```
+返回 null → 令牌已使用/过期/不存在（再做一次 SELECT 提供具体错误消息）。
+密码重置失败时回滚令牌状态。新增 IP 速率限制 (5次/15分钟)。
+
+### Bug 2 (Security): redeem-code.ts — 激活码 TOCTOU 竞态条件
+**原问题:** `SELECT used ... WHERE code = $1` → 检查通过 → `UPDATE SET used = true` 两步非原子。并发请求可双重兑换激活码（两人同时拿到订阅/余额）。
+
+**修复:** 先 SELECT 取回 id 和具体状态（用于错误消息），再用原子 UPDATE:
+```sql
+UPDATE activation_codes SET used = true, used_by = $1, used_at = NOW()
+WHERE id = $2 AND used = false AND (expires_at IS NULL OR expires_at > NOW())
+RETURNING id, plan_name, ...
+```
+返回 null → 被并发抢先 → 409。
+
+### Bug 3 (Security): apply-invite-code.ts — 邀请码 TOCTOU 竞态条件
+**原问题:** `SELECT use_count, max_uses` → 检查 `use_count < max_uses` → `UPDATE use_count + 1`。并发请求可超出 max_uses 上限（多人同时用满额码）。
+
+**修复:** 预检 SELECT 取 id + 状态 → 原子 UPDATE:
+```sql
+UPDATE invite_codes SET use_count = use_count + 1
+WHERE id = $1 AND is_active = true AND use_count < max_uses
+AND (expires_at IS NULL OR expires_at > NOW())
+RETURNING id
+```
+返回 null → 并发抢先耗尽 → 400。
+
+### Bug 4 (UX): send-email-change-code.ts — sendEmail 无 try/catch
+**原问题:** `await sendEmail(...)` 未包裹，邮件服务异常时直接抛出导致 500 无友好提示，且已写入 Redis 的验证码和速率限制 key 不会被清理，用户需等 60 秒才能重试。
+
+**修复:** 包裹 try/catch，发送失败时:
+- 删除 `email-change:${currentEmail}:${cleanNew}` key
+- 删除 `email-change-rate:${currentEmail}` key（让用户可立即重试）
+- 返回 500 + 中文友好提示
+
+### Bug 5 (Security): delete-account.ts — 管理员保护用编译时常量
+**原问题:** `if (email === ADMIN_EMAIL)` 只比对 `process.env.ADMIN_EMAIL` 环境变量。若管理员邮箱已通过 DB (`site_settings.admin_email`) 更新为其他地址，该账户不受保护可被删除。
+
+**修复:** 替换为 `await isAdminEmail(email)` — 同时检查 DB 值和环境变量，与其他鉴权逻辑一致。

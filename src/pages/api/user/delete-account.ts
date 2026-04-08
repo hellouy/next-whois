@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { isAdminEmail } from "@/lib/admin-server";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "DELETE") return res.status(405).end();
@@ -21,7 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const email = session.user.email;
 
-  if (email === ADMIN_EMAIL) {
+  // Guard against deleting the admin account — check both the env-var fallback
+  // and the DB-backed admin email (which may differ from the env var).
+  if (await isAdminEmail(email)) {
     return res.status(403).json({ error: "创始人账户无法删除" });
   }
 
