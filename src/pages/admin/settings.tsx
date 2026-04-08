@@ -14,38 +14,63 @@ import {
   RiEyeLine, RiEyeOffLine, RiSaveLine, RiRefreshLine,
   RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
   RiPaletteLine, RiSendPlane2Line, RiAlertLine, RiInformationLine,
-  RiAddLine, RiDeleteBinLine,
+  RiAddLine, RiDeleteBinLine, RiSearchLine,
 } from "@remixicon/react";
 
 type TabKey =
   | "branding"
   | "access"
   | "features"
-  | "home"
   | "analytics"
   | "captcha"
   | "email"
   | "payment";
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: "branding",  label: "品牌外观",  icon: RiPaletteLine },
-  { key: "access",    label: "访问控制",  icon: RiLockLine },
-  { key: "features",  label: "功能开关",  icon: RiSettings4Line },
-  { key: "home",      label: "首页内容",  icon: RiHomeLine },
-  { key: "analytics", label: "统计分析",  icon: RiBarChartLine },
-  { key: "captcha",   label: "验证码",    icon: RiShieldCheckLine },
-  { key: "email",     label: "邮件配置",  icon: RiMailLine },
-  { key: "payment",   label: "支付配置",  icon: RiBankCardLine },
+  { key: "branding",  label: "外观与首页", icon: RiPaletteLine },
+  { key: "access",    label: "访问控制",   icon: RiLockLine },
+  { key: "features",  label: "功能开关",   icon: RiSettings4Line },
+  { key: "analytics", label: "统计分析",   icon: RiBarChartLine },
+  { key: "captcha",   label: "验证码",     icon: RiShieldCheckLine },
+  { key: "email",     label: "邮件配置",   icon: RiMailLine },
+  { key: "payment",   label: "支付配置",   icon: RiBankCardLine },
 ];
 
-function SectionTitle({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc?: string }) {
+// ── Effect-location badge — shows admins where a setting takes effect ─────────
+type EffectScope = "全站" | "首页" | "结果页" | "SEO" | "社交分享" | "后台" | "顶部公告";
+const EFFECT_COLORS: Record<EffectScope, string> = {
+  "全站":   "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/40",
+  "首页":   "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40",
+  "结果页": "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/40",
+  "SEO":    "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border-orange-200/60 dark:border-orange-800/40",
+  "社交分享":"bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 border-cyan-200/60 dark:border-cyan-800/40",
+  "后台":   "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200/60 dark:border-red-800/40",
+  "顶部公告":"bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40",
+};
+function EffectBadge({ scope }: { scope: EffectScope }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold border shrink-0 tracking-wide",
+      EFFECT_COLORS[scope],
+    )}>
+      {scope}
+    </span>
+  );
+}
+
+function SectionTitle({
+  icon: Icon, title, desc, effect,
+}: { icon: React.ElementType; title: string; desc?: string; effect?: EffectScope }) {
   return (
     <div className="flex items-start gap-3 mb-5">
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
         <Icon className="w-4 h-4 text-primary" />
       </div>
-      <div>
-        <h3 className="text-sm font-bold">{title}</h3>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm font-bold">{title}</h3>
+          {effect && <EffectBadge scope={effect} />}
+        </div>
         {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
       </div>
     </div>
@@ -297,73 +322,207 @@ function SelectField({ label, desc, value, onChange, options }: {
 function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
   return (
     <div className="space-y-6">
+
+      {/* ── 站点基本信息 ──────────────────────────────────────── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiGlobalLine} title="基本信息" desc="站点名称、标题、描述等基础信息" />
+        <SectionTitle
+          icon={RiGlobalLine}
+          title="站点基本信息"
+          effect="全站"
+          desc="导航栏 Logo、浏览器标签页标题、页脚版权文字，保存后立即全站生效"
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="站点标题">
-            <Input value={s.site_title} onChange={e => set("site_title", e.target.value)} placeholder="X.RW · RDAP+WHOIS" className="text-xs" />
-          </Field>
-          <Field label="站点副标题">
-            <Input value={s.site_subtitle} onChange={e => set("site_subtitle", e.target.value)} placeholder="专业的 WHOIS / RDAP 查询工具" className="text-xs" />
-          </Field>
-          <Field label="Logo 文字">
+          <Field label="Logo 文字" desc="显示在导航栏左上角">
             <Input value={s.site_logo_text} onChange={e => set("site_logo_text", e.target.value)} placeholder="X.RW" className="text-xs" />
           </Field>
-          <Field label="图标 URL" desc="浏览器标签页图标">
+          <Field label="站点标题" desc="浏览器标签页 / SEO title">
+            <Input value={s.site_title} onChange={e => set("site_title", e.target.value)} placeholder="X.RW · RDAP+WHOIS" className="text-xs" />
+          </Field>
+          <Field label="站点副标题" desc="首页 Logo 下方小字 & 导航栏 tagline">
+            <Input value={s.site_subtitle} onChange={e => set("site_subtitle", e.target.value)} placeholder="专业的 WHOIS / RDAP 查询工具" className="text-xs" />
+          </Field>
+          <Field label="Favicon 图标 URL" desc="浏览器标签页图标（建议 32×32 PNG 或 SVG）">
             <Input value={s.site_icon_url} onChange={e => set("site_icon_url", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
         </div>
-        <TextareaField label="站点描述" desc="用于 SEO meta description" value={s.site_description} onChange={v => set("site_description", v)} placeholder="快速查询域名、IP、ASN 的 WHOIS / RDAP 信息..." />
-        <Field label="关键词" desc="用于 SEO meta keywords，逗号分隔">
-          <Input value={s.site_keywords} onChange={e => set("site_keywords", e.target.value)} placeholder="Whois, RDAP, Domain..." className="text-xs" />
-        </Field>
-        <Field label="页脚文字">
-          <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 X.RW" className="text-xs" />
-        </Field>
-        <Field label="全局公告" desc="显示在站点顶部的公告文字（留空则不显示）">
-          <Input value={s.site_announcement} onChange={e => set("site_announcement", e.target.value)} placeholder="站点公告内容..." className="text-xs" />
+        <Field label="页脚文字" desc="显示在所有页面底部（© 版权行）">
+          <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 X.RW · WHOIS & RDAP Lookup Service" className="text-xs" />
         </Field>
       </div>
 
+      {/* ── 首页 Hero ────────────────────────────────────────── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiImageLine} title="OG / Social 分享" desc="社交媒体分享时的预览信息" />
+        <SectionTitle
+          icon={RiHomeLine}
+          title="首页 Hero 区域"
+          effect="首页"
+          desc="首页居中展示的大标题、副标题和搜索框占位文字，保存后首页刷新即生效"
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="OG 站点名称">
+          <Field label="主标题" desc="首页居中大字（留空则使用 Logo 文字）">
+            <Input value={s.home_hero_title} onChange={e => set("home_hero_title", e.target.value)} placeholder="（默认使用 Logo 文字）" className="text-xs" />
+          </Field>
+          <Field label="副标题" desc="主标题下方小字（留空则使用站点副标题）">
+            <Input value={s.home_hero_subtitle} onChange={e => set("home_hero_subtitle", e.target.value)} placeholder="（默认使用站点副标题）" className="text-xs" />
+          </Field>
+          <Field label="搜索框占位文字" desc="搜索框内的提示文字">
+            <Input value={s.home_placeholder} onChange={e => set("home_placeholder", e.target.value)} placeholder="搜索域名、IPv4、IPv6、ASN 或 CIDR" className="text-xs" />
+          </Field>
+        </div>
+        <Toggle
+          label="显示查询统计数字"
+          desc="在首页搜索框下方显示总查询次数和今日查询次数"
+          checked={s.home_show_stats === "1"}
+          onChange={v => set("home_show_stats", v ? "1" : "")}
+        />
+      </div>
+
+      {/* ── 顶部公告 ─────────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiBellLine}
+          title="顶部公告横幅"
+          effect="顶部公告"
+          desc="显示在所有页面最顶部的公告栏，用户可手动关闭；首页专属公告仅在首页展示"
+        />
+        <Field label="全局公告文字" desc="显示在所有页面顶部（非首页），留空则不显示">
+          <Input value={s.site_announcement} onChange={e => set("site_announcement", e.target.value)} placeholder="全站公告内容，留空不显示…" className="text-xs" />
+        </Field>
+        <div className="border-t border-border/40 pt-4 space-y-4">
+          <p className="text-[11px] text-muted-foreground font-medium">首页专属公告（仅在首页显示，用户关闭后记住状态）</p>
+          <Toggle
+            label="启用首页专属公告"
+            checked={s.home_announcement_enabled === "1"}
+            onChange={v => set("home_announcement_enabled", v ? "1" : "")}
+          />
+          <Field label="首页公告内容" desc="支持多条，用 | 分隔，自动循环淡入淡出播放">
+            <MultiItemInput
+              value={s.home_announcement_text}
+              onChange={v => set("home_announcement_text", v)}
+              placeholder="首页公告文字，多条用 | 分隔…"
+            />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SelectField
+              label="公告类型"
+              value={s.home_announcement_type}
+              onChange={v => set("home_announcement_type", v)}
+              options={[
+                { value: "info",    label: "info — 蓝色信息" },
+                { value: "success", label: "success — 绿色成功" },
+                { value: "warning", label: "warning — 黄色警告" },
+                { value: "error",   label: "error — 红色错误" },
+              ]}
+            />
+            <Field label="公告点击跳转链接（可选）" desc="点击公告文字时跳转的 URL">
+              <Input value={s.home_announcement_url} onChange={e => set("home_announcement_url", e.target.value)} placeholder="https://..." className="text-xs" />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 结果页推广 ───────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiLinksLine}
+          title="结果页推广条"
+          effect="结果页"
+          desc="在域名 WHOIS 查询结果页底部显示推广文字/广告链接，保存后结果页刷新即生效"
+        />
+        <Toggle
+          label="启用结果页推广条"
+          checked={s.result_ad_enabled === "1"}
+          onChange={v => set("result_ad_enabled", v ? "1" : "")}
+        />
+        <Field label="推广文字" desc="支持多条，用 | 分隔，自动循环展示">
+          <MultiItemInput
+            value={s.result_ad_text}
+            onChange={v => set("result_ad_text", v)}
+            placeholder="推广/广告文字，多条用 | 分隔…"
+          />
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="点击跳转链接" desc="点击推广条时跳转的 URL">
+            <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
+          </Field>
+          <Field label="推广标签文字" desc="显示在推广条最左侧的小标签">
+            <Input value={s.result_ad_label} onChange={e => set("result_ad_label", e.target.value)} placeholder="广告" className="text-xs" />
+          </Field>
+        </div>
+      </div>
+
+      {/* ── SEO ──────────────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiSearchLine}
+          title="SEO / 搜索引擎优化"
+          effect="SEO"
+          desc="搜索引擎抓取时使用的描述和关键词，影响搜索结果排名和摘要展示"
+        />
+        <TextareaField
+          label="站点描述"
+          desc="浏览器收藏夹提示 & 搜索结果摘要（建议 80–160 字符）"
+          value={s.site_description}
+          onChange={v => set("site_description", v)}
+          placeholder="快速查询域名、IP、ASN 的 WHOIS / RDAP 信息..."
+        />
+        <Field label="关键词" desc="用于 meta keywords，逗号分隔（对现代搜索引擎影响较小）">
+          <Input value={s.site_keywords} onChange={e => set("site_keywords", e.target.value)} placeholder="Whois, RDAP, Domain Lookup..." className="text-xs" />
+        </Field>
+      </div>
+
+      {/* ── 社交分享 ─────────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiImageLine}
+          title="社交媒体分享"
+          effect="社交分享"
+          desc="在微信、Twitter/X、Facebook 等平台分享链接时显示的预览卡片信息"
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="站点名称" desc="分享卡片上显示的站点名">
             <Input value={s.og_site_name} onChange={e => set("og_site_name", e.target.value)} placeholder="X.RW" className="text-xs" />
           </Field>
-          <Field label="站点 URL">
+          <Field label="站点 URL" desc="分享卡片的链接地址（影响 canonical URL）">
             <Input value={s.og_url} onChange={e => set("og_url", e.target.value)} placeholder="https://x.rw" className="text-xs" />
           </Field>
-          <Field label="OG 封面图" desc="默认分享封面图 URL">
+          <Field label="默认封面图" desc="未指定平台时使用的分享封面（OG image）">
             <Input value={s.og_image} onChange={e => set("og_image", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
-          <Field label="Twitter 封面图">
+          <Field label="Twitter/X 封面图" desc="Twitter Card 专用封面图">
             <Input value={s.og_image_twitter} onChange={e => set("og_image_twitter", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
-          <Field label="微信封面图">
+          <Field label="微信封面图" desc="微信分享链接卡片专用封面图">
             <Input value={s.og_image_wechat} onChange={e => set("og_image_wechat", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
-          <Field label="Facebook 封面图">
+          <Field label="Facebook 封面图" desc="Facebook 分享卡片专用封面图">
             <Input value={s.og_image_facebook} onChange={e => set("og_image_facebook", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
         </div>
         <SelectField
-          label="Twitter Card 类型"
+          label="Twitter Card 样式"
           value={s.twitter_card}
           onChange={v => set("twitter_card", v)}
           options={[
-            { value: "summary", label: "summary — 小卡片" },
-            { value: "summary_large_image", label: "summary_large_image — 大图卡片" },
+            { value: "summary", label: "summary — 小图标卡片" },
+            { value: "summary_large_image", label: "summary_large_image — 大图卡片（推荐）" },
           ]}
         />
       </div>
 
+      {/* ── 管理员 ───────────────────────────────────────────── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiUserLine} title="管理员" desc="管理员邮箱配置" />
-        <Field label="管理员邮箱" desc="拥有后台管理权限的邮箱地址（修改后需重新登录）">
+        <SectionTitle
+          icon={RiUserLine}
+          title="管理员账号"
+          effect="后台"
+          desc="具有后台管理权限的邮箱，修改后需使用新邮箱重新登录"
+        />
+        <Field label="管理员邮箱" desc="修改后当前 session 仍然有效，下次登录或重新登录时生效">
           <Input value={s.admin_email} onChange={e => set("admin_email", e.target.value)} placeholder="admin@example.com" type="email" className="text-xs" />
         </Field>
       </div>
+
     </div>
   );
 }
@@ -460,89 +619,6 @@ function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
             onChange={v => set(f.key, v ? "1" : "")}
           />
         ))}
-      </div>
-    </div>
-  );
-}
-
-function HomeTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiHomeLine} title="Hero 区域" desc="首页顶部大标题区域的文案" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="主标题" desc="留空使用默认文字">
-            <Input value={s.home_hero_title} onChange={e => set("home_hero_title", e.target.value)} placeholder="（使用默认）" className="text-xs" />
-          </Field>
-          <Field label="副标题">
-            <Input value={s.home_hero_subtitle} onChange={e => set("home_hero_subtitle", e.target.value)} placeholder="（使用默认）" className="text-xs" />
-          </Field>
-          <Field label="搜索框占位文字">
-            <Input value={s.home_placeholder} onChange={e => set("home_placeholder", e.target.value)} placeholder="（使用默认）" className="text-xs" />
-          </Field>
-        </div>
-        <Toggle
-          label="显示统计数据"
-          desc="在首页 Hero 区域显示查询次数等统计信息"
-          checked={s.home_show_stats === "1"}
-          onChange={v => set("home_show_stats", v ? "1" : "")}
-        />
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBellLine} title="首页公告横幅" desc="在首页搜索框上方显示可关闭的公告横幅" />
-        <Toggle
-          label="启用首页公告"
-          checked={s.home_announcement_enabled === "1"}
-          onChange={v => set("home_announcement_enabled", v ? "1" : "")}
-        />
-        <Field label="公告内容" desc="支持添加多条，自动循环淡入淡出播放">
-          <MultiItemInput
-            value={s.home_announcement_text}
-            onChange={v => set("home_announcement_text", v)}
-            placeholder="公告文字内容..."
-          />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <SelectField
-            label="公告类型"
-            value={s.home_announcement_type}
-            onChange={v => set("home_announcement_type", v)}
-            options={[
-              { value: "info",    label: "info — 蓝色信息" },
-              { value: "success", label: "success — 绿色成功" },
-              { value: "warning", label: "warning — 黄色警告" },
-              { value: "error",   label: "error — 红色错误" },
-            ]}
-          />
-          <Field label="点击链接（可选）">
-            <Input value={s.home_announcement_url} onChange={e => set("home_announcement_url", e.target.value)} placeholder="https://..." className="text-xs" />
-          </Field>
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiLinksLine} title="结果页广告条" desc="在查询结果页顶部显示广告/推广链接" />
-        <Toggle
-          label="启用结果页广告条"
-          checked={s.result_ad_enabled === "1"}
-          onChange={v => set("result_ad_enabled", v ? "1" : "")}
-        />
-        <Field label="广告文字" desc="支持添加多条，自动循环展示">
-          <MultiItemInput
-            value={s.result_ad_text}
-            onChange={v => set("result_ad_text", v)}
-            placeholder="查询结果页广告文字..."
-          />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="广告链接">
-            <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
-          </Field>
-          <Field label="广告标签" desc="显示在广告条左侧的小标签">
-            <Input value={s.result_ad_label} onChange={e => set("result_ad_label", e.target.value)} placeholder="广告" className="text-xs" />
-          </Field>
-        </div>
       </div>
     </div>
   );
@@ -1063,7 +1139,6 @@ export default function AdminSettingsPage() {
           {tab === "branding"  && <BrandingTab {...tabProps} />}
           {tab === "access"    && <AccessTab {...tabProps} />}
           {tab === "features"  && <FeaturesTab {...tabProps} />}
-          {tab === "home"      && <HomeTab {...tabProps} />}
           {tab === "analytics" && <AnalyticsTab {...tabProps} />}
           {tab === "captcha"   && <CaptchaTab {...tabProps} />}
           {tab === "email"     && <EmailTab {...tabProps} />}
