@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DEFAULT_SETTINGS, type SiteSettings, notifySettingsUpdated } from "@/lib/site-settings";
+import Link from "next/link";
 import {
   RiLoader4Line, RiCheckLine, RiToggleLine, RiToggleFill,
   RiGlobalLine, RiShieldCheckLine, RiSettings4Line,
@@ -15,6 +16,11 @@ import {
   RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
   RiPaletteLine, RiSendPlane2Line, RiAlertLine, RiInformationLine,
   RiAddLine, RiDeleteBinLine, RiSearchLine,
+  // Feature icons
+  RiExternalLinkLine, RiMessage3Line, RiMedalLine, RiHeartLine,
+  RiShareLine, RiServerLine, RiMapPin2Line, RiFileList3Line,
+  RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
+  RiArrowRightLine, RiTimerLine, RiWifiLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -22,16 +28,14 @@ type TabKey =
   | "access"
   | "features"
   | "analytics"
-  | "captcha"
   | "email"
   | "payment";
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "branding",  label: "外观与首页", icon: RiPaletteLine },
-  { key: "access",    label: "访问控制",   icon: RiLockLine },
+  { key: "access",    label: "安全防护",   icon: RiShieldCheckLine },
   { key: "features",  label: "功能开关",   icon: RiSettings4Line },
   { key: "analytics", label: "统计分析",   icon: RiBarChartLine },
-  { key: "captcha",   label: "验证码",     icon: RiShieldCheckLine },
   { key: "email",     label: "邮件配置",   icon: RiMailLine },
   { key: "payment",   label: "支付配置",   icon: RiBankCardLine },
 ];
@@ -418,6 +422,38 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
               <Input value={s.home_announcement_url} onChange={e => set("home_announcement_url", e.target.value)} placeholder="https://..." className="text-xs" />
             </Field>
           </div>
+          <div className="border-t border-border/40 pt-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <RiTimerLine className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-[11px] text-muted-foreground font-medium">倒计时模式（可选）</p>
+            </div>
+            <Field
+              label="截止时间"
+              desc="设置后公告旁边自动显示「距活动结束 X 小时 X 分」倒计时；过期后自动隐藏公告"
+            >
+              <Input
+                type="datetime-local"
+                value={s.home_announcement_deadline || ""}
+                onChange={e => set("home_announcement_deadline", e.target.value)}
+                className="text-xs"
+              />
+            </Field>
+            {s.home_announcement_deadline && (() => {
+              const deadline = new Date(s.home_announcement_deadline);
+              const now = new Date();
+              const diff = deadline.getTime() - now.getTime();
+              if (diff <= 0) return (
+                <p className="text-[11px] text-red-500">⚠️ 截止时间已过期，公告将自动隐藏</p>
+              );
+              const hours = Math.floor(diff / 3600000);
+              const mins  = Math.floor((diff % 3600000) / 60000);
+              return (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  ✓ 距截止还剩 {hours > 0 ? `${hours} 小时 ` : ""}{mins} 分钟
+                </p>
+              );
+            })()}
+          </div>
         </div>
       </div>
 
@@ -548,6 +584,54 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           effect="社交分享"
           desc="在微信、Twitter/X、Facebook 等平台分享链接时显示的预览卡片信息"
         />
+
+        {/* OG Card Live Preview */}
+        {(() => {
+          const previewImg  = s.og_image_twitter || s.og_image || "";
+          const previewTitle = s.site_title || s.site_logo_text || "站点标题";
+          const previewDesc  = s.site_description || "站点描述";
+          const previewSite  = s.og_url ? s.og_url.replace(/^https?:\/\//, "").replace(/\/$/, "") : (s.og_site_name || "example.com");
+          const isLarge = !s.twitter_card || s.twitter_card === "summary_large_image";
+
+          return (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">实时预览 · Twitter/X 分享卡片</p>
+              <div className="rounded-2xl border border-border/80 overflow-hidden bg-card max-w-sm shadow-sm">
+                {previewImg ? (
+                  isLarge ? (
+                    <div className="w-full h-36 bg-muted/40 overflow-hidden">
+                      <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    </div>
+                  ) : (
+                    <div className="flex items-stretch">
+                      <div className="w-20 h-20 shrink-0 bg-muted/40 overflow-hidden">
+                        <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
+                      <div className="p-2.5 flex flex-col justify-center min-w-0">
+                        <p className="text-[11px] text-muted-foreground/60 truncate">{previewSite}</p>
+                        <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="w-full h-24 bg-muted/30 flex items-center justify-center">
+                    <RiImageLine className="w-6 h-6 text-muted-foreground/30" />
+                  </div>
+                )}
+                {isLarge && (
+                  <div className="p-3 border-t border-border/60">
+                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wide truncate">{previewSite}</p>
+                    <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
+                    <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">修改下方字段后预览实时更新</p>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="站点名称" desc="分享卡片上显示的站点名">
             <Input value={s.og_site_name} onChange={e => set("og_site_name", e.target.value)} placeholder="X.RW" className="text-xs" />
@@ -558,7 +642,7 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           <Field label="默认封面图" desc="未指定平台时使用的分享封面（OG image）">
             <Input value={s.og_image} onChange={e => set("og_image", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
-          <Field label="Twitter/X 封面图" desc="Twitter Card 专用封面图">
+          <Field label="Twitter/X 封面图" desc="Twitter Card 专用封面图（预览使用此图）">
             <Input value={s.og_image_twitter} onChange={e => set("og_image_twitter", e.target.value)} placeholder="https://..." className="text-xs" />
           </Field>
           <Field label="微信封面图" desc="微信分享链接卡片专用封面图">
@@ -573,7 +657,7 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           value={s.twitter_card}
           onChange={v => set("twitter_card", v)}
           options={[
-            { value: "summary", label: "summary — 小图标卡片" },
+            { value: "summary", label: "summary — 小图标卡片（左图右文）" },
             { value: "summary_large_image", label: "summary_large_image — 大图卡片（推荐）" },
           ]}
         />
@@ -597,97 +681,194 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
 }
 
 function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  const captchaProvider = s.captcha_provider;
+  const captchaEnabled  = !!captchaProvider;
+  const onLogin    = (s.captcha_on_login    ?? "1") !== "";
+  const onRegister = (s.captcha_on_register ?? "1") !== "";
+
   return (
     <div className="space-y-6">
+
+      {/* ── 注册与登录 ── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-        <SectionTitle icon={RiUserLine} title="注册与登录" desc="控制用户注册和访问方式" />
-        <Toggle
-          label="开放注册"
-          desc="允许新用户通过邮箱注册账号"
-          checked={s.allow_registration === "1"}
-          onChange={v => set("allow_registration", v ? "1" : "")}
-        />
-        <Toggle
-          label="需要邀请码注册"
-          desc="开启后注册时需要填写有效的邀请码"
-          checked={s.require_invite_code === "1"}
-          onChange={v => set("require_invite_code", v ? "1" : "")}
-        />
-        <Toggle
-          label="登录后才能查询"
-          desc="未登录用户无法进行任何查询"
-          checked={s.require_login === "1"}
-          onChange={v => set("require_login", v ? "1" : "")}
-        />
-        <Toggle
-          label="禁用登录入口"
-          desc="隐藏登录按钮，阻止用户登录（已登录用户不受影响）"
-          checked={s.disable_login === "1"}
-          onChange={v => set("disable_login", v ? "1" : "")}
-        />
+        <SectionTitle icon={RiUserLine} title="注册与登录" desc="控制用户注册方式和访问入口" />
+        <Toggle label="开放注册" desc="允许新用户通过邮箱注册账号" checked={s.allow_registration === "1"} onChange={v => set("allow_registration", v ? "1" : "")} />
+        <Toggle label="需要邀请码注册" desc="开启后注册时需要填写有效的邀请码" checked={s.require_invite_code === "1"} onChange={v => set("require_invite_code", v ? "1" : "")} />
+        <Toggle label="登录后才能查询" desc="未登录用户无法进行任何查询" checked={s.require_login === "1"} onChange={v => set("require_login", v ? "1" : "")} />
+        <Toggle label="禁用登录入口" desc="隐藏登录按钮，阻止用户登录（已登录用户不受影响）" checked={s.disable_login === "1"} onChange={v => set("disable_login", v ? "1" : "")} />
       </div>
 
+      {/* ── 站点状态 ── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
         <SectionTitle icon={RiLockLine} title="站点状态" desc="紧急管控与维护模式" />
-        <Toggle
-          label="维护模式"
-          desc="开启后所有访问者将看到维护提示页面"
-          checked={s.maintenance_mode === "1"}
-          onChange={v => set("maintenance_mode", v ? "1" : "")}
-        />
+        <Toggle label="维护模式" desc="开启后所有访问者将看到维护提示页面" checked={s.maintenance_mode === "1"} onChange={v => set("maintenance_mode", v ? "1" : "")} />
         <Field label="维护提示文字" desc="维护模式下显示给访问者的说明文字">
           <Input value={s.maintenance_message} onChange={e => set("maintenance_message", e.target.value)} placeholder="站点维护中，请稍后再来..." className="text-xs" />
         </Field>
-        <Toggle
-          label="只读查询模式"
-          desc="开启后用户只能进行查询，无法使用任何需要写入的功能（注册、订阅等）"
-          checked={s.query_only_mode === "1"}
-          onChange={v => set("query_only_mode", v ? "1" : "")}
-        />
-        <Toggle
-          label="隐藏原始 WHOIS"
-          desc="在查询结果页隐藏原始 WHOIS 文本，只显示结构化数据"
-          checked={s.hide_raw_whois === "1"}
-          onChange={v => set("hide_raw_whois", v ? "1" : "")}
-        />
+        <Toggle label="只读查询模式" desc="开启后用户只能进行查询，无法使用任何需要写入的功能（注册、订阅等）" checked={s.query_only_mode === "1"} onChange={v => set("query_only_mode", v ? "1" : "")} />
+        <Toggle label="隐藏原始 WHOIS" desc="在查询结果页隐藏原始 WHOIS 文本，只显示结构化数据" checked={s.hide_raw_whois === "1"} onChange={v => set("hide_raw_whois", v ? "1" : "")} />
       </div>
+
+      {/* ── 验证码 ── */}
+      <div className={cn(
+        "flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium",
+        captchaEnabled
+          ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-700/30 text-emerald-700 dark:text-emerald-300"
+          : "bg-muted/60 border-border text-muted-foreground"
+      )}>
+        <RiShieldCheckLine className={cn("w-4 h-4 shrink-0", captchaEnabled ? "text-emerald-500" : "text-muted-foreground/50")} />
+        <div className="flex-1 min-w-0">
+          <span className="font-bold">{captchaEnabled ? "验证码已启用" : "验证码未启用"}</span>
+          {captchaEnabled && <span className="text-xs ml-2 opacity-70">当前提供商：{captchaProvider}</span>}
+        </div>
+        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-bold", captchaEnabled ? "bg-emerald-500 text-white" : "bg-muted-foreground/20 text-muted-foreground")}>
+          {captchaEnabled ? "ON" : "OFF"}
+        </span>
+      </div>
+
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle icon={RiShieldCheckLine} title="人机验证 (CAPTCHA)" desc='防止机器人和恶意请求；选择"不启用"关闭所有验证' />
+        <SelectField
+          label="验证码提供商"
+          value={captchaProvider}
+          onChange={v => set("captcha_provider", v)}
+          options={[
+            { value: "",          label: "不启用验证码" },
+            { value: "turnstile", label: "Cloudflare Turnstile（推荐，无感验证）" },
+            { value: "hcaptcha",  label: "hCaptcha（隐私友好）" },
+            { value: "mtcaptcha", label: "MTCaptcha" },
+          ]}
+        />
+
+        {captchaEnabled && (
+          <div className="space-y-3 pt-1 border-t border-border/40">
+            <p className="text-[11px] text-muted-foreground font-medium pt-1">验证码生效范围</p>
+            <Toggle label="登录时验证" desc="用户登录时需通过人机验证" checked={onLogin} onChange={v => set("captcha_on_login", v ? "1" : "")} />
+            <Toggle label="注册时验证" desc="新用户注册时需通过人机验证" checked={onRegister} onChange={v => set("captcha_on_register", v ? "1" : "")} />
+          </div>
+        )}
+      </div>
+
+      {captchaProvider === "turnstile" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="Cloudflare Turnstile 密钥" desc="在 Cloudflare Dashboard → Turnstile 获取" />
+          <Field label="Site Key（公开密钥）">
+            <Input value={s.captcha_turnstile_site_key} onChange={e => set("captcha_turnstile_site_key", e.target.value)} placeholder="0x..." className="text-xs" />
+          </Field>
+          <PasswordField label="Secret Key（私密密钥）" value={s.captcha_turnstile_secret_key} onChange={v => set("captcha_turnstile_secret_key", v)} />
+        </div>
+      )}
+      {captchaProvider === "hcaptcha" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="hCaptcha 密钥" desc="在 hcaptcha.com 后台获取" />
+          <Field label="Site Key"><Input value={s.captcha_hcaptcha_site_key} onChange={e => set("captcha_hcaptcha_site_key", e.target.value)} placeholder="your-site-key" className="text-xs" /></Field>
+          <PasswordField label="Secret Key" value={s.captcha_hcaptcha_secret_key} onChange={v => set("captcha_hcaptcha_secret_key", v)} />
+        </div>
+      )}
+      {captchaProvider === "mtcaptcha" && (
+        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+          <SectionTitle icon={RiShieldCheckLine} title="MTCaptcha 密钥" desc="在 mtcaptcha.com 后台获取" />
+          <Field label="Site Key"><Input value={s.captcha_mtcaptcha_site_key} onChange={e => set("captcha_mtcaptcha_site_key", e.target.value)} placeholder="MTPublic-..." className="text-xs" /></Field>
+          <PasswordField label="Secret Key" value={s.captcha_mtcaptcha_secret_key} onChange={v => set("captcha_mtcaptcha_secret_key", v)} />
+        </div>
+      )}
     </div>
   );
 }
 
 function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
-  const FEATURES: { key: keyof SiteSettings; label: string; desc: string }[] = [
-    { key: "enable_search_links",  label: "查询结果外链",    desc: "在查询结果页显示跳转到注册商等外部链接" },
-    { key: "enable_feedback",      label: "用户反馈",        desc: "允许用户在查询结果页提交反馈报告" },
-    { key: "enable_stamps",        label: "品牌徽章 (Stamps)", desc: "开启域名所有权认证徽章功能" },
-    { key: "enable_sponsor",       label: "赞助页面",        desc: "在导航中显示赞助/打赏入口" },
-    { key: "enable_share",         label: "分享功能",        desc: "在查询结果页显示分享按钮" },
-    { key: "enable_dns",           label: "DNS 查询",        desc: "在结果页显示 DNS 记录标签页" },
-    { key: "enable_ip",            label: "IP 地理定位",     desc: "在结果页显示 IP 地理信息" },
-    { key: "enable_ssl",           label: "SSL 证书检测",    desc: "在结果页显示 SSL 证书信息" },
-    { key: "enable_icp",           label: "ICP 备案查询",    desc: "在结果页显示 ICP 备案信息" },
-    { key: "enable_http",          label: "HTTP 状态检测",   desc: "在结果页显示网站 HTTP 状态" },
-    { key: "enable_tools",         label: "工具页面",        desc: "在导航中显示在线工具入口" },
-    { key: "enable_remind",        label: "域名到期提醒",    desc: "允许用户设置域名到期邮件提醒" },
-    { key: "enable_links",         label: "友情链接页面",    desc: "在导航中显示友情链接页面" },
-    { key: "enable_about",         label: "关于页面",        desc: "在导航中显示关于/介绍页面" },
-    { key: "enable_changelog",     label: "更新日志页面",    desc: "在导航中显示版本更新日志" },
-    { key: "enable_docs",          label: "文档/API 页面",   desc: "在导航中显示 API 文档入口" },
+  type FeatureDef = {
+    key: keyof SiteSettings;
+    label: string;
+    desc: string;
+    icon: React.ElementType;
+    adminLink?: string;
+    adminLabel?: string;
+    requires?: string; // note about dependencies
+  };
+
+  const RESULT_FEATURES: FeatureDef[] = [
+    { key: "enable_search_links", label: "查询结果外链",     icon: RiExternalLinkLine, desc: "结果页显示跳转到注册商、Whois 查询等外部链接" },
+    { key: "enable_feedback",     label: "用户反馈",         icon: RiMessage3Line,     desc: "用户可在结果页提交 WHOIS 数据错误反馈", adminLink: "/admin/feedback", adminLabel: "查看反馈" },
+    { key: "enable_stamps",       label: "品牌徽章",         icon: RiMedalLine,        desc: "域名所有者可申请认证徽章（Stamps）", adminLink: "/admin/stamps", adminLabel: "管理徽章" },
+    { key: "enable_share",        label: "结果分享",         icon: RiShareLine,        desc: "结果页显示分享按钮，支持链接复制和社交分享" },
+    { key: "enable_dns",          label: "DNS 查询",         icon: RiServerLine,       desc: "结果页显示域名的 DNS 记录标签页" },
+    { key: "enable_ip",           label: "IP 地理定位",      icon: RiMapPin2Line,      desc: "结果页显示 IP 归属地和 ASN 信息" },
+    { key: "enable_ssl",          label: "SSL 证书检测",     icon: RiShieldCheckLine,  desc: "结果页显示域名 SSL 证书有效期和颁发机构" },
+    { key: "enable_icp",          label: "ICP 备案查询",     icon: RiFileList3Line,    desc: "结果页显示域名 ICP 备案信息（中国大陆适用）" },
+    { key: "enable_http",         label: "HTTP 状态检测",    icon: RiWifiLine,         desc: "结果页实时检测网站可访问性和 HTTP 响应状态" },
   ];
 
+  const NAV_FEATURES: FeatureDef[] = [
+    { key: "enable_remind",   label: "域名到期提醒", icon: RiAlarmLine,   desc: "用户可设置域名到期邮件提醒（需配置邮件服务）", adminLink: "/admin/reminders", adminLabel: "管理提醒", requires: "需配置邮件" },
+    { key: "enable_sponsor",  label: "赞助/打赏",    icon: RiHeartLine,   desc: "导航显示赞助入口，支持支付宝、微信、PayPal 等", adminLink: "/admin/sponsors", adminLabel: "管理赞助" },
+    { key: "enable_tools",    label: "在线工具",     icon: RiToolsLine,   desc: "导航显示工具页面入口" },
+    { key: "enable_links",    label: "友情链接",     icon: RiLinksLine,   desc: "导航显示友情链接页面", adminLink: "/admin/links", adminLabel: "管理链接" },
+    { key: "enable_about",    label: "关于页面",     icon: RiInformationLine, desc: "导航显示站点介绍/关于页面" },
+    { key: "enable_changelog",label: "更新日志",     icon: RiHistoryLine, desc: "导航显示版本更新日志页面", adminLink: "/admin/changelog", adminLabel: "管理日志" },
+    { key: "enable_docs",     label: "API 文档",     icon: RiBook2Line,   desc: "导航显示 API 文档和接入说明" },
+  ];
+
+  function FeatureCard({ f }: { f: FeatureDef }) {
+    const checked = s[f.key] === "1";
+    return (
+      <div className={cn(
+        "flex gap-3 p-3 rounded-xl border transition-all",
+        checked ? "border-primary/20 bg-primary/3" : "border-border hover:bg-muted/30",
+      )}>
+        {/* Icon */}
+        <div className={cn(
+          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+          checked ? "bg-primary/10" : "bg-muted/50",
+        )}>
+          <f.icon className={cn("w-3.5 h-3.5", checked ? "text-primary" : "text-muted-foreground/50")} />
+        </div>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold leading-none">{f.label}</span>
+            {f.requires && checked && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 font-medium">{f.requires}</span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{f.desc}</p>
+          {f.adminLink && checked && (
+            <Link
+              href={f.adminLink}
+              className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-primary/70 hover:text-primary transition-colors"
+            >
+              <RiArrowRightLine className="w-2.5 h-2.5" />
+              {f.adminLabel}
+            </Link>
+          )}
+        </div>
+        {/* Toggle */}
+        <button
+          type="button"
+          onClick={() => set(f.key, checked ? "" : "1")}
+          className="shrink-0 self-start mt-0.5"
+        >
+          {checked
+            ? <RiToggleFill className="w-8 h-8 text-primary" />
+            : <RiToggleLine className="w-8 h-8 text-muted-foreground/40" />}
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-      <SectionTitle icon={RiSettings4Line} title="功能模块开关" desc="按需开启或关闭各功能模块" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {FEATURES.map(f => (
-          <Toggle
-            key={f.key}
-            label={f.label}
-            desc={f.desc}
-            checked={s[f.key] === "1"}
-            onChange={v => set(f.key, v ? "1" : "")}
-          />
-        ))}
+    <div className="space-y-6">
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+        <SectionTitle icon={RiSearchLine} title="查询结果页功能" desc="在 WHOIS 查询结果页中显示的附加功能标签页和操作" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {RESULT_FEATURES.map(f => <FeatureCard key={f.key as string} f={f} />)}
+        </div>
+      </div>
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
+        <SectionTitle icon={RiLinksLine} title="导航与独立页面" desc="在导航栏显示的功能入口页面" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {NAV_FEATURES.map(f => <FeatureCard key={f.key as string} f={f} />)}
+        </div>
       </div>
     </div>
   );
@@ -719,99 +900,6 @@ function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings
           placeholder='<script>/* 自定义代码 */</script>'
         />
       </div>
-    </div>
-  );
-}
-
-function CaptchaTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
-  const provider = s.captcha_provider;
-  const isEnabled = !!provider;
-  const onLogin = (s.captcha_on_login ?? "1") !== "";
-  const onRegister = (s.captcha_on_register ?? "1") !== "";
-
-  return (
-    <div className="space-y-6">
-      {/* Status banner */}
-      <div className={cn(
-        "flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium",
-        isEnabled
-          ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-700/30 text-emerald-700 dark:text-emerald-300"
-          : "bg-muted/60 border-border text-muted-foreground"
-      )}>
-        <RiShieldCheckLine className={cn("w-4 h-4 shrink-0", isEnabled ? "text-emerald-500" : "text-muted-foreground/50")} />
-        <div className="flex-1 min-w-0">
-          <span className="font-bold">{isEnabled ? "验证码已启用" : "验证码未启用"}</span>
-          {isEnabled && <span className="text-xs ml-2 opacity-70">当前提供商：{provider}</span>}
-        </div>
-        <span className={cn(
-          "text-[11px] px-2 py-0.5 rounded-full font-bold",
-          isEnabled ? "bg-emerald-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
-        )}>{isEnabled ? "ON" : "OFF"}</span>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiShieldCheckLine} title="验证码提供商" desc={'选择用于防止机器人的验证码服务，选择"不启用"则关闭所有验证'} />
-        <SelectField
-          label="验证码提供商"
-          value={provider}
-          onChange={v => set("captcha_provider", v)}
-          options={[
-            { value: "",             label: "不启用验证码" },
-            { value: "turnstile",    label: "Cloudflare Turnstile（推荐）" },
-            { value: "hcaptcha",     label: "hCaptcha" },
-            { value: "mtcaptcha",    label: "MTCaptcha" },
-          ]}
-        />
-      </div>
-
-      {/* Scope toggles — only shown when CAPTCHA is enabled */}
-      {isEnabled && (
-        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="验证码生效范围" desc="控制哪些操作需要通过验证码验证" />
-          <Toggle
-            label="登录时验证"
-            desc="用户登录时需通过人机验证"
-            checked={onLogin}
-            onChange={v => set("captcha_on_login", v ? "1" : "")}
-          />
-          <Toggle
-            label="注册时验证"
-            desc="新用户注册时需通过人机验证"
-            checked={onRegister}
-            onChange={v => set("captcha_on_register", v ? "1" : "")}
-          />
-        </div>
-      )}
-
-      {provider === "turnstile" && (
-        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="Cloudflare Turnstile" />
-          <Field label="Site Key">
-            <Input value={s.captcha_turnstile_site_key} onChange={e => set("captcha_turnstile_site_key", e.target.value)} placeholder="0x..." className="text-xs" />
-          </Field>
-          <PasswordField label="Secret Key" value={s.captcha_turnstile_secret_key} onChange={v => set("captcha_turnstile_secret_key", v)} />
-        </div>
-      )}
-
-      {provider === "hcaptcha" && (
-        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="hCaptcha" />
-          <Field label="Site Key">
-            <Input value={s.captcha_hcaptcha_site_key} onChange={e => set("captcha_hcaptcha_site_key", e.target.value)} placeholder="your-site-key" className="text-xs" />
-          </Field>
-          <PasswordField label="Secret Key" value={s.captcha_hcaptcha_secret_key} onChange={v => set("captcha_hcaptcha_secret_key", v)} />
-        </div>
-      )}
-
-      {provider === "mtcaptcha" && (
-        <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="MTCaptcha" />
-          <Field label="Site Key">
-            <Input value={s.captcha_mtcaptcha_site_key} onChange={e => set("captcha_mtcaptcha_site_key", e.target.value)} placeholder="MTPublic-..." className="text-xs" />
-          </Field>
-          <PasswordField label="Secret Key" value={s.captcha_mtcaptcha_secret_key} onChange={v => set("captcha_mtcaptcha_secret_key", v)} />
-        </div>
-      )}
     </div>
   );
 }
@@ -1209,7 +1297,6 @@ export default function AdminSettingsPage() {
           {tab === "access"    && <AccessTab {...tabProps} />}
           {tab === "features"  && <FeaturesTab {...tabProps} />}
           {tab === "analytics" && <AnalyticsTab {...tabProps} />}
-          {tab === "captcha"   && <CaptchaTab {...tabProps} />}
           {tab === "email"     && <EmailTab {...tabProps} />}
           {tab === "payment"   && <PaymentTab {...tabProps} />}
         </>

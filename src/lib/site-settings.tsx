@@ -56,6 +56,7 @@ export interface SiteSettings {
   home_announcement_text: string;
   home_announcement_type: string;
   home_announcement_url: string;
+  home_announcement_deadline: string; // ISO datetime, empty = no countdown
   // Result page ad
   result_ad_enabled: string;
   result_ad_mode: string;      // "text" | "image" | "html"
@@ -206,6 +207,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   home_announcement_text: "",
   home_announcement_type: "info",
   home_announcement_url: "",
+  home_announcement_deadline: "",
   result_ad_enabled: "",
   result_ad_mode: "text",
   result_ad_text: "",

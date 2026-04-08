@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
-import { RiBellLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
+import { RiBellLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine, RiTimerLine } from "@remixicon/react";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -190,16 +190,48 @@ function parseAnnItems(raw: string): AnnRichItem[] {
   return trimmed.split("|").map(s => s.trim()).filter(Boolean).map(t => ({ text: t }));
 }
 
+function useCountdown(deadline: string | undefined) {
+  const calcRemaining = React.useCallback(() => {
+    if (!deadline) return null;
+    const d = new Date(deadline);
+    if (isNaN(d.getTime())) return null;
+    const diff = d.getTime() - Date.now();
+    if (diff <= 0) return { expired: true, text: "" };
+    const totalMins = Math.floor(diff / 60000);
+    const days  = Math.floor(totalMins / 1440);
+    const hours = Math.floor((totalMins % 1440) / 60);
+    const mins  = totalMins % 60;
+    let text = "";
+    if (days  > 0) text += `${days}天 `;
+    if (hours > 0) text += `${hours}小时 `;
+    text += `${mins}分`;
+    return { expired: false, text: `距结束 ${text}` };
+  }, [deadline]);
+
+  const [state, setState] = React.useState(calcRemaining);
+
+  React.useEffect(() => {
+    if (!deadline) { setState(null); return; }
+    setState(calcRemaining());
+    const timer = setInterval(() => setState(calcRemaining()), 30000);
+    return () => clearInterval(timer);
+  }, [deadline, calcRemaining]);
+
+  return state;
+}
+
 function AnnouncementBanner() {
   const settings = useSiteSettings();
   const { t } = useTranslation();
   const router = useRouter();
   const isHome = router.pathname === "/";
 
-  const homeEnabled = settings.home_announcement_enabled === "1";
-  const homeMsg = settings.home_announcement_text || "";
-  const globalMsg = settings.site_announcement || "";
-  const rawMsg = isHome && homeEnabled && homeMsg ? homeMsg : globalMsg;
+  const homeEnabled  = settings.home_announcement_enabled === "1";
+  const homeMsg      = settings.home_announcement_text || "";
+  const globalMsg    = settings.site_announcement || "";
+  const rawMsg       = isHome && homeEnabled && homeMsg ? homeMsg : globalMsg;
+  const deadline     = isHome && homeEnabled ? (settings.home_announcement_deadline || "") : "";
+  const countdown    = useCountdown(deadline || undefined);
 
   // null = "still checking localStorage" — avoids flash-then-hide on first render
   const [dismissed, setDismissed] = React.useState<boolean | null>(null);
@@ -207,12 +239,14 @@ function AnnouncementBanner() {
   const [fading, setFading] = React.useState(false);
 
   const items = React.useMemo(() => parseAnnItems(rawMsg), [rawMsg]);
-  // Only show once we've confirmed (client-side) it's not dismissed
-  const visible = items.length > 0 && dismissed === false;
+
+  // If deadline has expired, don't show the announcement
+  const deadlineExpired = countdown?.expired === true;
+  // Only show once we've confirmed (client-side) it's not dismissed and deadline not expired
+  const visible = items.length > 0 && dismissed === false && !deadlineExpired;
 
   React.useEffect(() => {
     if (!isHome || !homeEnabled || !homeMsg) {
-      // Global announcement or home-disabled: always show (not dismissible)
       setDismissed(false);
       return;
     }
@@ -291,6 +325,14 @@ function AnnouncementBanner() {
           {textContent}
         </Link>
       ) : textContent}
+
+      {/* Countdown badge */}
+      {countdown && !countdown.expired && countdown.text && (
+        <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-foreground/8 text-foreground/40 border border-foreground/10 tabular-nums">
+          <RiTimerLine className="w-2.5 h-2.5" />
+          {countdown.text}
+        </span>
+      )}
 
       {/* Dots for multiple items */}
       {items.length > 1 && (
