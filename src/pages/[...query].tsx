@@ -586,11 +586,12 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
 
+  const mode    = settings.result_ad_mode || "text";
   const rawText = settings.result_ad_text || "";
-  const items = React.useMemo(() => parseAdItems(rawText), [rawText]);
+  const items   = React.useMemo(() => parseAdItems(rawText), [rawText]);
 
   React.useEffect(() => {
-    if (items.length <= 1) return;
+    if (mode !== "text" || items.length <= 1) return;
     setActiveIdx(0);
     const timer = setInterval(() => {
       setFading(true);
@@ -600,29 +601,65 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
       }, 350);
     }, 5000);
     return () => clearInterval(timer);
-  }, [items.length, rawText]);
+  }, [mode, items.length, rawText]);
 
   if (settings.result_ad_enabled !== "1") return null;
-  if (items.length === 0) return null;
   if (loading) return null;
 
-  const label = settings.result_ad_label || "广告";
-  const url   = settings.result_ad_url;
+  const url = settings.result_ad_url;
+
+  // ── IMAGE mode ─────────────────────────────────────────────────────────────
+  if (mode === "image") {
+    const imgUrl = settings.result_ad_image_url;
+    const imgAlt = settings.result_ad_image_alt || "广告";
+    if (!imgUrl) return null;
+
+    const imgEl = (
+      <img
+        src={imgUrl}
+        alt={imgAlt}
+        className={cn(
+          "max-w-full max-h-24 object-contain rounded-xl mx-auto block",
+          url && "hover:opacity-80 transition-opacity cursor-pointer",
+        )}
+        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+    const wrapped = url
+      ? <Link href={url} target="_blank" rel="noopener noreferrer sponsored">{imgEl}</Link>
+      : imgEl;
+
+    if (inline) return <div className="sm:hidden mt-4 px-1 text-center">{wrapped}</div>;
+    return <div className="hidden sm:block mt-5 text-center">{wrapped}</div>;
+  }
+
+  // ── HTML mode ──────────────────────────────────────────────────────────────
+  if (mode === "html") {
+    const html = settings.result_ad_html;
+    if (!html) return null;
+    const div = (
+      <div
+        className="result-ad-html max-w-full overflow-hidden"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+    if (inline) return <div className="sm:hidden mt-4 px-1">{div}</div>;
+    return <div className="hidden sm:block mt-5">{div}</div>;
+  }
+
+  // ── TEXT mode (default) ────────────────────────────────────────────────────
+  if (items.length === 0) return null;
+  const label   = settings.result_ad_label || "广告";
   const current = items[activeIdx] ?? items[0];
 
   const content = (
     <div className={`flex items-center justify-center gap-2 ${url ? "hover:opacity-60 transition-opacity cursor-pointer" : ""}`}>
-      {/* Subtle megaphone icon */}
       <RiMegaphoneLine
         className="w-3 h-3 shrink-0 text-foreground/25"
         style={{ animation: "ad-float 3s ease-in-out infinite" }}
       />
-
-      {/* Label */}
       <span className="text-foreground/30 text-[10px] tracking-widest uppercase shrink-0">{label}</span>
       <span className="text-foreground/15 shrink-0">·</span>
-
-      {/* Animated text */}
       <span
         className="truncate text-foreground/40 leading-none"
         style={{
@@ -635,8 +672,6 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
       >
         {current.text}
       </span>
-
-      {/* Dots */}
       {items.length > 1 && (
         <div className="flex items-center gap-0.5 shrink-0">
           {items.map((_, i) => (
@@ -647,21 +682,15 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
           ))}
         </div>
       )}
-
-      {/* Link icon */}
       {url && <RiExternalLinkLine className="w-2.5 h-2.5 text-foreground/20 shrink-0" />}
     </div>
   );
 
-  const wrapper = url ? (
-    <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block">
-      {content}
-    </Link>
-  ) : content;
+  const wrapper = url
+    ? <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block">{content}</Link>
+    : content;
 
-  if (inline) {
-    return <div className="sm:hidden mt-4 px-1">{wrapper}</div>;
-  }
+  if (inline) return <div className="sm:hidden mt-4 px-1">{wrapper}</div>;
   return <div className="hidden sm:block mt-5 text-center">{wrapper}</div>;
 }
 

@@ -427,28 +427,97 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           icon={RiLinksLine}
           title="结果页推广条"
           effect="结果页"
-          desc="在域名 WHOIS 查询结果页底部显示推广文字/广告链接，保存后结果页刷新即生效"
+          desc="在域名 WHOIS 查询结果页显示推广内容，支持纯文字、图片横幅、自定义 HTML 三种模式"
         />
         <Toggle
           label="启用结果页推广条"
           checked={s.result_ad_enabled === "1"}
           onChange={v => set("result_ad_enabled", v ? "1" : "")}
         />
-        <Field label="推广文字" desc="支持多条，用 | 分隔，自动循环展示">
-          <MultiItemInput
-            value={s.result_ad_text}
-            onChange={v => set("result_ad_text", v)}
-            placeholder="推广/广告文字，多条用 | 分隔…"
-          />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="点击跳转链接" desc="点击推广条时跳转的 URL">
-            <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
-          </Field>
-          <Field label="推广标签文字" desc="显示在推广条最左侧的小标签">
-            <Input value={s.result_ad_label} onChange={e => set("result_ad_label", e.target.value)} placeholder="广告" className="text-xs" />
-          </Field>
-        </div>
+
+        {s.result_ad_enabled === "1" && (
+          <>
+            <SelectField
+              label="推广内容模式"
+              value={s.result_ad_mode || "text"}
+              onChange={v => set("result_ad_mode", v)}
+              options={[
+                { value: "text",  label: "纯文字 — 滚动文字条（支持多条轮播）" },
+                { value: "image", label: "图片横幅 — 显示一张广告图片" },
+                { value: "html",  label: "自定义 HTML — 嵌入任意 HTML 代码" },
+              ]}
+            />
+
+            {/* text mode */}
+            {(s.result_ad_mode || "text") === "text" && (
+              <>
+                <Field label="推广文字" desc="支持多条，自动循环轮播；可设置颜色、大小、加粗">
+                  <MultiItemInput
+                    value={s.result_ad_text}
+                    onChange={v => set("result_ad_text", v)}
+                    placeholder="推广/广告文字，多条用 | 分隔…"
+                  />
+                </Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="点击跳转链接" desc="点击推广条时跳转的 URL（可选）">
+                    <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
+                  </Field>
+                  <Field label="推广标签文字" desc="显示在左侧的小标签，如「广告」「推广」「合作」">
+                    <Input value={s.result_ad_label} onChange={e => set("result_ad_label", e.target.value)} placeholder="广告" className="text-xs" />
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {/* image mode */}
+            {s.result_ad_mode === "image" && (
+              <>
+                <Field label="图片 URL" desc="广告横幅图片地址（建议宽度 600–1200px，高度 60–120px 的长条图）">
+                  <Input value={s.result_ad_image_url} onChange={e => set("result_ad_image_url", e.target.value)} placeholder="https://example.com/banner.png" className="text-xs" />
+                </Field>
+                {s.result_ad_image_url && (
+                  <div className="rounded-xl border border-border/60 overflow-hidden bg-muted/30 p-2">
+                    <p className="text-[10px] text-muted-foreground mb-2">预览：</p>
+                    <img
+                      src={s.result_ad_image_url}
+                      alt={s.result_ad_image_alt || "广告预览"}
+                      className="max-w-full max-h-28 object-contain rounded-lg mx-auto block"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="图片 Alt 文字" desc="图片无法加载时显示的替代文字（同时用于 SEO）">
+                    <Input value={s.result_ad_image_alt} onChange={e => set("result_ad_image_alt", e.target.value)} placeholder="广告" className="text-xs" />
+                  </Field>
+                  <Field label="点击跳转链接" desc="点击图片时跳转的 URL（可选）">
+                    <Input value={s.result_ad_url} onChange={e => set("result_ad_url", e.target.value)} placeholder="https://..." className="text-xs" />
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {/* html mode */}
+            {s.result_ad_mode === "html" && (
+              <>
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                  <RiAlertLine className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                    HTML 模式会直接渲染代码，请确保内容来源可信。支持嵌入第三方广告脚本（如 Google AdSense、Carbon Ads 等）。
+                  </p>
+                </div>
+                <TextareaField
+                  label="自定义 HTML 代码"
+                  desc="直接渲染到结果页推广区域，支持 <script>、<img>、<a> 等所有 HTML 标签"
+                  value={s.result_ad_html}
+                  onChange={v => set("result_ad_html", v)}
+                  rows={6}
+                  placeholder={'<!-- 示例：Google AdSense -->\n<ins class="adsbygoogle"\n  style="display:block"\n  data-ad-client="ca-pub-XXXXXXXX"\n  data-ad-slot="XXXXXXXX"\n  data-ad-format="auto"></ins>'}
+                />
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {/* ── SEO ──────────────────────────────────────────────── */}

@@ -58,9 +58,13 @@ export interface SiteSettings {
   home_announcement_url: string;
   // Result page ad
   result_ad_enabled: string;
+  result_ad_mode: string;      // "text" | "image" | "html"
   result_ad_text: string;
   result_ad_url: string;
   result_ad_label: string;
+  result_ad_image_url: string;
+  result_ad_image_alt: string;
+  result_ad_html: string;
   // About page
   about_title: string;
   about_content: string;
@@ -203,9 +207,13 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   home_announcement_type: "info",
   home_announcement_url: "",
   result_ad_enabled: "",
+  result_ad_mode: "text",
   result_ad_text: "",
   result_ad_url: "",
   result_ad_label: "广告",
+  result_ad_image_url: "",
+  result_ad_image_alt: "",
+  result_ad_html: "",
   about_title: "",
   about_content: "",
   about_intro_en: "",
