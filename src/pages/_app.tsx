@@ -489,10 +489,16 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       // result → result: shallow routing — QueryProgressBar handles this
       if (sourceIsQueryPage && destIsQueryPage) return;
 
+      // Navigation TO any result/query page: the skeleton + QueryProgressBar
+      // provide all the loading feedback needed — no top bar required here.
+      // (The bar would linger until getServerSideProps finishes, making it look
+      //  like the result page doesn't start until the bar completes.)
+      if (destIsQueryPage) return;
+
       // Other self-contained stable pages (DNS, IP, etc.) manage their own feedback
       if (OTHER_STABLE.has(dest)) return;
 
-      // Everything else (including homepage → result, and non-stable pages): show bar
+      // Everything else (login, about, register …): show bar
       if (npResetRef.current) clearTimeout(npResetRef.current);
       setNpStatus("start");
     };
