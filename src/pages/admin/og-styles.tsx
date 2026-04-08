@@ -20,7 +20,6 @@ import {
   RiPencilLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
-import { isAdmin } from "@/lib/admin";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many } from "@/lib/db-query";
@@ -90,7 +89,7 @@ interface Props {
 
 export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
   const session = await getServerSession(ctx.req, ctx.res, authOptions);
-  if (!isAdmin((session?.user as any)?.email)) {
+  if (!(session?.user as any)?.isAdmin) {
     return { redirect: { destination: "/login", permanent: false } };
   }
 
