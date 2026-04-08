@@ -106,6 +106,7 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
   const { data: session, status } = useSession();
   const router = useRouter();
   const { t } = useTranslation();
+  const email = (session?.user as any)?.email as string | undefined;
   const isAdmin = (session?.user as any)?.isAdmin === true;
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
