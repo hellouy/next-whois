@@ -5,14 +5,44 @@ import { RiDownloadLine, RiFileCopyLine } from "@remixicon/react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useTranslation } from "@/lib/i18n";
 
-function WhoisHighlight({ content }: { content: string }) {
-  const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/;
+// Matches URLs, but stops before trailing punctuation that shouldn't be part of the link
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+?)(?=[.,;:!?)}\]]*(?:\s|$))/g;
+// WHOIS key pattern: starts with a letter, contains only letters/digits/hyphens/spaces, ends before ":"
+// Must be <= 50 chars and not look like an IPv6 address (which also contains colons)
+const WHOIS_KEY_REGEX = /^([A-Za-z][A-Za-z0-9 \-_]{0,48}?):\s*/;
 
+function renderWithLinks(text: string) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  const regex = new RegExp(URL_REGEX.source, "g");
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>);
+    parts.push(
+      <a
+        key={m.index}
+        href={m[1]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+      >
+        {m[1]}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>);
+  return parts.length > 0 ? parts : [<span key={0}>{text}</span>];
+}
+
+function WhoisHighlight({ content }: { content: string }) {
   return (
     <>
       {content.split("\n").map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-3" />;
+
+        // Comment / section header lines
         if (
           trimmed.startsWith("%") ||
           trimmed.startsWith("#") ||
@@ -25,52 +55,28 @@ function WhoisHighlight({ content }: { content: string }) {
             </div>
           );
         }
-        const colonIdx = line.indexOf(":");
-        if (colonIdx > 0 && colonIdx < 40) {
-          const key = line.slice(0, colonIdx + 1);
-          const value = line.slice(colonIdx + 1);
+
+        // WHOIS key-value line (strict pattern match to avoid false positives on IPv6, URLs etc.)
+        const keyMatch = line.match(WHOIS_KEY_REGEX);
+        if (keyMatch) {
+          const keyPart = keyMatch[0];
+          const valuePart = line.slice(keyPart.length);
           return (
             <div key={i}>
               <span className="text-sky-600 dark:text-sky-400 font-medium">
-                {key}
+                {keyMatch[1]}:
               </span>
+              {" "}
               <span className="text-zinc-700 dark:text-zinc-200">
-                {value.split(urlRegex).map((part, j) =>
-                  urlRegex.test(part) ? (
-                    <a
-                      key={j}
-                      href={part}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      {part}
-                    </a>
-                  ) : (
-                    <span key={j}>{part}</span>
-                  ),
-                )}
+                {renderWithLinks(valuePart)}
               </span>
             </div>
           );
         }
+
         return (
           <div key={i} className="text-zinc-600 dark:text-zinc-300">
-            {line.split(urlRegex).map((part, j) =>
-              urlRegex.test(part) ? (
-                <a
-                  key={j}
-                  href={part}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {part}
-                </a>
-              ) : (
-                <span key={j}>{part}</span>
-              ),
-            )}
+            {renderWithLinks(line)}
           </div>
         );
       })}

@@ -33,6 +33,34 @@ export async function queryWhoisTcp(
   });
 }
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    // Named entities
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&copy;/g, "©")
+    .replace(/&reg;/g, "®")
+    .replace(/&trade;/g, "™")
+    // Decimal numeric entities: &#123;
+    .replace(/&#(\d{1,6});/g, (_, n) => {
+      const code = parseInt(n, 10);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+    })
+    // Hex numeric entities: &#x1F600;
+    .replace(/&#x([0-9a-fA-F]{1,6});/g, (_, h) => {
+      const code = parseInt(h, 16);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+    });
+}
+
 function stripHtmlToWhoisText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -40,15 +68,8 @@ function stripHtmlToWhoisText(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(?:tr|p|div|li|h[1-6]|pre)>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/[ \t]+/g, " ")
     .split("\n")
-    .map((l) => l.trim())
+    .map((l) => decodeHtmlEntities(l).replace(/[ \t]+/g, " ").trim())
     .filter((l) => l.length > 0)
     .join("\n");
 }

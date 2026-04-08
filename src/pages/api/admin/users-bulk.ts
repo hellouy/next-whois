@@ -74,29 +74,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         const siteName = await getSiteLabel().catch(() => "X.RW");
         let sent = 0;
-        await Promise.allSettled(rows.map(async (row) => {
-          try {
-            await run(
-              "UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false",
-              [row.id]
-            );
-            const tokenId = randomBytes(8).toString("hex");
-            const rawToken = randomBytes(32).toString("hex");
-            const expiresAt = new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000).toISOString();
-            await run(
-              "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
-              [tokenId, row.id, rawToken, expiresAt]
-            );
-            const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
-            await sendEmail({
-              to: row.email,
-              subject: `重置你的 ${siteName} 密码（管理员触发）`,
-              html: passwordResetHtml({ resetUrl, siteName }),
-            });
-            sent++;
-          } catch { /* skip failed user */ }
+        const failedEmails: string[] = [];
+        const settledResults = await Promise.allSettled(rows.map(async (row) => {
+          await run(
+            "UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false",
+            [row.id]
+          );
+          const tokenId = randomBytes(8).toString("hex");
+          const rawToken = randomBytes(32).toString("hex");
+          const expiresAt = new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000).toISOString();
+          await run(
+            "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
+            [tokenId, row.id, rawToken, expiresAt]
+          );
+          const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
+          await sendEmail({
+            to: row.email,
+            subject: `重置你的 ${siteName} 密码（管理员触发）`,
+            html: passwordResetHtml({ resetUrl, siteName }),
+          });
+          return row.email;
         }));
+        settledResults.forEach((r, i) => {
+          if (r.status === "fulfilled") {
+            sent++;
+          } else {
+            failedEmails.push(rows[i].email);
+            console.warn(`[users-bulk] send_reset_email failed for ${rows[i].email}:`, r.reason?.message ?? r.reason);
+          }
+        });
         affected = sent;
+        if (failedEmails.length > 0) {
+          return res.status(207).json({ ok: true, affected, failed: failedEmails, failedCount: failedEmails.length });
+        }
         break;
       }
     }

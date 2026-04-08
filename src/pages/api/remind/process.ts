@@ -113,9 +113,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (cronSecret) {
     const authHeader = req.headers.authorization;
     const legacyHeader = req.headers["x-cron-secret"] as string | undefined;
-    const querySecret = req.query.secret as string | undefined;
+    // Note: query string secret removed for security (secrets can leak into server logs)
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-    const provided = bearerToken || legacyHeader || querySecret;
+    const provided = bearerToken || legacyHeader;
     if (provided === cronSecret) authed = true;
   }
   if (!authed) {

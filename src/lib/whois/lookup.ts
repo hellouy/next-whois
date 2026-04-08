@@ -180,8 +180,10 @@ export async function lookupWhoisWithCache(
   let result = await lookupWhois(domain);
   // Retry once on transient failures (e.g., intermittent connectivity to
   // slow ccTLD WHOIS servers like whois.nic.hu from cloud infrastructure).
+  // Use jitter (400–800ms) to avoid thundering herd on concurrent retries.
   if (isTransientLookupFailure(result)) {
-    await new Promise((r) => setTimeout(r, 600));
+    const jitter = 400 + Math.floor(Math.random() * 400);
+    await new Promise((r) => setTimeout(r, jitter));
     const retried = await lookupWhois(domain);
     if (retried.status) result = retried;
   }
