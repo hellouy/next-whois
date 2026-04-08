@@ -253,13 +253,13 @@ function AnnouncementBanner() {
 
   const textSpan = (
     <span
-      className="flex-1 min-w-0 truncate"
+      className="min-w-0 truncate text-foreground/45"
       style={{
         opacity: fading ? 0 : 1,
         transition: "opacity 0.35s ease",
         color: current.color || undefined,
-        fontWeight: current.bold ? "700" : undefined,
-        fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "13px" : undefined,
+        fontWeight: current.bold ? "600" : undefined,
+        fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "12px" : "11px",
       }}
     >
       {current.text}
@@ -267,23 +267,26 @@ function AnnouncementBanner() {
   );
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center gap-2 px-3 h-8 text-xs font-medium border-b border-border/20 bg-background/80 backdrop-blur-md">
+    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-[11px]">
       {/* Animated bell icon */}
       <RiBellLine
-        className="w-3.5 h-3.5 shrink-0 text-foreground/40"
+        className="w-3 h-3 shrink-0 text-foreground/30"
         style={{ animation: "ann-bell 5s ease-in-out infinite" }}
       />
 
-      {/* "公告" label */}
-      <span className="font-semibold text-foreground/50 shrink-0">公告</span>
-      <span className="text-foreground/25 shrink-0">·</span>
-
-      {/* Item text */}
+      {/* Item text — centered, pure text, no box */}
       {annUrl ? (
-        <Link href={annUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 hover:opacity-75 transition-opacity flex items-center">
+        <Link
+          href={annUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="min-w-0 truncate text-foreground/45 hover:text-foreground/70 transition-colors leading-none"
+        >
           {textSpan}
         </Link>
-      ) : textSpan}
+      ) : (
+        <span className="min-w-0 truncate leading-none">{textSpan}</span>
+      )}
 
       {/* Dots for multiple items */}
       {items.length > 1 && (
@@ -291,7 +294,7 @@ function AnnouncementBanner() {
           {items.map((_, i) => (
             <div
               key={i}
-              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1.5 bg-foreground/40" : "w-1.5 h-1.5 bg-foreground/15"}`}
+              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-2.5 h-1 bg-foreground/25" : "w-1 h-1 bg-foreground/12"}`}
             />
           ))}
         </div>
@@ -300,10 +303,10 @@ function AnnouncementBanner() {
       {/* Close */}
       <button
         onClick={handleDismiss}
-        className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-foreground/40 hover:text-foreground/80"
+        className="shrink-0 text-foreground/25 hover:text-foreground/55 transition-colors"
         aria-label={t("close_announcement")}
       >
-        <RiCloseLine className="w-3.5 h-3.5" />
+        <RiCloseLine className="w-3 h-3" />
       </button>
     </div>
   );

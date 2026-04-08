@@ -610,59 +610,59 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   const url   = settings.result_ad_url;
   const current = items[activeIdx] ?? items[0];
 
-  const inner = (
-    <div className={`flex items-center gap-1.5 text-xs ${url ? "cursor-pointer hover:opacity-75 transition-opacity" : ""}`}>
-      {/* Animated megaphone icon */}
+  const content = (
+    <div className={`flex items-center justify-center gap-2 ${url ? "hover:opacity-60 transition-opacity cursor-pointer" : ""}`}>
+      {/* Subtle megaphone icon */}
       <RiMegaphoneLine
-        className="w-3.5 h-3.5 shrink-0 text-foreground/35"
+        className="w-3 h-3 shrink-0 text-foreground/25"
         style={{ animation: "ad-float 3s ease-in-out infinite" }}
       />
 
       {/* Label */}
-      <span className="text-foreground/40 font-medium shrink-0 text-[10px] tracking-wide">{label}</span>
-      <span className="text-foreground/20 shrink-0">·</span>
+      <span className="text-foreground/30 text-[10px] tracking-widest uppercase shrink-0">{label}</span>
+      <span className="text-foreground/15 shrink-0">·</span>
 
       {/* Animated text */}
       <span
-        className="flex-1 min-w-0 truncate leading-snug text-foreground/60"
+        className="truncate text-foreground/40 leading-none"
         style={{
           opacity: fading ? 0 : 1,
           transition: "opacity 0.35s ease",
           color: current.color || undefined,
-          fontWeight: current.bold ? "700" : undefined,
-          fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "13px" : "11px",
+          fontWeight: current.bold ? "600" : undefined,
+          fontSize: current.size === "xs" ? "10px" : current.size === "base" ? "12px" : "11px",
         }}
       >
         {current.text}
       </span>
 
-      {/* Dots + link icon */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        {items.length > 1 && (
-          <div className="flex items-center gap-0.5">
-            {items.map((_, i) => (
-              <div
-                key={i}
-                className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-3 h-1 bg-foreground/30" : "w-1 h-1 bg-foreground/12"}`}
-              />
-            ))}
-          </div>
-        )}
-        {url && <RiExternalLinkLine className="w-3 h-3 text-foreground/30" />}
-      </div>
+      {/* Dots */}
+      {items.length > 1 && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          {items.map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-2.5 h-1 bg-foreground/25" : "w-1 h-1 bg-foreground/12"}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Link icon */}
+      {url && <RiExternalLinkLine className="w-2.5 h-2.5 text-foreground/20 shrink-0" />}
     </div>
   );
 
   const wrapper = url ? (
     <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block">
-      {inner}
+      {content}
     </Link>
-  ) : inner;
+  ) : content;
 
   if (inline) {
-    return <div className="sm:hidden mt-3">{wrapper}</div>;
+    return <div className="sm:hidden mt-4 px-1">{wrapper}</div>;
   }
-  return <div className="hidden sm:block mt-4">{wrapper}</div>;
+  return <div className="hidden sm:block mt-5 text-center">{wrapper}</div>;
 }
 
 export default function LookupPage({
