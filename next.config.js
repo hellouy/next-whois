@@ -13,12 +13,14 @@ const SECURITY_HEADERS = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com",
-      "style-src 'self' 'unsafe-inline'",
+      // Captcha providers (Turnstile / hCaptcha / MTCaptcha) need their own CDN
+      // origins in both script-src (JS) and frame-src (verification iframe).
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://challenges.cloudflare.com https://js.hcaptcha.com https://newassets.hcaptcha.com https://service.mtcaptcha.com",
+      "style-src 'self' 'unsafe-inline' https://newassets.hcaptcha.com https://service.mtcaptcha.com",
       "img-src * data: blob:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://newassets.hcaptcha.com",
       "connect-src * data:",
-      "frame-src 'self'",
+      "frame-src 'self' https://challenges.cloudflare.com https://newassets.hcaptcha.com https://hcaptcha.com https://service.mtcaptcha.com https://serviceworker.mtcaptcha.com",
       "media-src 'self'",
       "worker-src 'self' blob:",
     ].join('; '),

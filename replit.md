@@ -5045,3 +5045,77 @@ Admin: tld-probe → probe TLDs → [Save] → setCustomServer → next lookup u
 Admin: tld-registry → see whois_server → [hover Save] → setCustomServer
 Admin: custom-servers → view all sources → [Add/Delete] → DB entries
 ```
+
+---
+
+## Session — 2026-04-08: Captcha / Security / Redis-Fallback Fixes
+
+### 1. CSP Unblocking Captcha Widgets (Root Cause Fix)
+**File:** `next.config.js`
+
+`script-src` and `frame-src` in the Content-Security-Policy did not include the captcha provider CDNs, so the browser silently blocked every captcha script and its verification iframe — the widget area appeared empty with only the hint text.
+
+Updated CSP:
+```
+script-src: added https://challenges.cloudflare.com https://js.hcaptcha.com https://newassets.hcaptcha.com https://service.mtcaptcha.com
+style-src:  added https://newassets.hcaptcha.com https://service.mtcaptcha.com
+font-src:   added https://newassets.hcaptcha.com
+frame-src:  added https://challenges.cloudflare.com https://newassets.hcaptcha.com https://hcaptcha.com https://service.mtcaptcha.com https://serviceworker.mtcaptcha.com
+```
+
+### 2. useCaptcha Hook — Error Detection + Retry (`src/lib/use-captcha.ts`)
+- Added `captchaBlocked: boolean` state (exposed in return value)
+- Added `retryLoad()` — removes old script tag, clears container, bumps retry counter to re-trigger effect
+- Script uses `addEventListener("load/error")` instead of `onload` property to avoid overwriting handlers on re-renders
+- Script error → `setCaptchaBlocked(true)` immediately
+- Polling exhaustion (60 × 200 ms = 12 s) without widget → `setCaptchaBlocked(true)`
+- Fixed `reset()` bug: was setting `widgetIdRef.current = null` before reading it in the Turnstile/hCaptcha reset branch
+
+### 3. Register + Login Pages — Blocked Captcha UI
+**Files:** `src/pages/register.tsx`, `src/pages/login.tsx`
+- Destructure `captchaBlocked` and `retryLoad: retryCaptcha` from `useCaptcha`
+- When `captchaBlocked`: show amber warning card instead of empty container
+- Card includes: alert icon + localised explanation + "Retry" button
+- Added `RiRefreshLine` icon import to both pages
+
+### 4. All 8 Locale Files — New Translation Keys
+**Files:** `locales/en.json`, `zh.json`, `zh-tw.json`, `de.json`, `ru.json`, `ja.json`, `fr.json`, `ko.json`
+- `auth.captcha_blocked_hint` — explains why the captcha may not load (ad-blocker, extension)
+- `auth.captcha_retry` — retry button label
+
+### 5. Security Fix: Verification Code Bypass (`src/pages/api/user/register.ts`)
+**Bug:** `if (storedCode !== null)` guarded the email verification check. When Redis is down, `getRedisValue` returns `null` (circuit breaker), so verification was silently skipped — any direct POST to `/api/user/register` bypassed email verification.
+
+**Fix:**
+- Reads code from Redis first, falls back to `verify_codes` DB table
+- If both return null → 400 "请先发送验证码，或验证码已过期"
+- Verification is now **always required** (no bypass path)
+- On success: cleans up from both Redis and DB
+
+### 6. DB Fallback for Verification Code Storage (`src/pages/api/user/send-verify-code.ts`)
+Previously returned `503` when Redis was unavailable, blocking registration entirely.
+
+**New behaviour:**
+- Rate limiting: Redis preferred → `checkRateLimit` (DB-backed) fallback
+- Code storage: writes to **both** Redis and `verify_codes` DB table simultaneously
+- Fails only if neither store is reachable
+- On email send failure: rolls back from both stores
+
+### 7. New DB Table: `verify_codes` (`src/lib/db.ts`)
+```sql
+CREATE TABLE IF NOT EXISTS verify_codes (
+  email      TEXT        NOT NULL,
+  scope      TEXT        NOT NULL DEFAULT 'register',
+  code       TEXT        NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (email, scope)
+);
+```
+UPSERT pattern: one row per (email, scope) — re-sending code simply overwrites.
+
+### 8. System Cleanup (`src/pages/api/admin/system.ts`)
+Added `expired_verify_codes` cleanup to the `db_optimize` action:
+```sql
+DELETE FROM verify_codes WHERE expires_at < NOW()
+```

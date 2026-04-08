@@ -978,6 +978,8 @@
     "register_captcha_label": "캡차 인증",
     "register_captcha_hint": "코드를 보내기 전에 위의 캡차를 완료해 주세요",
     "register_captcha_verified": "인증 완료",
+    "captcha_blocked_hint": "캡차를 불러오지 못했습니다. 광고 차단기 또는 브라우저 확장 프로그램에 의해 차단되었을 수 있습니다. 해당 프로그램을 비활성화하고 페이지를 새로 고침하거나 재시도를 탭하세요.",
+    "captcha_retry": "재시도",
     "register_terms": "가입함으로써 ",
     "register_terms_link": "이용약관 및 개인정보처리방침에 동의합니다",
     "register_submit": "계정 만들기",

@@ -978,6 +978,8 @@
     "register_captcha_label": "人机验证",
     "register_captcha_hint": "请先完成上方人机验证，再点击发送验证码",
     "register_captcha_verified": "验证通过",
+    "captcha_blocked_hint": "验证码加载失败，可能被广告拦截器或浏览器扩展拦截。请尝试关闭拦截器后刷新，或点击重试。",
+    "captcha_retry": "重试",
     "register_terms": "注册即表示你同意我们的",
     "register_terms_link": "服务条款和隐私政策",
     "register_submit": "创建账户",

@@ -978,6 +978,8 @@
     "register_captcha_label": "人機驗證",
     "register_captcha_hint": "請先完成上方人機驗證，再點擊發送驗證碼",
     "register_captcha_verified": "驗證通過",
+    "captcha_blocked_hint": "驗證碼載入失敗，可能被廣告攔截器或瀏覽器擴充功能攔截。請嘗試關閉後重新整理，或點擊重試。",
+    "captcha_retry": "重試",
     "register_terms": "註冊即表示你同意我們的",
     "register_terms_link": "服務條款和隱私政策",
     "register_submit": "建立帳戶",

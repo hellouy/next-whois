@@ -978,6 +978,8 @@
     "register_captcha_label": "Vérification captcha",
     "register_captcha_hint": "Veuillez d'abord compléter le captcha avant d'envoyer le code",
     "register_captcha_verified": "Vérifié",
+    "captcha_blocked_hint": "Le captcha n'a pas pu se charger. Il est peut-être bloqué par un bloqueur de publicités ou une extension de navigateur. Désactivez-les et rechargez la page, ou appuyez sur « Réessayer ».",
+    "captcha_retry": "Réessayer",
     "register_terms": "En vous inscrivant, vous acceptez nos ",
     "register_terms_link": "Conditions d'utilisation et Politique de confidentialité",
     "register_submit": "Créer un compte",

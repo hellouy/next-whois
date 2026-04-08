@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { one, run, isDbReady, withTransaction } from "@/lib/db-query";
 import { sendEmail, welcomeHtml, getSiteLabel } from "@/lib/email";
 import { localeFromCookieHeader, localeFromAcceptHeader, getEmailStrings } from "@/lib/email-strings";
-import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
+import { getRedisValue, deleteRedisValue, isRedisAvailable } from "@/lib/server/redis";
 import { getCaptchaConfig, verifyCaptchaToken } from "@/lib/server/captcha";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -72,12 +72,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
   if (existing) return res.status(409).json({ error: "该邮箱已注册" });
 
-  const storedCode = await getRedisValue(`verify:register:${cleanEmail}`);
-  if (storedCode !== null) {
-    if (!verifyCode?.trim()) return res.status(400).json({ error: "请填写邮箱验证码" });
-    if (String(verifyCode).trim() !== storedCode)
-      return res.status(400).json({ error: "验证码错误或已过期" });
+  // Resolve verification code: Redis first, DB fallback.
+  // NOTE: storedCode being null means either the code was never sent or it expired —
+  // we ALWAYS require a valid code to prevent unauthenticated registration.
+  let storedCode: string | null = null;
+  if (isRedisAvailable()) {
+    storedCode = await getRedisValue(`verify:register:${cleanEmail}`);
   }
+  if (storedCode === null && (await isDbReady())) {
+    const dbCode = await one<{ code: string; expires_at: string }>(
+      "SELECT code, expires_at FROM verify_codes WHERE email = $1 AND scope = 'register'",
+      [cleanEmail],
+    );
+    if (dbCode && new Date(dbCode.expires_at) > new Date()) {
+      storedCode = dbCode.code;
+    }
+  }
+  // Enforce: code is always required
+  if (storedCode === null) {
+    return res.status(400).json({ error: "请先发送验证码，或验证码已过期，请重新发送" });
+  }
+  if (!verifyCode?.trim()) return res.status(400).json({ error: "请填写邮箱验证码" });
+  if (String(verifyCode).trim() !== storedCode)
+    return res.status(400).json({ error: "验证码错误或已过期" });
 
   const id = randomBytes(8).toString("hex");
   const passwordHash = await hash(String(password), 12);
@@ -117,8 +134,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "注册失败，请稍后重试" });
   }
 
-  if (storedCode !== null) {
-    await deleteRedisValue(`verify:register:${cleanEmail}`);
+  // Clean up verification codes (both stores) after successful registration
+  if (isRedisAvailable()) {
+    await deleteRedisValue(`verify:register:${cleanEmail}`).catch(() => {});
+  }
+  if (await isDbReady()) {
+    await run("DELETE FROM verify_codes WHERE email = $1 AND scope = 'register'", [cleanEmail]).catch(() => {});
   }
 
   getSiteLabel().then((siteName) => {

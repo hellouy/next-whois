@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Run all independent DELETE operations in parallel (each targets a different table)
-      const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
+      const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
         safeRun("expired_tokens",      "过期密码重置令牌",
           `DELETE FROM password_reset_tokens WHERE expires_at < NOW()`),
         safeRun("anon_searches_30d",   "匿名查询记录 (>30天)",
@@ -109,8 +109,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         safeRun("stale_user_history",  "用户普通查询记录 (>10天)",
           `DELETE FROM search_history WHERE user_id IS NOT NULL AND value_tier = 'normal'
            AND created_at < NOW() - INTERVAL '10 days'`),
+        safeRun("expired_verify_codes", "过期注册验证码",
+          `DELETE FROM verify_codes WHERE expires_at < NOW()`),
       ]);
-      const report: OpResult[] = [r1, r2, r3, r4, r5, r6, r7];
+      const report: OpResult[] = [r1, r2, r3, r4, r5, r6, r7, r8];
 
       // Flush Redis rate-limit keys
       if (isRedisAvailable() && redis) {

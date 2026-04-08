@@ -977,6 +977,8 @@
     "register_captcha_label": "キャプチャ認証",
     "register_captcha_hint": "コードを送信する前に上のキャプチャを完了してください",
     "register_captcha_verified": "認証済み",
+    "captcha_blocked_hint": "キャプチャを読み込めませんでした。広告ブロッカーやブラウザ拡張機能によってブロックされている可能性があります。それらを無効にしてページを更新するか、「再試行」をタップしてください。",
+    "captcha_retry": "再試行",
     "register_terms": "登録することで、",
     "register_terms_link": "利用規約とプライバシーポリシーに同意します",
     "register_submit": "アカウントを作成",

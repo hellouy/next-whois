@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   RiLoader4Line, RiLockLine, RiMailLine,
-  RiEyeLine, RiEyeOffLine, RiCheckLine, RiAlertLine,
+  RiEyeLine, RiEyeOffLine, RiCheckLine, RiAlertLine, RiRefreshLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ export default function LoginPage() {
     settings.captcha_site_key
   );
 
-  const { captchaRef, captchaRequired, reset: resetCaptcha } = useCaptcha({
+  const { captchaRef, captchaRequired, captchaBlocked, reset: resetCaptcha, retryLoad: retryCaptcha } = useCaptcha({
     provider: captchaProvider as any,
     siteKey: captchaSiteKey,
     scopeEnabled: settings.captcha_on_login,
@@ -213,11 +213,30 @@ export default function LoginPage() {
 
               {/* Captcha widget — only rendered when captcha is required for login */}
               {captchaRequired && (
-                <div
-                  ref={captchaRef}
-                  className={cn("flex justify-center", captchaProvider === "mtcaptcha" && "mtcaptcha")}
-                  {...(captchaProvider === "mtcaptcha" ? { "data-sitekey": captchaSiteKey } : {})}
-                />
+                captchaBlocked ? (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5">
+                    <RiAlertLine className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+                        {t("auth.captcha_blocked_hint")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={retryCaptcha}
+                        className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 hover:underline"
+                      >
+                        <RiRefreshLine className="w-3 h-3" />
+                        {t("auth.captcha_retry")}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    ref={captchaRef}
+                    className={cn("flex justify-center", captchaProvider === "mtcaptcha" && "mtcaptcha")}
+                    {...(captchaProvider === "mtcaptcha" ? { "data-sitekey": captchaSiteKey } : {})}
+                  />
+                )
               )}
 
               <AnimatePresence>

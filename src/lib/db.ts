@@ -135,6 +135,14 @@ const CREATE_TABLES = [
     count      INTEGER      NOT NULL DEFAULT 0,
     reset_at   TIMESTAMPTZ  NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS verify_codes (
+    email      TEXT         NOT NULL,
+    scope      TEXT         NOT NULL DEFAULT 'register',
+    code       TEXT         NOT NULL,
+    expires_at TIMESTAMPTZ  NOT NULL,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (email, scope)
+  )`,
   `CREATE TABLE IF NOT EXISTS tld_rules (
     tld                    TEXT         PRIMARY KEY,
     grace_period_days      INTEGER      NOT NULL DEFAULT 0,
