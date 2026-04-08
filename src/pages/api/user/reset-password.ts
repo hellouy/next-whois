@@ -11,6 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "无效的重置链接" });
   if (!password || String(password).length < 8)
     return res.status(400).json({ error: "密码至少 8 位" });
+  if (String(password).length > 128)
+    return res.status(400).json({ error: "密码最长 128 位" });
 
   if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
 

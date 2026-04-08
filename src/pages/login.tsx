@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
+import { useCaptcha } from "@/lib/use-captcha";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,10 +29,7 @@ export default function LoginPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [rememberMe, setRememberMe] = React.useState(true);
 
-  // Captcha state
   const [captchaToken, setCaptchaToken] = React.useState("");
-  const captchaRef = React.useRef<HTMLDivElement>(null);
-  const captchaWidgetId = React.useRef<unknown>(null);
 
   const captchaProvider = settings.captcha_provider;
   const captchaSiteKey = (
@@ -40,6 +38,14 @@ export default function LoginPage() {
     captchaProvider === "mtcaptcha" ? (settings.captcha_mtcaptcha_site_key || settings.captcha_site_key) :
     settings.captcha_site_key
   );
+
+  const { captchaRef, captchaRequired, reset: resetCaptcha } = useCaptcha({
+    provider: captchaProvider as any,
+    siteKey: captchaSiteKey,
+    scopeEnabled: settings.captcha_on_login,
+    onToken: setCaptchaToken,
+    onReset: () => setCaptchaToken(""),
+  });
 
   React.useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -53,95 +59,12 @@ export default function LoginPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady]);
 
-  // Load captcha widget
-  React.useEffect(() => {
-    if (!captchaProvider || !captchaSiteKey) return;
-    const scriptId = `captcha-script-${captchaProvider}`;
-    const w = window as unknown as Record<string, unknown>;
-
-    if (captchaProvider === "mtcaptcha") {
-      (w as any).mtcaptchaConfig = {
-        sitekey: captchaSiteKey,
-        callback: (detail: { verifyResult: string }) => setCaptchaToken(detail.verifyResult || ""),
-        "expired-callback": () => setCaptchaToken(""),
-        "error-callback": () => setCaptchaToken(""),
-      };
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement("script");
-        script.id = scriptId;
-        script.src = "https://service.mtcaptcha.com/mtcv1/client/mtcaptcha.min.js";
-        script.async = true;
-        document.head.appendChild(script);
-      } else if ((w as any).mtcaptcha) {
-        setTimeout(() => {
-          if (!captchaRef.current || captchaWidgetId.current !== null) return;
-          (w as any).mtcaptcha.renderUI(captchaRef.current);
-          captchaWidgetId.current = true;
-        }, 200);
-      }
-      return;
-    }
-
-    if (!document.getElementById(scriptId)) {
-      const scriptUrls: Record<string, string> = {
-        turnstile: "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
-        hcaptcha: "https://js.hcaptcha.com/1/api.js?render=explicit",
-      };
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = scriptUrls[captchaProvider] || "";
-      script.async = true;
-      script.defer = true;
-      script.onload = () => renderCaptcha();
-      document.head.appendChild(script);
-    } else {
-      renderCaptcha();
-    }
-    function renderCaptcha() {
-      setTimeout(() => {
-        if (!captchaRef.current || captchaWidgetId.current !== null) return;
-        if (captchaProvider === "turnstile" && w.turnstile) {
-          captchaWidgetId.current = (w.turnstile as {
-            render: (el: HTMLElement, opts: Record<string, unknown>) => unknown;
-          }).render(captchaRef.current, {
-            sitekey: captchaSiteKey,
-            callback: (tk: string) => setCaptchaToken(tk),
-            "expired-callback": () => setCaptchaToken(""),
-            "error-callback": () => setCaptchaToken(""),
-          });
-        } else if (captchaProvider === "hcaptcha" && w.hcaptcha) {
-          captchaWidgetId.current = (w.hcaptcha as {
-            render: (el: HTMLElement, opts: Record<string, unknown>) => unknown;
-          }).render(captchaRef.current, {
-            sitekey: captchaSiteKey,
-            callback: (tk: string) => setCaptchaToken(tk),
-            "expired-callback": () => setCaptchaToken(""),
-            "error-callback": () => setCaptchaToken(""),
-          });
-        }
-      }, 200);
-    }
-  }, [captchaProvider, captchaSiteKey]);
-
-  function resetCaptcha() {
-    const w = window as unknown as Record<string, unknown>;
-    if (captchaProvider === "mtcaptcha" && (w as any).mtcaptcha) {
-      (w as any).mtcaptcha.resetUI();
-      captchaWidgetId.current = null;
-    } else if (captchaProvider === "turnstile" && w.turnstile && captchaWidgetId.current !== null) {
-      (w.turnstile as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
-    } else if (captchaProvider === "hcaptcha" && w.hcaptcha && captchaWidgetId.current !== null) {
-      (w.hcaptcha as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
-    }
-    setCaptchaToken("");
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!email.trim()) { setError(t("auth.login_err_email")); return; }
     if (!password) { setError(t("auth.login_err_password")); return; }
-    if (captchaProvider && captchaSiteKey && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       setError(t("auth.register_err_captcha"));
       return;
     }
@@ -288,9 +211,13 @@ export default function LoginPage() {
                 <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">记住我（30天免重新登录）</span>
               </label>
 
-              {/* Captcha widget — only rendered when captcha is configured */}
-              {captchaProvider && captchaSiteKey && (
-                <div ref={captchaRef} className="flex justify-center" />
+              {/* Captcha widget — only rendered when captcha is required for login */}
+              {captchaRequired && (
+                <div
+                  ref={captchaRef}
+                  className={cn("flex justify-center", captchaProvider === "mtcaptcha" && "mtcaptcha")}
+                  {...(captchaProvider === "mtcaptcha" ? { "data-sitekey": captchaSiteKey } : {})}
+                />
               )}
 
               <AnimatePresence>

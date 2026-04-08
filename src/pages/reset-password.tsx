@@ -104,6 +104,7 @@ export default function ResetPasswordPage() {
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-xl"
+                      maxLength={128}
                     />
                     <button type="button" onClick={() => setShowPwd(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors">
@@ -123,6 +124,7 @@ export default function ResetPasswordPage() {
                       value={confirm}
                       onChange={e => setConfirm(e.target.value)}
                       className="pl-9 h-10 rounded-xl"
+                      maxLength={128}
                     />
                   </div>
                 </div>

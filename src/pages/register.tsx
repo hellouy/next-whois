@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
+import { useCaptcha } from "@/lib/use-captcha";
 
 interface StrengthResult { score: number; label: string; color: string; }
 
@@ -53,8 +54,6 @@ export default function RegisterPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = React.useState("");
-  const captchaRef = React.useRef<HTMLDivElement>(null);
-  const captchaWidgetId = React.useRef<unknown>(null);
 
   React.useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -67,7 +66,6 @@ export default function RegisterPage() {
   }, [codeCooldown]);
 
   const captchaProvider = settings.captcha_provider;
-  // Use per-provider site key, fall back to legacy shared key
   const captchaSiteKey = (
     captchaProvider === "turnstile" ? (settings.captcha_turnstile_site_key || settings.captcha_site_key) :
     captchaProvider === "hcaptcha"  ? (settings.captcha_hcaptcha_site_key  || settings.captcha_site_key) :
@@ -75,92 +73,18 @@ export default function RegisterPage() {
     settings.captcha_site_key
   );
 
-  React.useEffect(() => {
-    if (!captchaProvider || !captchaSiteKey) return;
-    const scriptId = `captcha-script-${captchaProvider}`;
-    const w = window as unknown as Record<string, unknown>;
-
-    if (captchaProvider === "mtcaptcha") {
-      (w as any).mtcaptchaConfig = {
-        sitekey: captchaSiteKey,
-        callback: (detail: { verifyResult: string }) => setCaptchaToken(detail.verifyResult || ""),
-        "expired-callback": () => setCaptchaToken(""),
-        "error-callback": () => setCaptchaToken(""),
-      };
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement("script");
-        script.id = scriptId;
-        script.src = "https://service.mtcaptcha.com/mtcv1/client/mtcaptcha.min.js";
-        script.async = true;
-        document.head.appendChild(script);
-      } else if ((w as any).mtcaptcha) {
-        setTimeout(() => {
-          if (!captchaRef.current || captchaWidgetId.current !== null) return;
-          (w as any).mtcaptcha.renderUI(captchaRef.current);
-          captchaWidgetId.current = true;
-        }, 200);
-      }
-      return;
-    }
-
-    if (!document.getElementById(scriptId)) {
-      const scriptUrls: Record<string, string> = {
-        turnstile: "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
-        hcaptcha: "https://js.hcaptcha.com/1/api.js?render=explicit",
-      };
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = scriptUrls[captchaProvider] || "";
-      script.async = true;
-      script.defer = true;
-      script.onload = () => renderCaptcha();
-      document.head.appendChild(script);
-    } else {
-      renderCaptcha();
-    }
-    function renderCaptcha() {
-      setTimeout(() => {
-        if (!captchaRef.current || captchaWidgetId.current !== null) return;
-        if (captchaProvider === "turnstile" && w.turnstile) {
-          captchaWidgetId.current = (w.turnstile as {
-            render: (el: HTMLElement, opts: Record<string, unknown>) => unknown;
-          }).render(captchaRef.current, {
-            sitekey: captchaSiteKey,
-            callback: (tk: string) => setCaptchaToken(tk),
-            "expired-callback": () => setCaptchaToken(""),
-            "error-callback": () => setCaptchaToken(""),
-          });
-        } else if (captchaProvider === "hcaptcha" && w.hcaptcha) {
-          captchaWidgetId.current = (w.hcaptcha as {
-            render: (el: HTMLElement, opts: Record<string, unknown>) => unknown;
-          }).render(captchaRef.current, {
-            sitekey: captchaSiteKey,
-            callback: (tk: string) => setCaptchaToken(tk),
-            "expired-callback": () => setCaptchaToken(""),
-            "error-callback": () => setCaptchaToken(""),
-          });
-        }
-      }, 200);
-    }
-  }, [captchaProvider, captchaSiteKey]);
-
-  function resetCaptcha() {
-    const w = window as unknown as Record<string, unknown>;
-    if (captchaProvider === "mtcaptcha" && (w as any).mtcaptcha) {
-      (w as any).mtcaptcha.resetUI();
-      captchaWidgetId.current = null;
-    } else if (captchaProvider === "turnstile" && w.turnstile && captchaWidgetId.current !== null) {
-      (w.turnstile as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
-    } else if (captchaProvider === "hcaptcha" && w.hcaptcha && captchaWidgetId.current !== null) {
-      (w.hcaptcha as { reset: (id: unknown) => void }).reset(captchaWidgetId.current);
-    }
-    setCaptchaToken("");
-  }
+  const { captchaRef, captchaRequired, reset: resetCaptcha } = useCaptcha({
+    provider: captchaProvider as any,
+    siteKey: captchaSiteKey,
+    scopeEnabled: settings.captcha_on_register,
+    onToken: setCaptchaToken,
+    onReset: () => setCaptchaToken(""),
+  });
 
   async function handleSendCode() {
     if (!email.trim()) { setError(t("auth.register_err_email_required")); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError(t("auth.register_err_email_invalid")); return; }
-    if (captchaProvider && captchaSiteKey && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       setError(t("auth.register_err_captcha"));
       return;
     }
@@ -202,7 +126,7 @@ export default function RegisterPage() {
     if (!password) { setError(t("auth.register_err_password_required")); return; }
     if (password.length < 8) { setError(t("auth.register_err_password_min")); return; }
     if (password !== confirm) { setError(t("auth.register_err_password_mismatch")); return; }
-    if (captchaProvider && captchaSiteKey && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       setError(t("auth.register_err_captcha"));
       return;
     }
@@ -348,10 +272,10 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={handleSendCode}
-                    disabled={sendingCode || codeCooldown > 0 || loading || !!(captchaProvider && captchaSiteKey && !captchaToken)}
+                    disabled={sendingCode || codeCooldown > 0 || loading || !!(captchaRequired && !captchaToken)}
                     className={cn(
                       "shrink-0 h-10 px-3 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap",
-                      (captchaProvider && captchaSiteKey && !captchaToken)
+                      (captchaRequired && !captchaToken)
                         ? "border-border text-muted-foreground/50 cursor-not-allowed opacity-60"
                         : codeCooldown > 0
                         ? "border-border text-muted-foreground cursor-not-allowed"
@@ -373,7 +297,7 @@ export default function RegisterPage() {
               </div>
 
               {/* CAPTCHA widget — shown directly after email, must be completed before sending code */}
-              {captchaProvider && captchaSiteKey && (
+              {captchaRequired && (
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <RiShieldKeyholeLine className="w-3.5 h-3.5 text-muted-foreground/70" />
@@ -447,6 +371,7 @@ export default function RegisterPage() {
                     onChange={e => { setPassword(e.target.value); setError(null); }}
                     className="pl-9 pr-10 h-10 rounded-xl"
                     disabled={loading}
+                    maxLength={128}
                   />
                   <button
                     type="button"
@@ -513,6 +438,7 @@ export default function RegisterPage() {
                       passwordsMismatch ? "border-red-400/60 focus-visible:ring-red-400/20" : ""
                     )}
                     disabled={loading}
+                    maxLength={128}
                   />
                   <AnimatePresence>
                     {(passwordsMatch || passwordsMismatch) && (

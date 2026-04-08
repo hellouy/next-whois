@@ -347,6 +347,7 @@ export function AccountTab({
                       value={f.value}
                       onChange={e => f.onChange(e.target.value)}
                       className="pl-8 pr-8 h-9 rounded-xl text-xs"
+                      maxLength={128}
                     />
                     {i < 2 && (
                       <button type="button" onClick={f.toggle}

@@ -582,8 +582,15 @@ export default function AdminUsersPage() {
         body: JSON.stringify({ ids, action }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "操作失败");
-      toast.success(`已${actionLabels[action]} ${data.affected} 名用户`);
+      if (!res.ok && res.status !== 207) throw new Error(data.error || "操作失败");
+      if (res.status === 207 && data.failedCount > 0) {
+        const successCount = (data.affected ?? 0) - data.failedCount;
+        toast.warning(
+          `${successCount} 封邮件发送成功，${data.failedCount} 封发送失败：${(data.failed ?? []).join("、")}`
+        );
+      } else {
+        toast.success(`已${actionLabels[action]} ${data.affected} 名用户`);
+      }
       setSelectedIds(new Set());
       load(search, activeFilter, 0);
     } catch (e) {
