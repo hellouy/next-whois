@@ -4,6 +4,7 @@ import { compare } from "bcryptjs";
 import { one } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { isAdminEmail } from "@/lib/admin-server";
 import {
   isRedisAvailable,
   incrRedisValue,
@@ -192,6 +193,9 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.subscriptionAccess = (user as any).subscriptionAccess ?? false;
+        // Resolve admin status at sign-in using DB-backed check so the session
+        // reflects the correct admin email even if the env var differs from DB.
+        token.isAdmin = await isAdminEmail(user.email).catch(() => false);
         const rememberMe = (user as any).rememberMe !== false;
         if (!rememberMe) {
           // Session-only: expire in 24h
@@ -233,6 +237,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
         (session.user as any).subscriptionAccess = (token.subscriptionAccess as boolean) ?? false;
+        (session.user as any).isAdmin = (token.isAdmin as boolean) ?? false;
       }
       return session;
     },

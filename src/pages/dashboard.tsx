@@ -10,7 +10,6 @@ import {
   RiVipCrownLine, RiShieldUserLine, RiSearchLine, RiHistoryLine,
   RiExternalLinkLine,
 } from "@remixicon/react";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useSiteSettings } from "@/lib/site-settings";
 import { SubscriptionsTab } from "@/components/dashboard/SubscriptionsTab";
 import { StampsTab } from "@/components/dashboard/StampsTab";
@@ -99,7 +98,7 @@ export default function DashboardPage() {
   }
 
   const user = session!.user! as DashboardUser;
-  const isAdminUser = user.email?.toLowerCase()?.trim() === ADMIN_EMAIL;
+  const isAdminUser = (session?.user as any)?.isAdmin === true;
 
   const activeSubs = subscriptions.filter(s => s.active);
   const expiringSoon = activeSubs.filter(s => {

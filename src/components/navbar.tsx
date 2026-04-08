@@ -46,7 +46,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useSession, signOut } from "next-auth/react";
 import { useSiteSettings } from "@/lib/site-settings";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation, TranslationKey } from "@/lib/i18n";
 
 const TAP = { whileTap: { scale: 0.88 }, transition: { type: "spring" as const, stiffness: 500, damping: 22 } };
@@ -75,7 +74,7 @@ function HistoryDrawer() {
   const { data: sessionData } = useSession();
   const histSettings = useSiteSettings();
   const queryOnlyMode = histSettings.query_only_mode === "1";
-  const isHistAdmin = (sessionData?.user as any)?.email?.toLowerCase?.()?.trim?.() === ADMIN_EMAIL;
+  const isHistAdmin = (sessionData?.user as any)?.isAdmin === true;
 
   React.useEffect(() => {
     setMounted(true);
@@ -706,7 +705,7 @@ function UserButton() {
   const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const email = (session?.user as any)?.email as string | undefined;
-  const isAdminUser = !!email && email.toLowerCase().trim() === ADMIN_EMAIL;
+  const isAdminUser = (session?.user as any)?.isAdmin === true;
 
   const loginDisabled  = settings.disable_login   === "1";
   const queryOnlyMode  = settings.query_only_mode  === "1";

@@ -15,7 +15,6 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
 import { RiBellLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, RiCheckLine } from "@remixicon/react";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -339,8 +338,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   // While auth status is resolving, render children so the page is never blank.
   // The maintenance screen replaces them once we know the user is not an admin.
   if (sessionStatus === "loading") return <>{children}</>;
-  const sessionEmail = (session?.user?.email as string | undefined) ?? null;
-  if (sessionEmail && sessionEmail.toLowerCase().trim() === ADMIN_EMAIL) return <>{children}</>;
+  if ((session?.user as any)?.isAdmin === true) return <>{children}</>;
 
   const customMsg = settings.maintenance_message || settings.site_announcement;
 

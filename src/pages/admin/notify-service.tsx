@@ -2,7 +2,6 @@ import React from "react";
 import { GetServerSideProps } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { isAdmin } from "@/lib/admin";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -497,7 +496,7 @@ export default function AdminNotifyServicePage() {
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const session = await getServerSession(ctx.req, ctx.res, authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) {
+  if (!(session?.user as any)?.isAdmin) {
     return { redirect: { destination: "/login", permanent: false } };
   }
   return { props: {} };

@@ -1,12 +1,12 @@
 import React from "react";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import {
   RiLoader4Line, RiSearchLine, RiDeleteBinLine,
   RiUserLine, RiMailLine, RiCalendarLine, RiPencilLine,
@@ -388,6 +388,8 @@ function EditModal({ user, onClose, onSaved, onViewOrders }: {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const currentUserEmail = (session?.user as any)?.email as string | undefined;
   const [users, setUsers] = React.useState<User[]>([]);
   const [total, setTotal] = React.useState(0);
   const [disabledCount, setDisabledCount] = React.useState(0);
@@ -551,7 +553,7 @@ export default function AdminUsersPage() {
     });
   }
 
-  const selectableUsers = users.filter(u => u.email !== ADMIN_EMAIL);
+  const selectableUsers = users.filter(u => u.email !== currentUserEmail);
 
   function toggleSelectAll() {
     if (selectedIds.size === selectableUsers.length && selectableUsers.length > 0) {
@@ -786,7 +788,7 @@ export default function AdminUsersPage() {
                     ? "border-red-200/50 dark:border-red-800/30 bg-red-50/20 dark:bg-red-950/10"
                     : "border-border"
                 )}>
-                {user.email !== ADMIN_EMAIL && (
+                {user.email !== currentUserEmail && (
                   <button
                     onClick={() => toggleSelect(user.id)}
                     className="shrink-0 text-muted-foreground hover:text-primary transition-colors -mr-1"
@@ -800,7 +802,7 @@ export default function AdminUsersPage() {
                 )}
                 <div className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                  user.email === ADMIN_EMAIL
+                  user.email === currentUserEmail
                     ? "bg-gradient-to-br from-violet-500 to-indigo-600"
                     : user.disabled
                       ? "bg-red-100 dark:bg-red-950/40"
@@ -808,7 +810,7 @@ export default function AdminUsersPage() {
                         ? "bg-gradient-to-br from-amber-400/30 to-orange-500/30"
                         : "bg-gradient-to-br from-primary/20 to-violet-500/20"
                 )}>
-                  {user.email === ADMIN_EMAIL
+                  {user.email === currentUserEmail
                     ? <RiShieldUserLine className="w-4 h-4 text-white" />
                     : user.disabled
                       ? <RiUserForbidLine className="w-4 h-4 text-red-500" />
@@ -821,7 +823,7 @@ export default function AdminUsersPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="text-sm font-semibold truncate">{user.name || "未设置昵称"}</p>
-                    {user.email === ADMIN_EMAIL && (
+                    {user.email === currentUserEmail && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300 font-semibold border border-violet-200/50 dark:border-violet-700/30 shrink-0">
                         创始人
                       </span>
@@ -865,7 +867,7 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                {user.email !== ADMIN_EMAIL && (
+                {user.email !== currentUserEmail && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     {/* Edit */}
                     <button

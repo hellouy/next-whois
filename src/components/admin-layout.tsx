@@ -3,7 +3,6 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { useTranslation } from "@/lib/i18n";
 import {
   RiDashboardLine, RiDashboardFill,
@@ -107,8 +106,7 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
   const { data: session, status } = useSession();
   const router = useRouter();
   const { t } = useTranslation();
-  const email = (session?.user as any)?.email;
-  const isAdmin = email?.toLowerCase().trim() === ADMIN_EMAIL;
+  const isAdmin = (session?.user as any)?.isAdmin === true;
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   React.useEffect(() => {
