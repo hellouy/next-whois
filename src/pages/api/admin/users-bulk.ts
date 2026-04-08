@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, run } from "@/lib/db-query";
-import { requireAdmin, ADMIN_EMAIL } from "@/lib/admin";
+import { requireAdmin, getAdminEmail } from "@/lib/admin";
 import { randomBytes } from "crypto";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 
@@ -33,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+  const adminEmail = await getAdminEmail();
 
   try {
     let affected = 0;
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case "disable":
         affected = await run(
           `UPDATE users SET disabled = true WHERE id IN (${placeholders}) AND email != $${ids.length + 1}`,
-          [...ids, ADMIN_EMAIL],
+          [...ids, adminEmail],
         );
         break;
       case "enable":
@@ -64,13 +65,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case "delete":
         affected = await run(
           `DELETE FROM users WHERE id IN (${placeholders}) AND email != $${ids.length + 1}`,
-          [...ids, ADMIN_EMAIL],
+          [...ids, adminEmail],
         );
         break;
       case "send_reset_email": {
         const rows = await many<{ id: string; email: string }>(
           `SELECT id, email FROM users WHERE id IN (${placeholders}) AND email != $${ids.length + 1}`,
-          [...ids, ADMIN_EMAIL]
+          [...ids, adminEmail]
         );
         const siteName = await getSiteLabel().catch(() => "X.RW");
         let sent = 0;

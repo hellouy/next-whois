@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { requireAdmin } from "@/lib/admin";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { isAdminEmail } from "@/lib/admin-server";
 
 const RESET_EXPIRES_MINUTES = 60;
 const SITE_URL =
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [userId]
     );
     if (!row) return res.status(404).json({ error: "用户不存在" });
-    if (row.email === ADMIN_EMAIL) return res.status(403).json({ error: "无法操作创始人账户" });
+    if (await isAdminEmail(row.email)) return res.status(403).json({ error: "无法操作创始人账户" });
     targetEmail = row.email;
     targetId = row.id;
   } else if (email) {

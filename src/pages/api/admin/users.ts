@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
-import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { isAdminEmail } from "@/lib/admin-server";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const existing = await one<{ email: string }>("SELECT email FROM users WHERE id = $1", [id]);
       if (!existing) return res.status(404).json({ error: "用户不存在" });
-      if (existing.email === ADMIN_EMAIL) return res.status(403).json({ error: "无法修改创始人账户" });
+      if (await isAdminEmail(existing.email)) return res.status(403).json({ error: "无法修改创始人账户" });
 
       const updates: string[] = [];
       const params: any[] = [];
@@ -163,7 +163,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
     try {
       const existing = await one<{ email: string }>("SELECT email FROM users WHERE id = $1", [id]);
-      if (existing?.email === ADMIN_EMAIL) return res.status(403).json({ error: "无法删除创始人账户" });
+      if (existing?.email && await isAdminEmail(existing.email)) return res.status(403).json({ error: "无法删除创始人账户" });
       await run("DELETE FROM users WHERE id = $1", [id]);
       return res.json({ ok: true });
     } catch (err: any) {
