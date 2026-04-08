@@ -5,6 +5,7 @@ import { WhoisRawResult } from "@/lib/whois/types";
 import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
 import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
+import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
 export type TcpServerEntry = {
   type: "tcp";
@@ -50,15 +51,26 @@ function readWhoisServers(): Record<string, string | null> {
 }
 
 /**
- * Returns the WHOIS server hostname for a TLD from the static whois-servers.json file.
- * Returns null if not listed or if the TLD is explicitly marked as having no server.
- * Used by the generic WHOIS fallback path as a fast bootstrap before whoiser.
+ * Returns the WHOIS server hostname for a TLD.
+ *
+ * Lookup priority:
+ *   1. whois-servers.json — explicit ccTLD map (null entry = definitively no server)
+ *   2. GTLD_WHOIS_BOOTSTRAP — 1200+ gTLD entries derived from IANA RDAP bootstrap
+ *
+ * Returns null when no server is known for the TLD.
+ * Used by the generic WHOIS fallback path to start a parallel TCP race
+ * immediately rather than waiting for IANA discovery via TCP.
  */
 export function getStaticWhoisServer(tld: string): string | null {
   const file = readWhoisServers();
   const normalized = tld.toLowerCase().replace(/^\./, "");
-  const server = file[normalized] ?? null;
-  return typeof server === "string" ? server : null;
+  const fileEntry = file[normalized];
+  // Explicit null in whois-servers.json = registry confirmed no WHOIS service
+  if (fileEntry === null) return null;
+  // Explicit string = use this server directly
+  if (typeof fileEntry === "string") return fileEntry;
+  // Not in JSON file → check gTLD bootstrap (1200+ TLDs derived from IANA RDAP)
+  return getGtldWhoisServer(normalized) ?? null;
 }
 
 /** Exported so admin pages can identify which TLDs are handled by built-in logic. */
