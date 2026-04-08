@@ -201,18 +201,24 @@ function AnnouncementBanner() {
   const globalMsg = settings.site_announcement || "";
   const rawMsg = isHome && homeEnabled && homeMsg ? homeMsg : globalMsg;
 
-  const [dismissed, setDismissed] = React.useState(false);
+  // null = "still checking localStorage" — avoids flash-then-hide on first render
+  const [dismissed, setDismissed] = React.useState<boolean | null>(null);
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
 
   const items = React.useMemo(() => parseAnnItems(rawMsg), [rawMsg]);
-  const visible = items.length > 0 && !dismissed;
+  // Only show once we've confirmed (client-side) it's not dismissed
+  const visible = items.length > 0 && dismissed === false;
 
   React.useEffect(() => {
-    if (!isHome || !homeEnabled || !homeMsg) return;
+    if (!isHome || !homeEnabled || !homeMsg) {
+      // Global announcement or home-disabled: always show (not dismissible)
+      setDismissed(false);
+      return;
+    }
     const hash = homeMsg.slice(0, 40);
     const stored = localStorage.getItem(HOME_ANN_DISMISS_KEY);
-    setDismissed(stored === hash);
+    setDismissed(stored === hash ? true : false);
   }, [isHome, homeEnabled, homeMsg]);
 
   React.useEffect(() => {
@@ -251,9 +257,9 @@ function AnnouncementBanner() {
   const annUrl = isHome && homeEnabled ? (settings.home_announcement_url || "") : "";
   const current = items[activeIdx] ?? items[0];
 
-  const textSpan = (
+  const textContent = (
     <span
-      className="min-w-0 truncate text-foreground/45"
+      className="min-w-0 truncate text-foreground/65"
       style={{
         opacity: fading ? 0 : 1,
         transition: "opacity 0.35s ease",
@@ -267,26 +273,24 @@ function AnnouncementBanner() {
   );
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-[11px]">
-      {/* Animated bell icon */}
+    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-[11px] border-b border-border/20">
+      {/* Bell icon */}
       <RiBellLine
-        className="w-3 h-3 shrink-0 text-foreground/30"
+        className="w-3 h-3 shrink-0 text-foreground/40"
         style={{ animation: "ann-bell 5s ease-in-out infinite" }}
       />
 
-      {/* Item text — centered, pure text, no box */}
+      {/* Text — with link if configured */}
       {annUrl ? (
         <Link
           href={annUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="min-w-0 truncate text-foreground/45 hover:text-foreground/70 transition-colors leading-none"
+          className="min-w-0 truncate leading-none hover:text-foreground/80 transition-colors"
         >
-          {textSpan}
+          {textContent}
         </Link>
-      ) : (
-        <span className="min-w-0 truncate leading-none">{textSpan}</span>
-      )}
+      ) : textContent}
 
       {/* Dots for multiple items */}
       {items.length > 1 && (
@@ -294,7 +298,7 @@ function AnnouncementBanner() {
           {items.map((_, i) => (
             <div
               key={i}
-              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-2.5 h-1 bg-foreground/25" : "w-1 h-1 bg-foreground/12"}`}
+              className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-2.5 h-1 bg-foreground/30" : "w-1 h-1 bg-foreground/15"}`}
             />
           ))}
         </div>
@@ -303,7 +307,7 @@ function AnnouncementBanner() {
       {/* Close */}
       <button
         onClick={handleDismiss}
-        className="shrink-0 text-foreground/25 hover:text-foreground/55 transition-colors"
+        className="shrink-0 text-foreground/30 hover:text-foreground/60 transition-colors"
         aria-label={t("close_announcement")}
       >
         <RiCloseLine className="w-3 h-3" />
