@@ -9,7 +9,7 @@ import {
   RiCheckLine, RiServerLine,
   RiErrorWarningLine, RiDeleteBinLine,
   RiInformationLine, RiEdit2Line, RiGlobalLine,
-  RiProhibitedLine,
+  RiProhibitedLine, RiWifiLine, RiCloseLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
@@ -44,6 +44,24 @@ function fmt(d: string | null) {
 
 type Summary = { reason: string | null; count: string };
 
+type TestResult = {
+  ok: boolean;
+  method: string;
+  output?: string;
+  statusCode?: number;
+  error?: string;
+  elapsedMs: number;
+};
+
+type TestPanel = {
+  type: "tcp" | "http";
+  host: string;
+  port: string;
+  url: string;
+  result: TestResult | null;
+  loading: boolean;
+};
+
 export default function TldFailuresPage() {
   const [rows, setRows] = React.useState<TldFailureRow[]>([]);
   const [summary, setSummary] = React.useState<Summary[]>([]);
@@ -59,6 +77,9 @@ export default function TldFailuresPage() {
   const [patchingStatus, setPatchingStatus] = React.useState<string | null>(null);
   const [resettingBypass, setResettingBypass] = React.useState<string | null>(null);
   const [resettingAllBypasses, setResettingAllBypasses] = React.useState(false);
+
+  // Per-row inline test panel state
+  const [testPanels, setTestPanels] = React.useState<Record<string, TestPanel>>({});
 
   function load() {
     setLoading(true);
@@ -157,6 +178,61 @@ export default function TldFailuresPage() {
       if (r.ok) { toast.success("备注已保存"); setEditingNotes(null); load(); }
       else toast.error("保存失败");
     } finally { setSavingNotes(false); }
+  }
+
+  function openTestPanel(tld: string) {
+    setTestPanels(prev => ({
+      ...prev,
+      [tld]: prev[tld] ?? {
+        type: "tcp",
+        host: `whois.nic.${tld}`,
+        port: "",
+        url: `https://rdap.nic.${tld}/domain/`,
+        result: null,
+        loading: false,
+      },
+    }));
+  }
+
+  function closeTestPanel(tld: string) {
+    setTestPanels(prev => {
+      const next = { ...prev };
+      delete next[tld];
+      return next;
+    });
+  }
+
+  function updateTestPanel(tld: string, patch: Partial<TestPanel>) {
+    setTestPanels(prev => ({ ...prev, [tld]: { ...prev[tld], ...patch } }));
+  }
+
+  async function runTest(tld: string) {
+    const panel = testPanels[tld];
+    if (!panel) return;
+    updateTestPanel(tld, { loading: true, result: null });
+
+    let entry: object;
+    if (panel.type === "tcp") {
+      const portNum = panel.port.trim() ? parseInt(panel.port.trim(), 10) : undefined;
+      entry = { type: "tcp", host: panel.host.trim(), ...(portNum ? { port: portNum } : {}) };
+    } else {
+      entry = { type: "http", url: panel.url.trim(), method: "GET" };
+    }
+
+    try {
+      const r = await fetch("/api/admin/test-server", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, entry }),
+      });
+      const data: TestResult = await r.json();
+      updateTestPanel(tld, { result: data, loading: false });
+    } catch (e: any) {
+      updateTestPanel(tld, {
+        loading: false,
+        result: { ok: false, method: "?", error: e?.message || "网络错误", elapsedMs: 0 },
+      });
+    }
   }
 
   const total = summary.reduce((s, r) => s + parseInt(r.count), 0);
@@ -276,7 +352,7 @@ export default function TldFailuresPage() {
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <div className="text-xs text-sky-700 dark:text-sky-400 space-y-0.5">
             <p><strong>失败原因说明：</strong>无服务器 = IANA未收录该后缀的WHOIS服务器；超时 = 服务器有记录但无法连接；解析失败 = 响应内容无法识别；速率限制 = 服务器拒绝过频访问</p>
-            <p>点击 <strong>配置服务器</strong> 可跳转到域名管理页面为该后缀添加自定义WHOIS服务器，保存后立即生效</p>
+            <p>点击 <strong>测试连接</strong> 可直接在此处测试 WHOIS 服务器连通性，点击 <strong>配置服务器</strong> 跳转到域名管理页添加自定义服务器</p>
           </div>
         </div>
 
@@ -297,6 +373,7 @@ export default function TldFailuresPage() {
               const reasonInfo = REASON_COLORS[row.fail_reason ?? ""] ?? { label: row.fail_reason ?? "未知", cls: "bg-muted text-muted-foreground" };
               const repairInfo = REPAIR_STATUS[row.repair_status ?? "pending"] ?? REPAIR_STATUS.pending;
               const isEditing = editingNotes === row.tld;
+              const testPanel = testPanels[row.tld];
               return (
                 <div key={row.tld} className="glass-panel border border-border rounded-2xl p-4 space-y-2.5">
                   {/* Row 1: TLD + counts + badges */}
@@ -318,7 +395,7 @@ export default function TldFailuresPage() {
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[11px] font-bold text-red-500">{row.fail_count.toLocaleString()}</span>
                       <span className="text-[10px] text-muted-foreground">次失败</span>
-                      {/* Week-over-week failure delta badge (reg_status IS NULL searches per TLD) */}
+                      {/* Week-over-week failure delta badge */}
                       {row.this_week_count !== undefined && row.prev_week_count !== undefined && (row.this_week_count > 0 || row.prev_week_count > 0) && (() => {
                         const delta = row.this_week_count - row.prev_week_count;
                         if (delta === 0) return (
@@ -388,6 +465,113 @@ export default function TldFailuresPage() {
                     </div>
                   ) : null}
 
+                  {/* Inline test panel */}
+                  {testPanel && (
+                    <div className="border border-border/60 rounded-xl bg-muted/20 p-3 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5">
+                          <RiWifiLine className="w-3.5 h-3.5 text-sky-500" />
+                          测试 WHOIS 服务器连通性
+                        </span>
+                        <button
+                          onClick={() => closeTestPanel(row.tld)}
+                          className="text-muted-foreground/60 hover:text-foreground transition-colors"
+                        >
+                          <RiCloseLine className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Type toggle */}
+                      <div className="flex gap-1">
+                        {(["tcp", "http"] as const).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => updateTestPanel(row.tld, { type: t, result: null })}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all",
+                              testPanel.type === t
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border/60 text-muted-foreground hover:border-primary/40 bg-background"
+                            )}
+                          >
+                            {t === "tcp" ? "WHOIS TCP" : "RDAP / HTTP"}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Inputs */}
+                      {testPanel.type === "tcp" ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={testPanel.host}
+                            onChange={e => updateTestPanel(row.tld, { host: e.target.value })}
+                            placeholder={`whois.nic.${row.tld}`}
+                            className="h-7 text-[11px] rounded-lg flex-1 font-mono"
+                          />
+                          <Input
+                            value={testPanel.port}
+                            onChange={e => updateTestPanel(row.tld, { port: e.target.value })}
+                            placeholder="43"
+                            className="h-7 text-[11px] rounded-lg w-16 font-mono"
+                          />
+                        </div>
+                      ) : (
+                        <Input
+                          value={testPanel.url}
+                          onChange={e => updateTestPanel(row.tld, { url: e.target.value })}
+                          placeholder={`https://rdap.nic.${row.tld}/domain/`}
+                          className="h-7 text-[11px] rounded-lg font-mono"
+                        />
+                      )}
+
+                      <button
+                        onClick={() => runTest(row.tld)}
+                        disabled={testPanel.loading || (testPanel.type === "tcp" ? !testPanel.host.trim() : !testPanel.url.trim())}
+                        className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white text-[11px] font-semibold transition-colors"
+                      >
+                        {testPanel.loading
+                          ? <RiLoader4Line className="w-3 h-3 animate-spin" />
+                          : <RiWifiLine className="w-3 h-3" />}
+                        {testPanel.loading ? "测试中…" : "开始测试"}
+                      </button>
+
+                      {/* Result */}
+                      {testPanel.result && (
+                        <div className={cn(
+                          "rounded-xl border p-3 space-y-1.5",
+                          testPanel.result.ok
+                            ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/30"
+                            : "bg-red-50/50 dark:bg-red-950/20 border-red-200/60 dark:border-red-800/30"
+                        )}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {testPanel.result.ok
+                              ? <RiCheckLine className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              : <RiErrorWarningLine className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                            <span className={cn(
+                              "text-[11px] font-semibold",
+                              testPanel.result.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"
+                            )}>
+                              {testPanel.result.ok ? "连接成功" : "连接失败"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">{testPanel.result.method}</span>
+                            {testPanel.result.statusCode !== undefined && (
+                              <span className="text-[10px] text-muted-foreground">HTTP {testPanel.result.statusCode}</span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground ml-auto">{testPanel.result.elapsedMs} ms</span>
+                          </div>
+                          {testPanel.result.error && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 break-all">{testPanel.result.error}</p>
+                          )}
+                          {testPanel.result.output && (
+                            <pre className="text-[10px] font-mono text-foreground/70 bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-40 leading-relaxed">
+                              {testPanel.result.output}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Actions row */}
                   <div className="flex items-center gap-1.5 flex-wrap pt-0.5 border-t border-border/40">
                     {/* Repair status controls */}
@@ -425,6 +609,20 @@ export default function TldFailuresPage() {
                       </button>
                     )}
 
+                    {/* Test connection */}
+                    <button
+                      onClick={() => testPanel ? closeTestPanel(row.tld) : openTestPanel(row.tld)}
+                      className={cn(
+                        "text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1 transition-all",
+                        testPanel
+                          ? "border-sky-400/60 bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400"
+                          : "border-border/60 text-muted-foreground hover:border-sky-400/60 hover:text-sky-600 dark:hover:text-sky-400"
+                      )}
+                    >
+                      <RiWifiLine className="w-2.5 h-2.5" />
+                      测试连接
+                    </button>
+
                     {/* Configure server */}
                     <a
                       href={`/admin/domains?tab=failures`}
@@ -443,8 +641,7 @@ export default function TldFailuresPage() {
                       >
                         {resettingBypass === row.tld
                           ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" />
-                          : <RiProhibitedLine className="w-2.5 h-2.5" />
-                        }
+                          : <RiProhibitedLine className="w-2.5 h-2.5" />}
                         重置旁路
                       </button>
                     )}
@@ -457,8 +654,7 @@ export default function TldFailuresPage() {
                     >
                       {clearing === row.tld
                         ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" />
-                        : <RiDeleteBinLine className="w-2.5 h-2.5" />
-                      }
+                        : <RiDeleteBinLine className="w-2.5 h-2.5" />}
                       清零
                     </button>
                   </div>
@@ -471,4 +667,3 @@ export default function TldFailuresPage() {
     </AdminLayout>
   );
 }
-

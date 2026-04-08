@@ -668,8 +668,13 @@ export async function recordTldLookupFailure(
   domain: string,
   errorMsg?: string,
 ): Promise<void> {
-  // Skip recording for obviously invalid TLDs (single char, non-alphabetic start, or purely numeric)
-  if (!tld || tld.length < 2 || !/^[a-zA-Z]/.test(tld) || /^\d+$/.test(tld)) return;
+  // Skip recording for obviously invalid TLDs:
+  // - too short or too long (IANA TLDs are at most 24 chars)
+  // - doesn't start with a letter
+  // - purely numeric
+  // - contains a dot (means it's a full domain label, not a TLD suffix)
+  if (!tld || tld.length < 2 || tld.length > 24) return;
+  if (!/^[a-zA-Z]/.test(tld) || /^\d+$/.test(tld) || tld.includes(".")) return;
   const db = await getDbReady().catch(() => null);
   if (!db) return;
   const client = await db.connect().catch(() => null);
