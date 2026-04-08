@@ -263,105 +263,149 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
       animate="visible"
       className="glass-panel rounded-xl overflow-hidden border border-border/60 relative"
     >
-      {/* Accent bar — theme primary for available, amber for premium */}
-      <div className={cn(
-        "h-1 w-full",
-        isPremium
-          ? "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400"
-          : "bg-gradient-to-r from-primary/70 via-primary to-primary/70"
-      )} />
+      {/* Accent bar — animates between green-primary and amber */}
+      <div className="h-1 w-full relative overflow-hidden">
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-700",
+          isPremium ? "opacity-100" : "opacity-0",
+          "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400"
+        )} />
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-700",
+          isPremium ? "opacity-0" : "opacity-100",
+          "bg-gradient-to-r from-primary/70 via-primary to-primary/70"
+        )} />
+      </div>
 
       {/* Subtle background glow */}
-      <div className={cn(
-        "absolute inset-0 pointer-events-none",
-        isPremium
-          ? "bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.03)_0%,transparent_60%)]"
-          : "bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.04)_0%,transparent_60%)]"
-      )} />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.04)_0%,transparent_60%)]" />
 
       {/* ── Hero ── */}
-      <motion.div
-        variants={staggerChildren}
-        initial="hidden"
-        animate="visible"
-        className={cn(
-          "relative px-5 sm:px-8 pt-6 pb-5",
-          isPremium
-            ? "bg-amber-500/5 dark:bg-amber-950/15"
-            : "bg-primary/[0.03] dark:bg-primary/[0.06]"
-        )}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            {/* Animated icon */}
-            <motion.div
-              variants={fadeUp}
-              className={cn(
-                "shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm",
-                isPremium
-                  ? "bg-amber-500/10 border-amber-400/30 dark:border-amber-500/30"
-                  : "bg-primary/10 border-primary/20"
-              )}
-              whileHover={{ scale: 1.08, rotate: isPremium ? 5 : -5 }}
-              transition={{ type: "spring", stiffness: 400, damping: 20 }}
-            >
-              {isPremium
-                ? <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />
-                : <RiCheckLine className="w-6 h-6 text-primary" />}
-            </motion.div>
+      <div className="relative overflow-hidden">
+        {/* Tinted hero background — transitions between states */}
+        <div className={cn(
+          "absolute inset-0 transition-colors duration-700",
+          isPremium ? "bg-amber-500/[0.07] dark:bg-amber-950/20" : "bg-primary/[0.06] dark:bg-primary/[0.10]"
+        )} />
 
-            <div className="min-w-0 flex-1">
-              {/* Domain name */}
-              <motion.div variants={fadeUp} className="mb-1.5 leading-tight">
-                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-all">{sldForDisplay}</span>
-                <span className={cn(
-                  "text-2xl sm:text-3xl font-bold tracking-tight",
-                  isPremium ? "text-amber-500 dark:text-amber-400" : "text-primary"
-                )}>{tldForDisplay}</span>
+        <motion.div
+          variants={staggerChildren}
+          initial="hidden"
+          animate="visible"
+          className="relative px-5 sm:px-8 pt-6 pb-5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              {/* Icon — crossfades between check and crown */}
+              <motion.div
+                variants={fadeUp}
+                className={cn(
+                  "shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-colors duration-700",
+                  isPremium
+                    ? "bg-amber-500/12 border-amber-400/35 dark:border-amber-500/35"
+                    : "bg-primary/[0.12] border-primary/25"
+                )}
+                whileHover={{ scale: 1.08, rotate: isPremium ? 5 : -5 }}
+                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {isPremium ? (
+                    <motion.span
+                      key="crown"
+                      initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+                      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                      exit={{ scale: 0.5, opacity: 0, rotate: 20 }}
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="check"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <RiCheckLine className="w-6 h-6 text-primary" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </motion.div>
-              {/* Description */}
-              <motion.p variants={fadeUp} className="text-sm text-muted-foreground leading-relaxed">
-                {isPremium
-                  ? (anyApiPremium && premiumRegistrars.length > 0
-                      ? (isZh
-                          ? `溢价域名，注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，实际以注册商报价为准。`
-                          : `Premium domain — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm price with registrar.`)
-                      : (isZh
-                          ? "溢价域名，注册价格高于普通域名，请以注册商实时报价为准。"
-                          : "Premium domain — registration costs above standard rates. Confirm with registrar."))
-                  : (isZh
-                      ? "该域名目前可注册，抓紧时间抢注吧！"
-                      : "This domain is available. Grab it before someone else does.")}
-              </motion.p>
-            </div>
-          </div>
 
-          {/* Status badge */}
-          <motion.div variants={fadeUp} className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end gap-2">
-            <motion.span
-              className={cn(
-                "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border",
-                isPremium
-                  ? "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-400/30 dark:border-amber-500/30"
-                  : "text-primary bg-primary/10 border-primary/25"
-              )}
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.25, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            >
+              <div className="min-w-0 flex-1">
+                {/* Domain name */}
+                <motion.div variants={fadeUp} className="mb-1.5 leading-tight">
+                  <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-all">{sldForDisplay}</span>
+                  <span className={cn(
+                    "text-2xl sm:text-3xl font-bold tracking-tight transition-colors duration-700",
+                    isPremium ? "text-amber-500 dark:text-amber-400" : "text-primary"
+                  )}>{tldForDisplay}</span>
+                </motion.div>
+                {/* Description */}
+                <motion.p variants={fadeUp} className="text-sm text-muted-foreground leading-relaxed">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={isPremium ? "premium-desc" : "available-desc"}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      {isPremium
+                        ? (anyApiPremium && premiumRegistrars.length > 0
+                            ? (isZh
+                                ? `溢价域名，注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，实际以注册商报价为准。`
+                                : `Premium domain — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm price with registrar.`)
+                            : (isZh
+                                ? "溢价域名，注册价格高于普通域名，请以注册商实时报价为准。"
+                                : "Premium domain — registration costs above standard rates. Confirm with registrar."))
+                        : (isZh
+                            ? "该域名目前可注册，抓紧时间抢注吧！"
+                            : "This domain is available. Grab it before someone else does.")}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.p>
+              </div>
+            </div>
+
+            {/* Status badge */}
+            <motion.div variants={fadeUp} className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end gap-2">
               <motion.span
                 className={cn(
-                  "w-1.5 h-1.5 rounded-full",
-                  isPremium ? "bg-amber-500" : "bg-primary"
+                  "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors duration-700",
+                  isPremium
+                    ? "text-amber-700 dark:text-amber-300 bg-amber-500/12 border-amber-400/35 dark:border-amber-500/35"
+                    : "text-primary bg-primary/12 border-primary/30"
                 )}
-                animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              />
-              {isPremium ? (isZh ? "溢价域名" : "Premium") : (isZh ? "可注册" : "Available")}
-            </motion.span>
-          </motion.div>
-        </div>
-      </motion.div>
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.25, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <motion.span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-colors duration-700",
+                    isPremium ? "bg-amber-500" : "bg-primary"
+                  )}
+                  animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={isPremium ? "lbl-premium" : "lbl-available"}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {isPremium ? (isZh ? "溢价域名" : "Premium") : (isZh ? "可注册" : "Available")}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.span>
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
 
       {/* ── Action buttons ── */}
       <motion.div
@@ -380,7 +424,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "inline-flex items-center justify-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-lg border transition-colors duration-150 active:scale-[0.97]",
+                "inline-flex items-center justify-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-lg border transition-colors duration-500 active:scale-[0.97]",
                 isPremium
                   ? "border-amber-400/40 dark:border-amber-500/35 text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/12 hover:bg-amber-500/18 dark:hover:bg-amber-500/20"
                   : "border-primary/30 text-primary bg-primary/10 hover:bg-primary/18"
@@ -475,7 +519,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
               className="flex items-start gap-2 text-sm text-muted-foreground leading-snug"
             >
               <span className={cn(
-                "mt-1 w-1.5 h-1.5 rounded-full shrink-0",
+                "mt-1 w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-700",
                 isPremium ? "bg-amber-400" : "bg-primary/60"
               )} />
               {tip}
@@ -492,9 +536,9 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.3 }}
-            className="mx-4 sm:mx-5 mt-4 flex items-start gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5"
+            className="mx-4 sm:mx-5 mt-4 flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 dark:bg-amber-950/20 px-3 py-2.5"
           >
-            <RiInformationLine className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <RiInformationLine className="w-3.5 h-3.5 text-amber-500/70 mt-0.5 shrink-0" />
             <p className="text-[11px] text-muted-foreground leading-snug">
               {anyApiPremium && premiumRegistrars.length > 0
                 ? (isZh
