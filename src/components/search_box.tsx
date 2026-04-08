@@ -450,8 +450,10 @@ export function SearchBox({
     setSelectedIndex(-1);
 
     // Debounced prefetch: if the input looks like a complete query (has a dot
-    // and at least 2 chars after it), start the lookup 600 ms after the user
+    // and at least 2 chars after it), start the lookup 400 ms after the user
     // stops typing so the response is already in-flight when they press Enter.
+    // Reduced from 600 → 400 ms: gives the server an extra 200 ms head start
+    // while still avoiding prefetch spam on fast typists.
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     const trimmed = value.trim();
     const dotIdx = trimmed.lastIndexOf(".");
@@ -459,7 +461,7 @@ export function SearchBox({
       prefetchTimerRef.current = setTimeout(() => {
         const target = cleanDomain(trimmed.replace(/\s+/g, ""));
         if (target) prefetchLookup(target);
-      }, 600);
+      }, 400);
     }
   };
 

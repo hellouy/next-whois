@@ -59,9 +59,6 @@ export default async function handler(
     return res.status(429).json({ error: "Too many requests — please slow down" });
   }
 
-  const keyOk = await enforceApiKey(req, res, "api");
-  if (!keyOk) return;
-
   const query = req.query.query || req.query.q;
   if (!query || typeof query !== "string" || !query.trim()) {
     return res.status(400).json({ error: "Query is required" });
@@ -76,14 +73,16 @@ export default async function handler(
 
   const nocache = req.query.nocache === "1";
 
-  // ── Early lookup start ────────────────────────────────────────────────────
-  // Begin the WHOIS/RDAP lookup immediately while the session check runs in
-  // parallel.  This hides the session-check latency (50-300 ms) behind the
-  // first RDAP round-trip, so the partial RDAP result is available sooner.
+  // ── Earliest possible lookup start ───────────────────────────────────────
+  // Begin the WHOIS/RDAP lookup immediately after input validation — before
+  // the API-key check and session check — so those auth round-trips run in
+  // parallel with the first RDAP/WHOIS network requests.
+  // For same-origin requests enforceApiKey is instant; for external API users
+  // the lookup now gets a ~50-200 ms head start during the key verification.
   //
   // We use a mutable callback ref: initially it buffers the partial result;
-  // after the session check passes and response headers are sent, it is
-  // upgraded to write directly to the response stream.
+  // after the auth check passes and response headers are sent, it is upgraded
+  // to write directly to the response stream.
   let _lookupAborted = false;
   let _bufferedPartial: WhoisResult | null = null;
   let _onPartial: (p: WhoisResult) => void = (p) => { _bufferedPartial = p; };
@@ -94,7 +93,14 @@ export default async function handler(
     (partial) => { if (!_lookupAborted) _onPartial(partial); },
   );
 
-  // ── Auth check (runs in parallel with the lookup above) ──────────────────
+  // ── API-key check + auth check (runs in parallel with the lookup above) ──
+  // enforceApiKey must resolve before streaming headers are sent — it can write
+  // its own error response (401/403) if the key is missing or invalid.  Run it
+  // in parallel with the session / require_login checks so both auth concerns
+  // resolve together while the lookup is already in-flight.
+  const keyOk = await enforceApiKey(req, res, "api");
+  if (!keyOk) { _lookupAborted = true; return; }
+
   const [session, requireLogin] = await Promise.all([
     getServerSession(req, res, authOptions).catch(() => null),
     getSetting("require_login"),
