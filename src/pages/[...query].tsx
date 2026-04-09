@@ -709,7 +709,11 @@ export default function LookupPage({
   const router = useRouter();
   const settings = useSiteSettings();
   const hideRawWhois = settings.hide_raw_whois === "1";
-  const enableSearchLinks = settings.enable_search_links !== "";
+  const enableSearchLinks = settings.enable_search_links === "1";
+  const enableShare    = settings.enable_share    === "1";
+  const enableFeedback = settings.enable_feedback === "1";
+  const enableRemind   = settings.enable_remind   === "1";
+  const enableStamps   = settings.enable_stamps   === "1";
 
   // ── Shallow-routing target sync ──────────────────────────────────────────
   // `target` starts as the SSR-provided prop.  When the user searches again
@@ -1826,6 +1830,7 @@ export default function LookupPage({
                         >
                           {queryType}
                         </Badge>
+                        {enableRemind && (
                         <button
                           onClick={() => {
                             if (!session) {
@@ -1851,6 +1856,7 @@ export default function LookupPage({
                         >
                           <RiTimerLine className="w-3 h-3" />
                         </button>
+                        )}
                         {isOfficialDomain ? (
                           <button
                             onClick={(e) => {
@@ -1873,7 +1879,7 @@ export default function LookupPage({
                             <RiGlobalLine className="w-3 h-3" />
                             {isChinese ? "官网认证" : "Official"}
                           </button>
-                        ) : verifiedStamps.length > 0 ? (
+                        ) : enableStamps ? verifiedStamps.length > 0 ? (
                           <button
                             onClick={() => setStampDetailOpen(true)}
                             className="stamp-claimed-badge sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400"
@@ -1896,7 +1902,7 @@ export default function LookupPage({
                           >
                             <RiShieldCheckLine className="w-3 h-3" />
                           </button>
-                        )}
+                        ) : null}
                       </div>
                       <div className="flex items-start gap-2 mb-1">
                         <motion.h2
@@ -2010,6 +2016,7 @@ export default function LookupPage({
                           </div>
                         )}
                         {/* Desktop-only Subscribe text button */}
+                        {enableRemind && (
                         <button
                           onClick={() => {
                             if (!session) {
@@ -2035,6 +2042,7 @@ export default function LookupPage({
                           <RiTimerLine className="w-3 h-3" />
                           {isChinese ? "域名订阅" : "Subscribe"}
                         </button>
+                        )}
                         {isOfficialDomain ? (
                           <button
                             onClick={(e) => {
@@ -2057,7 +2065,7 @@ export default function LookupPage({
                             <RiGlobalLine className="w-3 h-3" />
                             {isChinese ? "官网认证" : "Official"}
                           </button>
-                        ) : verifiedStamps.length > 0 ? (
+                        ) : enableStamps ? verifiedStamps.length > 0 ? (
                           <button
                             onClick={() => setStampDetailOpen(true)}
                             className="stamp-claimed-badge hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/40"
@@ -2080,7 +2088,7 @@ export default function LookupPage({
                             <RiShieldCheckLine className="w-3 h-3" />
                             {isChinese ? "域名认领" : "Claim"}
                           </button>
-                        )}
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-[10px] text-muted-foreground font-mono">
@@ -2136,6 +2144,7 @@ export default function LookupPage({
                           </span>
                         )}
                         <div className="ml-auto flex items-center gap-1">
+                          {enableFeedback && (
                           <button
                             onClick={() => setFeedbackOpen(true)}
                             title={t("feedback.issue_title")}
@@ -2144,6 +2153,8 @@ export default function LookupPage({
                             <RiErrorWarningLine className="w-3.5 h-3.5" />
                             {t("feedback.title")}
                           </button>
+                          )}
+                          {enableShare && (
                           <SharePanel
                             target={target}
                             result={result}
@@ -2151,6 +2162,7 @@ export default function LookupPage({
                             isZh={isZh}
                             onOpenImagePreview={() => setShowImagePreview(true)}
                           />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2289,13 +2301,16 @@ export default function LookupPage({
                       document.body
                     )}
 
+                    {enableFeedback && (
                     <FeedbackDrawer
                       open={feedbackOpen}
                       onOpenChange={setFeedbackOpen}
                       query={result.domain || target}
                       queryType={queryType}
                     />
+                    )}
 
+                    {enableRemind && (
                     <DomainReminderDialog
                       domain={result.domain || target}
                       expirationDate={result.expirationDate}
@@ -2318,6 +2333,7 @@ export default function LookupPage({
                       eppStatuses={result.status?.map((s) => s.status) ?? []}
                       regStatusType={getDomainRegistrationStatus(result, locale).type}
                     />
+                    )}
 
                     {result.remainingDays === null &&
                       (() => {
@@ -2411,7 +2427,7 @@ export default function LookupPage({
                     )}
 
                     {/* Stamp detail dialog — triggered by "已认领" badge */}
-                    <Dialog open={stampDetailOpen} onOpenChange={setStampDetailOpen}>
+                    {enableStamps && <Dialog open={stampDetailOpen} onOpenChange={setStampDetailOpen}>
                       <DialogContent hideClose className="max-w-[360px] p-0 overflow-hidden gap-0 rounded-[22px]">
                         <DialogHeader className="sr-only">
                           <DialogTitle>{isChinese ? "品牌认领信息" : "Claimed Brand"}</DialogTitle>
@@ -2457,7 +2473,7 @@ export default function LookupPage({
                           })}
                         </div>
                       </DialogContent>
-                    </Dialog>
+                    </Dialog>}
 
                     <WhoisFieldsTable
                       result={result}

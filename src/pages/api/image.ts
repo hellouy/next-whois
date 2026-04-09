@@ -13,6 +13,8 @@ const ALLOWED_KEYS = new Set([
 ]);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "GET") return res.status(405).end();
+
   const key = req.query.key as string;
   if (!key || !ALLOWED_KEYS.has(key)) {
     return res.status(400).json({ error: "Invalid key" });
