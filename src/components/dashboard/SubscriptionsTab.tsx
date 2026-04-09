@@ -325,7 +325,7 @@ export function SubscriptionsTab({
             isPostExpiry ? "border-orange-300/60 dark:border-orange-700/50" :
             isWarn ? "border-amber-300/60 dark:border-amber-700/50" : "border-border"
           )}>
-            {/* ── Main card row ─────────────────────────────── */}
+            {/* Main card row */}
             <div className="p-3.5 space-y-2.5">
               <div className="flex items-center gap-2.5">
                 {/* Status icon */}
@@ -450,7 +450,7 @@ export function SubscriptionsTab({
               )}
             </div>
 
-            {/* ── Expand / collapse toggle ──────────────────── */}
+            {/* Expand / collapse toggle */}
             {hasDetails && (
               <button
                 type="button"
@@ -464,7 +464,7 @@ export function SubscriptionsTab({
               </button>
             )}
 
-            {/* ── Expandable detail panel ───────────────────── */}
+            {/* Expandable detail panel */}
             <AnimatePresence initial={false}>
               {isExpanded && hasDetails && (
                 <motion.div
