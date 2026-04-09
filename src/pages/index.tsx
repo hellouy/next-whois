@@ -1,4 +1,4 @@
-import { cn, toSearchURI, isSearchRoute, cleanDomain } from "@/lib/utils";
+import { cn, toSearchURI, isSearchRoute, cleanDomain, isValidDomainTld } from "@/lib/utils";
 import { prefetchLookup } from "@/lib/lookup-prefetch";
 import React, { useEffect, useCallback, useState } from "react";
 import { AnimatePresence } from "framer-motion";
@@ -154,7 +154,12 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
   const handleSearch = useCallback(
     (query: string) => {
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
-      if (cleaned) prefetchLookup(cleaned);
+      const queryLooksValid =
+        cleaned &&
+        !cleaned.startsWith(".") &&
+        (cleaned.includes(".") || /^AS\d+$/i.test(cleaned) || /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(cleaned)) &&
+        isValidDomainTld(cleaned);
+      if (queryLooksValid) prefetchLookup(cleaned);
       setSearchTarget(cleaned || query.trim());
       setIsSearching(true);
       router.push(toSearchURI(query));

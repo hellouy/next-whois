@@ -142,6 +142,18 @@ const FeedbackDrawer = dynamic(
   { ssr: false, loading: () => null }
 );
 
+// Shared validity check used by both getServerSideProps (SSR) and the
+// client-side useEffect.  A "query" must have a dot (domain/IP), be an ASN
+// (AS12345), or be an IPv6 address.  Bare words like "zhouzhouw" are invalid.
+function looksLikeDomainQuery(t: string): boolean {
+  return (
+    !t.startsWith(".") &&
+    (t.includes(".") ||
+      /^AS\d+$/i.test(t) ||
+      /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(t))
+  );
+}
+
 const CARD_CONTAINER_VARIANTS = {
   hidden: { opacity: 1 },
   visible: {
@@ -453,27 +465,33 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
   const target = cleanDomain(spacelessPath);
   const displayTarget = targetToDisplayName(target);
 
-  const looksLikeQuery = (t: string) =>
-    // Reject bare TLDs like ".cc" or ".com" — a leading dot means an empty
-    // label before it, which is never a valid domain, IP, or ASN.
-    !t.startsWith(".") &&
-    (t.includes(".") ||
-      /^AS\d+$/i.test(t) ||
-      /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(t));
-
   // If cleaning changed the URL (spaces removed, protocol stripped, path trimmed…),
   // redirect to the canonical clean URL to avoid duplicate/broken results.
   // Always use encodeURI so non-ASCII characters (emoji, CJK surrogates, etc.)
   // are percent-encoded in the HTTP Location header (required by HTTP spec).
-  if (looksLikeQuery(target) && `/${target}` !== `/${rawPath}`) {
+  if (looksLikeDomainQuery(target) && `/${target}` !== `/${rawPath}`) {
     return { redirect: { destination: encodeURI(`/${target}`), permanent: false } };
   }
 
-  // If it still doesn't look like any known query type, redirect to home
-  // instead of a hard 404 — real app routes (/admin, /zh/about, etc.) are
-  // handled by their own pages before they ever reach this catch-all.
-  if (!looksLikeQuery(target)) {
-    return { redirect: { destination: "/", permanent: false } };
+  // If it still doesn't look like any known query type, show an error page.
+  // Real app routes (/admin, /dashboard, /login, etc.) are handled by their own
+  // Next.js pages BEFORE reaching this catch-all, so anything arriving here
+  // with no dot / IP / ASN pattern is a genuinely invalid user input.
+  if (!looksLikeDomainQuery(target)) {
+    return {
+      props: {
+        data: {
+          time: 0,
+          status: false,
+          cached: false,
+          error: "INVALID_DOMAIN_TLD",
+        } as WhoisResult,
+        // Show the raw user input so the error page can reference what they typed.
+        target: rawPath || target || "unknown",
+        displayTarget: rawPath || target || "unknown",
+        origin,
+      },
+    };
   }
 
   // ── CN Reserved SLD early-return (before cleanDomain rewrites the query) ──
@@ -884,6 +902,25 @@ export default function LookupPage({
     // silently update the data in the background — no skeleton flash.
     const isFirstLoad = !firstLoadDone.current;
     firstLoadDone.current = true;
+
+    // ── INVALID TLD short-circuit ────────────────────────────────────────────
+    // Skip the fetch if the current target is demonstrably invalid — no dot,
+    // no ASN pattern, no IPv6, or an unrecognised ICANN TLD.  This guard runs
+    // on every useEffect invocation so it works for both:
+    //   (a) direct navigation  — SSR returned INVALID_DOMAIN_TLD props
+    //   (b) shallow routing    — user searched a new invalid domain from within
+    //       the page (initialData still holds the old domain's SSR data, so the
+    //       ref-based approach would silently miss this case)
+    // Updating `data` here ensures the error card is visible even on a shallow
+    // navigation where SSR props are not refreshed.
+    const targetIsInvalid = !looksLikeDomainQuery(target) || !isValidDomainTld(target);
+    if (targetIsInvalid) {
+      firstLoadDone.current = true;
+      setLoading(false);
+      setData({ time: 0, status: false, cached: false, error: "INVALID_DOMAIN_TLD" });
+      return;
+    }
+
     const silentRefresh = isFirstLoad && initialData != null && refreshKey === 0;
 
     if (!silentRefresh) {
@@ -1150,7 +1187,9 @@ export default function LookupPage({
     const url = toSearchURI(query);
     if (url === router.asPath) return;
     const cleaned = cleanDomain(query.replace(/\s+/g, ""));
-    if (cleaned) prefetchLookup(cleaned);
+    if (cleaned && looksLikeDomainQuery(cleaned) && isValidDomainTld(cleaned)) {
+      prefetchLookup(cleaned);
+    }
     // Shallow routing: URL changes but SSR is skipped entirely (~500 ms saved).
     // router.query updates → targetFromRouterQuery → setTarget → useEffect
     // re-fetches the new domain without unmounting/remounting the page.
@@ -1471,37 +1510,62 @@ export default function LookupPage({
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
             >
               <div className={cn(hasErrorRaw ? "lg:col-span-8" : "lg:col-span-12", "space-y-6")}>
-                {error === "INVALID_DOMAIN_TLD" ? (
-                  <div className="glass-panel border border-amber-300/50 dark:border-amber-700/40 rounded-xl p-8 sm:p-12 text-center">
-                    <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/30 rounded-full flex items-center justify-center mx-auto mb-5">
-                      <RiErrorWarningLine className="w-8 h-8 text-amber-500" />
-                    </div>
-                    <Badge variant="outline" className="mb-4 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-600 border-amber-400/50">
-                      INVALID TLD
-                    </Badge>
-                    <h2 className="text-2xl font-bold mb-2">
-                      {isChinese ? `".${target.split(".").pop()}" 不是真实的域名后缀` : `".${target.split(".").pop()}" isn't a real TLD`}
-                    </h2>
-                    <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed mb-2">
-                      {isChinese
-                        ? `我们查遍了 ICANN 的所有顶级域名列表，没找到 `
-                        : `We searched the entire ICANN TLD registry and couldn't find `}
-                      <span className="font-mono font-semibold text-foreground">{`.${target.split(".").pop()}`}</span>
-                      {isChinese ? `。请检查拼写，常见的有 .com .net .org .io .cn` : `. Check for typos — try .com .net .org .io`}
-                    </p>
-                    <p className="text-xs text-muted-foreground/60 mb-8">
-                      {isChinese ? "WHOIS 查询不支持不存在的后缀，这不是 bug，是常识。" : "WHOIS doesn't work for non-existent TLDs. Not a bug — just how the internet works."}
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                      <Link href="/">
-                        <Button className="gap-2">
-                          <RiSearchLine className="w-4 h-4" />
-                          {isChinese ? "重新搜索" : "Search Again"}
-                        </Button>
-                      </Link>
+                {error === "INVALID_DOMAIN_TLD" ? (() => {
+                  const hasDot = target.includes(".");
+                  const tld = hasDot ? `.${target.split(".").pop()}` : null;
+                  return (
+                  <div className="glass-panel border border-amber-300/50 dark:border-amber-700/40 rounded-xl overflow-hidden">
+                    {/* Top accent bar */}
+                    <div className="h-1 w-full bg-gradient-to-r from-amber-400/60 via-amber-500/80 to-amber-400/60" />
+                    <div className="p-8 sm:p-10 text-center">
+                      {/* Icon */}
+                      <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/40 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-amber-100 dark:ring-amber-900/30">
+                        <RiErrorWarningLine className="w-7 h-7 text-amber-500" />
+                      </div>
+                      {/* Badge */}
+                      <Badge variant="outline" className="mb-4 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-600 border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/20">
+                        {hasDot ? "INVALID TLD" : "INVALID INPUT"}
+                      </Badge>
+                      {/* Heading */}
+                      <h2 className="text-xl sm:text-2xl font-bold mb-3 leading-snug">
+                        {hasDot
+                          ? (isChinese ? `"${tld}" 不是真实的域名后缀` : `"${tld}" is not a real TLD`)
+                          : (isChinese ? `"${target}" 不是有效的域名格式` : `"${target}" isn't a valid domain`)}
+                      </h2>
+                      {/* Input pill */}
+                      <div className="inline-flex items-center gap-1.5 bg-muted/60 border border-border/60 rounded-full px-3 py-1 mb-5 max-w-full overflow-hidden">
+                        <span className="text-[11px] text-muted-foreground shrink-0">{isChinese ? "你输入了：" : "You entered:"}</span>
+                        <span className="font-mono text-[13px] font-semibold truncate">{target}</span>
+                      </div>
+                      {/* Description */}
+                      <p className="text-muted-foreground max-w-sm mx-auto text-sm leading-relaxed">
+                        {hasDot
+                          ? (isChinese
+                            ? <>{`我们在 ICANN 顶级域名列表中找不到 `}<span className="font-mono font-semibold text-foreground">{tld}</span>，请检查拼写是否正确。</>
+                            : <>We couldn&apos;t find <span className="font-mono font-semibold text-foreground">{tld}</span> in the ICANN TLD registry. Check your spelling.</>)
+                          : (isChinese
+                            ? "请输入包含后缀的完整域名，例如 example.com、test.io 或 8.8.8.8"
+                            : "Please enter a full domain name including a TLD, e.g. example.com, test.io or 8.8.8.8")}
+                      </p>
+                      {/* TLD hint — only for invalid TLD case */}
+                      {hasDot && (
+                        <p className="text-xs text-muted-foreground/50 mt-2">
+                          {isChinese ? "常见后缀：.com .net .org .io .cn .rw .ai" : "Common TLDs: .com .net .org .io .cn .rw .ai"}
+                        </p>
+                      )}
+                      {/* Actions */}
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-7">
+                        <Link href="/">
+                          <Button className="gap-2 w-full sm:w-auto">
+                            <RiSearchLine className="w-4 h-4" />
+                            {isChinese ? "重新搜索" : "Search Again"}
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                ) : dnsProbe?.registrationStatus === "registered" ? (
+                  );
+                })() : dnsProbe?.registrationStatus === "registered" ? (
                   <>
                     <div className="glass-panel border border-emerald-400/40 bg-emerald-50/30 dark:bg-emerald-950/20 rounded-xl p-6 sm:p-8 relative overflow-hidden">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -1557,52 +1621,49 @@ export default function LookupPage({
                   <AvailableDomainCard domain={target} locale={locale} isPremiumByWhois={result ? getDomainRegistrationStatus(result, locale).isPremiumReserved : false} />
                 ) : (
                   <>
-                    <div className="glass-panel border border-border rounded-xl p-8 sm:p-12 text-center">
-                      <div className="w-16 h-16 bg-red-50 dark:bg-red-950/30 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-red-500"
-                        >
-                          <path d="m21 21-4.3-4.3" />
-                          <circle cx="11" cy="11" r="8" />
-                          <path d="m8 8 6 6" />
-                          <path d="m14 8-6 6" />
-                        </svg>
-                      </div>
-                      <h2 className="text-2xl font-bold mb-2">
-                        {t("lookup_failed")}
-                      </h2>
-                      <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed mb-8">
-                        {t("lookup_failed_description")}{" "}
-                        <span className="font-mono font-medium text-foreground">
-                          {target}
-                        </span>
-                        {". "}
-                        {error || t("lookup_failed_fallback")}
-                      </p>
-                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
-                        <Button onClick={handleRefresh}>
-                          {t("try_again")}
-                        </Button>
-                        {registryUrl && (
-                          <a href={registryUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="gap-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                              {isChinese ? "在注册局查询" : "Look up at Registry"}
-                            </Button>
-                          </a>
-                        )}
-                        <Link href="/">
-                          <Button variant="outline">{t("new_search")}</Button>
-                        </Link>
+                    <div className="glass-panel border border-red-200/50 dark:border-red-900/40 rounded-xl overflow-hidden">
+                      {/* Top accent bar */}
+                      <div className="h-1 w-full bg-gradient-to-r from-red-400/60 via-red-500/80 to-red-400/60" />
+                      <div className="p-8 sm:p-10 text-center">
+                        {/* Icon */}
+                        <div className="w-14 h-14 bg-red-50 dark:bg-red-950/40 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-red-100 dark:ring-red-900/30">
+                          <RiAlertLine className="w-7 h-7 text-red-500" />
+                        </div>
+                        {/* Badge */}
+                        <Badge variant="outline" className="mb-4 font-mono text-[10px] font-bold uppercase tracking-widest text-red-600 border-red-400/60 bg-red-50/50 dark:bg-red-950/20">
+                          LOOKUP FAILED
+                        </Badge>
+                        {/* Heading */}
+                        <h2 className="text-xl sm:text-2xl font-bold mb-3 leading-snug">
+                          {t("lookup_failed")}
+                        </h2>
+                        {/* Domain pill */}
+                        <div className="inline-flex items-center gap-1.5 bg-muted/60 border border-border/60 rounded-full px-3 py-1 mb-5 max-w-full overflow-hidden">
+                          <span className="text-[11px] text-muted-foreground shrink-0">{isChinese ? "查询目标：" : "Target:"}</span>
+                          <span className="font-mono text-[13px] font-semibold truncate">{target}</span>
+                        </div>
+                        {/* Error message */}
+                        <p className="text-muted-foreground max-w-sm mx-auto text-sm leading-relaxed">
+                          {error || t("lookup_failed_fallback")}
+                        </p>
+                        {/* Actions */}
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-7 flex-wrap">
+                          <Button onClick={handleRefresh} className="gap-2 w-full sm:w-auto">
+                            <RiSearchLine className="w-4 h-4" />
+                            {t("try_again")}
+                          </Button>
+                          {registryUrl && (
+                            <a href={registryUrl} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                              <Button variant="outline" className="gap-2 w-full">
+                                <RiLinkM className="w-4 h-4" />
+                                {isChinese ? "在注册局查询" : "Look up at Registry"}
+                              </Button>
+                            </a>
+                          )}
+                          <Link href="/" className="w-full sm:w-auto">
+                            <Button variant="outline" className="w-full">{t("new_search")}</Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </>
