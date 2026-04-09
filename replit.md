@@ -2,6 +2,64 @@
 
 ---
 
+## Session — 2026-04-09 (五): 生产就绪审计 (Production Readiness Audit)
+
+### 1. CI 管道 — 补充 i18n 检查步骤
+
+**`.github/workflows/ci.yaml`** — 在 Typecheck 步骤之后新增：
+```yaml
+- name: i18n key parity
+  run: node scripts/check-locale-keys.mjs
+```
+现在 CI 流水线顺序为：`install → typecheck → i18n → test → build`。
+任何提交如果导致 locale 文件不同步，都会在 PR 阶段被 CI 拦截并报错。
+
+### 2. `.env.example` 全面补充
+
+新增三个之前缺失的配置区块：
+
+**Supabase 组**：
+```
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_DATABASE_URL=postgresql://...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+**Admin 配置**（之前完全缺失）：
+```
+ADMIN_EMAIL=admin@yourdomain.com
+```
+注释说明：未配置时管理后台对所有用户不可用。
+
+**Observability 告警 Webhook**（之前完全缺失）：
+```
+# ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN/slack
+```
+注释说明：留空时 Alert Check 脚本只输出到控制台，不会静默失败。
+
+### 3. 管理后台权限验证 — 审计通过
+
+全部 `src/pages/api/admin/*.ts` 路由均通过 `requireAdmin()` (`src/lib/admin.ts`) 保护：
+- `getServerSession` 获取当前会话
+- `isAdminEmail()` 异步检查 DB 中的管理员邮箱列表（非硬编码比较）
+- IP 级别速率限制 (60 req/min) 防止枚举扫描
+
+`grep -rL "requireAdmin|..."` 对全部 admin API 路由搜索返回空集——无遗漏。
+
+### 4. 日志自动清理 — 验证 Fire-and-Forget 正确性
+
+`logQuery()` 在 INSERT 后通过 `DELETE FROM query_logs WHERE created_at < NOW() - INTERVAL '30 days'` 执行 30 天自动清理：
+- 整个 `logQuery()` 函数由调用方以 `.catch(() => {})` 不 await 调用
+- 清理运行在同一 DB client 连接上，在 INSERT 之后顺序执行，不阻塞主查询路径
+- 任何清理错误被 `catch {}` 块静默吞掉
+
+### 5. 硬编码配置审计 — cn-reserved-sld.ts 合理保留
+
+`src/lib/whois/cn-reserved-sld.ts`（130 行）包含 CNNIC 定义的省级行政区保留 SLD 列表（bj/sh/tj 等 34 个省级 + 7 个功能性 SLD）。  
+**结论：保留为静态文件是正确的**。CNNIC 每十年才可能变动一次，无需 DB 化，避免引入不必要的运维复杂度。
+
+---
+
 ## Session — 2026-04-09 (四): 安全修复 + 查缺补漏
 
 ### 1. 删除高危 Shell 执行接口 (Critical Security)

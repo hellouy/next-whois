@@ -27,6 +27,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: i18n key parity
+        run: node scripts/check-locale-keys.mjs
+
       - name: Test
         run: pnpm test
 
