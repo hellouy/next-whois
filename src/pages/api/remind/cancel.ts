@@ -24,6 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true, domain: existing.domain, email: existing.email });
   } catch (err: any) {
     console.error("[remind/cancel] DB error:", err);
-    return res.status(500).json({ error: "取消失败，请稍后重试" });
+    return res.status(500).json({ error: "Cancellation failed, please try again" });
   }
 }

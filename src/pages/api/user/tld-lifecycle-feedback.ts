@@ -29,7 +29,7 @@ async function ensureTable() {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   const {
     tld,
@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } = req.body;
 
   if (!tld || typeof tld !== "string") {
-    return res.status(400).json({ error: "tld 必须提供" });
+    return res.status(400).json({ error: "TLD is required" });
   }
 
   const sg = Number(suggested_grace);
@@ -47,11 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const sp = Number(suggested_pending_delete);
 
   if (isNaN(sg) || sg < 0 || isNaN(sr) || sr < 0 || isNaN(sp) || sp < 0) {
-    return res.status(400).json({ error: "建议天数必须为非负整数" });
+    return res.status(400).json({ error: "Suggested days must be non-negative integers" });
   }
 
   if (submitter_email && typeof submitter_email === "string" && !submitter_email.includes("@")) {
-    return res.status(400).json({ error: "邮箱格式不正确" });
+    return res.status(400).json({ error: "Invalid email format" });
   }
 
   try {
@@ -73,6 +73,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(201).json({ ok: true, id });
   } catch (err: any) {
     console.error("[tld-lifecycle-feedback] error:", err.message);
-    return res.status(500).json({ error: "提交失败，请稍后重试" });
+    return res.status(500).json({ error: "Submission failed, please try again" });
   }
 }

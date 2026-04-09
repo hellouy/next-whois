@@ -92,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const cleanDomain   = String(domain).toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "").replace(/\/.*$/, "");
   if (!isValidDomain(cleanDomain)) {
-    return res.status(400).json({ error: "域名格式不正确，请输入有效的域名（如 example.com）" });
+    return res.status(400).json({ error: "Invalid domain format, please enter a valid domain (e.g. example.com)" });
   }
   const cleanTagName  = rawTagName.slice(0, maxTagLen);
   const cleanTagStyle  = resolvedTagStyle;

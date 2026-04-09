@@ -110,7 +110,7 @@ export default async function handler(
 
   if (requireLogin === "1" && !userEmail) {
     _lookupAborted = true;
-    return res.status(401).json({ error: "请先登录后再进行查询" });
+    return res.status(401).json({ error: "Please log in to perform queries" });
   }
 
   // ── Set up NDJSON streaming response ─────────────────────────────────────

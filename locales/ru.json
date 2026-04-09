@@ -1029,7 +1029,8 @@
     "reset_err_password_mismatch": "Пароли не совпадают",
     "reset_err_invalid_token": "Недействительная ссылка для сброса",
     "reset_err_failed": "Сброс не удался, запросите снова",
-    "reset_err_network": "Ошибка сети, повторите попытку"
+    "reset_err_network": "Ошибка сети, повторите попытку",
+    "login_remember_me": "Запомнить меня (30 дней)"
   },
   "tlds": {
     "form_tld_label": "TLD / Расширение домена",
@@ -1612,7 +1613,29 @@
     "reg_available": "Доступен",
     "whois_stale_msg": "Дата истечения не подтверждена. Нажмите «Изменить» для ручной синхронизации WHOIS",
     "confidence_verified": "Данные верифицированы",
-    "confidence_estimated": "Оценка ИИ"
+    "confidence_estimated": "Оценка ИИ",
+    "code_sent": "Код подтверждения отправлен на новый email",
+    "send_failed": "Ошибка отправки",
+    "code_required": "Введите код подтверждения, отправленный на новый email",
+    "email_confirm_mismatch": "Email не совпадает",
+    "account_deleted": "Аккаунт удалён",
+    "delete_account_failed": "Ошибка удаления, попробуйте позже",
+    "sub_search_placeholder": "Поиск доменов…",
+    "code_placeholder": "6-значный код",
+    "send_code": "Отправить код",
+    "delete_account": "Удалить аккаунт",
+    "confirm_delete_title": "Подтверждение удаления аккаунта",
+    "confirm_delete_prefix": "Это действие ",
+    "confirm_delete_irreversible": "необратимо",
+    "confirm_delete_suffix": " и навсегда удалит ваш аккаунт и все данные (подписки, бренд-метки и т.д.). Введите ваш email для подтверждения:",
+    "confirm_delete_email_placeholder": "Введите ваш email",
+    "confirm_delete_btn": "Подтвердить удаление",
+    "activation_code_redeemable": "Можно активировать кодом активации",
+    "sync_from_whois": "Синхронизировать с WHOIS",
+    "syncing_whois": "Синхронизация…",
+    "sync_from_whois_ok": "Дата истечения синхронизирована с WHOIS",
+    "sync_failed": "Ошибка синхронизации, попробуйте ещё раз",
+    "no_expiry_whois": "В WHOIS нет даты истечения"
   },
   "admin": {
     "no_access_title": "Нет доступа",
@@ -1664,7 +1687,8 @@
     "nav_git_fix": "Исправление Git Push",
     "nav_notify_service": "Push-каналы",
     "nav_domain_access": "Доступ к домену",
-    "nav_db_export": "Экспорт БД"
+    "nav_db_export": "Экспорт БД",
+    "nav_server_test": "Тест сервера"
   },
   "common": {
     "retry": "Повторить",

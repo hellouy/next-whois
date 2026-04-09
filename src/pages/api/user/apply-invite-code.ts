@@ -15,24 +15,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!rl.ok) return res.status(429).json({ error: "Too many attempts, please try again later" });
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   const userEmail = (session.user as any).email as string;
   const user = await one<{ id: string; subscription_access: boolean; subscription_expires_at: string | null }>(
     "SELECT id, subscription_access, subscription_expires_at FROM users WHERE email = $1",
     [userEmail]
   );
-  if (!user) return res.status(404).json({ error: "用户不存在" });
+  if (!user) return res.status(404).json({ error: "User not found" });
 
   const isActiveSubscriber = user.subscription_access && (
     !user.subscription_expires_at || new Date(user.subscription_expires_at) > new Date()
   );
-  if (isActiveSubscriber) return res.status(400).json({ error: "你已拥有订阅权限", code: "ALREADY_HAS_ACCESS" });
+  if (isActiveSubscriber) return res.status(400).json({ error: "You already have subscription access", code: "ALREADY_HAS_ACCESS" });
 
   const { inviteCode } = req.body;
-  if (!inviteCode?.trim()) return res.status(400).json({ error: "请输入邀请码" });
+  if (!inviteCode?.trim()) return res.status(400).json({ error: "Please enter an invite code" });
 
   const code = String(inviteCode).trim().toUpperCase();
 
@@ -43,11 +43,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     "SELECT id, is_active, use_count, max_uses, expires_at FROM invite_codes WHERE code = $1",
     [code]
   );
-  if (!preview) return res.status(400).json({ error: "邀请码无效" });
-  if (!preview.is_active) return res.status(400).json({ error: "邀请码已停用" });
+  if (!preview) return res.status(400).json({ error: "Invalid invite code" });
+  if (!preview.is_active) return res.status(400).json({ error: "Invite code has been deactivated" });
   if (preview.expires_at && new Date(preview.expires_at) < new Date())
-    return res.status(400).json({ error: "邀请码已过期" });
-  if (preview.use_count >= preview.max_uses) return res.status(400).json({ error: "邀请码已达使用上限" });
+    return res.status(400).json({ error: "Invite code has expired" });
+  if (preview.use_count >= preview.max_uses) return res.status(400).json({ error: "Invite code usage limit reached" });
 
   // Atomically increment use_count only when still within limit.
   // Concurrent requests: only one wins; the rest get null back.
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!claimed) {
     // Race lost — concurrently exhausted or deactivated between SELECT and UPDATE
-    return res.status(400).json({ error: "邀请码已达使用上限或已停用" });
+    return res.status(400).json({ error: "Invite code limit reached or deactivated" });
   }
 
   await run(

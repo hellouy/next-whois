@@ -16,11 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!rl.ok) return res.status(429).json({ error: "Too many messages, please try again later" });
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
   const { message, category } = req.body;
   if (!message || typeof message !== "string" || !message.trim()) {
-    return res.status(400).json({ error: "消息内容不能为空" });
+    return res.status(400).json({ error: "Message content cannot be empty" });
   }
 
   const VALID_CATEGORIES = ["支付问题", "会员问题", "功能问题", "其他问题"];
@@ -80,6 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error("[user/contact] send error:", err.message);
-    return res.status(500).json({ error: "发送失败，请稍后重试" });
+    return res.status(500).json({ error: "Failed to send message, please try again" });
   }
 }

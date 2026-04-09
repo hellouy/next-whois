@@ -4,7 +4,7 @@ import { isDbReady } from "@/lib/db-query";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   try {
     const plans = await getActivePlans();
@@ -12,6 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ plans });
   } catch (err: any) {
     console.error("[payment/plans] error:", err.message);
-    return res.status(500).json({ error: "获取套餐信息失败，请稍后重试" });
+    return res.status(500).json({ error: "Failed to retrieve plans, please try again" });
   }
 }

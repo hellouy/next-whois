@@ -7,7 +7,7 @@ import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
   // Rate-limit write operations
   if (req.method === "PATCH") {
@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!rl.ok) return res.status(429).json({ error: "Too many requests" });
   }
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   if (req.method === "GET") {
     const user = await one<{
@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "SELECT id, name, email, avatar_color, email_verified, created_at FROM users WHERE email = $1",
       [session.user.email],
     );
-    if (!user) return res.status(404).json({ error: "用户不存在" });
+    if (!user) return res.status(404).json({ error: "User not found" });
     return res.status(200).json({ user });
   }
 
@@ -54,22 +54,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (email !== undefined) {
       const newEmail = String(email).toLowerCase().trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail))
-        return res.status(400).json({ error: "邮箱格式不正确" });
+        return res.status(400).json({ error: "Invalid email format" });
       if (newEmail !== session.user.email) {
         // Require verification code sent to the new email address
         if (!emailChangeCode?.trim()) {
-          return res.status(400).json({ error: "请先发送验证码到新邮箱，并填写验证码", code: "NEED_CODE" });
+          return res.status(400).json({ error: "Please send a verification code to the new email first", code: "NEED_CODE" });
         }
         const storeKey = `email-change:${session.user.email}:${newEmail}`;
         const storedCode = await getRedisValue(storeKey);
         if (!storedCode) {
-          return res.status(400).json({ error: "验证码已过期，请重新发送", code: "CODE_EXPIRED" });
+          return res.status(400).json({ error: "Verification code expired, please request a new one", code: "CODE_EXPIRED" });
         }
         if (String(emailChangeCode).trim() !== storedCode) {
-          return res.status(400).json({ error: "验证码不正确，请重新输入", code: "CODE_WRONG" });
+          return res.status(400).json({ error: "Incorrect verification code", code: "CODE_WRONG" });
         }
         const existing = await one("SELECT id FROM users WHERE email = $1", [newEmail]);
-        if (existing) return res.status(409).json({ error: "该邮箱已被使用" });
+        if (existing) return res.status(409).json({ error: "This email is already in use" });
         updates.push(`email = $${params.length + 1}`);
         params.push(newEmail);
         // Track key for deletion AFTER successful DB update
@@ -77,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    if (updates.length === 0) return res.status(400).json({ error: "没有需要更新的字段" });
+    if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
 
     updates.push(`updated_at = NOW()`);
     params.push(session.user.email);
@@ -89,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     } catch (err: any) {
       console.error("[profile] PATCH error:", err.message);
-      return res.status(500).json({ error: "更新失败" });
+      return res.status(500).json({ error: "Update failed, please try again" });
     }
 
     // Consume the email change code only after the DB update succeeds

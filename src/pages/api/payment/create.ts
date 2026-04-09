@@ -12,32 +12,32 @@ export const config = { maxDuration: 15 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   // Rate-limit order creation: 5 per minute per IP
   const ip = String(
     req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown"
   ).split(",")[0].trim();
   const rl = await checkRateLimit(`payment:create:${ip}`, 5, 60 * 1000);
-  if (!rl.ok) return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
+  if (!rl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user) return res.status(401).json({ error: "Unauthorized" });
 
   const userEmail = (session.user as any).email as string;
   const dbUser = await one<{ id: string; subscription_access: boolean }>(
     `SELECT id, subscription_access FROM users WHERE email = $1`, [userEmail]
   );
-  if (!dbUser) return res.status(404).json({ error: "用户不存在" });
+  if (!dbUser) return res.status(404).json({ error: "User not found" });
 
   const { planId, provider } = req.body as { planId: string; provider: PaymentProvider };
-  if (!planId || !provider) return res.status(400).json({ error: "缺少参数" });
+  if (!planId || !provider) return res.status(400).json({ error: "Missing required parameters" });
 
   const validProviders = ["stripe", "xunhupay", "alipay", "paypal", "wechat"];
-  if (!validProviders.includes(provider)) return res.status(400).json({ error: "不支持的支付方式" });
+  if (!validProviders.includes(provider)) return res.status(400).json({ error: "Unsupported payment method" });
 
   const providerEnabled = await getSetting(`payment_${provider}_enabled`);
-  if (!providerEnabled) return res.status(400).json({ error: "该支付方式未启用" });
+  if (!providerEnabled) return res.status(400).json({ error: "This payment method is not enabled" });
 
   try {
     const { order, plan } = await createOrder({
@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (provider === "stripe") {
       const stripeKey = (await getSetting("payment_stripe_sk")) || process.env.STRIPE_SECRET_KEY || "";
-      if (!stripeKey) return res.status(500).json({ error: "Stripe 未配置私钥" });
+      if (!stripeKey) return res.status(500).json({ error: "Stripe is not configured (missing secret key)" });
 
       const stripe = new Stripe(stripeKey, { apiVersion: "2026-02-25.clover" });
       const currencyCode = (plan.currency || "CNY").toLowerCase();
@@ -90,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (provider === "xunhupay") {
       const appId = await getSetting("payment_xunhupay_appid");
       const appSecret = process.env.XUNHUPAY_APP_SECRET ?? "";
-      if (!appId || !appSecret) return res.status(500).json({ error: "虎皮椒未配置" });
+      if (!appId || !appSecret) return res.status(500).json({ error: "Xunhupay is not configured" });
 
       const { xunhupaySign } = await import("@/lib/payment");
       const params: Record<string, string> = {
@@ -116,7 +116,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const appId = await getSetting("payment_alipay_appid");
       const privateKey = (await getSetting("payment_alipay_private_key")) || process.env.ALIPAY_PRIVATE_KEY || "";
       const alipayPublicKey = (await getSetting("payment_alipay_public_key")) || process.env.ALIPAY_PUBLIC_KEY || "";
-      if (!appId || !privateKey) return res.status(500).json({ error: "支付宝未配置" });
+      if (!appId || !privateKey) return res.status(500).json({ error: "Alipay is not configured" });
 
       const notifyUrl = await getSetting("payment_alipay_notify_url") ||
         `${baseUrl}/api/payment/webhook/alipay`;
@@ -161,7 +161,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // WeChat Pay via Xunhupay gateway — reuses xunhupay credentials with type="wechat"
       const appId = await getSetting("payment_xunhupay_appid");
       const appSecret = (await getSetting("payment_xunhupay_secret")) || process.env.XUNHUPAY_APP_SECRET || "";
-      if (!appId || !appSecret) return res.status(500).json({ error: "微信支付未配置（需在设置中配置虎皮椒 AppID/AppSecret）" });
+      if (!appId || !appSecret) return res.status(500).json({ error: "WeChat Pay is not configured (please set Xunhupay AppID/AppSecret in settings)" });
 
       const { xunhupaySign } = await import("@/lib/payment");
       const params: Record<string, string> = {
@@ -202,9 +202,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.json({ ok: true, provider: "paypal", url: paypalOrder.approveUrl, orderId: order.id });
     }
 
-    return res.status(400).json({ error: "不支持的支付方式" });
+    return res.status(400).json({ error: "Unsupported payment method" });
   } catch (err: any) {
     console.error("[payment/create]", err);
-    return res.status(500).json({ error: err.message || "创建订单失败" });
+    return res.status(500).json({ error: err.message || "Failed to create order" });
   }
 }

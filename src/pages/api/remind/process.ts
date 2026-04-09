@@ -406,6 +406,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true, processed: reminders.length, ...results });
   } catch (err: any) {
     console.error("[remind/process] Fatal error:", err);
-    return res.status(500).json({ error: "处理失败，请稍后重试" });
+    return res.status(500).json({ error: "Processing failed, please try again" });
   }
 }

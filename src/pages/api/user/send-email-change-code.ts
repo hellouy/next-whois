@@ -10,34 +10,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).end();
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
   const { newEmail } = req.body;
   if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(newEmail))) {
-    return res.status(400).json({ error: "邮箱格式不正确" });
+    return res.status(400).json({ error: "Invalid email format" });
   }
 
   const cleanNew = String(newEmail).toLowerCase().trim();
   const currentEmail = session.user.email;
 
   if (cleanNew === currentEmail.toLowerCase()) {
-    return res.status(400).json({ error: "新邮箱与当前邮箱相同" });
+    return res.status(400).json({ error: "New email is the same as the current email" });
   }
 
   const ip = String(
     req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown"
   ).split(",")[0].trim();
   const rl = await checkRateLimit(`email-change-code:${ip}`, 5, 60 * 60 * 1000);
-  if (!rl.ok) return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
+  if (!rl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   if (await isDbReady()) {
     const existing = await one("SELECT id FROM users WHERE email = $1", [cleanNew]);
-    if (existing) return res.status(409).json({ error: "该邮箱已被其他账户使用" });
+    if (existing) return res.status(409).json({ error: "This email is already used by another account" });
   }
 
   const rateLimitKey = `email-change-rate:${currentEmail}`;
   const recentlySent = await getRedisValue(rateLimitKey);
-  if (recentlySent) return res.status(429).json({ error: "请稍等 60 秒后再重新发送" });
+  if (recentlySent) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const storeKey = `email-change:${currentEmail}:${cleanNew}`;
@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await deleteRedisValue(storeKey).catch(() => {});
     await deleteRedisValue(rateLimitKey).catch(() => {});
     console.error("[send-email-change-code] sendEmail failed:", e.message);
-    return res.status(500).json({ error: "验证码发送失败，请检查邮箱地址后重试" });
+    return res.status(500).json({ error: "Failed to send verification code, please check the email address and try again" });
   }
 
   return res.status(200).json({ ok: true });

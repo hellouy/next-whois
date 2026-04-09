@@ -208,7 +208,7 @@ export default function LoginPage() {
                   onChange={e => setRememberMe(e.target.checked)}
                   className="sr-only"
                 />
-                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">记住我（30天免重新登录）</span>
+                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{t("auth.login_remember_me")}</span>
               </label>
 
               {/* Captcha widget — only rendered when captcha is required for login */}

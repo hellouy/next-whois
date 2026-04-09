@@ -22,9 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "GET") return res.status(405).end();
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   const email = session.user.email;
 
@@ -210,6 +210,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[dashboard] GET error:", msg);
-    return res.status(500).json({ error: "获取数据失败" });
+    return res.status(500).json({ error: "Failed to retrieve data" });
   }
 }

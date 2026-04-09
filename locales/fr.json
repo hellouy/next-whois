@@ -628,8 +628,8 @@
     "step2_desc": "Trouvez le bouton d'abonnement sur la page de détail du domaine et définissez les jours de rappel",
     "step3_title": "Recevez des rappels par e-mail automatiquement",
     "step3_desc": "Nous enverrons automatiquement des rappels à votre e-mail avant l'expiration",
-    "phase_grace": "Période de grâce",
-    "phase_redemption": "Période de rachat",
+    "phase_grace": "Grâce",
+    "phase_redemption": "Rachat",
     "phase_pending": "Suppression en attente",
     "phase_dropped": "Libéré",
     "today": "Aujourd'hui",
@@ -681,11 +681,8 @@
     "lifecycle_hint": "Sélectionnez les jours avant expiration pour recevoir des alertes email",
     "phase_alerts_label": "Alertes de phase de cycle de vie",
     "phase_alerts_hint": "Notifier aussi quand le domaine entre dans ces phases",
-    "phase_grace": "Grâce",
-    "phase_redemption": "Rachat",
     "phase_pendingDelete": "Suppr. en attente",
     "phase_dropSoon": "Bientôt libre",
-    "phase_dropped": "Libéré",
     "submitting": "Envoi en cours…",
     "submit": "Activer les rappels d'expiration",
     "manage_hint_prefix": "Après abonnement, gérez ou annulez sur",
@@ -1033,7 +1030,8 @@
     "reset_err_password_mismatch": "Les mots de passe ne correspondent pas",
     "reset_err_invalid_token": "Lien de réinitialisation invalide",
     "reset_err_failed": "Réinitialisation échouée, veuillez demander à nouveau",
-    "reset_err_network": "Erreur réseau, veuillez réessayer"
+    "reset_err_network": "Erreur réseau, veuillez réessayer",
+    "login_remember_me": "Se souvenir de moi (30 jours)"
   },
   "tlds": {
     "form_tld_label": "TLD / Extension de domaine",
@@ -1616,7 +1614,29 @@
     "reg_available": "Disponible",
     "whois_stale_msg": "Date d'expiration non confirmée. Cliquez sur Modifier pour synchroniser WHOIS manuellement",
     "confidence_verified": "Données vérifiées",
-    "confidence_estimated": "Estimation IA"
+    "confidence_estimated": "Estimation IA",
+    "code_sent": "Code de vérification envoyé au nouvel email",
+    "send_failed": "Échec de l'envoi",
+    "code_required": "Veuillez saisir le code de vérification envoyé à votre nouvel email",
+    "email_confirm_mismatch": "L'email ne correspond pas",
+    "account_deleted": "Compte supprimé",
+    "delete_account_failed": "Échec de la suppression, veuillez réessayer",
+    "sub_search_placeholder": "Rechercher des domaines…",
+    "code_placeholder": "Code à 6 chiffres",
+    "send_code": "Envoyer le code",
+    "delete_account": "Supprimer le compte",
+    "confirm_delete_title": "Confirmer la suppression du compte",
+    "confirm_delete_prefix": "Cette action est ",
+    "confirm_delete_irreversible": "irréversible",
+    "confirm_delete_suffix": " et supprimera définitivement votre compte et toutes vos données (abonnements, tampons de marque, etc.). Veuillez saisir votre adresse e-mail pour confirmer :",
+    "confirm_delete_email_placeholder": "Saisissez votre adresse e-mail",
+    "confirm_delete_btn": "Confirmer la suppression",
+    "activation_code_redeemable": "Échangeable avec un code d'activation",
+    "sync_from_whois": "Synchroniser depuis WHOIS",
+    "syncing_whois": "Synchronisation…",
+    "sync_from_whois_ok": "Date d'expiration synchronisée depuis WHOIS",
+    "sync_failed": "Échec de la synchronisation, veuillez réessayer",
+    "no_expiry_whois": "Aucune date d'expiration dans WHOIS"
   },
   "admin": {
     "no_access_title": "Accès Refusé",
@@ -1668,7 +1688,8 @@
     "nav_git_fix": "Réparation Git Push",
     "nav_notify_service": "Canaux Push",
     "nav_domain_access": "Accès Domaine",
-    "nav_db_export": "Export DB"
+    "nav_db_export": "Export DB",
+    "nav_server_test": "Test serveur"
   },
   "common": {
     "retry": "Réessayer",

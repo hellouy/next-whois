@@ -14,7 +14,7 @@ type ClaimedCode = {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   // Rate-limit activation code redemptions: 10 per hour per IP (prevents brute-force)
   const ip = String(
@@ -24,31 +24,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!rl.ok) return res.status(429).json({ error: "Too many attempts, please try again later" });
 
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
   const code = String(req.body?.code ?? "").trim().toUpperCase();
-  if (!code) return res.status(400).json({ error: "请输入激活码" });
+  if (!code) return res.status(400).json({ error: "Please enter an activation code" });
 
   try {
     const dbUser = await one<{ id: string; balance_cents: number }>(
       `SELECT id, balance_cents FROM users WHERE email = $1`,
       [session.user.email]
     );
-    if (!dbUser) return res.status(404).json({ error: "用户不存在" });
+    if (!dbUser) return res.status(404).json({ error: "User not found" });
 
     // Pre-flight check to give specific error messages before attempting atomic claim
     const preview = await one<{ id: number; used: boolean; used_by: string | null; expires_at: string | null }>(
       `SELECT id, used, used_by, expires_at FROM activation_codes WHERE code = $1`,
       [code]
     );
-    if (!preview) return res.status(404).json({ error: "激活码不存在，请检查后重试" });
+    if (!preview) return res.status(404).json({ error: "Activation code not found, please double-check and try again" });
     if (preview.used) {
       if (preview.used_by === dbUser.id)
-        return res.status(409).json({ error: "您已使用过该激活码" });
-      return res.status(409).json({ error: "该激活码已被使用" });
+        return res.status(409).json({ error: "You have already used this activation code" });
+      return res.status(409).json({ error: "This activation code has already been used" });
     }
     if (preview.expires_at && new Date(preview.expires_at) < new Date())
-      return res.status(410).json({ error: "激活码已过期" });
+      return res.status(410).json({ error: "Activation code has expired" });
 
     // Atomically claim the code — only ONE concurrent request can win.
     // WHERE used = false ensures a second concurrent request returns zero rows.
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!ac) {
       // Race lost — another request claimed it between our SELECT and UPDATE
-      return res.status(409).json({ error: "该激活码已被使用" });
+      return res.status(409).json({ error: "This activation code has already been used" });
     }
 
     const results: string[] = [];
@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            WHERE id = $1`,
           [dbUser.id, ac.plan_name, ac.duration_days]
         );
-        results.push(`会员已延长 ${ac.duration_days} 天（${ac.plan_name}）`);
+        results.push(`Membership extended by ${ac.duration_days} days (${ac.plan_name})`);
       } else {
         await run(
           `UPDATE users
@@ -93,7 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            WHERE id = $1`,
           [dbUser.id, ac.plan_name]
         );
-        results.push(`已开通永久会员（${ac.plan_name}）`);
+        results.push(`Lifetime membership activated (${ac.plan_name})`);
       }
     }
 
@@ -106,9 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await run(
         `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
          VALUES ($1, $2, 'recharge', $3)`,
-        [dbUser.id, ac.balance_grant_cents, `激活码充值：${code}`]
+        [dbUser.id, ac.balance_grant_cents, `Activation code recharge: ${code}`]
       );
-      results.push(`余额增加 ¥${(ac.balance_grant_cents / 100).toFixed(2)}`);
+      results.push(`Balance increased by ¥${(ac.balance_grant_cents / 100).toFixed(2)}`);
     }
 
     const updated = await one<{
@@ -131,6 +131,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (err: any) {
     console.error("[user/redeem-code]", err.message);
-    return res.status(500).json({ error: "兑换失败，请稍后重试" });
+    return res.status(500).json({ error: "Redemption failed, please try again" });
   }
 }

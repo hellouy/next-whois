@@ -681,11 +681,8 @@
     "lifecycle_hint": "選擇在網域到期前多少天收到電子郵件提醒",
     "phase_alerts_label": "生命週期階段提醒",
     "phase_alerts_hint": "當網域進入以下階段時也發送提醒",
-    "phase_grace": "寬限期",
-    "phase_redemption": "贖回期",
     "phase_pendingDelete": "待刪除",
     "phase_dropSoon": "即將釋放",
-    "phase_dropped": "已釋放",
     "submitting": "提交中…",
     "submit": "開啟到期提醒",
     "manage_hint_prefix": "訂閱成功後可在",
@@ -1033,7 +1030,8 @@
     "reset_err_password_mismatch": "兩次密碼輸入不一致",
     "reset_err_invalid_token": "無效的重置連結",
     "reset_err_failed": "重置失敗，請重新申請",
-    "reset_err_network": "網路錯誤，請重試"
+    "reset_err_network": "網路錯誤，請重試",
+    "login_remember_me": "記住我（30天免重新登入）"
   },
   "tlds": {
     "form_tld_label": "TLD / 網域後綴",
@@ -1690,7 +1688,8 @@
     "nav_git_fix": "Git 推送修復",
     "nav_notify_service": "推播渠道",
     "nav_domain_access": "網域接入",
-    "nav_db_export": "資料匯出"
+    "nav_db_export": "資料匯出",
+    "nav_server_test": "伺服器測試"
   },
   "common": {
     "retry": "重試",

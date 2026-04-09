@@ -9,9 +9,9 @@ const DEFAULT_THRESHOLDS = [60, 30, 10, 5, 1];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   if (req.method === "GET") {
     try {
@@ -137,7 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ subscriptions });
     } catch (err) {
       console.error("[subscriptions] GET error:", err instanceof Error ? err.message : String(err));
-      return res.status(500).json({ error: "获取数据失败" });
+      return res.status(500).json({ error: "Failed to retrieve data" });
     }
   }
 
@@ -167,7 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ ok: true, whois_synced_at: new Date().toISOString(), expiration_date: dateStr });
       } catch (err) {
         console.error("[subscriptions] PATCH whois_sync error:", err instanceof Error ? err.message : String(err));
-        return res.status(500).json({ error: "WHOIS 同步失败" });
+        return res.status(500).json({ error: "WHOIS sync failed" });
       }
     }
 
@@ -182,13 +182,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       } catch (err) {
         console.error("[subscriptions] PATCH expiration_date error:", err instanceof Error ? err.message : String(err));
-        return res.status(500).json({ error: "更新到期日期失败" });
+        return res.status(500).json({ error: "Failed to update expiration date" });
       }
     }
 
     if (days_before !== undefined) {
       const db = parseInt(days_before);
-      if (isNaN(db) || db < 1 || db > 365) return res.status(400).json({ error: "提前提醒天数需在 1–365 之间" });
+      if (isNaN(db) || db < 1 || db > 365) return res.status(400).json({ error: "Reminder lead time must be between 1 and 365 days" });
       try {
         await run(
           "UPDATE reminders SET days_before = $1 WHERE id = $2 AND email = $3",
@@ -196,7 +196,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       } catch (err) {
         console.error("[subscriptions] PATCH days_before error:", err instanceof Error ? err.message : String(err));
-        return res.status(500).json({ error: "更新提醒设置失败" });
+        return res.status(500).json({ error: "Failed to update reminder settings" });
       }
     }
 
@@ -209,7 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       } catch (err) {
         console.error("[subscriptions] PATCH active error:", err instanceof Error ? err.message : String(err));
-        return res.status(500).json({ error: "更新状态失败" });
+        return res.status(500).json({ error: "Failed to update status" });
       }
     }
 
@@ -229,7 +229,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     } catch (err) {
       console.error("[subscriptions] DELETE error:", err instanceof Error ? err.message : String(err));
-      return res.status(500).json({ error: "取消失败" });
+      return res.status(500).json({ error: "Cancellation failed, please try again" });
     }
     return res.status(200).json({ ok: true });
   }

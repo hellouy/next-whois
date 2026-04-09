@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rl = await checkRateLimit(ip, 3);
   if (!rl.ok) {
-    return res.status(429).json({ error: "提交过于频繁，请稍后再试" });
+    return res.status(429).json({ error: "Too many submissions, please try again later" });
   }
 
   const { query, queryType, issueTypes, description, email, _hp, _t } = req.body;
@@ -62,15 +62,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // ── Basic validation ─────────────────────────────────────────────────────
   if (!query || typeof query !== "string" || query.trim().length === 0) {
-    return res.status(400).json({ error: "缺少查询目标" });
+    return res.status(400).json({ error: "Missing query target" });
   }
   if (!Array.isArray(issueTypes) || issueTypes.length === 0) {
-    return res.status(400).json({ error: "请选择问题类型" });
+    return res.status(400).json({ error: "Please select an issue type" });
   }
 
   const validatedIssues = (issueTypes as string[]).filter((k) => VALID_ISSUE_KEYS.has(k));
   if (validatedIssues.length === 0) {
-    return res.status(400).json({ error: "无效的问题类型" });
+    return res.status(400).json({ error: "Invalid issue type" });
   }
 
   const cleanQuery       = String(query).trim().slice(0, 253);

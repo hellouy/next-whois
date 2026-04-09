@@ -133,14 +133,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Rate limiting: 20 requests per minute per IP (each verify triggers 4 DoH + 1 HTTP call)
   const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
-  if (!allowed) return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
+  if (!allowed) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   const { id, domain } = req.body;
   if (!id || !domain) return res.status(400).json({ error: "Missing id or domain" });
 
   const cleanDomain = String(domain).toLowerCase().trim();
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库未配置，品牌认领功能暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Database not configured, stamp verification is currently unavailable" });
 
   // Admin override — use constant-time comparison to prevent timing attacks
   const adminSecretEnv = process.env.ADMIN_VERIFY_SECRET;

@@ -15,11 +15,11 @@ async function validateInviteCode(code: string): Promise<{ codeRow: CodeRow | nu
     "SELECT id, is_active, use_count, max_uses, expires_at FROM invite_codes WHERE code = $1",
     [code.trim().toUpperCase()]
   );
-  if (!codeRow) return { codeRow: null, error: "邀请码无效" };
-  if (!codeRow.is_active) return { codeRow: null, error: "邀请码已停用" };
+  if (!codeRow) return { codeRow: null, error: "Invalid invite code" };
+  if (!codeRow.is_active) return { codeRow: null, error: "Invite code has been deactivated" };
   if (codeRow.expires_at && new Date(codeRow.expires_at) < new Date())
-    return { codeRow: null, error: "邀请码已过期" };
-  if (codeRow.use_count >= codeRow.max_uses) return { codeRow: null, error: "邀请码已达使用上限" };
+    return { codeRow: null, error: "Invite code has expired" };
+  if (codeRow.use_count >= codeRow.max_uses) return { codeRow: null, error: "Invite code usage limit reached" };
   return { codeRow, error: null };
 }
 
@@ -28,28 +28,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
   const rl = await checkRateLimit(`${ip}:register`, 10, 60 * 60_000);
-  if (!rl.ok) return res.status(429).json({ error: "注册请求过于频繁，请1小时后再试" });
+  if (!rl.ok) return res.status(429).json({ error: "Too many registration attempts, please try again in 1 hour" });
 
   const { email, password, name, inviteCode, verifyCode, captchaToken } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "邮箱和密码不能为空" });
+  if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ error: "邮箱格式不正确" });
+    return res.status(400).json({ error: "Invalid email format" });
   if (String(password).length < 8)
-    return res.status(400).json({ error: "密码至少 8 位" });
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
   if (String(password).length > 128)
-    return res.status(400).json({ error: "密码最长 128 位" });
+    return res.status(400).json({ error: "Password must not exceed 128 characters" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用，请稍后重试" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable, please try again" });
 
   const regSetting = await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'allow_registration'");
   const allowReg = !regSetting || regSetting.value === "1";
-  if (!allowReg) return res.status(403).json({ error: "注册已暂停，请联系管理员" });
+  if (!allowReg) return res.status(403).json({ error: "Registration is currently disabled, please contact the administrator" });
 
   const captchaConfig = await getCaptchaConfig("register");
   if (captchaConfig.provider && captchaConfig.secretKey) {
-    if (!captchaToken?.trim()) return res.status(400).json({ error: "请完成人机验证" });
+    if (!captchaToken?.trim()) return res.status(400).json({ error: "Please complete the CAPTCHA verification" });
     const captchaOk = await verifyCaptchaToken(String(captchaToken), captchaConfig.provider, captchaConfig.secretKey);
-    if (!captchaOk) return res.status(400).json({ error: "人机验证失败，请重试" });
+    if (!captchaOk) return res.status(400).json({ error: "CAPTCHA verification failed, please try again" });
   }
 
   const requireInvite = await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'require_invite_code'");
@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cleanInviteCode = inviteCode?.trim() ? String(inviteCode).trim().toUpperCase() : null;
 
   if (needsInvite) {
-    if (!cleanInviteCode) return res.status(400).json({ error: "注册需要邀请码" });
+    if (!cleanInviteCode) return res.status(400).json({ error: "An invite code is required to register" });
     const { codeRow: cr, error } = await validateInviteCode(cleanInviteCode);
     if (error) return res.status(400).json({ error });
     codeRow = cr;
@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const cleanEmail = String(email).toLowerCase().trim();
   const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
-  if (existing) return res.status(409).json({ error: "该邮箱已注册" });
+  if (existing) return res.status(409).json({ error: "This email is already registered" });
 
   // Resolve verification code: Redis first, DB fallback.
   // NOTE: storedCode being null means either the code was never sent or it expired —
@@ -90,11 +90,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   // Enforce: code is always required
   if (storedCode === null) {
-    return res.status(400).json({ error: "请先发送验证码，或验证码已过期，请重新发送" });
+    return res.status(400).json({ error: "Please send a verification code first, or the code has expired — please request a new one" });
   }
-  if (!verifyCode?.trim()) return res.status(400).json({ error: "请填写邮箱验证码" });
+  if (!verifyCode?.trim()) return res.status(400).json({ error: "Please enter the email verification code" });
   if (String(verifyCode).trim() !== storedCode)
-    return res.status(400).json({ error: "验证码错误或已过期" });
+    return res.status(400).json({ error: "Incorrect or expired verification code" });
 
   const id = randomBytes(8).toString("hex");
   const passwordHash = await hash(String(password), 12);
@@ -119,19 +119,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [codeRow.id],
         );
         if (updated === 0) {
-          throw Object.assign(new Error("邀请码已达使用上限，注册失败"), { code: "INVITE_EXHAUSTED" });
+          throw Object.assign(new Error("Invite code usage limit reached, registration failed"), { code: "INVITE_EXHAUSTED" });
         }
       }
     });
   } catch (err: any) {
     if (err.code === "23505") {
-      return res.status(409).json({ error: "该邮箱已注册" });
+      return res.status(409).json({ error: "This email is already registered" });
     }
     if (err.code === "INVITE_EXHAUSTED") {
       return res.status(400).json({ error: err.message });
     }
     console.error("[register] transaction error:", err.message);
-    return res.status(500).json({ error: "注册失败，请稍后重试" });
+    return res.status(500).json({ error: "Registration failed, please try again" });
   }
 
   // Clean up verification codes (both stores) after successful registration

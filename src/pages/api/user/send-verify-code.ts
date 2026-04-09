@@ -28,29 +28,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { email } = req.body;
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email)))
-    return res.status(400).json({ error: "邮箱格式不正确" });
+    return res.status(400).json({ error: "Invalid email format" });
 
   const cleanEmail = String(email).toLowerCase().trim();
 
   if (await isDbReady()) {
     const regSetting = await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'allow_registration'");
     const allowReg = !regSetting || regSetting.value === "1";
-    if (!allowReg) return res.status(403).json({ error: "注册已暂停，请联系管理员" });
+    if (!allowReg) return res.status(403).json({ error: "Registration is currently disabled, please contact the administrator" });
 
     const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
-    if (existing) return res.status(409).json({ error: "该邮箱已注册" });
+    if (existing) return res.status(409).json({ error: "This email is already registered" });
   }
 
   // Rate limit: max 1 code per 60 s (Redis-preferred, DB fallback via checkRateLimit)
   if (isRedisAvailable()) {
     const rateLimitKey = `verify:rate:${cleanEmail}`;
     const recentlySent = await getRedisValue(rateLimitKey);
-    if (recentlySent) return res.status(429).json({ error: "请稍等 60 秒后再重新发送" });
+    if (recentlySent) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
   } else if (await isDbReady()) {
     const rl = await checkRateLimit(`verify:rate:${cleanEmail}`, 1, 60_000);
-    if (!rl.ok) return res.status(429).json({ error: "请稍等 60 秒后再重新发送" });
+    if (!rl.ok) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
   } else {
-    return res.status(503).json({ error: "验证码服务暂不可用，请稍后重试" });
+    return res.status(503).json({ error: "Verification service is temporarily unavailable, please try again later" });
   }
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!stored) {
-    return res.status(503).json({ error: "验证码服务暂不可用，请稍后重试" });
+    return res.status(503).json({ error: "Verification service is temporarily unavailable, please try again later" });
   }
 
   const siteName = await getSiteLabel().catch(() => "X.RW");
@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (await isDbReady())
       await run("DELETE FROM verify_codes WHERE email = $1 AND scope = 'register'", [cleanEmail]).catch(() => {});
     console.error("[send-verify-code] email send failed:", err.message);
-    return res.status(500).json({ error: "邮件发送失败，请检查邮件配置或稍后重试" });
+    return res.status(500).json({ error: "Failed to send email, please check your email address or try again later" });
   }
 
   // Set Redis rate-limit key (best-effort; DB rate-limit already recorded above when Redis was down)

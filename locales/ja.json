@@ -1029,7 +1029,8 @@
     "reset_err_password_mismatch": "パスワードが一致しません",
     "reset_err_invalid_token": "無効なリセットリンク",
     "reset_err_failed": "リセットに失敗しました。再リクエストしてください",
-    "reset_err_network": "ネットワークエラーが発生しました。再試行してください"
+    "reset_err_network": "ネットワークエラーが発生しました。再試行してください",
+    "login_remember_me": "ログイン状態を保持（30日間）"
   },
   "tlds": {
     "form_tld_label": "TLD / ドメイン拡張子",
@@ -1612,7 +1613,29 @@
     "reg_available": "登録可能",
     "whois_stale_msg": "有効期限未確認。編集をクリックして WHOIS を手動同期",
     "confidence_verified": "データ確認済み",
-    "confidence_estimated": "AI 推定"
+    "confidence_estimated": "AI 推定",
+    "code_sent": "確認コードを新しいメールアドレスに送信しました",
+    "send_failed": "送信に失敗しました",
+    "code_required": "新しいメールアドレスに送られた確認コードを入力してください",
+    "email_confirm_mismatch": "メールアドレスが一致しません",
+    "account_deleted": "アカウントが削除されました",
+    "delete_account_failed": "削除に失敗しました、後でもう一度お試しください",
+    "sub_search_placeholder": "ドメインを検索…",
+    "code_placeholder": "6桁のコード",
+    "send_code": "コードを送信",
+    "delete_account": "アカウントを削除",
+    "confirm_delete_title": "アカウント削除の確認",
+    "confirm_delete_prefix": "この操作は",
+    "confirm_delete_irreversible": "取り消し不可",
+    "confirm_delete_suffix": "であり、アカウントとすべてのデータ（サブスクリプション、ブランドスタンプなど）が完全に削除されます。確認のためメールアドレスを入力してください：",
+    "confirm_delete_email_placeholder": "メールアドレスを入力",
+    "confirm_delete_btn": "削除を確認",
+    "activation_code_redeemable": "アクティベーションコードで利用可能",
+    "sync_from_whois": "WHOISから同期",
+    "syncing_whois": "同期中…",
+    "sync_from_whois_ok": "WHOISから有効期限を同期しました",
+    "sync_failed": "同期に失敗しました、再試行してください",
+    "no_expiry_whois": "WHOISに有効期限がありません"
   },
   "admin": {
     "no_access_title": "アクセス権限なし",
@@ -1664,7 +1687,8 @@
     "nav_git_fix": "Git プッシュ修復",
     "nav_notify_service": "プッシュチャンネル",
     "nav_domain_access": "ドメインアクセス",
-    "nav_db_export": "DBエクスポート"
+    "nav_db_export": "DBエクスポート",
+    "nav_server_test": "サーバーテスト"
   },
   "common": {
     "retry": "再試行",

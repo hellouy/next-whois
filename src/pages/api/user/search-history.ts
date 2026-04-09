@@ -35,7 +35,7 @@ async function trimToLimit(userId: string) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getSession(req, res);
   const userId = (session?.user as any)?.id as string | undefined;
-  if (!userId) return res.status(401).json({ error: "未登录" });
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   if (!(await isDbReady())) return res.status(503).json({ error: "db unavailable" });
 

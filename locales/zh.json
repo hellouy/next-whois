@@ -681,11 +681,8 @@
     "lifecycle_hint": "选择在域名到期前多少天收到邮件提醒",
     "phase_alerts_label": "生命周期阶段提醒",
     "phase_alerts_hint": "当域名进入以下阶段时也发送提醒",
-    "phase_grace": "宽限期",
-    "phase_redemption": "赎回期",
     "phase_pendingDelete": "待删除",
     "phase_dropSoon": "即将释放",
-    "phase_dropped": "已释放",
     "submitting": "提交中…",
     "submit": "开启到期提醒",
     "manage_hint_prefix": "订阅成功后可在",
@@ -1033,7 +1030,8 @@
     "reset_err_password_mismatch": "两次密码输入不一致",
     "reset_err_invalid_token": "无效的重置链接",
     "reset_err_failed": "重置失败，请重新申请",
-    "reset_err_network": "网络错误，请重试"
+    "reset_err_network": "网络错误，请重试",
+    "login_remember_me": "记住我（30天免重新登录）"
   },
   "tlds": {
     "form_tld_label": "TLD / 域名后缀",

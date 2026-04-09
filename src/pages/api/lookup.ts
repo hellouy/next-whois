@@ -103,7 +103,7 @@ export default async function handler(
 
   // require_login: if enabled, deny anonymous lookups
   if (requireLogin === "1" && !userEmail) {
-    return res.status(401).json({ time: -1, status: false, error: "请先登录后再进行查询" });
+    return res.status(401).json({ time: -1, status: false, error: "Please log in to perform queries" });
   }
 
   // ── CN Reserved SLD short-circuit ─────────────────────────────────────────

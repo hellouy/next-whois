@@ -629,9 +629,9 @@
     "step3_title": "Receive Email Reminders Automatically",
     "step3_desc": "We'll automatically send reminders to your account email before expiration",
     "phase_grace": "Grace Period",
-    "phase_redemption": "Redemption Period",
+    "phase_redemption": "Redemption",
     "phase_pending": "Pending Delete",
-    "phase_dropped": "Released",
+    "phase_dropped": "Dropped",
     "today": "Today",
     "days_ago": "{{n}} days ago",
     "months_ago": "{{n}} months ago",
@@ -681,11 +681,8 @@
     "lifecycle_hint": "Select days before expiry to receive email alerts",
     "phase_alerts_label": "Lifecycle Phase Alerts",
     "phase_alerts_hint": "Also notify when domain enters these post-expiry phases",
-    "phase_grace": "Grace Period",
-    "phase_redemption": "Redemption",
     "phase_pendingDelete": "Pending Delete",
     "phase_dropSoon": "Drop Soon",
-    "phase_dropped": "Dropped",
     "submitting": "Submitting…",
     "submit": "Enable Expiry Reminders",
     "manage_hint_prefix": "After subscribing, manage or cancel at",
@@ -1033,7 +1030,8 @@
     "reset_err_password_mismatch": "Passwords don't match",
     "reset_err_invalid_token": "Invalid reset link",
     "reset_err_failed": "Reset failed, please request again",
-    "reset_err_network": "Network error, please try again"
+    "reset_err_network": "Network error, please try again",
+    "login_remember_me": "Remember me (stay signed in for 30 days)"
   },
   "tlds": {
     "form_tld_label": "TLD / Domain Extension",

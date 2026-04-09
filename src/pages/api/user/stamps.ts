@@ -6,9 +6,9 @@ import { invalidateStampCache } from "@/lib/stamp-cache";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.email) return res.status(401).json({ error: "请先登录" });
+  if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   if (req.method === "GET") {
     try {
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ stamps: rows });
     } catch (err: any) {
       console.error("[stamps] GET error:", err.message);
-      return res.status(500).json({ error: "获取数据失败" });
+      return res.status(500).json({ error: "Failed to retrieve data" });
     }
   }
 
@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
       console.error("[stamps] PATCH error:", err.message);
-      return res.status(500).json({ error: "更新失败" });
+      return res.status(500).json({ error: "Update failed, please try again" });
     }
     return res.status(200).json({ ok: true });
   }
@@ -88,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (existing?.domain) invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
       console.error("[stamps] DELETE error:", err.message);
-      return res.status(500).json({ error: "删除失败" });
+      return res.status(500).json({ error: "Deletion failed, please try again" });
     }
     return res.status(200).json({ ok: true });
   }

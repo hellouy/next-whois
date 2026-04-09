@@ -5,10 +5,10 @@ import { many, one, isDbReady } from "@/lib/db-query";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   const session = await getServerSession(req, res, authOptions);
-  if (!(session?.user as any)?.id) return res.status(401).json({ error: "请先登录" });
+  if (!(session?.user as any)?.id) return res.status(401).json({ error: "Unauthorized" });
 
   const userId = (session!.user as any).id as string;
 
@@ -40,6 +40,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (err: any) {
     console.error("[user/balance-transactions]", err.message);
-    return res.status(500).json({ error: "获取余额记录失败" });
+    return res.status(500).json({ error: "Failed to retrieve balance records" });
   }
 }

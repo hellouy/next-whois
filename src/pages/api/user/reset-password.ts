@@ -11,17 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown"
   ).split(",")[0].trim();
   const rl = await checkRateLimit(`reset-pwd:${ip}`, 5, 15 * 60 * 1000);
-  if (!rl.ok) return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
+  if (!rl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   const { token, password } = req.body;
   if (!token || typeof token !== "string")
-    return res.status(400).json({ error: "无效的重置链接" });
+    return res.status(400).json({ error: "Invalid reset link" });
   if (!password || String(password).length < 8)
-    return res.status(400).json({ error: "密码至少 8 位" });
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
   if (String(password).length > 128)
-    return res.status(400).json({ error: "密码最长 128 位" });
+    return res.status(400).json({ error: "Password must not exceed 128 characters" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   // Hash password first so the atomic claim is instant (not slowed by bcrypt)
   const newHash = await hash(String(password), 12);
@@ -45,9 +45,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "SELECT used, expires_at FROM password_reset_tokens WHERE token = $1",
       [token],
     );
-    if (!exists) return res.status(400).json({ error: "重置链接无效或已过期" });
-    if (exists.used) return res.status(400).json({ error: "该重置链接已被使用，请重新申请" });
-    return res.status(400).json({ error: "重置链接已过期，请重新申请" });
+    if (!exists) return res.status(400).json({ error: "Invalid or expired reset link" });
+    if (exists.used) return res.status(400).json({ error: "This reset link has already been used, please request a new one" });
+    return res.status(400).json({ error: "Reset link has expired, please request a new one" });
   }
 
   try {
@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Roll back the token claim so the user can retry
     await run("UPDATE password_reset_tokens SET used = false WHERE id = $1", [claimed.id]).catch(() => {});
     console.error("[reset-password] update error:", err.message);
-    return res.status(500).json({ error: "重置失败，请稍后重试" });
+    return res.status(500).json({ error: "Reset failed, please try again" });
   }
 
   const userRow = await one<{ email: string; name: string | null }>(
@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     getSiteLabel().then(siteName =>
       sendEmail({
         to: userRow.email,
-        subject: `账号密码已重置 — 安全提醒 | ${siteName}`,
+        subject: `Password Reset Successful — Security Notice | ${siteName}`,
         html: passwordChangedHtml({ name: userRow.name ?? null, email: userRow.email, siteName }),
       }).catch(e => console.error("[reset-password] email error:", e))
     );

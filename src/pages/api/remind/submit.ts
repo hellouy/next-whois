@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
   const rl = await checkRateLimit(ip, 5);
-  if (!rl.ok) return res.status(429).json({ error: "请求过于频繁，请稍后再试" });
+  if (!rl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   const { domain, email, expirationDate, phaseAlerts, thresholds, regStatusType } = req.body;
   if (!domain || !email) return res.status(400).json({ error: "Missing required fields" });
@@ -85,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     : DEFAULT_THRESHOLDS;
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return res.status(400).json({ error: "邮箱格式不正确" });
+  if (!emailRegex.test(email)) return res.status(400).json({ error: "Invalid email format" });
 
   if (!(await isDbReady())) return res.status(500).json({ error: "Database unavailable" });
 
@@ -106,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
   }
   if (!isValidDomain(cleanDomain)) {
-    return res.status(400).json({ error: "域名格式不正确，请输入有效的域名（如 example.com）" });
+    return res.status(400).json({ error: "Invalid domain format, please enter a valid domain (e.g. example.com)" });
   }
 
   // ── Enforce free-tier subscription limit (re-validate from DB, not JWT) ─────
@@ -135,7 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ).catch(() => null);
     if (!existing && activeCount >= FREE_TIER_LIMIT) {
       return res.status(403).json({
-        error: `普通用户最多订阅 ${FREE_TIER_LIMIT} 个域名，请升级会员解锁无限订阅`,
+        error: `Free users can subscribe to at most ${FREE_TIER_LIMIT} domains. Upgrade to membership for unlimited subscriptions.`,
         code: "LIMIT_EXCEEDED",
         limit: FREE_TIER_LIMIT,
         current: activeCount,
@@ -179,7 +179,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } catch (dbErr: any) {
     console.error("[remind/submit] DB error:", dbErr);
-    return res.status(500).json({ error: "数据库写入失败，请稍后重试" });
+    return res.status(500).json({ error: "Database write failed, please try again" });
   }
 
   // ── WHOIS sync: verify expiry date against live registry data ──────────────

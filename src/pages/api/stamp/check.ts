@@ -34,6 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ stamps });
   } catch (err: any) {
     console.error("[stamp/check] error:", err);
-    return res.status(500).json({ error: "查询失败，请稍后重试", stamps: [] });
+    return res.status(500).json({ error: "Query failed, please try again", stamps: [] });
   }
 }
