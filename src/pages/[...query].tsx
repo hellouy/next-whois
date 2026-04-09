@@ -135,7 +135,6 @@ import { DomainReminderDialog } from "@/components/query/DomainReminderDialog";
 import { AvailableDomainCard, DomainFavicon } from "@/components/query/AvailableDomainCard";
 import { RegistrationStatusType } from "@/lib/domain-status-types";
 import { getDomainRegistrationStatus, DomainStatusInfoCard } from "@/components/query/DomainStatusHelpers";
-import DOMPurify from "dompurify";
 
 // Lazy-loaded: only needed when the user opens the feedback panel
 const FeedbackDrawer = dynamic(
@@ -724,8 +723,9 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   if (mode === "html") {
     const html = settings.result_ad_html;
     if (!html) return null;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sanitized = typeof window !== "undefined"
-      ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
+      ? (require("dompurify") as typeof import("dompurify")).default.sanitize(html, { USE_PROFILES: { html: true } })
       : "";
     if (!sanitized) return null;
     const div = (

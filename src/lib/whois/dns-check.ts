@@ -109,7 +109,7 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
     signals.push({ type: "MX", value: mx[0], label: `MX: ${mx.slice(0, 2).join(", ")}` });
   }
   if (hasSsl !== null) {
-    signals.push({ type: "SSL", value: String(hasSsl), label: hasSsl ? "SSL: 证书有效" : "SSL: 无响应" });
+    signals.push({ type: "SSL", value: String(hasSsl), label: hasSsl ? "SSL: Certificate valid" : "SSL: No response" });
   }
 
   let registrationStatus: DnsProbeResult["registrationStatus"] = "unknown";

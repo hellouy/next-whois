@@ -306,7 +306,8 @@ export async function lookupWhoisCacheStreaming(
   // attempt the partial result is streamed immediately (clears the loading
   // skeleton at ~RDAP_TIMEOUT rather than waiting the full retry duration).
   if (isTransientLookupFailure(result)) {
-    await new Promise((r) => setTimeout(r, 250));
+    const jitter = 400 + Math.floor(Math.random() * 400);
+    await new Promise((r) => setTimeout(r, jitter));
     const retried = await lookupWhoisStreaming(domain, onPartialResult);
     if (retried.status) result = retried;
   }
@@ -512,7 +513,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     }
     if (isWhoisRateLimited(whoisRawStr)) {
       recordFailure("rate_limited");
-      return failWithDns("WHOIS 服务器临时限制了本次查询速率，请稍后再试");
+      return failWithDns("WHOIS server temporarily rate-limited this query — please try again in a moment");
     }
     try {
       const result = await analyzeWhois(whoisRawStr);
