@@ -114,10 +114,14 @@ export function extractDomain(url: string): string | null {
 
 export function stripUrlToHostname(input: string): string {
   let s = input.trim();
-  // Strip full protocol (scheme://)
+  // Strip full protocol (scheme://) first
+  const hadFullProtocol = /^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(s);
   s = s.replace(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//i, "");
-  // Strip partial protocol artifacts: "https:/" or "https:" left over after single-slash URLs
-  s = s.replace(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/?/i, "");
+  // Only strip partial protocol artifacts ("https:/" or "https:") when the full
+  // "scheme://" form was NOT present — avoids eating "host:" in "host:port"
+  if (!hadFullProtocol) {
+    s = s.replace(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/?/i, "");
+  }
   // Strip any leading slashes remaining
   s = s.replace(/^\/+/, "");
   const slashIdx = s.indexOf("/");
