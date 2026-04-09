@@ -85,7 +85,7 @@ export function useDashboard() {
   const [recentSearches, setRecentSearches] = React.useState<RecentSearch[]>([]);
 
   React.useEffect(() => {
-    if (status === "unauthenticated") router.replace("/auth/signin?callbackUrl=/dashboard");
+    if (status === "unauthenticated") router.replace("/login?callbackUrl=/dashboard");
   }, [status, router]);
 
   React.useEffect(() => {

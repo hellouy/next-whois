@@ -87,9 +87,7 @@ export default function DashboardPage() {
     handleRedeemCode, handleApplyInviteCode,
   } = useDashboard();
 
-  if (status === "unauthenticated") return null;
-
-  if (status === "loading") {
+  if (status === "unauthenticated" || status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <RiLoader4Line className="w-6 h-6 animate-spin text-muted-foreground" />
