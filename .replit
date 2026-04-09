@@ -21,6 +21,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Keep Alive"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Alert Check"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -40,6 +44,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node scripts/keep-alive.mjs"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Alert Check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/check-failure-rate.mjs"
 
 [workflows.workflow.metadata]
 outputType = "console"
