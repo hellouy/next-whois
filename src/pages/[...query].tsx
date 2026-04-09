@@ -72,7 +72,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
-import { domainToUnicode } from "url";
+import { domainToUnicode, domainToASCII } from "url";
 import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -397,6 +397,32 @@ function targetToDisplayName(target: string): string {
 }
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
+  try {
+  return await _getServerSidePropsImpl(context);
+  } catch (err) {
+    // Safety net: any unexpected error (encoding issues, library throws, etc.)
+    // renders the "invalid domain" result page instead of a 500 crash.
+    const querySegments: string[] = (context.params?.query as string[]) ?? [];
+    const rawFallbackTarget = querySegments.join("/");
+    const fallbackTarget = rawFallbackTarget || "unknown";
+    console.error("[getServerSideProps] Unhandled error for query", fallbackTarget, err);
+    return {
+      props: {
+        data: {
+          time: 0,
+          status: false,
+          cached: false,
+          error: "INVALID_DOMAIN_TLD",
+        } as WhoisResult,
+        target: fallbackTarget,
+        displayTarget: fallbackTarget,
+        origin: getOrigin(context.req),
+      },
+    };
+  }
+}
+
+async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
   const querySegments: string[] = (context.params?.query as string[]) ?? [];
   const origin = getOrigin(context.req);
 
@@ -407,8 +433,13 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   const hasLocalePrefix =
     querySegments.length >= 2 && VALID_LOCALES.has(querySegments[0]);
   if (hasLocalePrefix) {
-    const cleanPath = "/" + querySegments.slice(1).join("/");
-    return { redirect: { destination: cleanPath, permanent: true } };
+    // encodeURI preserves valid URI chars (/ . - _) but encodes non-ASCII
+    // characters (emoji, CJK surrogate pairs, etc.) so the HTTP Location
+    // header never contains raw Unicode, which causes FUNCTION_INVOCATION_FAILED
+    // on Vercel (HTTP headers must be ISO-8859-1 safe).
+    const rawPath = "/" + querySegments.slice(1).join("/");
+    const safePath = encodeURI(rawPath);
+    return { redirect: { destination: safePath, permanent: true } };
   }
   const effectiveSegments = querySegments;
 
@@ -430,8 +461,10 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 
   // If cleaning changed the URL (spaces removed, protocol stripped, path trimmed…),
   // redirect to the canonical clean URL to avoid duplicate/broken results.
+  // Always use encodeURI so non-ASCII characters (emoji, CJK surrogates, etc.)
+  // are percent-encoded in the HTTP Location header (required by HTTP spec).
   if (looksLikeQuery(target) && `/${target}` !== `/${rawPath}`) {
-    return { redirect: { destination: `/${target}`, permanent: false } };
+    return { redirect: { destination: encodeURI(`/${target}`), permanent: false } };
   }
 
   // If it still doesn't look like any known query type, redirect to home
@@ -487,6 +520,39 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
         origin,
       },
     };
+  }
+
+  // ── IDNA / encoding safety check ────────────────────────────────────────
+  // Guard against domain labels that contain control characters, surrogates,
+  // or other byte sequences that would cause Net/DNS modules to throw.
+  // Note: emoji ARE handled by Node.js domainToASCII (converts to punycode),
+  // so we only reject truly unprocessable inputs here.  Any domain that passes
+  // this guard but still has no WHOIS/RDAP data will show "not found" — that
+  // is the correct user experience for an unregistered or invalid domain.
+  if (target.includes(".")) {
+    let asciiEncoded: string | null = null;
+    try {
+      asciiEncoded = domainToASCII(target.toLowerCase());
+    } catch {
+      asciiEncoded = null; // surrogate pairs or other unprocessable input
+    }
+    if (asciiEncoded === null || asciiEncoded === "") {
+      // domainToASCII returned "" (null bytes, control chars) or threw
+      // (malformed Unicode) → unprocessable input, show invalid domain page
+      return {
+        props: {
+          data: {
+            time: 0,
+            status: false,
+            cached: false,
+            error: "INVALID_DOMAIN_TLD",
+          } as WhoisResult,
+          target,
+          displayTarget,
+          origin,
+        },
+      };
+    }
   }
 
   // ── Fast-path for client-side navigations ────────────────────────────────
