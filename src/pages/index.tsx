@@ -314,6 +314,13 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
                   </Link>
                 ))}
               </div>
+
+              {/* Footer copyright — compact single line for mobile */}
+              {settings.site_footer && (
+                <p className="mt-2 text-center text-[10px] text-muted-foreground/30 leading-tight" suppressHydrationWarning>
+                  {settings.site_footer}
+                </p>
+              )}
             </React.Fragment>
           )}
         </AnimatePresence>
@@ -337,8 +344,9 @@ export const getStaticProps: GetStaticProps = async () => {
     s = await Promise.race([
       getSettings([
         "site_title", "site_description", "site_keywords", "site_logo_text",
-        "site_subtitle", "og_site_name", "og_image", "og_url", "twitter_card",
-        "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_placeholder",
+        "site_subtitle", "site_footer", "og_site_name", "og_image", "og_url", "twitter_card",
+        "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_hero_title_size",
+        "home_hero_subtitle_size", "home_placeholder",
         "home_announcement_enabled", "home_announcement_text", "home_announcement_type",
         "home_announcement_url",
       ]),
@@ -349,19 +357,22 @@ export const getStaticProps: GetStaticProps = async () => {
     s = {};
   }
 
-  const siteTitle        = s["site_title"]        || "";
-  const siteDesc         = s["site_description"]   || "";
-  const siteKeywords     = s["site_keywords"]       || "";
-  const siteLogo         = s["site_logo_text"]      || "";
-  const siteSubtitle     = s["site_subtitle"]       || "";
-  const ogSiteName       = s["og_site_name"]        || "";
-  const ogImage          = s["og_image"]            || "";
-  const ogUrl            = s["og_url"]              || "";
-  const twitterCard      = s["twitter_card"]        || "";
-  const homeShowStats    = s["home_show_stats"]     || "";
-  const homeHeroTitle    = s["home_hero_title"]     || "";
-  const homeHeroSubtitle = s["home_hero_subtitle"]  || "";
-  const homePlaceholder  = s["home_placeholder"]    || "";
+  const siteTitle         = s["site_title"]             || "";
+  const siteDesc          = s["site_description"]        || "";
+  const siteKeywords      = s["site_keywords"]            || "";
+  const siteLogo          = s["site_logo_text"]           || "";
+  const siteSubtitle      = s["site_subtitle"]            || "";
+  const siteFooter        = s["site_footer"]              || "";
+  const ogSiteName        = s["og_site_name"]             || "";
+  const ogImage           = s["og_image"]                 || "";
+  const ogUrl             = s["og_url"]                   || "";
+  const twitterCard       = s["twitter_card"]             || "";
+  const homeShowStats     = s["home_show_stats"]          || "";
+  const homeHeroTitle     = s["home_hero_title"]          || "";
+  const homeHeroSubtitle  = s["home_hero_subtitle"]       || "";
+  const homeHeroTitleSize = s["home_hero_title_size"]     || "";
+  const homeHeroSubSize   = s["home_hero_subtitle_size"]  || "";
+  const homePlaceholder   = s["home_placeholder"]         || "";
 
   const logoText   = siteLogo   || DEFAULT_LOGO;
   const tagline    = homeHeroSubtitle || siteSubtitle || DEFAULT_TAGLINE;
@@ -393,6 +404,7 @@ export const getStaticProps: GetStaticProps = async () => {
     site_title:                  title,
     site_description:            desc,
     site_keywords:               keywords,
+    site_footer:                 siteFooter || "",
     og_site_name:                siteName,
     og_image:                    ogImage || "",
     og_url:                      ogUrl || "",
@@ -400,6 +412,8 @@ export const getStaticProps: GetStaticProps = async () => {
     site_subtitle:               siteSubtitle || "",
     home_hero_title:             homeHeroTitle || "",
     home_hero_subtitle:          homeHeroSubtitle || "",
+    home_hero_title_size:        homeHeroTitleSize || "",
+    home_hero_subtitle_size:     homeHeroSubSize || "",
     home_placeholder:            homePlaceholder || "",
     home_announcement_enabled:   s["home_announcement_enabled"] || "",
     home_announcement_text:      s["home_announcement_text"]    || "",

@@ -503,7 +503,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       // /not registered/i, incorrectly flagging an existing reserved domain as
       // unregistered).
       const hasRegistryStatus = result.status?.some(s =>
-        ["registry-reserved", "registry-premium", "prohibited", "blocked"].includes(s.status ?? "")
+        ["registry-reserved", "registry-premium", "prohibited", "registrationProhibited", "blocked"].includes(s.status ?? "")
       );
       if (hasRegistryStatus) {
         // Fill in the domain name from the query if the WHOIS body omitted it

@@ -1197,11 +1197,61 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         rawLow.includes("注册局保留") ||
         rawLow.includes("保留中") ||
         rawLow.includes("该域名已保留") ||
-        // ── CNNIC (.cn) reserved domains — registry holds name offline ────
+        // ── CNNIC (.cn / .中国 / .网络 / .公司 / .中文网 etc.) ─────────────
         // Response: "the Domain Name you apply can not be registered online.
         //            Please consult your Domain Name registrar"
         rawLow.includes("can not be registered online") ||
         rawLow.includes("cannot be registered online") ||
+        // ── auDA (.au / .com.au / .net.au etc.) ──────────────────────────
+        rawLow.includes("not currently available for registration") ||
+        rawLow.includes("currently not available for registration") ||
+        rawLow.includes("reserved for future use by auda") ||
+        rawLow.includes("reserved for auda") ||
+        rawLow.includes("auda reserved") ||
+        // ── JPRS (.jp / .co.jp / .ne.jp etc.) ─────────────────────────────
+        rawLow.includes("登録保留") ||            // "registration hold" (JPRS)
+        rawLow.includes("登録審査中") ||          // "under registration review" (JPRS)
+        rawLow.includes("jprs管理") ||            // "JPRS managed"
+        rawLow.includes("jprs reserved") ||
+        // ── SGNIC (.sg / .com.sg / .net.sg etc.) ──────────────────────────
+        rawLow.includes("reserved by sgnic") ||
+        rawLow.includes("allocated by sgnic") ||
+        rawLow.includes("sgnic reserved") ||
+        // ── MYNIC (.my / .com.my etc.) ────────────────────────────────────
+        rawLow.includes("reserved by mynic") ||
+        rawLow.includes("mynic reserved") ||
+        rawLow.includes("ditempah") ||            // "reserved/booked" in Malay
+        rawLow.includes("nama domain ditempah") || // "domain name reserved" in Malay
+        // ── PANDI (.id / .co.id etc.) ─────────────────────────────────────
+        rawLow.includes("dicadangkan") ||          // "reserved" in Indonesian
+        rawLow.includes("nama domain dicadangkan") || // "domain name reserved" in Indonesian
+        rawLow.includes("pandi reserved") ||
+        // ── THNIC (.th / .co.th etc.) ────────────────────────────────────
+        rawLow.includes("สงวนชื่อ") ||             // "reserved name" in Thai
+        rawLow.includes("ถูกสงวน") ||             // "is reserved" in Thai
+        rawLow.includes("thnic reserved") ||
+        // ── VNNIC (.vn / .com.vn etc.) ────────────────────────────────────
+        rawLow.includes("bảo lưu") ||             // "reserved" in Vietnamese
+        rawLow.includes("đang bảo lưu") ||        // "is being reserved" in Vietnamese
+        rawLow.includes("tên miền bảo lưu") ||    // "domain name reserved" in Vietnamese
+        rawLow.includes("vnnic reserved") ||
+        // ── DOTPH (.ph / .com.ph etc.) ────────────────────────────────────
+        rawLow.includes("nakareserbang") ||        // "reserved" in Filipino
+        rawLow.includes("inireserba") ||           // "reserved" in Filipino
+        // ── New gTLD pre-delegation / not yet active ──────────────────────
+        rawLow.includes("not delegated") ||
+        rawLow.includes("pending delegation") ||
+        rawLow.includes("not yet delegated") ||
+        rawLow.includes("pre-delegation") ||
+        // ── Generic registry administration hold ─────────────────────────
+        rawLow.includes("administrator hold") ||
+        rawLow.includes("administrative hold") ||
+        rawLow.includes("under registry administration") ||
+        rawLow.includes("administered by the registry") ||
+        rawLow.includes("managed by the registry") ||
+        rawLow.includes("registry freeze") ||
+        rawLow.includes("registry allocated") ||
+        rawLow.includes("registry-allocated") ||
         // ── standalone "reserved" on its own line (TWNIC / NZRS) ─────────
         /(?:^|\n)\s*reserved\s*(?:\n|$)/.test(rawLow));
 
@@ -1315,6 +1365,34 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         // ── Arabic ccTLDs ────────────────────────────────────────────────
         rawLow.includes("محظور") ||           // "prohibited/forbidden" in Arabic
         rawLow.includes("التسجيل محظور") ||   // "registration is prohibited" in Arabic
+        // ── Japanese (.jp) extra patterns ───────────────────────────────
+        rawLow.includes("登録できません") ||   // "cannot register" in Japanese
+        rawLow.includes("利用できません") ||   // "cannot use" in Japanese
+        // ── Vietnamese (.vn / .com.vn) ───────────────────────────────────
+        rawLow.includes("bị cấm đăng ký") ||       // "registration prohibited" in Vietnamese
+        rawLow.includes("không được đăng ký") ||   // "cannot be registered" in Vietnamese
+        rawLow.includes("cấm đăng ký") ||           // "registration banned" in Vietnamese
+        // ── Indonesian (.id / .co.id) ─────────────────────────────────
+        rawLow.includes("tidak dapat didaftarkan") ||  // "cannot be registered" in Indonesian
+        rawLow.includes("dilarang didaftarkan") ||     // "registration prohibited" in Indonesian
+        rawLow.includes("tidak tersedia untuk registrasi") || // "not available for registration"
+        // ── THNIC (.th / .co.th) ─────────────────────────────────────
+        rawLow.includes("ห้ามจดทะเบียน") ||    // "registration prohibited" in Thai
+        rawLow.includes("ไม่สามารถจดทะเบียน") || // "cannot register" in Thai
+        // ── SGNIC (.sg) ──────────────────────────────────────────────
+        rawLow.includes("prohibited by sgnic") ||
+        rawLow.includes("not eligible for .sg") ||
+        // ── MYNIC (.my) ──────────────────────────────────────────────
+        rawLow.includes("tidak layak didaftarkan") ||  // "not eligible to register" in Malay
+        rawLow.includes("tidak boleh didaftarkan") ||  // "cannot be registered" in Malay
+        // ── Filipino (.ph) ───────────────────────────────────────────
+        rawLow.includes("bawal irehistro") ||    // "prohibited to register" in Filipino
+        rawLow.includes("hindi maaaring irehistro") ||  // "cannot be registered" in Filipino
+        // ── Hebrew (.il) ─────────────────────────────────────────────
+        rawLow.includes("לא ניתן לרשום") ||     // "cannot be registered" in Hebrew
+        rawLow.includes("רישום אסור") ||         // "registration prohibited" in Hebrew
+        // ── Greek (.gr) ──────────────────────────────────────────────
+        rawLow.includes("δεν επιτρέπεται η εγγραφή") || // "registration not permitted" in Greek
         /\bblocked\s+by\s+(?:registry|registrar)\b/.test(rawLow) ||
         /\bregistration\s+blocked\b/.test(rawLow));
 
