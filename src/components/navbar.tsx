@@ -771,15 +771,17 @@ function UserButton() {
         {...TAP}
         ref={buttonRef}
         onClick={handleToggle}
-        className={cn(
-          "w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center touch-manipulation",
+        className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
+        aria-label={t("nav_dashboard")}
+      >
+        <span className={cn(
+          "w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center",
           isAdminUser
             ? "bg-gradient-to-br from-violet-500 to-indigo-600 text-white"
             : "bg-primary text-primary-foreground"
-        )}
-        aria-label={t("nav_dashboard")}
-      >
-        {initials}
+        )}>
+          {initials}
+        </span>
       </motion.button>
       <AnimatePresence>
         {open && (

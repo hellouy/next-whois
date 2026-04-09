@@ -155,8 +155,9 @@ function SiteFooter() {
 
   if (router.pathname.startsWith("/admin")) return null;
   if (!footerText && footerLinks.length === 0) return null;
+  const isHome = router.pathname === "/";
   return (
-    <footer className="mt-4 py-4 px-4 text-center">
+    <footer className={`mt-4 py-4 px-4 text-center${isHome ? " hidden sm:block" : ""}`}>
       <div className="flex items-center justify-center gap-5 mb-2">
         {footerLinks.map((link) => (
           <Link

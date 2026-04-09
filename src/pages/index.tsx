@@ -36,17 +36,33 @@ interface HomeSeo {
 
 // ── Brand display ─────────────────────────────────────────────────────────────
 
+const HERO_TITLE_SIZE_MAP: Record<string, string> = {
+  xs: "text-3xl sm:text-4xl",
+  sm: "text-4xl sm:text-5xl",
+  md: "text-5xl sm:text-6xl",
+  lg: "text-6xl sm:text-7xl",
+  xl: "text-7xl sm:text-8xl",
+};
+const HERO_SUBTITLE_SIZE_MAP: Record<string, string> = {
+  xs: "text-[9px]",
+  sm: "text-[11px]",
+  md: "text-xs",
+  lg: "text-sm",
+};
+
 function XRWDisplay({ heroTitle, tagline }: { heroTitle: string; tagline: string }) {
   const settings = useSiteSettings();
   const displayTitle = settings.home_hero_title || heroTitle;
   const displayTagline = settings.home_hero_subtitle || tagline;
+  const titleSizeClass = HERO_TITLE_SIZE_MAP[settings.home_hero_title_size] ?? HERO_TITLE_SIZE_MAP.md;
+  const subtitleSizeClass = HERO_SUBTITLE_SIZE_MAP[settings.home_hero_subtitle_size] ?? HERO_SUBTITLE_SIZE_MAP.xs;
   return (
     <div className="w-full flex flex-col items-center justify-center select-none gap-2" suppressHydrationWarning>
-      <span className="text-shimmer text-5xl sm:text-6xl font-bold tracking-[0.22em]" suppressHydrationWarning>
+      <span className={`text-shimmer font-bold tracking-[0.22em] ${titleSizeClass}`} suppressHydrationWarning>
         {displayTitle}
       </span>
       <span
-        className="text-[10px] text-muted-foreground/35 tracking-[0.22em] uppercase"
+        className={`text-muted-foreground/35 tracking-[0.22em] uppercase ${subtitleSizeClass}`}
         style={{ display: displayTagline ? undefined : "none" }}
         suppressHydrationWarning
       >
@@ -236,7 +252,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
       </main>
 
       {/* ── Mobile layout (one viewport, no scroll) ──────────────────────── */}
-      <div className="sm:hidden flex flex-col w-full px-4" style={{ height: "calc(100dvh - 4rem)", paddingTop: "1.25rem", paddingBottom: "1.5rem" }}>
+      <div className="sm:hidden flex flex-col w-full px-4" style={{ height: "calc(100dvh - 4rem - var(--ann-h, 0px))", paddingTop: "1.25rem", paddingBottom: "1.5rem" }}>
 
         {/* Search box — top of viewport */}
         <div className="relative group mb-3">

@@ -49,6 +49,8 @@ export interface SiteSettings {
   // Home page content
   home_hero_title: string;
   home_hero_subtitle: string;
+  home_hero_title_size: string;
+  home_hero_subtitle_size: string;
   home_placeholder: string;
   home_show_stats: string;
   // Home announcement
@@ -201,6 +203,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   enable_docs: "1",
   home_hero_title: "",
   home_hero_subtitle: "",
+  home_hero_title_size: "",
+  home_hero_subtitle_size: "",
   home_placeholder: "",
   home_show_stats: "1",
   home_announcement_enabled: "",

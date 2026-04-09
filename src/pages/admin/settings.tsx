@@ -369,6 +369,42 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           <Field label="副标题" desc="主标题下方小字（留空则使用站点副标题）">
             <Input value={s.home_hero_subtitle} onChange={e => set("home_hero_subtitle", e.target.value)} placeholder="（默认使用站点副标题）" className="text-xs" />
           </Field>
+          <Field label="主标题字号" desc="控制首页大标题的显示大小">
+            <div className="flex gap-1.5 flex-wrap">
+              {(["xs","sm","md","lg","xl"] as const).map(sz => {
+                const labels: Record<string,string> = { xs:"极小", sm:"小", md:"中（默认）", lg:"大", xl:"超大" };
+                const active = (s.home_hero_title_size || "md") === sz;
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => set("home_hero_title_size", sz === "md" ? "" : sz)}
+                    className={cn("px-2.5 py-1 rounded-lg text-xs border transition-colors", active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40 hover:bg-muted/50")}
+                  >
+                    {labels[sz]}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          <Field label="副标题字号" desc="控制首页副标题的显示大小">
+            <div className="flex gap-1.5 flex-wrap">
+              {(["xs","sm","md","lg"] as const).map(sz => {
+                const labels: Record<string,string> = { xs:"极小（默认）", sm:"小", md:"中", lg:"大" };
+                const active = (s.home_hero_subtitle_size || "xs") === sz;
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => set("home_hero_subtitle_size", sz === "xs" ? "" : sz)}
+                    className={cn("px-2.5 py-1 rounded-lg text-xs border transition-colors", active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40 hover:bg-muted/50")}
+                  >
+                    {labels[sz]}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
           <Field label="搜索框占位文字" desc="搜索框内的提示文字">
             <Input value={s.home_placeholder} onChange={e => set("home_placeholder", e.target.value)} placeholder="搜索域名、IPv4、IPv6、ASN 或 CIDR" className="text-xs" />
           </Field>
