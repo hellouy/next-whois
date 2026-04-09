@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!process.env.VERCEL_API_TOKEN || !process.env.VERCEL_PROJECT_ID)
     return res.status(503).json({ error: "Vercel integration not configured" });
 
-  if (!(await isDbReady())) return res.status(503).json({ error: "数据库暂不可用" });
+  if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable" });
 
   const stamp = await one<{ id: string; verified: boolean }>(
     "SELECT id, verified FROM stamps WHERE id = $1 AND domain = $2",
