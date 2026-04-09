@@ -73,6 +73,16 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
     withDnsTimeout(dns.resolveMx(domain)),
   ]);
 
+  // Track whether each lookup actually responded (null = timed out / failed).
+  // We distinguish "server said NXDOMAIN / empty" (returned []) from "no response
+  // at all" (returned null after timeout) to avoid false "unregistered" results
+  // when DNS is unreachable from this infrastructure.
+  const nsTimedOut   = nsResult   === null;
+  const aTimedOut    = aResult    === null;
+  const aaaaTimedOut = aaaaResult === null;
+  const mxTimedOut   = mxResult   === null;
+  const allTimedOut  = nsTimedOut && aTimedOut && aaaaTimedOut && mxTimedOut;
+
   const nameservers = nsResult ?? [];
   const ipv4 = aResult ?? [];
   const ipv6 = aaaaResult ?? [];
@@ -106,15 +116,23 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
   let confidence: DnsProbeResult["confidence"] = "low";
 
   if (nameservers.length > 0) {
+    // NS records are the most authoritative signal: domain is definitely registered
     registrationStatus = "registered";
     confidence = "high";
   } else if (ipv4.length > 0 || ipv6.length > 0 || mx.length > 0) {
+    // A/AAAA/MX records without NS: domain appears active even if NS lookup failed
     registrationStatus = "registered";
     confidence = "medium";
-  } else if (hasAny === false) {
+  } else if (!allTimedOut) {
+    // At least one lookup returned an actual response (empty = NXDOMAIN).
+    // This is meaningfully different from a timeout: we got a real DNS answer
+    // saying the domain has no records, which suggests it is unregistered.
     registrationStatus = "unregistered";
     confidence = "medium";
   }
+  // If allTimedOut: all DNS queries timed out — we have no evidence either way.
+  // Keep registrationStatus = "unknown" so the UI shows "查询失败" rather than
+  // incorrectly reporting the domain as available / unregistered.
 
   return {
     domain,

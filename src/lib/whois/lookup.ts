@@ -216,11 +216,11 @@ function intEnv(name: string, def: number): number {
 }
 
 // ── Core lookup: custom server → RDAP → generic WHOIS → merge/error ──────────
-// Timeouts: RDAP_TIMEOUT_MS (default 2.5 s), WHOIS_TIMEOUT_MS (default 8 s).
-// RDAP: 3500 → 2500 ms — RDAP servers are fast; extra budget was wasted.
-// WHOIS: restored to 8000 ms (was reduced 8000→7000→5000, but this broke slow
-// ccTLD servers like whois.nic.hu which can take 4-8 s to respond).
-const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  2_500);
+// Timeouts: RDAP_TIMEOUT_MS (default 4.0 s), WHOIS_TIMEOUT_MS (default 8 s).
+// RDAP: bumped 2500 → 4000 ms — some ccTLD RDAP servers (e.g. .rw, .tz, .ke)
+// respond in 2-3.5 s from cloud infra; the old cap triggered needless retries.
+// WHOIS: 8000 ms (restored; was briefly reduced, broke slow servers like .nic.hu).
+const RDAP_TIMEOUT  = intEnv("RDAP_TIMEOUT_MS",  4_000);
 const WHOIS_TIMEOUT = intEnv("WHOIS_TIMEOUT_MS", 8_000);
 
 /**
@@ -302,11 +302,12 @@ export async function lookupWhoisCacheStreaming(
 
   let result = await lookupWhoisStreaming(domain, onPartialResult);
   // Retry once on transient failures (same logic as lookupWhoisWithCache).
-  // Reduced wait from 600 → 250 ms: enough anti-thundering-herd jitter while
-  // showing results ~350 ms sooner on transient failures.
+  // Pass onPartialResult to the retry so that if RDAP succeeds on the second
+  // attempt the partial result is streamed immediately (clears the loading
+  // skeleton at ~RDAP_TIMEOUT rather than waiting the full retry duration).
   if (isTransientLookupFailure(result)) {
     await new Promise((r) => setTimeout(r, 250));
-    const retried = await lookupWhoisStreaming(domain);
+    const retried = await lookupWhoisStreaming(domain, onPartialResult);
     if (retried.status) result = retried;
   }
   if (result.status) {
@@ -339,9 +340,16 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
 
+  // Holds a pre-started DNS probe promise (started when RDAP fails, so DNS runs
+  // in parallel with WHOIS rather than serially after it — saves up to 5 s on
+  // the failure path).
+  let _earlyDnsProbe: Promise<import("@/lib/whois/dns-check").DnsProbeResult | undefined> | null = null;
+
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
+    // Reuse the early DNS probe if it was started during the RDAP failure;
+    // otherwise start one now (fallback for paths that skipped the early start).
     const dnsProbe = isDomainQuery
-      ? await probeDomain(domain).catch(() => undefined)
+      ? await (_earlyDnsProbe ?? probeDomain(domain)).catch(() => undefined)
       : undefined;
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
@@ -445,14 +453,22 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       rdapSettled  = { status: "fulfilled", value: rdapVal };
       whoisSettled = whoisGraceResult;
     } else {
-      // RDAP failed/empty — wait for WHOIS normally
+      // RDAP failed/empty — start DNS probe NOW so it runs in parallel with WHOIS
+      // instead of serially after WHOIS times out (saves up to 5 s on failure path).
+      if (isDomainQuery) {
+        _earlyDnsProbe = probeDomain(domain).catch(() => undefined);
+      }
       const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
       rdapSettled  = { status: "fulfilled", value: rdapVal };
       whoisSettled = w;
       void r; // already settled, just for symmetry
     }
   } else {
-    // WHOIS finished first — wait for both to finish normally
+    // WHOIS finished first — start DNS probe in parallel with the remaining RDAP wait
+    // so we have DNS data ready if RDAP also fails.
+    if (isDomainQuery) {
+      _earlyDnsProbe = probeDomain(domain).catch(() => undefined);
+    }
     const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
     rdapSettled  = r;
     whoisSettled = w;
