@@ -1629,7 +1629,16 @@
     "syncing_whois": "同步中…",
     "sync_from_whois_ok": "已从 WHOIS 同步到期日期",
     "sync_failed": "同步失败，请重试",
-    "no_expiry_whois": "WHOIS 中无到期日期"
+    "no_expiry_whois": "WHOIS 中无到期日期",
+    "expand_details": "展开详情",
+    "collapse_details": "收起详情",
+    "whois_info_label": "WHOIS 信息",
+    "reminder_section_label": "提醒设置",
+    "reg_registered": "已注册",
+    "reg_available": "可注册",
+    "whois_stale_msg": "到期日待核实，点击编辑可手动同步 WHOIS",
+    "confidence_verified": "数据已核实",
+    "confidence_estimated": "AI 估算"
   },
   "admin": {
     "no_access_title": "无访问权限",

@@ -1607,7 +1607,16 @@
     "sub_section_title": "도메인 구독",
     "unknown": "알 수 없음",
     "urgent_domains": "긴급",
-    "verified": "확인됨"
+    "verified": "확인됨",
+    "expand_details": "상세 보기",
+    "collapse_details": "상세 숨기기",
+    "whois_info_label": "WHOIS 정보",
+    "reminder_section_label": "알림 설정",
+    "reg_registered": "등록됨",
+    "reg_available": "등록 가능",
+    "whois_stale_msg": "만료일 미확인. 편집을 클릭하여 WHOIS 수동 동기화",
+    "confidence_verified": "데이터 확인됨",
+    "confidence_estimated": "AI 추정"
   },
   "admin": {
     "no_access_title": "접근 권한 없음",

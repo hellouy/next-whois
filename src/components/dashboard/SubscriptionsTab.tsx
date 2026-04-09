@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -8,7 +8,7 @@ import {
   RiDeleteBinLine, RiEdit2Line, RiFireLine, RiTimeLine, RiTimerLine,
   RiCheckLine, RiSearchLine, RiCloseLine, RiGlobalLine, RiShieldCheckLine,
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
-  RiKeyLine, RiBankCardLine,
+  RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
@@ -54,6 +54,17 @@ export function SubscriptionsTab({
   onCancelSubscription, onEditSubscription, onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
 }: SubscriptionsTabProps) {
+  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
       {!(subscriptionAccessDB ?? user.subscriptionAccess) && (
@@ -297,236 +308,273 @@ export function SubscriptionsTab({
           dropped: t("dashboard.phase_guidance_dropped"),
         };
 
-        // WHOIS freshness: warn if within 30 days of expiry but synced >3 days ago (or never)
         const daysSinceWhoisSync = sub.whois_synced_at
           ? Math.floor((Date.now() - new Date(sub.whois_synced_at).getTime()) / 86400000)
           : null;
         const isWhoisStale = sub.active && (isWarn || isUrgent) && (daysSinceWhoisSync === null || daysSinceWhoisSync > 3);
+        const confidenceLabel = sub.tld_confidence === "high" ? t("dashboard.confidence_verified") : sub.tld_confidence === "est" ? t("dashboard.confidence_estimated") : null;
 
-        // Lifecycle data confidence badge
-        const confidenceLabel = sub.tld_confidence === "high" ? "数据已核实" : sub.tld_confidence === "est" ? "AI估算" : null;
+        const isExpanded = expandedIds.has(sub.id);
+        const hasDetails = !!(sub.registrar || sub.creation_date || sub.nameservers?.length > 0 || sub.drop_date);
 
         return (
           <div key={sub.id} className={cn(
-            "glass-panel border rounded-2xl p-4 space-y-3 transition-all",
+            "glass-panel border rounded-2xl overflow-hidden transition-all",
             !sub.active ? "border-border/40 opacity-60" :
             isUrgent ? "border-red-300/60 dark:border-red-700/50" :
             isPostExpiry ? "border-orange-300/60 dark:border-orange-700/50" :
             isWarn ? "border-amber-300/60 dark:border-amber-700/50" : "border-border"
           )}>
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-                isUrgent ? "bg-red-100 dark:bg-red-950/40" :
-                isPostExpiry ? "bg-orange-100 dark:bg-orange-950/40" :
-                isWarn ? "bg-amber-100 dark:bg-amber-950/40" : "bg-primary/10"
-              )}>
-                {isUrgent ? <RiFireLine className="w-4 h-4 text-red-500" /> :
-                 isPostExpiry ? <RiAlertLine className="w-4 h-4 text-orange-500" /> :
-                 isWarn ? <RiTimerLine className="w-4 h-4 text-amber-500" /> :
-                 <RiGlobalLine className="w-4 h-4 text-primary" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold truncate">{sub.domain}</p>
-                  {!sub.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("dashboard.cancelled")}</span>}
-                  {isUrgent && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
-                      {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
+            {/* ── Main card row ─────────────────────────────── */}
+            <div className="p-3.5 space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                {/* Status icon */}
+                <div className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                  isUrgent ? "bg-red-100 dark:bg-red-950/40" :
+                  isPostExpiry ? "bg-orange-100 dark:bg-orange-950/40" :
+                  isWarn ? "bg-amber-100 dark:bg-amber-950/40" : "bg-primary/10"
+                )}>
+                  {isUrgent ? <RiFireLine className="w-3.5 h-3.5 text-red-500" /> :
+                   isPostExpiry ? <RiAlertLine className="w-3.5 h-3.5 text-orange-500" /> :
+                   isWarn ? <RiTimerLine className="w-3.5 h-3.5 text-amber-500" /> :
+                   <RiGlobalLine className="w-3.5 h-3.5 text-primary" />}
+                </div>
+
+                {/* Domain + badges */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-semibold truncate">{sub.domain}</span>
+                    {!sub.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("dashboard.cancelled")}</span>}
+                    {isUrgent && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
+                        {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
+                      </span>
+                    )}
+                    {isWarn && !isUrgent && !isPostExpiry && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50">
+                        {t("dashboard.expires_in_days", { n: days ?? 0 })}
+                      </span>
+                    )}
+                    {isDropSoon && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold border border-purple-300/50">
+                        {daysDropping === 0 ? t("dashboard.drop_today") : t("dashboard.drop_in_days", { n: daysDropping })}
+                      </span>
+                    )}
+                    {phaseInfo && phase !== "active" && (
+                      <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-md border", phaseInfo.color,
+                        phase === "grace" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300/50" :
+                        phase === "redemption" ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300/50" :
+                        phase === "pendingDelete" ? "bg-purple-50 dark:bg-purple-950/30 border-purple-300/50" :
+                        "bg-muted border-border/50"
+                      )}>{t(("dashboard.phase_" + phase) as TranslationKey)}</span>
+                    )}
+                  </div>
+                  {/* Expiry date row */}
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <RiTimeLine className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-[11px] text-muted-foreground">
+                      {sub.expiration_date
+                        ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date), locale) })
+                        : t("dashboard.expiry_not_set")}
                     </span>
-                  )}
-                  {isWarn && !isUrgent && !isPostExpiry && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50">
-                      {t("dashboard.expires_in_days", { n: days ?? 0 })}
-                    </span>
-                  )}
-                  {isDropSoon && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold border border-purple-300/50">
-                      {daysDropping === 0 ? t("dashboard.drop_today") : t("dashboard.drop_in_days", { n: daysDropping })}
-                    </span>
-                  )}
-                  {phaseInfo && phase !== "active" && (
-                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-md border", phaseInfo.color,
-                      phase === "grace" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300/50" :
-                      phase === "redemption" ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300/50" :
-                      phase === "pendingDelete" ? "bg-purple-50 dark:bg-purple-950/30 border-purple-300/50" :
-                      "bg-muted border-border/50"
-                    )}>{t(("dashboard.phase_" + phase) as TranslationKey)}</span>
+                    {sub.whois_synced_at && (
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium ml-0.5">WHOIS✓</span>
+                    )}
+                  </div>
+                  {isWhoisStale && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
+                      <RiAlertLine className="w-2.5 h-2.5 shrink-0" />
+                      {t("dashboard.whois_stale_msg")}
+                    </p>
                   )}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                  <RiTimeLine className="w-3 h-3 shrink-0" />
-                  {sub.expiration_date
-                    ? t("dashboard.expires_on", { date: fmt(new Date(sub.expiration_date), locale) })
-                    : t("dashboard.expiry_not_set")}
-                  {sub.whois_synced_at && (
-                    <span className="ml-1 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
-                      WHOIS✓
-                    </span>
-                  )}
-                </p>
-                {isWhoisStale && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
-                    <RiAlertLine className="w-2.5 h-2.5 shrink-0" />
-                    到期日待核实，点击编辑可手动同步 WHOIS
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={() => onEditSubscription(sub)}
-                  title={t("dashboard.edit_expiry_title")}
-                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                  <RiEdit2Line className="w-3.5 h-3.5" />
-                </button>
-                <Link href={`/${sub.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                  <RiExternalLinkLine className="w-3.5 h-3.5" />
-                </Link>
-                {sub.active && (
-                  <button onClick={() => onCancelSubscription(sub.id)} disabled={cancelling === sub.id}
-                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">
-                    {cancelling === sub.id
-                      ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
-                      : <RiDeleteBinLine className="w-3.5 h-3.5" />}
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => onEditSubscription(sub)}
+                    title={t("dashboard.edit_expiry_title")}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                    <RiEdit2Line className="w-3.5 h-3.5" />
                   </button>
-                )}
-              </div>
-            </div>
-
-            {/* Lifecycle progress bar */}
-            {sub.active && sub.expiration_date && phase === "active" && (
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-muted-foreground">{t("dashboard.remaining_validity")}</span>
-                  <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                    {days !== null && days > 0 ? t("dashboard.n_days", { n: days }) : days === 0 ? t("dashboard.expires_today") : t("dashboard.expired")}
-                  </span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${barPct}%` }} />
+                  <Link href={`/${sub.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                    <RiExternalLinkLine className="w-3.5 h-3.5" />
+                  </Link>
+                  {sub.active && (
+                    <button onClick={() => onCancelSubscription(sub.id)} disabled={cancelling === sub.id}
+                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">
+                      {cancelling === sub.id
+                        ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                        : <RiDeleteBinLine className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Phase guidance */}
-            {isPostExpiry && phase && phaseGuidance[phase] && (
-              <div className="px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-700/30">
-                <p className="text-[11px] text-orange-700 dark:text-orange-300 leading-relaxed">{phaseGuidance[phase]}</p>
-              </div>
-            )}
-
-            {/* WHOIS info */}
-            {(sub.registrar || sub.creation_date || sub.nameservers?.length > 0) && (
-              <div className="pt-2 border-t border-border/40 space-y-1.5">
-                {(sub.registrar || sub.creation_date) && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {sub.registrar && (
-                      <div className="flex items-center gap-1 min-w-0">
-                        <RiInformationLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <span className="text-[10px] text-muted-foreground truncate max-w-[160px]" title={sub.registrar}>{sub.registrar}</span>
-                      </div>
-                    )}
-                    {sub.creation_date && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <RiTimeLine className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground">{t("dashboard.registered_on")} {fmt(new Date(sub.creation_date), locale)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {sub.nameservers?.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {sub.nameservers.slice(0, 4).map((ns, i) => (
-                      <span key={i} className="text-[9px] font-mono bg-muted/50 rounded-md px-1.5 py-0.5 text-muted-foreground lowercase">{ns}</span>
-                    ))}
-                  </div>
-                )}
-                {sub.whois_synced_at && (
-                  <div className="flex items-center gap-1">
-                    <RiShieldCheckLine className="w-2.5 h-2.5 text-emerald-500" />
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400">{t("dashboard.whois_synced")} {fmt(new Date(sub.whois_synced_at), locale)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Reminder info */}
-            {sub.active && (
-              <div className="pt-2 border-t border-border/40 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <RiCalendarLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {nextReminderIsUpcoming
-                        ? <>{t("dashboard.next_reminder")} <span className="font-medium text-foreground">{fmt(nextReminderDate!, locale)}</span></>
-                        : phase === "dropped"
-                          ? t("dashboard.no_pending_reminder")
-                          : t("dashboard.no_reminder")
-                      }
+              {/* Lifecycle progress bar — always visible when active */}
+              {sub.active && sub.expiration_date && phase === "active" && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-muted-foreground">{t("dashboard.remaining_validity")}</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                      {days !== null && days > 0 ? t("dashboard.n_days", { n: days }) : days === 0 ? t("dashboard.expires_today") : t("dashboard.expired")}
                     </span>
                   </div>
-                  {sub.next_reminder_days !== null && sub.next_reminder_days !== undefined && nextReminderIsUpcoming && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-semibold shrink-0 tabular-nums">
+                  <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${barPct}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Phase guidance — always visible when in crisis phase */}
+              {isPostExpiry && phase && phaseGuidance[phase] && (
+                <div className="px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-700/30">
+                  <p className="text-[11px] text-orange-700 dark:text-orange-300 leading-relaxed">{phaseGuidance[phase]}</p>
+                </div>
+              )}
+
+              {/* Next reminder summary — single line always visible */}
+              {sub.active && nextReminderIsUpcoming && (
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <RiBellLine className="w-3 h-3 shrink-0 text-primary/60" />
+                  <span>
+                    {t("dashboard.next_reminder")} <span className="font-medium text-foreground">{fmt(nextReminderDate!, locale)}</span>
+                  </span>
+                  {sub.next_reminder_days !== null && sub.next_reminder_days !== undefined && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-semibold tabular-nums">
                       {t("dashboard.advance_days", { n: sub.next_reminder_days })}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <RiMailLine className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-[11px] text-muted-foreground">
-                    {daysSinceLastReminder !== null
-                      ? daysSinceLastReminder === 0
-                        ? <>{t("dashboard.last_reminded_today")}</>
-                        : <>{t("dashboard.last_reminded_days_ago", { n: daysSinceLastReminder })}</>
-                      : t("dashboard.never_reminded")}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground mt-0.5 shrink-0">{t("dashboard.reminder_threshold")}</span>
-                  <div className="flex flex-wrap gap-1">
-                    {(sub.thresholds?.length ? sub.thresholds : [60, 30, 1]).map(d => (
-                      <span key={d} className="text-[9px] px-1.5 py-0.5 rounded-full border bg-sky-50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800 font-semibold tabular-nums">
-                        {t("dashboard.n_days_abbr", { days: d })}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              )}
+            </div>
+
+            {/* ── Expand / collapse toggle ──────────────────── */}
+            {hasDetails && (
+              <button
+                type="button"
+                onClick={() => toggleExpand(sub.id)}
+                className="w-full flex items-center justify-center gap-1 py-1.5 border-t border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                {isExpanded
+                  ? <><RiArrowUpSLine className="w-3.5 h-3.5" />{t("dashboard.collapse_details")}</>
+                  : <><RiArrowDownSLine className="w-3.5 h-3.5" />{t("dashboard.expand_details")}</>
+                }
+              </button>
             )}
 
-            {/* Lifecycle dates */}
-            {sub.drop_date && sub.expiration_date && (
-              <div className="pt-2 border-t border-border/40 space-y-2">
-              {confidenceLabel && (
-                <div className="flex items-center gap-1">
-                  <RiShieldCheckLine className={cn("w-2.5 h-2.5 shrink-0", sub.tld_confidence === "high" ? "text-emerald-500" : "text-amber-500")} />
-                  <span className={cn("text-[9px] font-medium", sub.tld_confidence === "high" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
-                    {confidenceLabel}
-                  </span>
-                </div>
+            {/* ── Expandable detail panel ───────────────────── */}
+            <AnimatePresence initial={false}>
+              {isExpanded && hasDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-3.5 pb-3.5 pt-3 space-y-3 border-t border-border/40 bg-muted/10">
+                    {/* WHOIS info */}
+                    {(sub.registrar || sub.creation_date || sub.nameservers?.length > 0) && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide">{t("dashboard.whois_info_label")}</p>
+                        {(sub.registrar || sub.creation_date) && (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {sub.registrar && (
+                              <div className="flex items-center gap-1 min-w-0">
+                                <RiInformationLine className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[160px]" title={sub.registrar}>{sub.registrar}</span>
+                              </div>
+                            )}
+                            {sub.creation_date && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <RiTimeLine className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground">{t("dashboard.registered_on")} {fmt(new Date(sub.creation_date), locale)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {sub.nameservers?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {sub.nameservers.slice(0, 4).map((ns, i) => (
+                              <span key={i} className="text-[9px] font-mono bg-muted/50 rounded-md px-1.5 py-0.5 text-muted-foreground lowercase">{ns}</span>
+                            ))}
+                          </div>
+                        )}
+                        {sub.whois_synced_at && (
+                          <div className="flex items-center gap-1">
+                            <RiShieldCheckLine className="w-2.5 h-2.5 text-emerald-500" />
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400">{t("dashboard.whois_synced")} {fmt(new Date(sub.whois_synced_at), locale)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reminder details */}
+                    {sub.active && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide">{t("dashboard.reminder_section_label")}</p>
+                        <div className="flex items-center gap-1.5">
+                          <RiMailLine className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="text-[11px] text-muted-foreground">
+                            {daysSinceLastReminder !== null
+                              ? daysSinceLastReminder === 0
+                                ? t("dashboard.last_reminded_today")
+                                : t("dashboard.last_reminded_days_ago", { n: daysSinceLastReminder })
+                              : t("dashboard.never_reminded")}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground mt-0.5 shrink-0">{t("dashboard.reminder_threshold")}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {(sub.thresholds?.length ? sub.thresholds : [60, 30, 1]).map(d => (
+                              <span key={d} className="text-[9px] px-1.5 py-0.5 rounded-full border bg-sky-50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800 font-semibold tabular-nums">
+                                {t("dashboard.n_days_abbr", { days: d })}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lifecycle dates */}
+                    {sub.drop_date && sub.expiration_date && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1">
+                          {confidenceLabel && <>
+                            <RiShieldCheckLine className={cn("w-2.5 h-2.5 shrink-0", sub.tld_confidence === "high" ? "text-emerald-500" : "text-amber-500")} />
+                            <span className={cn("text-[9px] font-medium", sub.tld_confidence === "high" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                              {confidenceLabel}
+                            </span>
+                          </>}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.grace_end")}</p>
+                            <p className={cn("text-[11px] font-semibold tabular-nums", phase === "grace" ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+                              {sub.grace_end ? fmt(new Date(sub.grace_end), locale) : "—"}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.redemption_end")}</p>
+                            <p className={cn("text-[11px] font-semibold tabular-nums", phase === "redemption" ? "text-orange-600 dark:text-orange-400" : "text-foreground")}>
+                              {sub.redemption_end ? fmt(new Date(sub.redemption_end), locale) : "—"}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.estimated_drop")}</p>
+                            <p className={cn("text-[11px] font-semibold tabular-nums", phase === "pendingDelete" || isDropSoon ? "text-purple-600 dark:text-purple-400" : "text-foreground")}>
+                              {fmt(new Date(sub.drop_date), locale)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               )}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.grace_end")}</p>
-                  <p className={cn("text-[11px] font-semibold tabular-nums", phase === "grace" ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
-                    {sub.grace_end ? fmt(new Date(sub.grace_end), locale) : "—"}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.redemption_end")}</p>
-                  <p className={cn("text-[11px] font-semibold tabular-nums", phase === "redemption" ? "text-orange-600 dark:text-orange-400" : "text-foreground")}>
-                    {sub.redemption_end ? fmt(new Date(sub.redemption_end), locale) : "—"}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">{t("dashboard.estimated_drop")}</p>
-                  <p className={cn("text-[11px] font-semibold tabular-nums", phase === "pendingDelete" || isDropSoon ? "text-purple-600 dark:text-purple-400" : "text-foreground")}>
-                    {fmt(new Date(sub.drop_date), locale)}
-                  </p>
-                </div>
-              </div>
-              </div>
-            )}
+            </AnimatePresence>
           </div>
         );
       })}

@@ -1603,7 +1603,16 @@
     "sub_section_title": "Подписки на домены",
     "unknown": "Неизвестно",
     "urgent_domains": "Срочно",
-    "verified": "Верифицировано"
+    "verified": "Верифицировано",
+    "expand_details": "Показать детали",
+    "collapse_details": "Скрыть детали",
+    "whois_info_label": "Информация WHOIS",
+    "reminder_section_label": "Настройки напоминаний",
+    "reg_registered": "Зарегистрирован",
+    "reg_available": "Доступен",
+    "whois_stale_msg": "Дата истечения не подтверждена. Нажмите «Изменить» для ручной синхронизации WHOIS",
+    "confidence_verified": "Данные верифицированы",
+    "confidence_estimated": "Оценка ИИ"
   },
   "admin": {
     "no_access_title": "Нет доступа",

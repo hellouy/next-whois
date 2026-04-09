@@ -1607,7 +1607,16 @@
     "sub_section_title": "Domain-Abonnements",
     "unknown": "Unbekannt",
     "urgent_domains": "Dringend",
-    "verified": "Verifiziert"
+    "verified": "Verifiziert",
+    "expand_details": "Details anzeigen",
+    "collapse_details": "Details ausblenden",
+    "whois_info_label": "WHOIS Info",
+    "reminder_section_label": "Erinnerungseinstellungen",
+    "reg_registered": "Registriert",
+    "reg_available": "Verfügbar",
+    "whois_stale_msg": "Ablaufdatum unbestätigt. Klicken Sie auf Bearbeiten, um WHOIS manuell zu synchronisieren",
+    "confidence_verified": "Daten verifiziert",
+    "confidence_estimated": "KI-Schätzung"
   },
   "admin": {
     "no_access_title": "Kein Zugriff",

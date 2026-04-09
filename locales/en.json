@@ -1629,7 +1629,16 @@
     "syncing_whois": "Syncing…",
     "sync_from_whois_ok": "Expiry date synced from WHOIS",
     "sync_failed": "Sync failed, please try again",
-    "no_expiry_whois": "WHOIS has no expiry date"
+    "no_expiry_whois": "WHOIS has no expiry date",
+    "expand_details": "Show Details",
+    "collapse_details": "Hide Details",
+    "whois_info_label": "WHOIS Info",
+    "reminder_section_label": "Reminder Settings",
+    "reg_registered": "Registered",
+    "reg_available": "Available",
+    "whois_stale_msg": "Expiry date unconfirmed, click Edit to sync WHOIS manually",
+    "confidence_verified": "Verified Data",
+    "confidence_estimated": "AI Estimate"
   },
   "admin": {
     "no_access_title": "No Access",

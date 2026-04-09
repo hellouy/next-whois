@@ -1603,7 +1603,16 @@
     "sub_section_title": "ドメインサブスクリプション",
     "unknown": "不明",
     "urgent_domains": "緊急",
-    "verified": "確認済み"
+    "verified": "確認済み",
+    "expand_details": "詳細を表示",
+    "collapse_details": "詳細を閉じる",
+    "whois_info_label": "WHOIS 情報",
+    "reminder_section_label": "リマインダー設定",
+    "reg_registered": "登録済み",
+    "reg_available": "登録可能",
+    "whois_stale_msg": "有効期限未確認。編集をクリックして WHOIS を手動同期",
+    "confidence_verified": "データ確認済み",
+    "confidence_estimated": "AI 推定"
   },
   "admin": {
     "no_access_title": "アクセス権限なし",

@@ -270,10 +270,10 @@ export default function DashboardPage() {
           <div className="glass-panel border border-border rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[11px] font-bold flex items-center gap-1.5 text-muted-foreground">
-                <RiHistoryLine className="w-3.5 h-3.5" />最近查询
+                <RiHistoryLine className="w-3.5 h-3.5" />{t("recent_searches")}
               </h3>
               <Link href="/" className="text-[11px] text-primary hover:underline flex items-center gap-0.5">
-                搜索<RiExternalLinkLine className="w-3 h-3" />
+                {t("search")}<RiExternalLinkLine className="w-3 h-3" />
               </Link>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -289,8 +289,8 @@ export default function DashboardPage() {
                   )}
                 >
                   <span className="font-semibold text-foreground">{s.query}</span>
-                  {s.reg_status === "registered" && <span className="text-[9px] text-emerald-600 dark:text-emerald-400">已注册</span>}
-                  {s.reg_status === "unregistered" && <span className="text-[9px] text-blue-500">可注册</span>}
+                  {s.reg_status === "registered" && <span className="text-[9px] text-emerald-600 dark:text-emerald-400">{t("dashboard.reg_registered")}</span>}
+                  {s.reg_status === "unregistered" && <span className="text-[9px] text-blue-500">{t("dashboard.reg_available")}</span>}
                 </Link>
               ))}
             </div>

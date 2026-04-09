@@ -14,16 +14,24 @@ import { toSearchURI } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 
 const FUN_FACTS = [
+  "世界上第一个 404 错误发生在 1992 年的欧洲核子研究中心（CERN），来自 Room 404 这个房间。",
+  "NXDOMAIN 全称 Non-Existent Domain，即「不存在的域名」，是 DNS 世界里的鬼城。",
+  "全球注册域名数量超过 3.5 亿个，但你访问的这个并不在其中。",
+  "最古老的活跃域名 symbolics.com 注册于 1985 年 3 月 15 日，至今已运行 40 年。",
+  ".com 自 1985 年起就是最受欢迎的顶级域，王者地位从未动摇。",
+  "一次 DNS 查询通常在 50ms 内完成，这个 404 用的时间更短 —— 因为什么都没找到。",
+  "ICANN 管理着 1,500 多个顶级域名（TLD），不过你要找的这个还没被注册。",
+  "DNS 根服务器逻辑上只有 13 个，但实际分布在全球 1,500 多个物理节点上。",
+  "TTL（Time To Live）是 DNS 记录的缓存时间。这个 404 页面的 TTL：0 秒。",
+  "全球每天有超过 10 万个新域名被注册 —— 你找的这个可能明天就会出现！",
+  "域名不区分大小写，google.com 和 GOOGLE.COM 会解析到同一个地方。",
+  "IPv4 地址总共约 43 亿个，而 IPv6 地址数量比地球上的沙粒还多。",
+  "世界上最贵的域名交易：voice.com 以 3,000 万美元成交（2019 年）。",
+  ".tk（托克劳群岛）曾经是全球注册数量最多的 ccTLD，因为它免费开放注册。",
   "The first 404 error was served at CERN in 1992 — from Room 404.",
-  "NXDOMAIN stands for Non-Existent Domain — the DNS equivalent of a ghost town.",
-  "There are over 350 million registered domain names worldwide.",
-  "The oldest active domain, symbolics.com, was registered on March 15, 1985.",
+  "Over 100,000 new domains are registered every single day worldwide.",
   ".com has been the most popular TLD since 1985 — and still holds the crown.",
   "A DNS lookup typically completes in under 50ms. This 404 took even less.",
-  "ICANN manages 1,500+ top-level domains. Yours just isn't one of them.",
-  "The root DNS has 13 logical servers, distributed across 1,500+ physical locations.",
-  "TTL: Time To Live — how long a DNS record is cached. This page: 0 seconds.",
-  "Over 100,000 new domains are registered every single day.",
 ];
 
 function RadarAnimation() {
