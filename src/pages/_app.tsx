@@ -545,11 +545,18 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       // result → result: shallow routing — QueryProgressBar handles this
       if (sourceIsQueryPage && destIsQueryPage) return;
 
-      // Navigation TO any result/query page: the skeleton + QueryProgressBar
-      // provide all the loading feedback needed — no top bar required here.
-      // (The bar would linger until getServerSideProps finishes, making it look
-      //  like the result page doesn't start until the bar completes.)
-      if (destIsQueryPage) return;
+      // Navigation TO any result/query page from a non-query source (e.g. homepage):
+      // show the progress bar for immediate visual feedback.  SSR now returns in
+      // <5ms for client-side navigation (Redis check is skipped), so the bar
+      // completes almost instantly and doesn't linger awkwardly.
+      // result → result: shallow routing — QueryProgressBar handles it; skip bar.
+      if (destIsQueryPage) {
+        if (!sourceIsQueryPage) {
+          if (npResetRef.current) clearTimeout(npResetRef.current);
+          setNpStatus("start");
+        }
+        return;
+      }
 
       // Other self-contained stable pages (DNS, IP, etc.) manage their own feedback
       if (OTHER_STABLE.has(dest)) return;

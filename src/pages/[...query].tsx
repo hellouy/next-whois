@@ -487,12 +487,22 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
+  // ── Fast-path for client-side navigations ────────────────────────────────
+  // When Next.js fetches SSR data for a client-side router.push(), it sets the
+  // x-nextjs-data header.  In this case the user's browser will immediately
+  // start the real lookup via prefetchLookup + /api/lookup-stream, so there's
+  // no benefit in hitting Redis here — skip the cache check and return in <5ms.
+  // Bot crawlers and direct page loads still get the full Redis lookup path.
+  const isClientNav = context.req.headers["x-nextjs-data"] === "1";
+
   // ── Parallel: require_login check + cache lookup ────────────────────────────
   // Both are independently fetchable: settings has a 30s in-process cache;
-  // the WHOIS cache check is a quick Postgres read.  Firing them together
+  // the WHOIS cache check is a quick Redis read.  Firing them together
   // removes the sequential gap (~20-60ms) on every page request.
   const requireLoginPromise = getSettingServer("require_login");
-  const ssrCachePromise = lookupWhoisWithCache(target, { cacheOnly: true }).catch(() => null);
+  const ssrCachePromise = isClientNav
+    ? Promise.resolve(null)
+    : lookupWhoisWithCache(target, { cacheOnly: true }).catch(() => null);
 
   const requireLogin = await requireLoginPromise;
   if (requireLogin === "1") {
@@ -506,6 +516,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   // Try to serve cached WHOIS data for SSR (gives search engines rich content).
   // cacheOnly=true means we only check Redis/L1 — if there's no cache hit we
   // return data:null immediately (no live lookup, no latency added).
+  // Skipped entirely for client-side navigation (see isClientNav above).
   let ssrData: WhoisResult | null = null;
   try {
     const cached = await ssrCachePromise;
@@ -523,8 +534,9 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   //   is as fresh as the underlying WHOIS cache.
   // - Without WHOIS data (loading shell): short TTL so the shell is cached
   //   briefly; the client will fetch live data via /api/lookup regardless.
+  // - Client-side navigation: skip caching (response is just an empty shell).
   // When require_login is ON, the response is user-specific — no edge caching.
-  if (requireLogin !== "1") {
+  if (requireLogin !== "1" && !isClientNav) {
     const sMaxAge = ssrData?.cacheTtl && ssrData.cacheTtl > 0
       ? Math.min(ssrData.cacheTtl, 3600)
       : 30;
