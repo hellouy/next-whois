@@ -136,6 +136,7 @@ import { DomainReminderDialog } from "@/components/query/DomainReminderDialog";
 import { AvailableDomainCard, DomainFavicon } from "@/components/query/AvailableDomainCard";
 import { RegistrationStatusType } from "@/lib/domain-status-types";
 import { getDomainRegistrationStatus, DomainStatusInfoCard } from "@/components/query/DomainStatusHelpers";
+import DOMPurify from "dompurify";
 
 // Lazy-loaded: only needed when the user opens the feedback panel
 const FeedbackDrawer = dynamic(
@@ -650,10 +651,14 @@ function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; 
   if (mode === "html") {
     const html = settings.result_ad_html;
     if (!html) return null;
+    const sanitized = typeof window !== "undefined"
+      ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
+      : "";
+    if (!sanitized) return null;
     const div = (
       <div
         className="result-ad-html max-w-full overflow-hidden"
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
       />
     );
     if (inline) return <div className="sm:hidden mt-4 px-1">{div}</div>;
@@ -2008,12 +2013,33 @@ export default function LookupPage({
                                 const ageMs = Date.now() - cachedAt;
                                 const ageMins = Math.floor(ageMs / 60_000);
                                 const ageHrs = Math.floor(ageMs / 3_600_000);
+                                const isStale = ageMs > 10 * 60 * 1000;
                                 const ageStr = ageHrs >= 1
                                   ? isChinese ? `${ageHrs}小时前缓存` : `cached ${ageHrs}h ago`
                                   : ageMins >= 1
                                     ? isChinese ? `${ageMins}分钟前缓存` : `cached ${ageMins}m ago`
                                     : isChinese ? "刚刚缓存" : "cached just now";
-                                return <span suppressHydrationWarning title={new Date(cachedAt).toLocaleString()}>{ageStr}</span>;
+                                return (
+                                  <>
+                                    <span
+                                      suppressHydrationWarning
+                                      title={new Date(cachedAt).toLocaleString()}
+                                      className={isStale ? "text-amber-500/80" : ""}
+                                    >
+                                      {ageStr}
+                                    </span>
+                                    {isStale && (
+                                      <button
+                                        onClick={handleRefresh}
+                                        suppressHydrationWarning
+                                        title={isChinese ? "数据已过期，点击重新查询" : "Data may be stale — click to refresh"}
+                                        className="ml-0.5 inline-flex items-center text-amber-500/70 hover:text-amber-500 transition-colors"
+                                      >
+                                        <RiLoopLeftLine className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </>
+                                );
                               })() : t("cached")}
                               {cacheTtl && cacheTtl > 0 && (
                                 <span className="opacity-60">
