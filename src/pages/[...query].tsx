@@ -72,7 +72,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
-import { domainToUnicode, domainToASCII } from "url";
 import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -389,6 +388,10 @@ function targetToDisplayName(target: string): string {
       .split(".")
       .some((l: string) => l.startsWith("xn--"));
     if (!hasAce) return target;
+    // domainToUnicode is a Node.js built-in — require() at call-site so webpack
+    // does NOT bundle it into the client-side JavaScript chunk.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { domainToUnicode } = require("url") as typeof import("url");
     const unicode = domainToUnicode(target.toLowerCase());
     return unicode && unicode !== target.toLowerCase() ? unicode : target;
   } catch {
@@ -532,6 +535,10 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
   if (target.includes(".")) {
     let asciiEncoded: string | null = null;
     try {
+      // domainToASCII is a Node.js built-in — require() at call-site to prevent
+      // webpack from bundling it into the client-side JavaScript chunk.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { domainToASCII } = require("url") as typeof import("url");
       asciiEncoded = domainToASCII(target.toLowerCase());
     } catch {
       asciiEncoded = null; // surrogate pairs or other unprocessable input
