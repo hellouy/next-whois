@@ -217,7 +217,6 @@ const ACTION_GROUPS: ActionGroup[] = [
       { href: "/admin/settings",         label: "网站设置",    desc: "标题、公告、功能开关",      icon: RiSettings4Line,  color: "text-blue-500" },
       { href: "/admin/system",           label: "系统监控",    desc: "数据库连接与运行状态",      icon: RiServerLine,     color: "text-gray-500" },
       { href: "/admin/db-export",        label: "数据导出",    desc: "导出数据库记录与备份",      icon: RiDownloadLine,   color: "text-green-600" },
-      { href: "/admin/git-fix",          label: "仓库工具",    desc: "Git 同步与提交工具",        icon: RiGithubLine,     color: "text-neutral-500" },
     ],
   },
 ];

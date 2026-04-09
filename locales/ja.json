@@ -628,7 +628,7 @@
     "step3_title": "メールリマインダーを自動受信",
     "step3_desc": "期限前にアカウントのメールアドレスへ自動でリマインダーを送信します",
     "phase_grace": "猶予期間",
-    "phase_redemption": "贖回期間",
+    "phase_redemption": "買戻し期間",
     "phase_pending": "削除待ち",
     "phase_dropped": "解放済み",
     "today": "今日",
@@ -680,11 +680,8 @@
     "lifecycle_hint": "期限前の何日前にメールを受け取るかを選択",
     "phase_alerts_label": "ライフサイクルフェーズアラート",
     "phase_alerts_hint": "ドメインがこれらのフェーズに入ったときも通知",
-    "phase_grace": "猶予期間",
-    "phase_redemption": "買戻し期間",
     "phase_pendingDelete": "削除待ち",
     "phase_dropSoon": "まもなく解放",
-    "phase_dropped": "解放済み",
     "submitting": "送信中…",
     "submit": "期限切れリマインダーを有効化",
     "manage_hint_prefix": "購読後は",
@@ -1720,5 +1717,6 @@
   "home": {
     "stats_total": "総検索数",
     "stats_today": "本日の検索数"
-  }
+  },
+  "back_to_top": "トップに戻る"
 }

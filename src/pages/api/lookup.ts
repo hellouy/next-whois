@@ -15,8 +15,11 @@ export const config = {
   maxDuration: 30,
 };
 
-// Rate limit: 40 requests per 60 s per IP
-const RATE_LIMIT        = 40;
+// Tiered rate limits per 60 s per IP.
+// Subscribed users get the highest quota; anonymous the lowest.
+const RATE_LIMIT_ANON   = 40;   // unauthenticated / API-key users
+const RATE_LIMIT_AUTHED = 120;  // logged-in free accounts
+const RATE_LIMIT_SUB    = 300;  // active subscription holders
 const RATE_WINDOW_MS    = 60_000;
 // Maximum accepted query length (domain names: 253 chars per RFC 1035)
 const MAX_QUERY_LENGTH  = 300;
@@ -45,24 +48,7 @@ export default async function handler(
     return res.status(405).json({ time: -1, status: false, error: "Method not allowed" });
   }
 
-  // Rate limiting — same-origin requests (the site itself) bypass the limit
-  const ip = getClientIp(req);
-  const sameOrigin = isSameOriginRequest(req);
-  const { allowed, remaining, resetMs } = sameOrigin
-    ? { allowed: true, remaining: RATE_LIMIT, resetMs: 0 }
-    : rateLimit(ip, RATE_LIMIT, RATE_WINDOW_MS);
-  res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT));
-  res.setHeader("X-RateLimit-Remaining", String(remaining));
-  res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
-  if (!allowed) {
-    return res.status(429).json({ time: -1, status: false, error: "Too many requests — please slow down" });
-  }
-
-  // API key enforcement (when enabled in admin)
-  const keyOk = await enforceApiKey(req, res, "api");
-  if (!keyOk) return;
-
-  // Input validation
+  // Input validation (sync — run before any async work)
   const query = req.query.query || req.query.q;
   if (!query || typeof query !== "string" || query.trim().length === 0) {
     return res.status(400).json({ time: -1, status: false, error: "Query is required" });
@@ -73,18 +59,47 @@ export default async function handler(
       .status(400)
       .json({ time: -1, status: false, error: `Query too long (max ${MAX_QUERY_LENGTH} chars)` });
   }
-  // Reject obviously non-sensical characters (null bytes, control chars)
   if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(trimmed)) {
     return res.status(400).json({ time: -1, status: false, error: "Invalid characters in query" });
   }
 
-  // Fetch session + require_login setting in parallel — both are independent
+  // Fetch session + require_login in parallel before rate-limiting so we can
+  // apply the correct tier (getServerSession is a fast in-process JWT decode).
   const [session, requireLogin] = await Promise.all([
     getServerSession(req, res, authOptions).catch(() => null),
     getSetting("require_login"),
   ]);
-  const userId    = (session?.user as any)?.id    ?? null;
-  const userEmail = session?.user?.email           ?? null;
+  const userId    = (session?.user as any)?.id             ?? null;
+  const userEmail = session?.user?.email                    ?? null;
+  const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
+
+  // Tiered rate limiting — same-origin (the site itself) is always exempt.
+  // Tier key includes auth state so each tier has its own independent bucket.
+  const ip         = getClientIp(req);
+  const sameOrigin = isSameOriginRequest(req);
+  const tierLimit  = sameOrigin  ? RATE_LIMIT_SUB
+                   : isSubscribed ? RATE_LIMIT_SUB
+                   : userEmail    ? RATE_LIMIT_AUTHED
+                   :                RATE_LIMIT_ANON;
+  const tierKey    = sameOrigin  ? `${ip}:origin`
+                   : isSubscribed ? `${ip}:sub`
+                   : userEmail    ? `${ip}:auth`
+                   :                `${ip}:anon`;
+
+  const { allowed, remaining, resetMs } = sameOrigin
+    ? { allowed: true, remaining: tierLimit, resetMs: 0 }
+    : rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+
+  res.setHeader("X-RateLimit-Limit", String(tierLimit));
+  res.setHeader("X-RateLimit-Remaining", String(remaining));
+  res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
+  if (!allowed) {
+    return res.status(429).json({ time: -1, status: false, error: "Too many requests — please slow down" });
+  }
+
+  // API key enforcement (when enabled in admin)
+  const keyOk = await enforceApiKey(req, res, "api");
+  if (!keyOk) return;
 
   // require_login: if enabled, deny anonymous lookups
   if (requireLogin === "1" && !userEmail) {

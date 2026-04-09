@@ -10,7 +10,8 @@
     "ui": "pnpm dlx shadcn@latest add",
     "prettier": "prettier --write src/**/*.{ts,tsx,js,jsx,json,md}",
     "test": "vitest run",
-    "update:rdap-bootstrap": "node scripts/update-rdap-bootstrap.js"
+    "update:rdap-bootstrap": "node scripts/update-rdap-bootstrap.js",
+    "check:i18n": "node scripts/check-locale-keys.mjs"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.6.2",

@@ -1,0 +1,40 @@
+### 核心优化建议
+
+你的项目已经从 CI 崩溃修复到了具备全链路监控的成熟阶段。目前的重点应当从“构建系统”转向“提升系统可用性”和“安全加固”。
+
+#### 1. 安全加固 (Security)
+- **清理高危 Admin API**：在 `src/pages/admin/git-fix.tsx` 中存在代码修复工具。这极其危险。如果 Admin Auth 出现任何配置错误（如环境变量泄漏），攻击者可以执行任意 shell 命令。
+    - **建议**：立即删除此页面。任何服务器端修复应通过 GitHub Actions 的专用 Pipeline 或部署脚本完成，绝不应通过 Web UI 触发。
+- **配置项的逻辑验证**：`src/lib/server/site-settings-server.ts` 读取设置时，缺乏类型校验（Schema Validation）。如果有人在后台错误地修改了 `result_ad_html` 字段，会导致前端崩溃。
+    - **建议**：引入 `zod` 对后台配置项进行读取校验，确保 `enable_feedback` 等字段的值符合 `0` 或 `1` 的预期，防止意外输入导致页面行为异常。
+
+#### 2. 功能缺失 (Functional Gaps)
+- **批量查询 (Bulk Lookup)**：这是 WHOIS 工具最常见的功能缺失。用户通常不会只查询一个域名。
+    - **建议**：在 `pages/[...query].tsx` 中添加一个“批量查询”模式，通过逗号分隔域名，前端循环调用 API，后端利用你现有的 Redis 缓存机制快速返回。
+- **速率限流的精细化 (Fine-grained Rate Limiting)**：你目前在 `api/lookup.ts` 中有 40 req/min 的限制，但这是“一刀切”。
+    - **建议**：为 `authenticated` 用户和 `anonymous` 用户设置不同的配额。在 `db.ts` 中已有的 `users` 表和 `subscription_access` 字段，应该与 API 层的 `rate-limit.ts` 联动。
+
+#### 3. 内容与页面优化 (Content & UX)
+- **SEO 与多语言同步**：你拥有 7 个语种的 `README` 和 `locales` 文件，但这些文件的维护非常依赖人工。
+    - **建议**：检查 `README_TW.md` 或 `README_JP.md` 等非英语 README，查看它们是否与 `README_CN.md` 同步。对于多语言翻译，建议在 `scripts/` 中加入一个检查脚本，确保 key 在所有 locale 文件中完整存在，防止出现“文案缺失”的情况。
+- **404 与错误页面**：虽然你有 Error Boundary，但 `src/pages/_error.tsx` 页面（若存在）可能过于简陋。
+    - **建议**：自定义一个轻量级的 404 页面，且必须包含“搜索框”，而不是让用户迷路。如果用户搜索了一个不存在的 TLD，应该直接建议正确的 TLD 拼写（如：查询 `.coom` 时建议用户是否想搜 `.com`）。
+
+#### 4. 技术债务 (Tech Debt)
+- **Bundle 优化**：你使用了大量 RemixIcon (`@remixicon/react`)。
+    - **建议**：这些图标库会显著增加 JS Bundle 体积。建议使用 `lucide-react`，并开启 Tree Shaking，只打包实际使用的图标，减少首屏加载时间。
+
+---
+
+### 需要检查的“错误”区域
+
+在分析代码结构时，发现了以下疑似逻辑错误点：
+
+1.  **locale-context.tsx 的竞态**：`locale-context.tsx` 可能在 Server Component 和 Client Component 之间处理不一致。如果在渲染 `Header` 时 locale 尚未从 Cookie 中解析出来，会出现闪烁。
+2.  **CN Reserved 域名的逻辑**：`src/lib/whois/cn-reserved-sld.ts` 是硬编码的。如果 CNNIC 更新了保留列表，用户会查不到结果。
+    - **改进**：你应该在后台增加一个表，将这些“保留词”配置化，而不是写死在代码里。
+
+### 总结
+你现在的系统架构非常稳健。如果你打算进行下一次重构，建议将重点放在**“用户画像与计费”**上：利用你现有的 `payment_orders` 和 `balance_transactions` 表，通过后台分析哪些用户是高频查询者，针对他们推送订阅计划，从而实现产品的自我造血。
+
+这套逻辑已经非常成熟，目前的开发工作应当放慢节奏，以测试稳定性为主。

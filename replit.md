@@ -2,6 +2,65 @@
 
 ---
 
+## Session — 2026-04-09 (四): 安全修复 + 查缺补漏
+
+### 1. 删除高危 Shell 执行接口 (Critical Security)
+
+**删除的文件：**
+- `src/pages/admin/git-fix.tsx` — 管理后台 Git 同步工具页面
+- `src/pages/api/admin/git-force-push.ts` — 后端 API（使用 `spawnSync` 执行任意 shell 命令：`git pull`、`git push --force` 等）
+- `src/pages/admin/index.tsx` — 移除"仓库工具"导航入口
+
+**风险说明：** 任何管理员 Auth 配置错误（环境变量泄漏、session 劫持）都可能导致攻击者通过此接口执行任意 shell 命令，直接 RCE。Git 操作应通过 GitHub Actions / Vercel 部署 Pipeline 完成，绝不通过 Web UI 暴露。
+
+### 2. 多语言文件缺失 Key 修复
+
+**`locales/ja.json`** — 补充缺失 key：
+```json
+"back_to_top": "トップに戻る"
+```
+
+**`locales/ru.json`** — 补充缺失 key：
+```json
+"back_to_top": "Наверх"
+```
+
+所有 8 个 locale 文件现在完全同步（各 159 个 key）。
+
+### 3. Locale Key 一致性检查脚本
+
+新建 `scripts/check-locale-keys.mjs`：
+- 以 `en.json` 为基准，检查所有其他 locale 文件
+- 缺失 key → 输出 `❌` 错误，`process.exit(1)`（CI 失败）
+- 多余 key → 输出 `⚠` 警告（不阻断）
+- 在同步时输出 `✓` 行
+
+**集成到 `package.json`：**
+```json
+"check:i18n": "node scripts/check-locale-keys.mjs"
+```
+
+运行：`pnpm check:i18n`
+
+### 4. 精细化 API 速率限制 (Fine-grained Rate Limiting)
+
+**`src/pages/api/lookup.ts`** — 三档限流策略：
+
+| 用户类型 | 每分钟限额 | Key 格式 |
+|---|---|---|
+| 匿名 / API Key | 40 req/min | `${ip}:anon` |
+| 已登录（免费） | 120 req/min | `${ip}:auth` |
+| 订阅用户 | 300 req/min | `${ip}:sub` |
+| 同源请求（网站本身） | 无限制 | `${ip}:origin` |
+
+**实现要点：**
+- Session 提前于限流判断获取（`getServerSession` 是纯 JWT 解码，无 DB 开销）
+- `getSetting("require_login")` 与 session 并行获取（`Promise.all`）
+- 每个档位使用独立的限流 key，互不影响（订阅用户的请求不占用匿名配额）
+- `X-RateLimit-Limit` 响应头反映当前用户的实际配额（而非固定值）
+
+---
+
 ## Session — 2026-04-09 (三): 自动化告警 + 可观测性完善
 
 ### 1. 自动化告警脚本 `scripts/check-failure-rate.mjs`
