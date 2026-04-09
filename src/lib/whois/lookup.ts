@@ -496,6 +496,22 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     }
     try {
       const result = await analyzeWhois(whoisRawStr);
+      // If analyzeWhois explicitly detected a registry-level domain status
+      // (reserved, premium, prohibited, blocked), trust that result even when
+      // detectWhoisError() would otherwise classify the response as an error
+      // via a broad pattern (e.g., CNNIC "can not be registered online" matches
+      // /not registered/i, incorrectly flagging an existing reserved domain as
+      // unregistered).
+      const hasRegistryStatus = result.status?.some(s =>
+        ["registry-reserved", "registry-premium", "prohibited", "blocked"].includes(s.status ?? "")
+      );
+      if (hasRegistryStatus) {
+        // Fill in the domain name from the query if the WHOIS body omitted it
+        if (!result.domain) result.domain = rawExtracted;
+        if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
+        if (rdapRaw) result.rawRdapContent = rdapRaw;
+        return { time: elapsed(), status: true, cached: false, source: "whois", result };
+      }
       const detectedError = detectWhoisError(whoisRawStr);
       if (detectedError || isEmptyResult(result)) {
         if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
