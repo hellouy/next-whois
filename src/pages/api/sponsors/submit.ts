@@ -34,8 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Please enter your name or choose to remain anonymous" });
   }
 
-  // Validate currency
-  const ALLOWED_CURRENCIES = ["CNY", "USD", "EUR", "GBP", "JPY", "HKD"];
+  // Validate currency (fiat + crypto)
+  const ALLOWED_CURRENCIES = ["CNY", "USD", "EUR", "GBP", "JPY", "HKD", "USDT", "BTC", "ETH"];
   const cleanCurrency = ALLOWED_CURRENCIES.includes(String(currency || "").toUpperCase())
     ? String(currency).toUpperCase()
     : "CNY";

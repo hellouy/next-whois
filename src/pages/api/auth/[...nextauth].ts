@@ -208,6 +208,9 @@ export const authOptions: NextAuthOptions = {
         // Allow updating display name from client
         if (session?.name !== undefined) token.name = session.name;
 
+        // Allow updating email after a verified email change
+        if (session?.email !== undefined) token.email = session.email;
+
         // SECURITY: Never trust client-provided subscriptionAccess.
         // Use the `refreshSubscription` signal to re-read from DB.
         if (session?.refreshSubscription === true && token.email) {

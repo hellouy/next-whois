@@ -134,7 +134,8 @@ export default function DashboardPage() {
       if (a.active && !b.active) return -1;
       const da = a.days_to_expiry ?? 9999;
       const db = b.days_to_expiry ?? 9999;
-      return da - db;
+      if (da !== db) return da - db;
+      return a.domain.localeCompare(b.domain);
     });
 
   return (

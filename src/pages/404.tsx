@@ -13,7 +13,7 @@ import {
 import { toSearchURI } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 
-const FUN_FACTS = [
+const FUN_FACTS_ZH = [
   "世界上第一个 404 错误发生在 1992 年的欧洲核子研究中心（CERN），来自 Room 404 这个房间。",
   "NXDOMAIN 全称 Non-Existent Domain，即「不存在的域名」，是 DNS 世界里的鬼城。",
   "全球注册域名数量超过 3.5 亿个，但你访问的这个并不在其中。",
@@ -28,10 +28,23 @@ const FUN_FACTS = [
   "IPv4 地址总共约 43 亿个，而 IPv6 地址数量比地球上的沙粒还多。",
   "世界上最贵的域名交易：voice.com 以 3,000 万美元成交（2019 年）。",
   ".tk（托克劳群岛）曾经是全球注册数量最多的 ccTLD，因为它免费开放注册。",
+];
+
+const FUN_FACTS_EN = [
   "The first 404 error was served at CERN in 1992 — from Room 404.",
-  "Over 100,000 new domains are registered every single day worldwide.",
+  "NXDOMAIN stands for Non-Existent Domain — the ghost town of the DNS world.",
+  "Over 350 million domains are registered worldwide, but this one isn't among them.",
+  "The oldest active domain, symbolics.com, was registered on March 15, 1985.",
   ".com has been the most popular TLD since 1985 — and still holds the crown.",
   "A DNS lookup typically completes in under 50ms. This 404 took even less.",
+  "ICANN manages over 1,500 top-level domains — but yours hasn't been registered yet.",
+  "There are only 13 logical DNS root servers, but 1,500+ physical nodes worldwide.",
+  "TTL stands for Time To Live — the cache lifetime of a DNS record. This page: 0 sec.",
+  "Over 100,000 new domains are registered every single day worldwide.",
+  "Domain names are case-insensitive — google.com and GOOGLE.COM go to the same place.",
+  "IPv4 has ~4.3 billion addresses. IPv6 has more addresses than grains of sand on Earth.",
+  "The most expensive domain sale: voice.com sold for $30 million in 2019.",
+  ".tk (Tokelau) was once the most-registered ccTLD in the world — because it was free.",
 ];
 
 function RadarAnimation() {
@@ -168,7 +181,7 @@ const WHOIS_FIELDS = [
 
 export default function NotFoundPage() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [query, setQuery] = useState("");
   const [showTerminal, setShowTerminal] = useState(false);
   const [visibleLines, setVisibleLines] = useState(0);
@@ -180,13 +193,16 @@ export default function NotFoundPage() {
   // produce identical HTML.  We fill it in via useEffect (client-only).
   const [whenDate, setWhenDate] = useState("");
   // randomFact likewise: start with a fixed entry so SSR matches client.
-  const [randomFact, setRandomFact] = useState(FUN_FACTS[0]);
+  // Use locale-appropriate fact list to avoid Chinese/English mixing.
+  const [randomFact, setRandomFact] = useState(FUN_FACTS_EN[0]);
 
   useEffect(() => {
+    const isChinese = locale === "zh" || locale === "zh-tw";
+    const facts = isChinese ? FUN_FACTS_ZH : FUN_FACTS_EN;
     setRawPath(window.location.pathname.replace(/^\//, "") || "");
     setWhenDate(new Date().toUTCString());
-    setRandomFact(FUN_FACTS[Math.floor(Math.random() * FUN_FACTS.length)]);
-  }, []);
+    setRandomFact(facts[Math.floor(Math.random() * facts.length)]);
+  }, [locale]);
 
   const looksLikeDomain = rawPath.includes(".");
 

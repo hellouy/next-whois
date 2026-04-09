@@ -3,14 +3,25 @@ import { many } from "@/lib/db-query";
 import { getOrigin } from "@/lib/seo";
 
 const STATIC_PAGES = [
-  { path: "/",          changefreq: "daily",   priority: "1.0" },
-  { path: "/about",     changefreq: "monthly",  priority: "0.8" },
-  { path: "/guide",     changefreq: "monthly",  priority: "0.7" },
-  { path: "/tlds",      changefreq: "weekly",   priority: "0.7" },
-  { path: "/links",     changefreq: "monthly",  priority: "0.6" },
-  { path: "/changelog", changefreq: "weekly",   priority: "0.6" },
-  { path: "/login",     changefreq: "monthly",  priority: "0.4" },
-  { path: "/register",  changefreq: "monthly",  priority: "0.4" },
+  { path: "/",            changefreq: "daily",   priority: "1.0" },
+  { path: "/about",       changefreq: "monthly",  priority: "0.8" },
+  { path: "/guide",       changefreq: "monthly",  priority: "0.7" },
+  { path: "/tlds",        changefreq: "weekly",   priority: "0.7" },
+  { path: "/directory",   changefreq: "weekly",   priority: "0.7" },
+  { path: "/dns",         changefreq: "monthly",  priority: "0.7" },
+  { path: "/ip",          changefreq: "monthly",  priority: "0.7" },
+  { path: "/ssl",         changefreq: "monthly",  priority: "0.7" },
+  { path: "/icp",         changefreq: "monthly",  priority: "0.6" },
+  { path: "/http",        changefreq: "monthly",  priority: "0.6" },
+  { path: "/tools",       changefreq: "monthly",  priority: "0.6" },
+  { path: "/docs",        changefreq: "monthly",  priority: "0.6" },
+  { path: "/faq",         changefreq: "monthly",  priority: "0.6" },
+  { path: "/feedback",    changefreq: "monthly",  priority: "0.5" },
+  { path: "/sponsor",     changefreq: "monthly",  priority: "0.5" },
+  { path: "/links",       changefreq: "monthly",  priority: "0.6" },
+  { path: "/changelog",   changefreq: "weekly",   priority: "0.6" },
+  { path: "/login",       changefreq: "monthly",  priority: "0.4" },
+  { path: "/register",    changefreq: "monthly",  priority: "0.4" },
 ];
 
 function escXml(str: string) {

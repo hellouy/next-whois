@@ -105,7 +105,10 @@ function extractVcard(vcardArray: any[]): { name?: string; org?: string; email?:
   for (const item of items) {
     if (item[0] === "fn"  && !result.name)  result.name  = item[3];
     if (item[0] === "org" && !result.org)   result.org   = typeof item[3] === "string" ? item[3] : item[3]?.[0];
-    if (item[0] === "email" && !result.email) result.email = item[3];
+    if (item[0] === "email" && !result.email) {
+      const raw = Array.isArray(item[3]) ? item[3][0] : item[3];
+      result.email = typeof raw === "string" ? raw.replace(/^mailto:/i, "") : undefined;
+    }
   }
   return result;
 }

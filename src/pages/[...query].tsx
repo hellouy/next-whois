@@ -473,25 +473,15 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
     return { redirect: { destination: encodeURI(`/${target}`), permanent: false } };
   }
 
-  // If it still doesn't look like any known query type, show an error page.
+  // If it still doesn't look like any known query type, delegate to the 404 page.
   // Real app routes (/admin, /dashboard, /login, etc.) are handled by their own
   // Next.js pages BEFORE reaching this catch-all, so anything arriving here
-  // with no dot / IP / ASN pattern is a genuinely invalid user input.
+  // with no dot / IP / ASN pattern is a genuinely invalid user input (e.g. a
+  // mistyped URL or bare word with no TLD).  Showing the interactive 404 page
+  // (which has a pre-filled search box) is a far better experience than a
+  // generic "Invalid Domain" error card inside the WHOIS results layout.
   if (!looksLikeDomainQuery(target)) {
-    return {
-      props: {
-        data: {
-          time: 0,
-          status: false,
-          cached: false,
-          error: "INVALID_DOMAIN_TLD",
-        } as WhoisResult,
-        // Show the raw user input so the error page can reference what they typed.
-        target: rawPath || target || "unknown",
-        displayTarget: rawPath || target || "unknown",
-        origin,
-      },
-    };
+    return { notFound: true };
   }
 
   // ── CN Reserved SLD early-return (before cleanDomain rewrites the query) ──

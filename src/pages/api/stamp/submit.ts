@@ -39,6 +39,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!domain || !tagName || !nickname || !email)
     return res.status(400).json({ error: "Missing required fields" });
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_RE.test(String(email).trim()))
+    return res.status(400).json({ error: "Invalid email address format" });
+
   if (!(await isDbReady())) return res.status(503).json({ error: "Database unavailable" });
 
   // ── Determine membership status from DB (never trust client JWT alone) ───────

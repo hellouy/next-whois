@@ -8,11 +8,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!(await isDbReady())) return res.status(500).json({ error: "Database unavailable" });
 
   try {
-    const existing = await one<{ id: string; domain: string; email: string }>(
-      "SELECT id, domain, email FROM reminders WHERE cancel_token = $1 AND active = true",
+    const existing = await one<{ id: string; domain: string; email: string; active: boolean }>(
+      "SELECT id, domain, email, active FROM reminders WHERE cancel_token = $1",
       [token],
     );
     if (!existing) return res.status(404).json({ error: "not_found" });
+    if (!existing.active) return res.status(200).json({ ok: true, already_cancelled: true, domain: existing.domain, email: existing.email });
 
     await run(
       `UPDATE reminders
