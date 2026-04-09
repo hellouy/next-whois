@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { logQuery } from "@/lib/db";
 
 export const config = {
   maxDuration: 30,
@@ -118,12 +119,18 @@ export default async function handler(
   const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl } =
     await lookupWhoisWithCache(trimmed, { nocache });
 
+  // Extract the TLD (last dot-separated label) for log grouping
+  const tldParts = trimmed.toLowerCase().split(".");
+  const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
+
   if (!status) {
+    logQuery({ domain: trimmed, tld, success: false, cached: false, durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null }).catch(() => {});
     return res.status(500).json({ time, status, error, dnsProbe, registryUrl });
   }
 
   // Record every successful lookup — logged-in or anonymous, cached or fresh.
   saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail).catch(() => {});
+  logQuery({ domain: trimmed, tld, success: true, cached: cached ?? false, durationMs: time * 1000, errorCode: null, source: source ?? null }).catch(() => {});
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
   // CDN edge cache also honours the same expiry windows as Redis.

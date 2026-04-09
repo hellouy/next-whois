@@ -193,6 +193,7 @@ const ACTION_GROUPS: ActionGroup[] = [
       { href: "/admin/domains",          label: "域名生命周期", desc: "注册·宽限·赎回·删除节点",   icon: RiGlobalLine,     color: "text-blue-600" },
       { href: "/admin/tld-rules",        label: "后缀解析规则", desc: "WHOIS / RDAP 规则定制",     icon: RiCodeBoxLine,    color: "text-teal-500" },
       { href: "/admin/tld-failures",     label: "查询失败统计", desc: "后缀查询失败分析与修复",    icon: RiAlertLine,      color: "text-amber-500" },
+      { href: "/admin/query-logs",       label: "查询日志",     desc: "实时请求日志与错误率监控",  icon: RiHistoryLine,    color: "text-sky-500" },
       { href: "/admin/api",              label: "API 集成",     desc: "AI Key · 第三方数据源配置", icon: RiPlugLine,       color: "text-orange-500" },
       { href: "/admin/hot-prefixes",     label: "热门搜索词",   desc: "首页推荐查询词条管理",      icon: RiFireLine,       color: "text-red-500" },
     ],

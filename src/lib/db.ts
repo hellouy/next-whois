@@ -462,6 +462,20 @@ const CREATE_INDEXES = [
     sent_at       TIMESTAMPTZ
   )`,
   `CREATE INDEX IF NOT EXISTS idx_email_queue_pending ON email_queue (next_retry_at, created_at) WHERE status = 'pending'`,
+  `CREATE TABLE IF NOT EXISTS query_logs (
+    id          BIGSERIAL    PRIMARY KEY,
+    domain      TEXT         NOT NULL,
+    tld         TEXT         NOT NULL DEFAULT '',
+    success     BOOLEAN      NOT NULL,
+    cached      BOOLEAN      NOT NULL DEFAULT false,
+    duration_ms INTEGER      NOT NULL DEFAULT 0,
+    error_code  TEXT,
+    source      TEXT,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_query_logs_tld     ON query_logs (tld)`,
+  `CREATE INDEX IF NOT EXISTS idx_query_logs_success ON query_logs (success)`,
 ];
 
 /**
@@ -656,6 +670,49 @@ export async function getDbReady(): Promise<Pool | null> {
     return null;
   }
   return getMigrated() ? db : null;
+}
+
+/**
+ * Log an individual query event (success or failure) for the admin observability dashboard.
+ * Fire-and-forget — never throws, never blocks the main query path.
+ * Automatically prunes records older than 30 days to cap table growth.
+ */
+export async function logQuery(entry: {
+  domain: string;
+  tld: string;
+  success: boolean;
+  cached: boolean;
+  durationMs: number;
+  errorCode?: string | null;
+  source?: string | null;
+}): Promise<void> {
+  const db = await getDbReady().catch(() => null);
+  if (!db) return;
+  const client = await db.connect().catch(() => null);
+  if (!client) return;
+  try {
+    await client.query(
+      `INSERT INTO query_logs (domain, tld, success, cached, duration_ms, error_code, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        entry.domain.slice(0, 253),
+        entry.tld.slice(0, 63),
+        entry.success,
+        entry.cached,
+        Math.round(entry.durationMs),
+        entry.errorCode ?? null,
+        entry.source ?? null,
+      ],
+    );
+    // Prune old records: keep only the last 30 days (runs occasionally, non-blocking)
+    await client.query(
+      `DELETE FROM query_logs WHERE created_at < NOW() - INTERVAL '30 days'`,
+    );
+  } catch {
+    // Silently ignore — never disrupt the query path
+  } finally {
+    client.release();
+  }
 }
 
 /**
