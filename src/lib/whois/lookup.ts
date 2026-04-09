@@ -7,7 +7,7 @@ import {
 } from "@/lib/server/redis";
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
-import { lookupRdap, convertRdapToWhoisResult, RdapResponse } from "@/lib/whois/rdap_client";
+import { lookupRdap, convertRdapToWhoisResult, RdapResponse, RDAP_OUTER_TIMEOUT_MS } from "@/lib/whois/rdap_client";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { probeDomain } from "@/lib/whois/dns-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
@@ -398,7 +398,11 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const RDAP_WIN_WHOIS_GRACE_MS = 900;
 
   // Start RDAP + WHOIS in parallel.
-  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_TIMEOUT) as Promise<RdapResult>;
+  // IMPORTANT: The outer withTimeout must use RDAP_OUTER_TIMEOUT_MS (12 s), NOT
+  // RDAP_TIMEOUT (4 s), so per-TLD inner timeouts in rdap_client.ts (e.g. .rw=6s,
+  // .ar=10s) fire BEFORE the outer wrapper cancels the promise.  RDAP_TIMEOUT is
+  // kept for documentation; RDAP_OUTER_TIMEOUT_MS is the actual runtime value.
+  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
   const whoisPromise = withTimeout(
     tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
     effectiveWhoisTimeout,

@@ -319,6 +319,9 @@ export function getCctldRdapOverrides(): Record<string, string> {
  * Per-TLD RDAP timeout overrides (milliseconds).
  * Used for registries that are consistently slow to respond.
  * Default timeout is 4000ms; entries here extend that for specific TLDs.
+ *
+ * IMPORTANT: The outer withTimeout() in lookup.ts must be set to a value
+ * HIGHER than the max value here.  Use RDAP_OUTER_TIMEOUT_MS for that.
  */
 const RDAP_TLD_TIMEOUT_MS: Record<string, number> = {
   // CIS / Eastern Europe — some servers have higher latency
@@ -333,6 +336,14 @@ const RDAP_TLD_TIMEOUT_MS: Record<string, number> = {
   // Asia / Pacific — some have higher latency
   bn: 6000, pg: 6000, sb: 6000, tl: 6000,
 };
+
+/**
+ * The outer safety-net timeout that lookup.ts should use when wrapping
+ * lookupRdap() with withTimeout().  Must always be > max(RDAP_TLD_TIMEOUT_MS)
+ * so the outer timer never fires before the inner AbortSignal.
+ * (max per-TLD = 10000ms for .ar; 12000ms gives 2 s headroom)
+ */
+export const RDAP_OUTER_TIMEOUT_MS = 12_000;
 
 /**
  * Direct RDAP fetch to a known server URL.
