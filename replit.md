@@ -2,6 +2,63 @@
 
 ---
 
+## Session — 2026-04-09 (六): 漏洞审计修复 (Vulnerability Audit Hardening)
+
+### 1. 依赖升级 — nodemailer CVE 修复
+
+**升级前**: `nodemailer ^7.0.13`  
+**升级后**: `nodemailer ^8.0.5`
+
+**修复的 CVE:**
+- `GHSA-c7w3-x93f-qmm8` (low) — SMTP 命令注入：`envelope.size` 参数未净化
+- `GHSA-vvjj-xcjg-gr5g` (moderate) — SMTP CRLF 注入：Transport name option 未净化，影响 EHLO/HELO 握手
+
+**影响评估**: next-auth 以 `^7.0.7` 为 peer dependency，但我们不使用 next-auth 的 Email Provider，只在自己的 `sendViaSMTP()` 中使用 nodemailer。peer warning 无实际影响。
+
+**审计前**: 42 vulnerabilities (3 low | 16 moderate | 23 high)  
+**审计后**: 40 vulnerabilities (2 low | 15 moderate | 23 high) ← nodemailer 的两条漏洞已清除
+
+**剩余 40 条全为不可操控的传递依赖**（minimatch/rollup/vite/webpack 在 next-pwa 的 node_modules 内），均为构建时工具，不影响生产运行时。
+
+### 2. IP/ASN 查询错误标准化 — `lookupIpOrAsn`
+
+**`src/lib/whois/whois-generic.ts`** — 整个函数体包入 try/catch：
+```typescript
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  throw new Error(msg.length > 120 ? msg.slice(0, 120) + "…" : msg);
+}
+```
+效果：
+- whoiser 内部错误（包括 Cloudflare/反爬堆栈）截断到 120 字符后重新抛出
+- 原始调用栈永远不会透传给客户端
+- 与 `tryGenericWhoisForDomain` 的错误规范化风格保持一致
+
+### 3. 搜索记录入库校验 — `saveSearchRecord`
+
+**`src/lib/server/save-search-record.ts`** — 新增 `isValidQuery()` 守卫：
+```typescript
+function isValidQuery(q: string): boolean {
+  if (!q || q.length > 253) return false;
+  return /^[a-z0-9.\-:/@_]+$/i.test(q);
+}
+```
+守卫在 DB 写入前调用，如果查询字符串不满足条件，静默返回（不写入）：
+- 长度上限 253 chars（RFC 1035 FQDN 最大值）
+- 字符白名单：域名、IPv4、IPv6、ASN、CIDR 的所有合法字符
+- 拒绝 SQL 元字符（`'`, `"`, `;`, `<`, `>`）、null 字节、控制字符
+
+### 4. SERVICE_ROLE_KEY 泄露扫描 — 无问题
+
+`grep -r "SERVICE_ROLE_KEY|service_role" src/components/ src/pages --include="*.tsx"` 返回空结果。  
+Service Role Key 仅在 `src/lib/supabase.ts`（server-only）中引用，不会泄露到前端 bundle。
+
+### 5. 管理 API 权限 — 全部使用 DB 角色验证
+
+`requireAdmin()` 内部调用 `isAdminEmail()` 进行**异步 DB 查询**验证（不是简单的字符串比较）。检查逻辑位于 `src/lib/admin-server.ts`。管理员列表存在 DB 中，支持动态更新，无需重启服务。
+
+---
+
 ## Session — 2026-04-09 (五): 生产就绪审计 (Production Readiness Audit)
 
 ### 1. CI 管道 — 补充 i18n 检查步骤

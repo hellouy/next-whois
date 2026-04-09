@@ -126,6 +126,20 @@ async function maybePruneAnonymous() {
   } catch {}
 }
 
+/**
+ * Validate the raw query string before persisting.
+ * Accepts all valid query types: domains, IPv4/6, ASNs, CIDRs.
+ * Rejects anything that looks like an injection attempt or oversized input.
+ */
+function isValidQuery(q: string): boolean {
+  // Hard length cap — FQDN max is 253, IPv6 is at most 39, ASN ~10.
+  if (!q || q.length > 253) return false;
+  // Allow only printable ASCII characters that appear in valid query types.
+  // Covers: a–z, 0–9, dots, hyphens, colons (IPv6), slashes (CIDR), @, underscores.
+  // Rejects null bytes, control chars, SQL metacharacters, angle brackets, etc.
+  return /^[a-z0-9.\-:/@_]+$/i.test(q);
+}
+
 export async function saveSearchRecord(
   query: string,
   result: WhoisAnalyzeResult,
@@ -136,6 +150,10 @@ export async function saveSearchRecord(
   if (!(await isDbReady())) return;
   try {
     const cleanQuery = query.toLowerCase().trim();
+
+    // Validate before any DB interaction — silently skip invalid inputs rather
+    // than writing garbage to the search_history table.
+    if (!isValidQuery(cleanQuery)) return;
     const queryType  = detectQueryType(cleanQuery);
     const regStatus  = deriveRegStatus(result, dnsProbe);
     const valueTier  = computeValueTier(cleanQuery, queryType, regStatus);
