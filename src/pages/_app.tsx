@@ -231,6 +231,7 @@ function AnnouncementBanner() {
   const globalMsg    = settings.site_announcement || "";
   const rawMsg       = isHome && homeEnabled && homeMsg ? homeMsg : globalMsg;
   const deadline     = isHome && homeEnabled ? (settings.home_announcement_deadline || "") : "";
+  const annType      = (isHome && homeEnabled ? (settings.home_announcement_type || "info") : "info") as "info" | "success" | "warning" | "error";
   const countdown    = useCountdown(deadline || undefined);
 
   // null = "still checking localStorage" — avoids flash-then-hide on first render
@@ -306,11 +307,19 @@ function AnnouncementBanner() {
     </span>
   );
 
+  const ANN_THEME = {
+    info:    { bg: "bg-blue-50/80 dark:bg-blue-950/30",   border: "border-blue-200/50 dark:border-blue-800/30",   icon: "text-blue-500 dark:text-blue-400" },
+    success: { bg: "bg-emerald-50/80 dark:bg-emerald-950/30", border: "border-emerald-200/50 dark:border-emerald-800/30", icon: "text-emerald-500 dark:text-emerald-400" },
+    warning: { bg: "bg-amber-50/80 dark:bg-amber-950/30", border: "border-amber-200/50 dark:border-amber-800/30", icon: "text-amber-500 dark:text-amber-400" },
+    error:   { bg: "bg-red-50/80 dark:bg-red-950/30",    border: "border-red-200/50 dark:border-red-800/30",    icon: "text-red-500 dark:text-red-400" },
+  } as const;
+  const theme = ANN_THEME[annType] ?? ANN_THEME.info;
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-[11px] border-b border-border/20">
+    <div className={`fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-4 h-8 text-[11px] border-b ${theme.bg} ${theme.border}`}>
       {/* Bell icon */}
       <RiBellLine
-        className="w-3 h-3 shrink-0 text-foreground/40"
+        className={`w-3 h-3 shrink-0 ${theme.icon}`}
         style={{ animation: "ann-bell 5s ease-in-out infinite" }}
       />
 
