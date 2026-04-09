@@ -1,5 +1,225 @@
 # Next Whois UI — v3.35
 
+---
+
+## Session — 2026-04-09 (三): 自动化告警 + 可观测性完善
+
+### 1. 自动化告警脚本 `scripts/check-failure-rate.mjs`
+
+新增独立 Node.js ESM 脚本，配合 **Alert Check** Workflow 每小时自动分析 `query_logs` 表，三项检测并发执行：
+
+| 检测项 | 逻辑 | 触发条件 |
+|---|---|---|
+| **TLD 失败率** | 过去 1 小时按 TLD 分组，统计 success=false 占比 | 失败率 ≥ 20% 且总查询 ≥ 5 次 |
+| **慢查询（缓存未命中）** | 过去 1 小时按 TLD 统计平均 duration_ms，仅 `cached=false` | 平均耗时 > 5000ms 且未命中次数 ≥ 3 |
+| **耗时骤增（趋势）** | 前 30 分钟 vs 后 30 分钟平均 duration 对比 | recent/early 比值 ≥ 2.0 且每段 ≥ 5 次查询 |
+
+**告警输出：** 同时带修复建议（慢查询 → 建议延长 TTL；骤增 → 建议熔断）
+
+**Webhook 支持：**
+- 环境变量 `ALERT_WEBHOOK_URL` — Discord（`discord.com` URL 自动选 `{ content }` 格式）或 Slack（其他 URL 用 `{ text }` 格式）
+- 未配置时告警仍打印到控制台，不阻断运行
+
+**架构要点：**
+- 使用 `pool.query()` 代替手动 `client.connect()` — 三个查询并行但各自获得独立连接，无 pg "already executing" 弃用警告
+- 完全复用 `keep-alive.mjs` 的 `resolveDbUrl()` / SSL 配置模式
+- 在 `query_logs` 表不存在时（从未发起过查询）静默跳过，不报错
+
+**新 Workflow — `Alert Check`：**
+- 命令：`node scripts/check-failure-rate.mjs`
+- 输出类型：`console`
+- 与 `Keep Alive`、`Start application` 并列运行
+
+---
+
+## Session — 2026-04-09 (二): 查询日志可观测性系统
+
+### 1. DB Schema — `query_logs` 表
+
+新增时序日志表，记录每一次通过 `/api/lookup` 的查询事件（包含成功和失败）：
+
+```sql
+CREATE TABLE IF NOT EXISTS query_logs (
+  id          BIGSERIAL    PRIMARY KEY,
+  domain      TEXT         NOT NULL,
+  tld         TEXT         NOT NULL DEFAULT '',
+  success     BOOLEAN      NOT NULL,
+  cached      BOOLEAN      NOT NULL DEFAULT false,
+  duration_ms INTEGER      NOT NULL DEFAULT 0,
+  error_code  TEXT,
+  source      TEXT,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_query_logs_tld     ON query_logs (tld);
+CREATE INDEX IF NOT EXISTS idx_query_logs_success ON query_logs (success);
+```
+
+自动清理：每次写入后删除 30 天前的旧记录。
+
+### 2. `logQuery()` 辅助函数 — `src/lib/db.ts`
+
+fire-and-forget 模式（同 `recordTldLookupFailure`），参数：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `domain` | string | 查询域名（截断至 253 字符） |
+| `tld` | string | 顶级后缀（截断至 63 字符） |
+| `success` | boolean | 是否成功 |
+| `cached` | boolean | 是否从缓存返回 |
+| `durationMs` | number | 总耗时（毫秒） |
+| `errorCode` | string? | 失败时的错误信息前 60 字符 |
+| `source` | string? | 查询来源（rdap/whois 等） |
+
+### 3. `src/pages/api/lookup.ts` — 成功与失败路径均接入日志
+
+- TLD 提取：`domain.split(".").pop()` 取最后一级后缀
+- 失败路径：`logQuery({ success: false, cached: false, errorCode: error?.slice(0,60) })` 后立即返回 500
+- 成功路径：`logQuery({ success: true, cached, source })` 与 `saveSearchRecord` 并列 fire-and-forget
+
+### 4. Admin API — `src/pages/api/admin/query-logs.ts`
+
+GET 端点，返回 `QueryLogResponse`：
+
+```typescript
+type QueryLogResponse = {
+  rows: QueryLogRow[];          // 分页日志行（最多 200 条/页）
+  stats: QueryLogStats;         // 当前筛选范围内的聚合统计
+  total_count: number;          // 总行数（用于分页）
+};
+
+type QueryLogStats = {
+  total: number;
+  errors: number;
+  cached: number;
+  avg_duration_ms: number;
+  error_rate: number;           // 0–100 的百分比值（保留 1 位小数）
+};
+```
+
+支持参数：`?tld=com&status=all|ok|fail&hours=24&page=1&limit=100`
+
+三个聚合 SQL 在同一 client 上顺序执行（避免 pg 并发警告）。
+
+### 5. Admin 页面 — `src/pages/admin/query-logs.tsx`
+
+- **统计卡片** (4 格网格)：总查询数 / 失败次数+错误率 / 缓存命中+命中率 / 平均耗时（超 5s 高亮琥珀色）
+- **筛选栏**：TLD 文本输入 / 状态下拉（全部/成功/失败）/ 时间窗口（1h–7d）/ 自动刷新开关（15 秒）
+- **日志表格**：序号、域名（font-mono 截断）、TLD 标签、状态徽章（成功/缓存/失败）、耗时（热力颜色）、来源、错误码（红色 font-mono badge）、相对时间
+- **分页**：每页 100 条，上一页/下一页，显示总数和当前页码
+- **空状态**：首次使用提示，引导进行一次查询
+
+### 6. Admin 首页导航 — `src/pages/admin/index.tsx`
+
+在"域名与接入"分组的"查询失败统计"条目之后添加：
+
+```typescript
+{ href: "/admin/query-logs", label: "查询日志", desc: "实时请求日志与错误率监控", icon: RiHistoryLine, color: "text-sky-500" }
+```
+
+---
+
+## Session — 2026-04-09 (一): 缓存指示 + XSS + CI + 骨架屏
+
+### 1. DOMPurify XSS 防护 — `src/pages/[...query].tsx`
+
+**`ResultTextAd`** 组件的 HTML 广告模式（`dangerouslySetInnerHTML`）现在通过 `DOMPurify.sanitize()` 净化管理员配置的 HTML 内容后再渲染。
+
+- 安装：`dompurify` + `@types/dompurify`
+- SSR 保护：`typeof window !== "undefined"` 判断后才调用 DOMPurify（避免 SSR 崩溃）
+- 纯文本广告不受影响
+
+### 2. 过期缓存指示器 — `src/pages/[...query].tsx`
+
+当缓存数据超过 10 分钟未更新时：
+- 缓存年龄文字变为琥珀色（`text-amber-500`）
+- 显示 `RiLoopLeftLine` 刷新图标按钮
+- 点击调用现有 `handleRefresh()` 绕过缓存重新查询
+
+### 3. CI 修复 + `cleanDomain` Bug 修复
+
+**vitest 配置修复**（`vitest.config.ts`）：
+- 添加 `esbuild: { jsx: "automatic", jsxImportSource: "react" }`
+- 环境改为 `jsdom`
+- 安装 `jsdom` dev 依赖
+- 不兼容 `@vitejs/plugin-react` v6 — 不安装
+
+**`stripUrlToHostname` bug 修复**（`src/lib/utils.ts`）：
+- 剥离协议后错误地返回了端口号（如 `http://host:8080/path` → `"8080"` 而非 `"host"`）
+- 修复：剥离协议后用 `new URL()` 正确解析 hostname
+
+**测试结果：** 所有 174 个测试通过。
+
+### 4. 首页即时骨架屏
+
+**`src/components/query/query-loading-skeleton.tsx`** — 提取为共享组件 `QueryLoadingSkeleton`
+
+**`src/pages/index.tsx`** — `isSearching=true` 时立即渲染骨架屏（桌面端 + 移动端），无需等待路由跳转完成
+
+**`src/pages/_app.tsx`** — 回滚首页→查询页导航的顶部进度条（不再显示顶栏，避免与骨架屏重复）
+
+---
+
+## Session — 2026-04-08 (一): 紧急修复 + 安全加固 (T001–T011)
+
+### T001 — ADMIN_EMAIL 硬编码移除
+
+`src/lib/auth.ts` / `src/lib/db.ts`：移除硬编码的默认 qq 邮箱（`9208522@qq.com`）。未配置 `ADMIN_EMAIL` 环境变量时打印告警，`isAdminEmail()` 返回 `false` 而非静默匹配。
+
+### T002 — 缺失环境变量补全
+
+`.env.local` 添加占位注释，标注必填变量：`SUPABASE_SERVICE_ROLE_KEY`、`ADMIN_EMAIL`、`SETUP_SECRET`。
+
+### T003 — Cron Secret 仅 Header 认证
+
+`src/pages/api/remind/process.ts` / `src/pages/api/process-email-queue.ts`：移除 query string `?secret=` 支持，只接受 `Authorization: Bearer <token>` header。防止 secret 泄露到服务器日志和浏览器历史。
+
+### T004 — `init-admin` 端点加强
+
+`src/pages/api/init-admin.ts`：
+- IP 速率限制：5次/15分钟（超限返回 429）
+- 使用 `crypto.timingSafeEqual()` 比较 secret，防止时序攻击
+- 密码长度上限：128 字符（防 bcrypt DoS）
+- 操作成功/失败均写入审计日志
+
+### T005 — 国旗图片 `flagcdn.com` 加载失败处理
+
+`src/components/flag-icon.tsx`：添加 `onError` handler，图片加载失败时设置 `display: none` 优雅隐藏，不显示破图标。
+
+### T006 — WHOIS 高亮逻辑修复
+
+`src/lib/whois/highlight.ts`：
+- Key 识别正则改为严格行首匹配，避免 IPv6 地址（`2001:db8::1`）中的冒号误匹配为字段分隔符
+- URL 检测避免尾部标点（`.`、`,`、`)`）被误包含进可点击链接
+
+### T007 — 批量邮件失败详细上报
+
+`src/pages/api/admin/notify.ts`：返回 HTTP 207 Multi-Status，响应体包含：
+```json
+{ "sent": 95, "failedCount": 5, "failed": ["a@example.com", ...] }
+```
+前端同步展示失败邮箱列表（原来只返回 200 + 总数）。
+
+### T008 — `WhoisFieldsTable` 过滤逻辑修复
+
+`src/components/query/whois-fields-table.tsx`：移除对字符串 `"na"` 的误过滤（原本意图是过滤 N/A，但也过滤掉了正常包含 "na" 的姓名如 "Jonathan"）。改为仅过滤空字符串、`null`、`undefined`。
+
+### T009 — WHOIS 传输层 HTML 实体解析增强
+
+`src/lib/whois/whois-transport.ts`：
+- 支持完整数字实体：`&#123;`（十进制）和 `&#x1F600;`（十六进制）
+- 补充常用命名实体：`&amp;`、`&lt;`、`&gt;`、`&quot;`、`&apos;`、`&nbsp;`（原来只处理部分）
+
+### T010 — 查询重试 Jitter Backoff
+
+`src/lib/whois/lookup.ts`：重试等待从固定延迟改为 400–800ms 随机抖动（`Math.random() * 400 + 400`），避免多并发请求在同一时刻同步重试，降低对上游注册局的瞬时压力。
+
+### T011 — HTML 剥离逐行实体解码
+
+`src/lib/whois/whois-transport.ts`：HTML → 纯文本转换时，对每一行分别解码 HTML 实体后再拼接，解决跨行实体边界问题，确保 WHOIS raw text 中不出现未解码的 `&amp;`、`&#123;` 等残留。
+
+---
+
 ## Bug Fixes & Improvements (2026-04-03)
 
 ### Admin Panel — 网站设置页面 (`/admin/settings`)
