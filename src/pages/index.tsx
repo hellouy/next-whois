@@ -1,6 +1,8 @@
 import { cn, toSearchURI, isSearchRoute, cleanDomain } from "@/lib/utils";
 import { prefetchLookup } from "@/lib/lookup-prefetch";
 import React, { useEffect, useCallback, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { QueryLoadingSkeleton } from "@/components/query/query-loading-skeleton";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/lib/i18n";
 import Head from "next/head";
@@ -120,10 +122,11 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
   useSearchHotkeys({});
 
   const [isSearching, setIsSearching] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<string>("");
 
   // Reset loading state when navigation finishes or errors (e.g. user presses back)
   useEffect(() => {
-    const reset = () => setIsSearching(false);
+    const reset = () => { setIsSearching(false); setSearchTarget(""); };
     router.events.on("routeChangeComplete", reset);
     router.events.on("routeChangeError", reset);
     return () => {
@@ -136,6 +139,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
     (query: string) => {
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
       if (cleaned) prefetchLookup(cleaned);
+      setSearchTarget(cleaned || query.trim());
       setIsSearching(true);
       router.push(toSearchURI(query));
     },
@@ -203,23 +207,32 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           <SearchHotkeysText className="flex mt-2 px-1 justify-end" />
         </div>
 
-        {seo.showStats && stats && (
-          <div className="flex justify-center gap-6 mt-3 mb-1">
-            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-              <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
-              {t("home.stats_total")}
-            </span>
-            <span className="text-muted-foreground/30">·</span>
-            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-              <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
-              {t("home.stats_today")}
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-center" style={{ height: "calc(100vh - 22rem)" }}>
-          <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          {isSearching ? (
+            <div key="skeleton" className="mt-4">
+              <QueryLoadingSkeleton isChinese={isChinese} domain={searchTarget} />
+            </div>
+          ) : (
+            <div key="home">
+              {seo.showStats && stats && (
+                <div className="flex justify-center gap-6 mt-3 mb-1">
+                  <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                    <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
+                    {t("home.stats_total")}
+                  </span>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                    <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
+                    {t("home.stats_today")}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-center" style={{ height: "calc(100vh - 22rem)" }}>
+                <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* ── Mobile layout (one viewport, no scroll) ──────────────────────── */}
@@ -233,51 +246,61 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           </div>
         </div>
 
-        {/* Brand: fills remaining space in the middle */}
-        <div className="flex flex-1 items-center justify-center">
-          <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          {isSearching ? (
+            <div key="skeleton" className="flex-1 overflow-auto">
+              <QueryLoadingSkeleton isChinese={isChinese} domain={searchTarget} />
+            </div>
+          ) : (
+            <React.Fragment key="home">
+              {/* Brand: fills remaining space in the middle */}
+              <div className="flex flex-1 items-center justify-center">
+                <XRWDisplay heroTitle={seo.heroTitle} tagline={seo.tagline} />
+              </div>
 
-        {/* Stats */}
-        {seo.showStats && stats && (
-          <div className="flex justify-center gap-5 mb-3">
-            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-              <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
-              {t("home.stats_total")}
-            </span>
-            <span className="text-muted-foreground/30">·</span>
-            <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-              <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
-              {t("home.stats_today")}
-            </span>
-          </div>
-        )}
+              {/* Stats */}
+              {seo.showStats && stats && (
+                <div className="flex justify-center gap-5 mb-3">
+                  <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                    <span className="font-semibold text-foreground/70">{fmt(stats.totalSearches)}</span>
+                    {t("home.stats_total")}
+                  </span>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                    <span className="font-semibold text-foreground/70">{fmt(stats.todaySearches)}</span>
+                    {t("home.stats_today")}
+                  </span>
+                </div>
+              )}
 
-        {/* Quick-access tool links — pinned at bottom, above footer copyright */}
-        <div className="flex items-center justify-center gap-2 flex-wrap">
-          {(isChinese
-            ? [
-                { href: "/dns", label: "DNS 查询" },
-                { href: "/ip",  label: "IP 查询" },
-                { href: "/ssl", label: "SSL 证书" },
-                { href: "/icp", label: "ICP 备案" },
-              ]
-            : [
-                { href: "/dns", label: "DNS Lookup" },
-                { href: "/ip",  label: "IP Lookup" },
-                { href: "/ssl", label: "SSL Check" },
-                { href: "/icp", label: "ICP Query" },
-              ]
-          ).map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors bg-background/50"
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
+              {/* Quick-access tool links — pinned at bottom, above footer copyright */}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {(isChinese
+                  ? [
+                      { href: "/dns", label: "DNS 查询" },
+                      { href: "/ip",  label: "IP 查询" },
+                      { href: "/ssl", label: "SSL 证书" },
+                      { href: "/icp", label: "ICP 备案" },
+                    ]
+                  : [
+                      { href: "/dns", label: "DNS Lookup" },
+                      { href: "/ip",  label: "IP Lookup" },
+                      { href: "/ssl", label: "SSL Check" },
+                      { href: "/icp", label: "ICP Query" },
+                    ]
+                ).map(({ href, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="px-3 py-1.5 rounded-full text-xs border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors bg-background/50"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </React.Fragment>
+          )}
+        </AnimatePresence>
       </div>
     </div>
     </>
