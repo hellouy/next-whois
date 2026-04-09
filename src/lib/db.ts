@@ -524,9 +524,13 @@ function getConnectionString(): { url: string; source: string } | null {
   }
 
   if (process.env.SUPABASE_DATABASE_URL) {
+    const txUrl = deriveTransactionModeUrl(process.env.SUPABASE_DATABASE_URL);
+    if (txUrl) return { url: txUrl, source: "SUPABASE_DATABASE_URL→TX" };
     return { url: process.env.SUPABASE_DATABASE_URL, source: "SUPABASE_DATABASE_URL" };
   }
   if (process.env.DATABASE_URL) {
+    const txUrl = deriveTransactionModeUrl(process.env.DATABASE_URL);
+    if (txUrl) return { url: txUrl, source: "DATABASE_URL→TX" };
     return { url: process.env.DATABASE_URL, source: "DATABASE_URL" };
   }
   return null;
@@ -570,20 +574,23 @@ function makePool(connectionString: string): Pool {
   } catch {
     sslConfig = { rejectUnauthorized: false };
   }
-  // On Vercel (serverless) each function instance is short-lived and isolated.
-  // A pool of 2 is sufficient per instance; more would hit Supabase/Neon limits.
-  // On traditional servers keep a larger pool for throughput.
+  // On Vercel/Lambda each function instance is short-lived and isolated.
+  // On Replit the server is long-running but shares the same Supabase session-mode
+  // pool_size limit — keep the pool small to avoid "max clients reached" errors.
+  // On traditional self-hosted servers a larger pool is fine.
   const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const isReplit = !!(process.env.REPLIT_DEV_DOMAIN || process.env.REPL_ID);
+  const maxConns = isServerless ? 2 : isReplit ? 3 : 8;
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
     application_name: "next-whois-ui",
-    max: isServerless ? 2 : 8,
+    max: maxConns,
     min: 0,
-    connectionTimeoutMillis: isServerless ? 8_000 : 5_000,
-    idleTimeoutMillis: isServerless ? 10_000 : 30_000,
+    connectionTimeoutMillis: 8_000,
+    idleTimeoutMillis: 10_000,
     allowExitOnIdle: true,
-    keepAlive: !isServerless,
+    keepAlive: !(isServerless || isReplit),
     keepAliveInitialDelayMillis: 20_000,
     query_timeout: 25_000,
     statement_timeout: 25_000,

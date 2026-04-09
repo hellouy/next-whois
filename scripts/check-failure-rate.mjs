@@ -49,7 +49,11 @@ function resolveDbUrl() {
   }
   if (explicit && !nonPooling)  return explicit;
   if (nonPooling) return deriveTransactionModeUrl(nonPooling) ?? nonPooling;
-  return process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL || null;
+  const supabaseUrl = process.env.SUPABASE_DATABASE_URL;
+  if (supabaseUrl) return deriveTransactionModeUrl(supabaseUrl) ?? supabaseUrl;
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) return deriveTransactionModeUrl(dbUrl) ?? dbUrl;
+  return null;
 }
 
 const DB_URL = resolveDbUrl();

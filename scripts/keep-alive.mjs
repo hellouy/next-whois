@@ -36,8 +36,16 @@ function resolveDbUrl() {
     return { url: nonPoolingUrl, source: "POSTGRES_URL_NON_POOLING" };
   }
 
-  const fallback = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
-  if (fallback) return { url: fallback, source: "DATABASE_URL" };
+  if (process.env.SUPABASE_DATABASE_URL) {
+    const txUrl = deriveTransactionModeUrl(process.env.SUPABASE_DATABASE_URL);
+    if (txUrl) return { url: txUrl, source: "SUPABASE_DATABASE_URL→TX" };
+    return { url: process.env.SUPABASE_DATABASE_URL, source: "SUPABASE_DATABASE_URL" };
+  }
+  if (process.env.DATABASE_URL) {
+    const txUrl = deriveTransactionModeUrl(process.env.DATABASE_URL);
+    if (txUrl) return { url: txUrl, source: "DATABASE_URL→TX" };
+    return { url: process.env.DATABASE_URL, source: "DATABASE_URL" };
+  }
   return null;
 }
 
