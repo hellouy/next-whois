@@ -368,11 +368,12 @@ export function extractDomainTld(domain: string): string {
 export function isValidDomainTld(domain: string): boolean {
   if (!domain.includes(".")) return true;
   if (/^AS\d+$/i.test(domain)) return true;
-  if (/^[\d.:/]+$/.test(domain)) return true;
+  if (/^(\d{1,3}\.){3}\d{1,3}(:\d+|\/\d{1,2})?$/.test(domain)) return true;
   if (/^([0-9a-fA-F]{0,4}:){1,7}/.test(domain)) return true;
   const parts = domain.split(".");
   const tld = parts[parts.length - 1];
-  if (tld.length < 2) return true;
+  // ICANN minimum TLD length is 2 — single-char "TLDs" like "3" in "2.3" are never valid.
+  if (tld.length < 2) return false;
   const hasNonAsciiTld = /[^\x00-\x7F]/.test(tld); // IDN TLD — be lenient
   if (hasNonAsciiTld) return true;
   const parsed = parse(domain, { allowPrivateDomains: false });
