@@ -62,6 +62,21 @@
     },
     "src/pages/api/admin/subscription-sync.ts": {
       "maxDuration": 60
+    },
+    "src/pages/api/admin/tld-rules.ts": {
+      "maxDuration": 90
+    },
+    "src/pages/api/admin/tld-registry.ts": {
+      "maxDuration": 30
+    },
+    "src/pages/api/admin/tld-list.ts": {
+      "maxDuration": 20
+    },
+    "src/pages/api/admin/api-keys.ts": {
+      "maxDuration": 30
+    },
+    "src/pages/api/domain-value-ai.ts": {
+      "maxDuration": 30
     }
   },
   "headers": [
