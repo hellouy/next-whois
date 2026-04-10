@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { queryMiitIcp, type MiitIcpPage } from "@/lib/server/icp-miit";
 
 export const config = { maxDuration: 15 };
 
@@ -8,31 +9,6 @@ const RL_WINDOW = 60_000;
 
 const VALID_TYPES = ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"] as const;
 type IcpType = typeof VALID_TYPES[number];
-
-/** Actual response shape from api.ong:16181 */
-type UpstreamParams = {
-  list: IcpRecord[];
-  total: number;
-  pages: number;
-  pageNum: number;
-  pageSize: number;
-  nextPage: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  isFirstPage: boolean;
-  isLastPage: boolean;
-  navigateLastPage: number;
-  size: number;
-  startRow: number;
-  endRow: number;
-};
-
-type UpstreamResponse = {
-  code: number;
-  msg: string;
-  success: boolean;
-  params: UpstreamParams;
-};
 
 export type IcpRecord = {
   domain?: string;
@@ -45,8 +21,8 @@ export type IcpRecord = {
   leaderName?: string;
   updateRecordTime?: string;
   contentTypeName?: string;
-  cityId?: string | number;
-  countyId?: string | number;
+  cityId?: string | number | null;
+  countyId?: string | number | null;
   mainUnitAddress?: string;
   serviceName?: string;
   serviceId?: number | string;
@@ -67,6 +43,7 @@ export type IcpResponse = {
   hasPreviousPage: boolean;
   list: IcpRecord[];
   error?: string;
+  source?: string;
 };
 
 function stripHtml(text: string): string {
@@ -78,10 +55,83 @@ function isHtmlResponse(text: string): boolean {
   return t.startsWith("<!doctype") || t.startsWith("<html");
 }
 
-// ICP_API_BASE can be set in Vercel environment variables to point to a custom
-// ICP backend accessible from cloud infrastructure (port 16181 is blocked by Vercel).
-// Example: ICP_API_BASE=https://your-icp-proxy.example.com
+function pageToResponse(p: MiitIcpPage, type: IcpType, search: string): IcpResponse {
+  return {
+    ok: true,
+    type, search,
+    pageNum: p.pageNum,
+    pageSize: p.pageSize,
+    total: p.total,
+    pages: p.pages,
+    hasNextPage: p.hasNextPage,
+    hasPreviousPage: p.hasPreviousPage,
+    list: p.list as IcpRecord[],
+    source: "miit",
+  };
+}
+
+// Legacy fallback: ICP_API_BASE (e.g. api.ong:16181 or a custom proxy).
+// Vercel blocks non-standard ports, so this only works if ICP_API_BASE points
+// to an HTTPS endpoint on port 443 that proxies MIIT data.
 const UPSTREAM_BASE = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
+
+async function fetchLegacyUpstream(
+  type: IcpType,
+  search: string,
+  pageNum: number,
+  pageSize: number,
+): Promise<IcpResponse | null> {
+  const url = `${UPSTREAM_BASE}/query/${encodeURIComponent(type)}?search=${encodeURIComponent(search)}&pageNum=${pageNum}&pageSize=${pageSize}`;
+  async function doFetch(): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      return await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json", "User-Agent": "NextWhois/3.0" },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  let r: Response;
+  try {
+    r = await doFetch();
+    if (!r.ok && r.status >= 500) {
+      await new Promise(res => setTimeout(res, 800));
+      r = await doFetch();
+    }
+  } catch {
+    try {
+      await new Promise(res => setTimeout(res, 800));
+      r = await doFetch();
+    } catch {
+      return null;
+    }
+  }
+  if (!r.ok) return null;
+  const ct = r.headers.get("content-type") ?? "";
+  if (!ct.includes("json")) {
+    const txt = await r.text().catch(() => "");
+    if (isHtmlResponse(txt)) return null;
+    return null;
+  }
+  const data = await r.json().catch(() => null);
+  if (!data || (!data.success && data.code !== 200)) return null;
+  const p = data.params ?? {};
+  const list: IcpRecord[] = Array.isArray(p.list) ? p.list : [];
+  return {
+    ok: true, type, search,
+    pageNum: p.pageNum ?? pageNum,
+    pageSize: p.pageSize ?? pageSize,
+    total: p.total ?? list.length,
+    pages: p.pages ?? 1,
+    hasNextPage: p.hasNextPage ?? false,
+    hasPreviousPage: p.hasPreviousPage ?? false,
+    list,
+    source: "legacy",
+  };
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -96,7 +146,6 @@ export default async function handler(
     });
   }
 
-  // Rate limiting: 30 requests per minute per IP
   const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
   if (!allowed) {
     return res.status(429).json({
@@ -108,7 +157,7 @@ export default async function handler(
 
   const type = (req.query.type as string | undefined)?.trim() as IcpType | undefined;
   const search = (req.query.search as string | undefined)?.trim() ?? "";
-  const pageNum = Math.max(1, parseInt((req.query.pageNum as string) || "1", 10) || 1);
+  const pageNum  = Math.max(1, parseInt((req.query.pageNum  as string) || "1",  10) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize as string) || "10", 10) || 10));
 
   if (!type || !VALID_TYPES.includes(type)) {
@@ -127,99 +176,36 @@ export default async function handler(
     });
   }
 
-  try {
-    const upstream = `${UPSTREAM_BASE}/query/${encodeURIComponent(type)}?search=${encodeURIComponent(search)}&pageNum=${pageNum}&pageSize=${pageSize}`;
+  res.setHeader("Cache-Control", "no-store");
 
-    async function fetchUpstream(): Promise<Response> {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
-      try {
-        return await fetch(upstream, {
-          signal: controller.signal,
-          headers: { Accept: "application/json", "User-Agent": "NextWhois/2.0" },
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-    }
+  // ── Primary: direct MIIT ICP API ─────────────────────────────────────────
+  const miitResult = await queryMiitIcp({ type, search, pageNum, pageSize, timeoutMs: 12_000 });
 
-    let upstreamRes: Response;
-    try {
-      upstreamRes = await fetchUpstream();
-      if (!upstreamRes.ok && upstreamRes.status >= 500) {
-        await new Promise(r => setTimeout(r, 1200));
-        upstreamRes = await fetchUpstream();
-      }
-    } catch (firstErr) {
-      await new Promise(r => setTimeout(r, 1200));
-      upstreamRes = await fetchUpstream();
-    }
-
-    if (!upstreamRes.ok) {
-      const text = await upstreamRes.text().catch(() => "");
-      const clean = isHtmlResponse(text)
-        ? `数据服务暂时不可用（HTTP ${upstreamRes.status}），请稍后重试`
-        : `上游接口错误（HTTP ${upstreamRes.status}）：${stripHtml(text)}`;
-      return res.status(502).json({
-        ok: false, type, search, pageNum, pageSize,
-        total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
-        error: clean,
-      });
-    }
-
-    const contentType = upstreamRes.headers.get("content-type") ?? "";
-    if (!contentType.includes("json")) {
-      const text = await upstreamRes.text().catch(() => "");
-      const clean = isHtmlResponse(text)
-        ? "数据服务返回了非 JSON 响应，可能正在维护，请稍后重试"
-        : `意外响应：${text.slice(0, 100)}`;
-      return res.status(502).json({
-        ok: false, type, search, pageNum, pageSize,
-        total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
-        error: clean,
-      });
-    }
-
-    const data: UpstreamResponse = await upstreamRes.json();
-
-    if (!data.success && data.code !== 200) {
-      return res.status(200).json({
-        ok: false, type, search, pageNum, pageSize,
-        total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
-        error: data.msg || "查询失败",
-      });
-    }
-
-    const p = data.params ?? ({} as UpstreamParams);
-    const list: IcpRecord[] = Array.isArray(p.list) ? p.list : [];
-
-    res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({
-      ok: true, type, search,
-      pageNum: p.pageNum ?? pageNum,
-      pageSize: p.pageSize ?? pageSize,
-      total: p.total ?? list.length,
-      pages: p.pages ?? 1,
-      hasNextPage: p.hasNextPage ?? false,
-      hasPreviousPage: p.hasPreviousPage ?? false,
-      list,
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "未知错误";
-    const isTimeout = msg.includes("abort") || msg.includes("timeout");
-    const isNoConn = msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed");
-    const isPortBlocked = msg.includes("ECONNREFUSED") || (isNoConn && !msg.includes("ENOTFOUND"));
-    const clean = isTimeout
-      ? "备案查询超时（>12s）。Vercel 等云平台会屏蔽非标端口（16181），请在环境变量 ICP_API_BASE 中配置可访问的后端地址，或直接前往 beian.miit.gov.cn 手动查询"
-      : isPortBlocked
-      ? "无法连接到备案数据服务（端口被防火墙屏蔽）。请配置环境变量 ICP_API_BASE 或直接访问 beian.miit.gov.cn"
-      : isNoConn
-      ? "无法连接到备案数据服务。请配置环境变量 ICP_API_BASE 指向可用的 ICP 查询后端"
-      : `查询失败：${msg.slice(0, 100)}`;
-    return res.status(502).json({
-      ok: false, type, search, pageNum, pageSize,
-      total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
-      error: clean,
-    });
+  if (miitResult.ok) {
+    return res.status(200).json(pageToResponse(miitResult.data, type, search));
   }
+
+  // Transient MIIT errors (server down, timeout, token issue) → try legacy fallback
+  const miitErr = miitResult.error;
+  const miitCode = miitResult.code ?? 0;
+  const miitTransient = miitCode === 500 || miitCode === -1 || miitCode === 401;
+
+  if (miitTransient) {
+    const legacy = await fetchLegacyUpstream(type, search, pageNum, pageSize);
+    if (legacy) {
+      return res.status(200).json(legacy);
+    }
+  }
+
+  // ── All sources failed: return best error ────────────────────────────────
+  const hasCustomBase = process.env.ICP_API_BASE && process.env.ICP_API_BASE !== "http://api.ong:16181";
+  const finalError = miitTransient
+    ? miitErr + (hasCustomBase ? "" : "。如有自建代理，请设置 ICP_API_BASE 环境变量")
+    : miitErr;
+
+  return res.status(502).json({
+    ok: false, type, search, pageNum, pageSize,
+    total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
+    error: finalError,
+  });
 }

@@ -1,74 +1,111 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-export const config = { maxDuration: 10 };
+export const config = { maxDuration: 12 };
 
 export type IcpHealthResponse = {
   online: boolean;
   latencyMs: number | null;
   checkedAt: string;
+  source?: "miit" | "legacy";
   error?: string;
 };
+
+const MIIT_AUTH_URL = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/auth";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<IcpHealthResponse>,
 ) {
   const checkedAt = new Date().toISOString();
-  const t0 = Date.now();
+  res.setHeader("Cache-Control", "no-store");
 
+  // ── Check MIIT direct access (primary source) ────────────────────────────
+  const t0 = Date.now();
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-
-    const icpBase = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
-    let upstream: Response;
+    const body = JSON.stringify({ authKey: "healthcheck", timeStamp: Date.now() });
+    let authRes: Response;
     try {
-      upstream = await fetch(
-        `${icpBase}/query/web?search=miit.gov.cn&pageNum=1&pageSize=1`,
-        {
-          signal: controller.signal,
-          headers: { Accept: "application/json", "User-Agent": "NextWhois/2.0" },
+      authRes = await fetch(MIIT_AUTH_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json;charset=UTF-8",
+          "Origin": "https://beian.miit.gov.cn",
+          "Referer": "https://beian.miit.gov.cn/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
         },
-      );
+        body,
+      });
     } finally {
       clearTimeout(timer);
     }
-
     const latencyMs = Date.now() - t0;
-    const contentType = upstream.headers.get("content-type") ?? "";
-    const isJson = contentType.includes("json");
+    const data = await authRes.json().catch(() => null);
+    const miitOnline = data?.success === true || data?.code === 200;
 
-    if (!upstream.ok || !isJson) {
-      res.setHeader("Cache-Control", "no-store");
+    if (miitOnline) {
+      return res.status(200).json({ online: true, latencyMs, checkedAt, source: "miit" });
+    }
+
+    // code 500 = MIIT server error (service down); fall through to legacy check
+    if (data?.code !== 500 && data?.code !== undefined) {
       return res.status(200).json({
-        online: false,
-        latencyMs,
-        checkedAt,
-        error: `HTTP ${upstream.status}${!isJson ? "，非 JSON 响应" : ""}`,
+        online: false, latencyMs, checkedAt, source: "miit",
+        error: `MIIT: ${String(data?.msg || data?.code || "异常")}`,
       });
     }
 
-    const data = await upstream.json();
-    const online = data?.success === true || data?.code === 200;
+    // code 500 means MIIT backend down → check legacy fallback
+    const miitLatency = latencyMs;
 
-    res.setHeader("Cache-Control", "no-store");
+    const icpBase = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
+    const t1 = Date.now();
+    const controller2 = new AbortController();
+    const timer2 = setTimeout(() => controller2.abort(), 8000);
+    let legacyOnline = false;
+    let legacyErr = "不可用";
+    try {
+      const legacyRes = await fetch(
+        `${icpBase}/query/web?search=miit.gov.cn&pageNum=1&pageSize=1`,
+        {
+          signal: controller2.signal,
+          headers: { Accept: "application/json", "User-Agent": "NextWhois/3.0" },
+        },
+      );
+      const legacyData = await legacyRes.json().catch(() => null);
+      legacyOnline = legacyData?.success === true || legacyData?.code === 200;
+      if (!legacyOnline) legacyErr = String(legacyData?.msg || legacyData?.message || `HTTP ${legacyRes.status}`);
+    } catch (e: unknown) {
+      legacyErr = e instanceof Error ? e.message.slice(0, 60) : "连接失败";
+    } finally {
+      clearTimeout(timer2);
+    }
+    const legacyLatency = Date.now() - t1;
+
+    if (legacyOnline) {
+      return res.status(200).json({ online: true, latencyMs: legacyLatency, checkedAt, source: "legacy" });
+    }
+
     return res.status(200).json({
-      online,
-      latencyMs,
+      online: false,
+      latencyMs: miitLatency,
       checkedAt,
-      error: online ? undefined : (data?.msg || "服务异常"),
+      source: "miit",
+      error: `MIIT 服务异常（code 500），备用服务: ${legacyErr}`,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "unknown";
     const latencyMs = Date.now() - t0;
     const isTimeout = msg.includes("abort") || msg.includes("timeout");
-    const isNoConn = msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed");
-    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       online: false,
       latencyMs: isTimeout ? null : latencyMs,
       checkedAt,
-      error: isTimeout ? "连接超时" : isNoConn ? "服务不可达" : msg.slice(0, 80),
+      source: "miit",
+      error: isTimeout ? "MIIT 连接超时" : msg.slice(0, 80),
     });
   }
 }

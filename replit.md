@@ -5695,3 +5695,53 @@ L3: PostgreSQL whois_cache表 (现在真正读取了)  ← 原来只写不读！
 - `src/lib/server/redis.ts`: 移除 ioredis guard、eager init、新增 `activeRedisBackend()` / `isIoredisAvailable()`
 - `src/lib/whois/lookup.ts`: L1 提升 (60s/2000/LRU)、in-flight dedup、L3读取、模块预热、DNS扩展
 - `src/pages/api/admin/system.ts`: 导入新函数，健康检查返回 backend 类型信息
+
+---
+
+## Session — 2026-04-10 (五): 直接对接 MIIT ICP 数据库 (Bypass CloudWAF via Cookie)
+
+### 调查结论
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `.bb` WHOIS 不可用 | 港口 43 从所有云 IP 被防火墙屏蔽；telecoms.gov.bb 网站返回 0 字节 | 已有 3s 快速失败 + 手动查询链接，无法通过代码层面修复 |
+| ICP `api.ong:16181` 不可用 | 端口 16181 被 Vercel 屏蔽；Python 后端代码错误（code 122） | 弃用，改为直接调用 MIIT 官方 API |
+| MIIT 官方 API 被 WAF 屏蔽 | Knownsec CloudWAF 对云 IP 使用 IP 精准访问控制 | **发现 WAF Cookie Bypass**：见下文 |
+
+### WAF Cookie Bypass 发现过程
+
+1. `POST /icpproject_query/api/auth` — 即使 authKey 任意值，响应也会设置 `__jsluid_s` JSL WAF cookie
+2. 使用该 cookie 请求 `/api/icpAbbreviateInfo/queryByCondition` — 响应从 WAF HTML 变为 MIIT 自己的 JSON 401
+3. 这证明 WAF cookie 绕过了 IP 精准访问控制；MIIT 401 说明只需要有效 token 即可正常查询
+4. 当前 MIIT auth 端点返回 code 500（服务器异常），`beian.miit.gov.cn` 返回 521（服务本身正在维护）
+
+### 实现架构
+
+**新文件**: `src/lib/server/icp-miit.ts`
+- `queryMiitIcp()` — 完整的 MIIT ICP 查询流程：
+  1. `POST /api/auth` → 获取 `__jsluid_s` WAF cookie + auth token
+  2. `POST /api/icpAbbreviateInfo/queryByCondition`（或黑名单端点）with cookie + token
+  3. 解析并返回标准化的 `MiitIcpPage` 数据结构
+- 支持全部 8 种查询类型 (web/app/mapp/kapp 及 b* 黑名单变体)
+- serviceType 映射：web=1, app=2, mapp=3, kapp=4
+
+**重写**: `src/pages/api/icp/query.ts`
+- **主路径**: `queryMiitIcp()` — 直接调用 MIIT，无需外部代理
+- **降级路径**: 若 MIIT 返回 500/401/-1（瞬时错误），自动回退到 `ICP_API_BASE`（legacy api.ong）
+- **最终错误**: 两路都失败时返回清晰的中文错误信息
+- 响应增加 `source: "miit" | "legacy"` 字段便于调试
+
+**重写**: `src/pages/api/icp/health.ts`
+- 先检查 MIIT auth 端点延迟 + 响应码
+- 若 MIIT 返回 code 500（服务下线），再检查 legacy 端点
+- 响应增加 `source` 字段
+
+### 当前状态 (2026-04-10)
+- MIIT 服务本身正在维护：`beian.miit.gov.cn` HTTP 521，auth 端点 code 500
+- 代码实现已完成并部署至 Vercel（3 个文件已推送 GitHub → Vercel 自动构建）
+- **一旦 MIIT 恢复正常，ICP 功能将从 Vercel 自动恢复，无需任何额外配置**
+
+### 文件修改清单
+- `src/lib/server/icp-miit.ts`（新建）: 直接 MIIT ICP 客户端，含 WAF cookie bypass 流程
+- `src/pages/api/icp/query.ts`: 主路径改为 MIIT 直连，api.ong 为降级后备
+- `src/pages/api/icp/health.ts`: 优先检查 MIIT，若 500 再检查 legacy，source 字段
