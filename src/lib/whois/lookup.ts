@@ -4,6 +4,8 @@ import {
   getJsonRedisValueWithTtl,
   setJsonRedisValue,
   isRedisAvailable,
+  getWhoisDbCache,
+  setWhoisDbCache,
 } from "@/lib/server/redis";
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
@@ -21,6 +23,7 @@ import {
   isASNumber,
   toAsciiDomain,
 } from "@/lib/whois/whois-patterns";
+import { ScraperRequiredError } from "@/lib/whois/custom-servers";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { recordTldLookupFailure } from "@/lib/db";
@@ -30,17 +33,38 @@ warmupDnsCache([
   "whois.verisign-grs.com", "whois.pir.org", "whois.iana.org",
   "whois.afilias.net", "whois.apnic.net",
   "whois.arin.net", "whois.ripe.net", "whois.lacnic.net", "whois.afrinic.net",
+  // Popular gTLD registry WHOIS
+  "whois.centralnic.com", "whois.donuts.co", "whois.afilias-grs.info",
+  "whois.nic.google", "whois.godaddy.com", "whois.uniregistry.net",
+  "whois.publicinterestregistry.org",
   // High-traffic ccTLD WHOIS servers
   "whois.nic.hu", "whois.jprs.jp", "whois.registro.br",
   "whois.nic.fr", "whois.denic.de", "whois.nic.uk",
   "whois.cnnic.cn", "whois.nic.it", "whois.tcinet.ru",
   "whois.dns.pl", "whois.dnsbelgium.be", "whois.domreg.lt",
   "whois.nic.au", "whois.srs.net.nz", "whois.teleinfo.cn",
+  // Additional ccTLD servers
+  "whois.nic.es", "whois.nic.se", "whois.norid.no",
+  "whois.nic.fi", "whois.dk-hostmaster.dk", "whois.domain.fi",
+  "whois.nic.ch", "whois.switch.ch", "whois.nic.at",
+  "whois.nic.cz", "whois.sk-nic.sk", "whois.nic.ro",
+  "whois.registry.net.za", "whois.nic.ng", "whois.rnids.rs",
+  "whois.nic.co.uk", "whois.nominet.org.uk",
+  "whois.nic.kr", "whois.twnic.net.tw", "whois.pandi.or.id",
+  "whois.vnnic.vn", "whois.thnic.co.th", "whois.nic.ir",
+  "whois.nic.tr", "whois.pknic.net.pk", "whois.nic.mx",
 ]);
 
-// ── L1 in-process cache (30 s / 500 entries) ─────────────────────────────────
-const L1_TTL_MS = 30_000;
-const L1_MAX = 500;
+// Pre-warm the whoiser module in the background so the first WHOIS TCP lookup
+// does not pay the module-parse cost (~30-100 ms) during the request hot path.
+import("whoiser").catch(() => {});
+
+// ── L1 in-process cache (60 s / 2 000 entries, LRU eviction) ─────────────────
+// Increased from 30 s / 500 to absorb more repeated queries between Redis
+// round-trips while keeping memory bounded.  LRU eviction keeps hot domains
+// alive longer, evicting cold entries first.
+const L1_TTL_MS = 60_000;
+const L1_MAX = 2_000;
 type MemEntry = { value: WhoisResult; expiresAt: number };
 const _memCache = new Map<string, MemEntry>();
 
@@ -48,8 +72,17 @@ function l1Get(key: string): WhoisResult | null {
   const entry = _memCache.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) { _memCache.delete(key); return null; }
+  // LRU: re-insert to move to Map end (most-recently-used position).
+  _memCache.delete(key);
+  _memCache.set(key, entry);
   return entry.value;
 }
+
+// ── In-flight deduplication ───────────────────────────────────────────────────
+// Prevents thundering-herd on cache misses: if N requests arrive simultaneously
+// for the same uncached domain, only the first spawns a real lookup; the rest
+// await the shared Promise and get the result for free.
+const _inflight = new Map<string, Promise<WhoisResult>>();
 
 /**
  * Compute approximate remaining TTL (seconds) from the stored result's
@@ -63,7 +96,10 @@ function l1ComputeRemainingTtl(r: WhoisResult): number | null {
 }
 
 function l1Set(key: string, value: WhoisResult) {
+  // Remove first so existing keys are moved to MRU position (LRU Map semantics).
+  if (_memCache.has(key)) _memCache.delete(key);
   if (_memCache.size >= L1_MAX) {
+    // Evict the LRU entry (first/oldest key in insertion order).
     const oldest = _memCache.keys().next().value;
     if (oldest) _memCache.delete(oldest);
   }
@@ -173,13 +209,15 @@ export async function lookupWhoisWithCache(
   const key = `whois:${domain}`;
 
   if (!options.nocache) {
+    // L1 — in-process memory (fastest, no network)
     const l1Hit = l1Get(key);
     if (l1Hit) {
       // Compute remaining TTL locally — avoids an extra Redis round-trip on every
-      // L1 cache hit. The result is accurate to within the L1 TTL window (30 s).
+      // L1 cache hit. The result is accurate to within the L1 TTL window.
       const remainingTtl = l1ComputeRemainingTtl(l1Hit);
       return { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
     }
+    // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
     if (isRedisAvailable()) {
       const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
       if (l2) {
@@ -187,29 +225,63 @@ export async function lookupWhoisWithCache(
         return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
       }
     }
+    // L3 — PostgreSQL fallback (used when both Redis tiers are unavailable)
+    if (!isRedisAvailable()) {
+      const l3Raw = await getWhoisDbCache(key);
+      if (l3Raw) {
+        try {
+          const l3 = JSON.parse(l3Raw) as WhoisResult;
+          l1Set(key, l3);
+          return { ...l3, time: 0, cached: true };
+        } catch { /* corrupted — fall through to fresh lookup */ }
+      }
+    }
+    // In-flight deduplication: piggyback on a concurrent lookup for the same domain.
+    const inflight = _inflight.get(key);
+    if (inflight) return inflight;
   }
 
   if (options.cacheOnly) return { time: 0, status: false, cached: false };
 
-  let result = await lookupWhois(domain);
-  // Retry once on transient failures (e.g., intermittent connectivity to
-  // slow ccTLD WHOIS servers like whois.nic.hu from cloud infrastructure).
-  // Use jitter (400–800ms) to avoid thundering herd on concurrent retries.
-  if (isTransientLookupFailure(result)) {
-    const jitter = 400 + Math.floor(Math.random() * 400);
-    await new Promise((r) => setTimeout(r, jitter));
-    const retried = await lookupWhois(domain);
-    if (retried.status) result = retried;
+  const doLookup = async (): Promise<WhoisResult> => {
+    let result = await lookupWhois(domain);
+    // Retry once on transient failures (e.g., intermittent connectivity to
+    // slow ccTLD WHOIS servers like whois.nic.hu from cloud infrastructure).
+    // Use jitter (400–800ms) to avoid thundering herd on concurrent retries.
+    if (isTransientLookupFailure(result)) {
+      const jitter = 400 + Math.floor(Math.random() * 400);
+      await new Promise((r) => setTimeout(r, jitter));
+      const retried = await lookupWhois(domain);
+      if (retried.status) result = retried;
+    }
+    if (result.status) {
+      const ttl = computeSmartTtl(result);
+      const now = Date.now();
+      const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
+      l1Set(key, toStore);
+      if (ttl > 0) {
+        if (isRedisAvailable()) {
+          setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+        } else {
+          // Both Redis tiers unavailable — persist to PostgreSQL L3.
+          setWhoisDbCache(key, JSON.stringify(toStore), ttl).catch(() => {});
+        }
+      }
+      return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
+    }
+    return { ...result, cached: false };
+  };
+
+  if (options.nocache) return doLookup();
+
+  // Register in-flight promise so concurrent identical requests share this lookup.
+  const promise = doLookup();
+  _inflight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    _inflight.delete(key);
   }
-  if (result.status) {
-    const ttl = computeSmartTtl(result);
-    const now = Date.now();
-    const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
-    l1Set(key, toStore);
-    if (isRedisAvailable() && ttl > 0) setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
-    return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
-  }
-  return { ...result, cached: false };
 }
 
 function intEnv(name: string, def: number): number {
@@ -298,6 +370,7 @@ export async function lookupWhoisCacheStreaming(
   const key = `whois:${domain}`;
 
   if (!options.nocache) {
+    // L1 — in-process memory (fastest, no network)
     const l1Hit = l1Get(key);
     if (l1Hit) {
       const remainingTtl = l1ComputeRemainingTtl(l1Hit);
@@ -308,6 +381,7 @@ export async function lookupWhoisCacheStreaming(
       // data, producing a false "refreshing" flash in the UI.
       return r;
     }
+    // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
     if (isRedisAvailable()) {
       const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
       if (l2) {
@@ -317,28 +391,65 @@ export async function lookupWhoisCacheStreaming(
         return r;
       }
     }
+    // L3 — PostgreSQL fallback (used when both Redis tiers are unavailable)
+    if (!isRedisAvailable()) {
+      const l3Raw = await getWhoisDbCache(key);
+      if (l3Raw) {
+        try {
+          const l3 = JSON.parse(l3Raw) as WhoisResult;
+          l1Set(key, l3);
+          return { ...l3, time: 0, cached: true };
+        } catch { /* corrupted — fall through to fresh lookup */ }
+      }
+    }
+    // In-flight deduplication: piggyback on a concurrent identical lookup.
+    // Note: the secondary request won't receive streaming partials (the first
+    // request owns the onPartialResult callback), but it avoids a duplicate
+    // WHOIS query — it receives the final result as soon as the first completes.
+    const inflight = _inflight.get(key);
+    if (inflight) return inflight;
   }
 
-  let result = await lookupWhois(domain, onPartialResult);
-  // Retry once on transient failures (same logic as lookupWhoisWithCache).
-  // Pass onPartialResult to the retry so that if RDAP succeeds on the second
-  // attempt the partial result is streamed immediately (clears the loading
-  // skeleton at ~RDAP_TIMEOUT rather than waiting the full retry duration).
-  if (isTransientLookupFailure(result)) {
-    const jitter = 400 + Math.floor(Math.random() * 400);
-    await new Promise((r) => setTimeout(r, jitter));
-    const retried = await lookupWhois(domain, onPartialResult);
-    if (retried.status) result = retried;
+  const doLookup = async (): Promise<WhoisResult> => {
+    let result = await lookupWhois(domain, onPartialResult);
+    // Retry once on transient failures (same logic as lookupWhoisWithCache).
+    // Pass onPartialResult to the retry so that if RDAP succeeds on the second
+    // attempt the partial result is streamed immediately (clears the loading
+    // skeleton at ~RDAP_TIMEOUT rather than waiting the full retry duration).
+    if (isTransientLookupFailure(result)) {
+      const jitter = 400 + Math.floor(Math.random() * 400);
+      await new Promise((r) => setTimeout(r, jitter));
+      const retried = await lookupWhois(domain, onPartialResult);
+      if (retried.status) result = retried;
+    }
+    if (result.status) {
+      const ttl = computeSmartTtl(result);
+      const now = Date.now();
+      const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
+      l1Set(key, toStore);
+      if (ttl > 0) {
+        if (isRedisAvailable()) {
+          setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+        } else {
+          // Both Redis tiers unavailable — persist to PostgreSQL L3.
+          setWhoisDbCache(key, JSON.stringify(toStore), ttl).catch(() => {});
+        }
+      }
+      return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
+    }
+    return { ...result, cached: false };
+  };
+
+  if (options.nocache) return doLookup();
+
+  // Register in-flight promise so concurrent identical requests share this lookup.
+  const promise = doLookup();
+  _inflight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    _inflight.delete(key);
   }
-  if (result.status) {
-    const ttl = computeSmartTtl(result);
-    const now = Date.now();
-    const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
-    l1Set(key, toStore);
-    if (isRedisAvailable() && ttl > 0) setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
-    return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
-  }
-  return { ...result, cached: false };
 }
 
 export async function lookupWhois(domain: string, onPartialResult?: (partial: WhoisResult) => void): Promise<WhoisResult> {
@@ -627,6 +738,12 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapMsg = rdapSettled.status === "rejected" ? (rdapSettled.reason instanceof Error ? rdapSettled.reason.message : "") : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
 
+  // Preserve the registryUrl from ScraperRequiredError so the UI can show a
+  // "manual lookup" link when automated access is blocked (e.g. .ba).
+  const scraperRegistryUrl = whoisError instanceof ScraperRequiredError
+    ? whoisError.registryUrl
+    : undefined;
+
   const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout" : "no_server";
   const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
@@ -636,5 +753,5 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
     : whoisMsg || rdapMsg || "Unknown error occurred";
   recordFailure(reason, errMsg);
-  return failWithDns(errMsg);
+  return failWithDns(errMsg, scraperRegistryUrl);
 }
