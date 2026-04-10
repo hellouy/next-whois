@@ -5565,3 +5565,48 @@ RETURNING id
 **原问题:** `if (email === ADMIN_EMAIL)` 只比对 `process.env.ADMIN_EMAIL` 环境变量。若管理员邮箱已通过 DB (`site_settings.admin_email`) 更新为其他地址，该账户不受保护可被删除。
 
 **修复:** 替换为 `await isAdminEmail(email)` — 同时检查 DB 值和环境变量，与其他鉴权逻辑一致。
+
+---
+
+## Session — 2026-04-10: `.im` TLD 双重 Bug 修复
+
+### Bug 1: `whois-generic.ts` — Whoiser Bypass 错误地跳过静态 TCP 查询
+
+**文件:** `src/lib/whois/whois-generic.ts`
+
+**原问题:** `isWhoiserBypassed(tld)` 判断将整个步骤③ (静态服务器 + whoiser) 全部包在 `if (!bypassed)` 块内。当 `.im` 因多次 whoiser 失败被自动加入 bypass 列表后，静态 TCP 服务器 (`whois.nic.im`) 也随之被跳过，导致查询永远返回 "未知 TLD"。
+
+**修复:** 将结构改为：静态服务器 Promise 始终启动（在 bypass 判断之外），bypass 只控制是否加入 whoiser 竞速：
+```typescript
+const staticP = staticServer ? queryWhoisTcp(...) : null;
+if (!bypassed) {
+  const winner = await Promise.race([staticP, whoiserP]);
+  ...
+} else if (staticP) {
+  const winner = await staticP;
+  ...
+}
+```
+
+### Bug 2: `lookup.ts` — RDAP 404 提前退出阻断 WHOIS 路径
+
+**文件:** `src/lib/whois/lookup.ts`
+
+**原问题:** `if (rdapErrorCode === 404)` 无条件提前退出，直接做 DNS 探测后返回。对于 `.im` 这类 IANA Bootstrap 中无 RDAP 服务的 TLD，IANA 对所有 `.im` 域名返回 404（无论注册与否），导致：
+- 已注册域名（如 `nic.im`）被误判为 "无法确定状态"，WHOIS 结果被忽略
+- `whois.nic.im` 返回的有效注册信息永远不被使用
+
+**修复:** 增加 `whoisHasData` 检查：
+```typescript
+const whoisHasData = !!(whoisData?.raw?.trim());
+if (rdapErrorCode === 404 && !whoisHasData) {
+  // 只有 RDAP 是 404 且 WHOIS 也没有数据时才提前退出
+  ...
+}
+```
+
+**效果验证:**
+- `nic.im` → Registered，显示完整 WHOIS 数据 ✓
+- `notregistered99999.im` → Not Registered，1-2s 完成 ✓  
+- `google.dev` (RDAP-only TLD) → 仍正常工作 ✓
+- API 响应时间: `nic.im` ~1.7s，`notregistered99999.im` ~1.4s（缓存后 ~0.4s）

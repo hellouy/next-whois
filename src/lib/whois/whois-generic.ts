@@ -98,10 +98,12 @@ function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | nul
  *      On success → return immediately.
  *      On failure → throw (DNS probe in lookup.ts provides the availability fallback).
  *      Not configured → null, fall through to step ③.
- *   ③ whoiser + static-map TCP race (skipped if TLD is auto-bypassed):
- *      - For TLDs in whois-servers.json: static TCP + whoiser run in parallel;
- *        first non-empty result wins.
- *      - For TLDs NOT in the static map: whoiser only.
+ *   ③ Static-map TCP + whoiser race:
+ *      - Static server (whois-servers.json) is ALWAYS tried when present,
+ *        even if whoiser is bypassed. Bypass only suppresses the whoiser call.
+ *      - For TLDs in whois-servers.json + not bypassed: race both in parallel.
+ *      - For TLDs in whois-servers.json + bypassed: static TCP only.
+ *      - For TLDs NOT in static map + not bypassed: whoiser only.
  *      - Success → reset failure counter and return.
  *      - Both fail → record failure; if ≥3 consecutive: mark TLD bypassed.
  *   ④ IANA TCP fallback — last resort server discovery.
@@ -135,62 +137,72 @@ export async function tryGenericWhoisForDomain(
 
   let primaryError: unknown = null;
 
-  // ③ whoiser + static-map TCP race (unless TLD is whoiser-bypassed)
+  // ③ Static-map TCP + whoiser race.
+  //
+  //    The static server (from whois-servers.json) is ALWAYS tried when one
+  //    exists for this TLD — even when whoiser is bypassed.  Bypass only
+  //    suppresses the whoiser call; it must never prevent us from querying a
+  //    perfectly-good server that is already in our own static map.
+  //
   //    Bypass is set automatically after BYPASS_FAIL_THRESHOLD consecutive
-  //    failures; it can also be set/cleared manually from the admin panel.
+  //    whoiser failures; it can also be toggled manually from the admin panel.
   const bypassed = await isWhoiserBypassed(tldSuffix);
+  const staticServer = getStaticWhoisServer(tldSuffix);
 
-  if (!bypassed) {
-    // For TLDs in whois-servers.json: kick off static TCP immediately in
-    // parallel with whoiser. Whichever returns a non-empty result first wins.
-    // This preserves the original speed optimisation for known ccTLDs.
-    const staticServer = getStaticWhoisServer(tldSuffix);
+  // Always start the static TCP query if we have a server for this TLD.
+  const staticP: Promise<WhoisRawResult | null> = staticServer
+    ? queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
+        .then((raw): WhoisRawResult | null => {
+          if (!raw || raw.trim().length === 0) return null;
+          return { raw, structured: {}, server: staticServer };
+        })
+        .catch((): null => null)
+    : Promise.resolve(null);
 
-    const staticP: Promise<WhoisRawResult | null> = staticServer
-      ? queryWhoisTcp(staticServer, 43, domainToQuery, innerTimeout)
-          .then((raw): WhoisRawResult | null => {
-            if (!raw || raw.trim().length === 0) return null;
-            return { raw, structured: {}, server: staticServer };
-          })
-          .catch((): null => null)
-      : Promise.resolve(null);
-
-    const { whoisDomain } = await getWhoiser();
-
+  {
     let winner: WhoisRawResult | null = null;
 
-    if (staticServer) {
-      const whoiserP = (async (): Promise<WhoisRawResult | null> => {
+    if (!bypassed) {
+      const { whoisDomain } = await getWhoiser();
+
+      if (staticServer) {
+        // Race static TCP against whoiser — first non-null result wins.
+        const whoiserP = (async (): Promise<WhoisRawResult | null> => {
+          try {
+            const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
+            const result = extractRawFromData(data as Record<string, unknown>);
+            return result && result.raw.trim().length > 0 ? result : null;
+          } catch (err) {
+            primaryError = err;
+            return null;
+          }
+        })();
+
+        winner = await new Promise<WhoisRawResult | null>((resolve) => {
+          let pending = 2;
+          let resolved = false;
+          function handleResult(v: WhoisRawResult | null) {
+            if (resolved) return;
+            if (v !== null) { resolved = true; resolve(v); return; }
+            pending--;
+            if (pending === 0) resolve(null);
+          }
+          staticP.then(handleResult);
+          whoiserP.then(handleResult);
+        });
+      } else {
+        // No static server — whoiser only.
         try {
           const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
           const result = extractRawFromData(data as Record<string, unknown>);
-          return result && result.raw.trim().length > 0 ? result : null;
+          if (result && result.raw.trim().length > 0) winner = result;
         } catch (err) {
           primaryError = err;
-          return null;
         }
-      })();
-
-      winner = await new Promise<WhoisRawResult | null>((resolve) => {
-        let pending = 2;
-        let resolved = false;
-        function handleResult(v: WhoisRawResult | null) {
-          if (resolved) return;
-          if (v !== null) { resolved = true; resolve(v); return; }
-          pending--;
-          if (pending === 0) resolve(null);
-        }
-        staticP.then(handleResult);
-        whoiserP.then(handleResult);
-      });
-    } else {
-      try {
-        const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
-        const result = extractRawFromData(data as Record<string, unknown>);
-        if (result && result.raw.trim().length > 0) winner = result;
-      } catch (err) {
-        primaryError = err;
       }
+    } else if (staticServer) {
+      // Whoiser is bypassed but a static server exists — wait for static TCP only.
+      winner = await staticP;
     }
 
     if (winner) {
@@ -213,9 +225,9 @@ export async function tryGenericWhoisForDomain(
       return winner;
     }
 
-    // whoiser (and static-map) failed — record the failure.
+    // whoiser (and static-map TCP) failed — record the failure.
     // recordWhoiserFailure is fire-and-forget; never awaited on the hot path.
-    recordWhoiserFailure(tldSuffix).catch(() => {});
+    if (!bypassed) recordWhoiserFailure(tldSuffix).catch(() => {});
   }
 
   // ④ IANA TCP fallback — ask whois.iana.org for the canonical server

@@ -524,7 +524,13 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapErrorCode = rdapSettledResult && "errorCode" in rdapSettledResult
     ? (rdapSettledResult as { errorCode: number }).errorCode
     : null;
-  if (rdapErrorCode === 404) {
+  // RDAP 404 means "domain not found" for TLDs that have an RDAP service
+  // (e.g. Google TLDs: .dev, .app, .page).  But for TLDs with NO RDAP service
+  // at all (e.g. .im), the IANA bootstrap itself returns 404 — in that case
+  // WHOIS may still have valid data.  Only trust the RDAP 404 as definitive
+  // when WHOIS also returned nothing useful.
+  const whoisHasData = !!(whoisData?.raw?.trim());
+  if (rdapErrorCode === 404 && !whoisHasData) {
     const dnsProbe = isDomainQuery
       ? await (_earlyDnsProbe ?? probeDomain(domain)).catch(() => undefined)
       : undefined;
