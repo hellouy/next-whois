@@ -20,10 +20,11 @@ export default async function handler(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
 
+    const icpBase = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
     let upstream: Response;
     try {
       upstream = await fetch(
-        "http://api.ong:16181/query/web?search=miit.gov.cn&pageNum=1&pageSize=1",
+        `${icpBase}/query/web?search=miit.gov.cn&pageNum=1&pageSize=1`,
         {
           signal: controller.signal,
           headers: { Accept: "application/json", "User-Agent": "NextWhois/2.0" },

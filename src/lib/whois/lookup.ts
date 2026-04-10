@@ -23,6 +23,7 @@ import {
   isASNumber,
   toAsciiDomain,
 } from "@/lib/whois/whois-patterns";
+import { ScraperRequiredError } from "@/lib/whois/custom-servers";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { recordTldLookupFailure } from "@/lib/db";
@@ -737,6 +738,12 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapMsg = rdapSettled.status === "rejected" ? (rdapSettled.reason instanceof Error ? rdapSettled.reason.message : "") : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
 
+  // Preserve the registryUrl from ScraperRequiredError so the UI can show a
+  // "manual lookup" link when automated access is blocked (e.g. .ba, .bb).
+  const scraperRegistryUrl = whoisError instanceof ScraperRequiredError
+    ? whoisError.registryUrl
+    : undefined;
+
   const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout" : "no_server";
   const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
@@ -746,5 +753,5 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
     : whoisMsg || rdapMsg || "Unknown error occurred";
   recordFailure(reason, errMsg);
-  return failWithDns(errMsg);
+  return failWithDns(errMsg, scraperRegistryUrl);
 }

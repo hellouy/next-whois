@@ -78,7 +78,10 @@ function isHtmlResponse(text: string): boolean {
   return t.startsWith("<!doctype") || t.startsWith("<html");
 }
 
-const UPSTREAM_BASE = "http://api.ong:16181";
+// ICP_API_BASE can be set in Vercel environment variables to point to a custom
+// ICP backend accessible from cloud infrastructure (port 16181 is blocked by Vercel).
+// Example: ICP_API_BASE=https://your-icp-proxy.example.com
+const UPSTREAM_BASE = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
 
 export default async function handler(
   req: NextApiRequest,
@@ -205,10 +208,13 @@ export default async function handler(
     const msg = err instanceof Error ? err.message : "未知错误";
     const isTimeout = msg.includes("abort") || msg.includes("timeout");
     const isNoConn = msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed");
+    const isPortBlocked = msg.includes("ECONNREFUSED") || (isNoConn && !msg.includes("ENOTFOUND"));
     const clean = isTimeout
-      ? "查询超时（>12s），数据服务可能暂时不可用，请稍后重试"
+      ? "备案查询超时（>12s）。Vercel 等云平台会屏蔽非标端口（16181），请在环境变量 ICP_API_BASE 中配置可访问的后端地址，或直接前往 beian.miit.gov.cn 手动查询"
+      : isPortBlocked
+      ? "无法连接到备案数据服务（端口被防火墙屏蔽）。请配置环境变量 ICP_API_BASE 或直接访问 beian.miit.gov.cn"
       : isNoConn
-      ? "无法连接到备案数据服务，服务可能暂时离线"
+      ? "无法连接到备案数据服务。请配置环境变量 ICP_API_BASE 指向可用的 ICP 查询后端"
       : `查询失败：${msg.slice(0, 100)}`;
     return res.status(502).json({
       ok: false, type, search, pageNum, pageSize,
