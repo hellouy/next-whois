@@ -5610,3 +5610,39 @@ if (rdapErrorCode === 404 && !whoisHasData) {
 - `notregistered99999.im` → Not Registered，1-2s 完成 ✓  
 - `google.dev` (RDAP-only TLD) → 仍正常工作 ✓
 - API 响应时间: `nic.im` ~1.7s，`notregistered99999.im` ~1.4s（缓存后 ~0.4s）
+
+---
+
+## Session — 2026-04-10: AvailableDomainCard 移动端布局 + 标签系统重构
+
+### 1. 移动端布局优化
+**文件:** `src/components/query/AvailableDomainCard.tsx`
+
+重构 Hero 区域为两行结构：
+- **行 1**: [图标 40px] + [域名 text-2xl/3xl 加粗，域名为主角]
+- **行 2**: [状态徽章] + [描述文本]（相对行 1 缩进对齐）
+
+不再将徽章和域名争夺同一行空间。
+
+### 2. 精准标签系统 (`labelType`)
+废弃宽泛的 `isPremium / 溢价域名` 单一标签，改为三级精准标签：
+
+| labelType | 显示标签(ZH) | 触发条件 |
+|-----------|------------|--------|
+| `available` | 可注册 | 普通可注册域名 |
+| `high_value` | 高价值域名 | `isPremiumByWhois` — 注册局 WHOIS 明确标注溢价 |
+| `high_fee` | 高注册费 | 价格 API 检测到高注册费（非注册局明确标注） |
+
+**关键逻辑:**
+```typescript
+const labelType: "available" | "high_value" | "high_fee" =
+  !isPremium ? "available" :
+  isPremiumByWhois ? "high_value" :
+  "high_fee";
+```
+
+### 3. 其他细节
+- 图标: `available` → ✓(蓝), `high_value` → 皇冠(琥珀), `high_fee` → 价格标签(橙)
+- 价格列表"溢价" badge 改为"高价"，颜色由 amber 改为 orange
+- 注册按钮: `available` 显示"立即注册"，其他显示"查看价格"，统一使用 primary 样式
+- 注意框: 统一使用中性 `bg-muted/30` 背景，不再使用 amber 背景

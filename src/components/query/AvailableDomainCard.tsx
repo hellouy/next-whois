@@ -11,6 +11,7 @@ import {
   RiInformationLine,
   RiExternalLinkLine,
   RiGlobalLine,
+  RiPriceTag3Line,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DomainPricing } from "@/lib/pricing/client";
@@ -67,23 +68,16 @@ interface AvailableDomainCardProps {
 }
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 16, scale: 0.98 },
+  hidden: { opacity: 0, y: 14, scale: 0.98 },
   visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    opacity: 1, y: 0, scale: 1,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
-const staggerChildren = {
-  hidden: { opacity: 1 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.1 } },
-};
-
 const fadeUp = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } },
 };
 
 export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: AvailableDomainCardProps) {
@@ -197,6 +191,69 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
     ? premiumRegistrars[0]
     : (registrars.find((r) => !r.isPremium) ?? registrars[0] ?? null);
 
+  // ── Label logic ──────────────────────────────────────────────────────────────
+  // "高价值域名": only when WHOIS explicitly marks this domain as premium
+  //   (registry-level premium — the most reliable signal).
+  // "高注册费":  price-based detection (API fee threshold / anyApiPremium).
+  //   Accurate description: the registration fee is above average, but it is
+  //   NOT necessarily a "premium" name in the registry-reserved sense.
+  // "可注册":    regular available domain.
+  const labelType: "available" | "high_value" | "high_fee" =
+    !isPremium ? "available" :
+    isPremiumByWhois ? "high_value" :
+    "high_fee";
+
+  const LABELS = {
+    available:  { zh: "可注册",    en: "Available" },
+    high_value: { zh: "高价值域名", en: "Premium Name" },
+    high_fee:   { zh: "高注册费",   en: "High Reg. Fee" },
+  };
+  const labelText = isZh ? LABELS[labelType].zh : LABELS[labelType].en;
+
+  const ICON_MAP = {
+    available:  <RiCheckLine  className="w-5 h-5 text-primary" />,
+    high_value: <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
+    high_fee:   <RiPriceTag3Line className="w-5 h-5 text-orange-500 dark:text-orange-400" />,
+  };
+
+  const BADGE_CLASS = {
+    available:  "text-primary  bg-primary/8    border-primary/25",
+    high_value: "text-amber-600 dark:text-amber-400 bg-muted/60 border-border/60",
+    high_fee:   "text-orange-600 dark:text-orange-400 bg-muted/60 border-border/60",
+  };
+
+  const DOT_CLASS = {
+    available:  "bg-primary",
+    high_value: "bg-amber-500",
+    high_fee:   "bg-orange-500",
+  };
+
+  const ACCENT_CLASS = {
+    available:  "bg-gradient-to-r from-primary/60 via-primary to-primary/60",
+    high_value: "bg-gradient-to-r from-amber-400/50 via-amber-500/70 to-amber-400/50",
+    high_fee:   "bg-gradient-to-r from-orange-400/40 via-orange-500/60 to-orange-400/40",
+  };
+
+  function getDescription(): string {
+    if (labelType === "available") {
+      return isZh ? "该域名目前可注册，抓紧时间抢注吧！" : "This domain is available. Grab it before someone else does.";
+    }
+    if (labelType === "high_value") {
+      return isZh
+        ? "该域名为注册局标注的高价值精品域名，注册价格通常显著高于普通域名。"
+        : "This is a registry-level premium name. Registration costs significantly above standard rates.";
+    }
+    // high_fee
+    if (anyApiPremium && premiumRegistrars.length > 0) {
+      return isZh
+        ? `注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，高于该后缀普通注册价，以注册商实时报价为准。`
+        : `Registration fee starts at ~${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr — above standard rates for this TLD. Confirm with registrar.`;
+    }
+    return isZh
+      ? "该域名注册费高于普通域名，请以注册商实时报价为准。"
+      : "Registration fee is above average for this TLD. Confirm current pricing with your registrar.";
+  }
+
   function RegistrarRow({ r, idx, priceField, colorFirst }: { r: DomainPricing; idx: number; priceField: "new" | "renew"; colorFirst: boolean }) {
     const faviconDomain = (() => { try { return new URL(r.registrarweb).hostname; } catch { return null; } })();
     const rowIsPremium = r.isPremium;
@@ -226,8 +283,8 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
             </span>
           )}
           {rowIsPremium && (
-            <span className="shrink-0 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/8 border border-amber-400/25 dark:border-amber-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">
-              {isZh ? "溢价" : "PREMIUM"}
+            <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/8 border border-orange-400/25 px-1.5 py-0.5 rounded uppercase tracking-wide">
+              {isZh ? "高价" : "HIGH"}
             </span>
           )}
           {!rowIsPremium && anyApiPremium && (
@@ -241,7 +298,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
             <span className={cn(
               "font-bold tabular-nums",
               rowIsPremium
-                ? (isFirst ? "text-base text-amber-600 dark:text-amber-400" : "text-sm text-amber-500/60 dark:text-amber-500/50")
+                ? (isFirst ? "text-base text-orange-600 dark:text-orange-400" : "text-sm text-orange-500/60 dark:text-orange-500/50")
                 : (isFirst && colorFirst ? "text-base text-primary" : "text-sm text-foreground/60"),
             )}>
               {typeof price === "number" ? formatPrice(price, r.currency) : "N/A"}
@@ -263,127 +320,82 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
       animate="visible"
       className="glass-panel rounded-xl overflow-hidden border border-border/60 relative"
     >
-      {/* Thin accent line — available: primary gradient, premium: subtle amber */}
-      <div className={cn(
-        "h-[3px] w-full",
-        isPremium
-          ? "bg-gradient-to-r from-amber-400/60 via-amber-500/80 to-amber-400/60"
-          : "bg-gradient-to-r from-primary/60 via-primary to-primary/60"
-      )} />
+      {/* Accent line */}
+      <div className={cn("h-[3px] w-full", ACCENT_CLASS[labelType])} />
 
       {/* ── Hero ── */}
       <motion.div
-        variants={staggerChildren}
         initial="hidden"
         animate="visible"
-        className="px-5 sm:px-7 pt-5 pb-4"
+        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+        className="px-5 sm:px-7 pt-5 pb-5"
       >
-        {/* Row 1: icon + domain name + status badge */}
-        <motion.div variants={fadeUp} className="flex items-center gap-3 mb-2">
-          {/* Icon */}
-          <div className={cn(
-            "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm",
-            "bg-muted/50 border-border/60"
-          )}>
+        {/* Row 1: Icon + Domain name (domain is the hero) */}
+        <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
+          {/* Status icon */}
+          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border bg-muted/50 border-border/60">
             <AnimatePresence mode="wait" initial={false}>
-              {isPremium ? (
-                <motion.span
-                  key="crown"
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.6, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="check"
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.6, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <RiCheckLine className="w-5 h-5 text-primary" />
-                </motion.span>
-              )}
+              <motion.span
+                key={labelType}
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+              >
+                {ICON_MAP[labelType]}
+              </motion.span>
             </AnimatePresence>
           </div>
 
-          {/* Domain name */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight break-all">
-              <span className="text-foreground">{sldForDisplay}</span>
-              <span className="text-primary">{tldForDisplay}</span>
-            </h1>
-          </div>
+          {/* Domain name — prominent, full remaining width */}
+          <h1 className="flex-1 min-w-0 text-2xl sm:text-3xl font-bold tracking-tight leading-tight break-all">
+            <span className="text-foreground">{sldForDisplay}</span>
+            <span className="text-primary">{tldForDisplay}</span>
+          </h1>
+        </motion.div>
 
-          {/* Status badge — always on right */}
+        {/* Row 2: Status badge + description */}
+        <motion.div variants={fadeUp} className="pl-[52px]">
+          {/* Badge */}
           <motion.span
             className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border",
-              isPremium
-                ? "text-amber-700 dark:text-amber-400 bg-muted/60 border-border/60"
-                : "text-primary bg-primary/8 border-primary/25"
+              "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border mb-2",
+              BADGE_CLASS[labelType]
             )}
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.18, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
             <motion.span
-              className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                isPremium ? "bg-amber-500" : "bg-primary"
-              )}
-              animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+              className={cn("w-1.5 h-1.5 rounded-full", DOT_CLASS[labelType])}
+              animate={{ scale: [1, 1.45, 1], opacity: [1, 0.45, 1] }}
               transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
             />
+            {labelText}
+          </motion.span>
+
+          {/* Description */}
+          <p className="text-sm text-muted-foreground leading-relaxed">
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
-                key={isPremium ? "lbl-premium" : "lbl-available"}
+                key={labelType}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.2 }}
               >
-                {isPremium ? (isZh ? "溢价域名" : "Premium") : (isZh ? "可注册" : "Available")}
+                {getDescription()}
               </motion.span>
             </AnimatePresence>
-          </motion.span>
+          </p>
         </motion.div>
-
-        {/* Row 2: description */}
-        <motion.p variants={fadeUp} className="text-sm text-muted-foreground leading-relaxed pl-[52px] sm:pl-[52px]">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={isPremium ? "premium-desc" : "available-desc"}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {isPremium
-                ? (anyApiPremium && premiumRegistrars.length > 0
-                    ? (isZh
-                        ? `溢价域名，注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，实际以注册商报价为准。`
-                        : `Premium domain — starting from ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr. Confirm price with registrar.`)
-                    : (isZh
-                        ? "溢价域名，注册价格高于普通域名，请以注册商实时报价为准。"
-                        : "Premium domain — registration costs above standard rates. Confirm with registrar."))
-                : (isZh
-                    ? "该域名目前可注册，抓紧时间抢注吧！"
-                    : "This domain is available. Grab it before someone else does.")}
-            </motion.span>
-          </AnimatePresence>
-        </motion.p>
       </motion.div>
 
       {/* ── Action buttons ── */}
       <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        transition={{ delay: 0.15 }}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18, duration: 0.28 }}
         className="px-5 sm:px-7 pb-4 border-t border-border/40 pt-4"
       >
         <div className="flex flex-col gap-2">
@@ -401,8 +413,8 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
               <RiShoppingCartLine className="w-4 h-4 shrink-0" />
               <span>
                 {isZh
-                  ? `${isPremium ? "查看价格" : "立即注册"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/首年起`
-                  : `${isPremium ? "Check Price" : "Register Now"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/yr`}
+                  ? `${labelType === "available" ? "立即注册" : "查看价格"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/首年起`
+                  : `${labelType === "available" ? "Register Now" : "Check Price"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/yr`}
               </span>
             </motion.a>
           ) : null}
@@ -420,7 +432,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.12 }}
+                    transition={{ duration: 0.1 }}
                     className="inline-flex items-center gap-2"
                   >
                     <RiCheckLine className="w-4 h-4 shrink-0 text-primary" />
@@ -432,7 +444,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.12 }}
+                    transition={{ duration: 0.1 }}
                     className="inline-flex items-center gap-2"
                   >
                     <RiFileCopyLine className="w-4 h-4 shrink-0" />
@@ -454,10 +466,9 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
 
       {/* ── Registration tips ── */}
       <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        transition={{ delay: 0.25 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.28, duration: 0.3 }}
         className="border-t border-border/50 px-5 sm:px-7 py-4"
       >
         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-3 flex items-center gap-1.5">
@@ -472,12 +483,12 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
           ].map((tip, i) => (
             <motion.li
               key={i}
-              initial={{ opacity: 0, x: -6 }}
+              initial={{ opacity: 0, x: -5 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + i * 0.07, duration: 0.25, ease: "easeOut" }}
+              transition={{ delay: 0.32 + i * 0.06, duration: 0.22 }}
               className="flex items-start gap-2 text-sm text-muted-foreground leading-snug"
             >
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-primary/50" />
+              <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-primary/45" />
               {tip}
             </motion.li>
           ))}
@@ -486,23 +497,27 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
 
       {/* ── Price section ── */}
       <div className="border-t border-border/50">
-        {/* Premium notice */}
+        {/* High-fee / high-value notice */}
         {isPremium && !loadingPrices && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.3 }}
+            transition={{ delay: 0.35, duration: 0.28 }}
             className="mx-4 sm:mx-5 mt-4 flex items-start gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5"
           >
             <RiInformationLine className="w-3.5 h-3.5 text-muted-foreground/60 mt-0.5 shrink-0" />
             <p className="text-[11px] text-muted-foreground leading-snug">
-              {anyApiPremium && premiumRegistrars.length > 0
+              {labelType === "high_value"
                 ? (isZh
-                    ? "溢价注册商报价（标注「溢价」）为域名真实价格，其余为参考标准价，实际价格以注册商报价为准。"
-                    : "Entries marked \"Premium\" reflect the actual premium fee. Others show standard TLD reference prices — always confirm with the registrar.")
-                : (isZh
-                    ? "以下为该 TLD 标准/参考价，实际溢价金额可能显著更高，以注册商报价为准。"
-                    : "Prices shown are standard/reference rates. Actual premium cost may be significantly higher — confirm with the registrar.")}
+                    ? "此域名为注册局高价值精品域名，注册价格以注册商最终报价为准，各家价格可能存在差异。"
+                    : "This is a registry-level premium name. Final pricing may vary across registrars — always confirm before purchasing.")
+                : anyApiPremium && premiumRegistrars.length > 0
+                  ? (isZh
+                      ? "标注「高价」的报价为该域名的实际高价格，其余为该后缀标准参考价，实际以注册商报价为准。"
+                      : "Entries marked \"High\" show the elevated fee for this domain. Others are standard TLD reference prices — confirm with your registrar.")
+                  : (isZh
+                      ? "以下为该后缀标准/参考价，部分域名实际注册价可能更高，以注册商报价为准。"
+                      : "Prices shown are standard/reference rates. Actual cost may be higher — confirm with your registrar.")}
             </p>
           </motion.div>
         )}
@@ -533,7 +548,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
             className="pb-1"
             initial="hidden"
             animate="visible"
-            variants={staggerChildren}
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
           >
             {registrars.map((r, idx) => (
               <RegistrarRow key={r.registrar} r={r} idx={idx} priceField="new" colorFirst={true} />
@@ -546,12 +561,12 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
             </p>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { name: "Namecheap", color: "#de3723", logo: "namecheap.com", url: `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}` },
-                { name: "GoDaddy",   color: "#1bdbdb", logo: "godaddy.com",   url: `https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(domain)}` },
-                { name: "Porkbun",   color: "#f76b8a", logo: "porkbun.com",   url: `https://porkbun.com/checkout/search?q=${encodeURIComponent(domain)}` },
-                { name: "Dynadot",   color: "#4e2998", logo: "dynadot.com",   url: `https://www.dynadot.com/domain/search.html?domain=${encodeURIComponent(domain)}` },
-                { name: "Cloudflare",color: "#f48120", logo: "cloudflare.com",url: `https://www.cloudflare.com/products/registrar/` },
-                { name: "Name.com",  color: "#0066cc", logo: "name.com",      url: `https://www.name.com/domain/search?search=${encodeURIComponent(domain)}` },
+                { name: "Namecheap", logo: "namecheap.com", url: `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}` },
+                { name: "GoDaddy",   logo: "godaddy.com",   url: `https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(domain)}` },
+                { name: "Porkbun",   logo: "porkbun.com",   url: `https://porkbun.com/checkout/search?q=${encodeURIComponent(domain)}` },
+                { name: "Dynadot",   logo: "dynadot.com",   url: `https://www.dynadot.com/domain/search.html?domain=${encodeURIComponent(domain)}` },
+                { name: "Cloudflare",logo: "cloudflare.com",url: `https://www.cloudflare.com/products/registrar/` },
+                { name: "Name.com",  logo: "name.com",      url: `https://www.name.com/domain/search?search=${encodeURIComponent(domain)}` },
               ].map(reg => (
                 <motion.a
                   key={reg.name}
