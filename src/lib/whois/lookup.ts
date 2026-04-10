@@ -739,7 +739,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
 
   // Preserve the registryUrl from ScraperRequiredError so the UI can show a
-  // "manual lookup" link when automated access is blocked (e.g. .ba, .bb).
+  // "manual lookup" link when automated access is blocked (e.g. .ba).
   const scraperRegistryUrl = whoisError instanceof ScraperRequiredError
     ? whoisError.registryUrl
     : undefined;

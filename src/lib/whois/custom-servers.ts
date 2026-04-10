@@ -5,7 +5,6 @@ import { WhoisRawResult } from "@/lib/whois/types";
 import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
 import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
-import { lookupTelecomsBb, BB_REGISTRY_URL } from "@/lib/whois/http-scrapers/telecoms-bb";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
 export type TcpServerEntry = {
@@ -75,7 +74,7 @@ export function getStaticWhoisServer(tld: string): string | null {
 }
 
 /** Exported so admin pages can identify which TLDs are handled by built-in logic. */
-export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba","bb"]);
+export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba"]);
 
 const BUILTIN_SERVERS: CustomServerMap = {
   bn: "whois.bnnic.bn",
@@ -86,8 +85,6 @@ const BUILTIN_SERVERS: CustomServerMap = {
   "gov.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "edu.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "mil.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
-  // .bb — port 43 is firewalled for cloud IPs; fast TCP probe with graceful fallback.
-  bb: { type: "scraper", name: "telecoms-bb", registryUrl: BB_REGISTRY_URL },
 };
 
 function readFileServers(): CustomServerMap {
@@ -498,19 +495,6 @@ async function executeServerEntry(
           : `nic.ba scraper error: ${nicBaFail.reason}`,
         registryUrl,
         nicBaFail.blocked,
-      );
-    }
-    if (scraperName === "telecoms-bb") {
-      // Use a short (3 s) TCP timeout — this probe fails fast when cloud IPs are blocked.
-      const bbResult = await lookupTelecomsBb(domainToQuery, Math.min(innerTimeout, 3_000));
-      if (bbResult.success) {
-        return { raw: bbResult.raw, structured: {}, server: "whois.telecoms.gov.bb", registryUrl };
-      }
-      const bbFail = bbResult as { success: false; blocked: boolean; reason: string };
-      throw new ScraperRequiredError(
-        bbFail.reason,
-        registryUrl,
-        bbFail.blocked,
       );
     }
     throw new ScraperRequiredError(`No scraper implementation for "${scraperName}"`, customEntry.registryUrl);
