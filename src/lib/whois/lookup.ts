@@ -483,6 +483,32 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapData: RdapResponse | null = rdapSettledResult && !("errorCode" in rdapSettledResult) ? rdapSettledResult as RdapResponse : null;
   const whoisData: WhoisRawResult | null = whoisSettled.status === "fulfilled" ? whoisSettled.value : null;
   const whoisError: unknown = whoisSettled.status === "rejected" ? whoisSettled.reason : null;
+
+  // If RDAP explicitly returned "Object Not Found" (HTTP 404), the domain is
+  // definitively unregistered — even when WHOIS also returned connection-error
+  // text (e.g. "error: getaddrinfo ENOTFOUND whois.nic.google" embedded in the
+  // whoiser response body).  This is the authoritative signal for RDAP-only TLDs
+  // such as Google-managed .dev, .app, .page, .foo, .zip, .mov whose WHOIS
+  // server (whois.nic.google) is not publicly resolvable.  Checking here, before
+  // the whoisRawStr block, prevents the WHOIS garbage text from reaching
+  // detectWhoisError and masking the real "not registered" outcome.
+  const rdapErrorCode = rdapSettledResult && "errorCode" in rdapSettledResult
+    ? (rdapSettledResult as { errorCode: number }).errorCode
+    : null;
+  if (rdapErrorCode === 404) {
+    const dnsProbe = isDomainQuery
+      ? await (_earlyDnsProbe ?? probeDomain(domain)).catch(() => undefined)
+      : undefined;
+    return {
+      time: elapsed(), status: false, cached: false,
+      error: "Domain not found",
+      dnsProbe: dnsProbe ?? {
+        domain, registrationStatus: "unregistered", confidence: "high",
+        signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
+      },
+    };
+  }
+
   // Step 4: Build result — prefer RDAP, optionally enrich with WHOIS raw text,
   // then fall back to WHOIS-only; if neither succeeded, return error.
   const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
