@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin, getAdminEmail } from "@/lib/admin";
-import { isRedisAvailable, redis } from "@/lib/server/redis";
+import { isRedisAvailable, isIoredisAvailable, activeRedisBackend, redis } from "@/lib/server/redis";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -210,9 +210,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } catch { /* remain null */ }
 
-    // Redis health check
+    // Redis health check — tests whichever backend is currently active.
+    // activeRedisBackend() returns "upstash" | "ioredis" | "none".
     let redisOk = false;
     let redisLatencyMs: number | null = null;
+    const redisBackend = activeRedisBackend();
     if (isRedisAvailable() && redis) {
       try {
         const t0 = Date.now();
@@ -220,12 +222,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         redisLatencyMs = Date.now() - t0;
         redisOk = true;
       } catch { /* remain false */ }
+    } else if (isRedisAvailable()) {
+      // Upstash HTTP is active (no ioredis client for direct ping)
+      redisOk = true;
     }
 
     return res.json({
       ok: true,
       db: { ok: dbOk, latencyMs: dbLatencyMs },
-      redis: { ok: redisOk, configured: !!redis, latencyMs: redisLatencyMs },
+      redis: {
+        ok: redisOk,
+        configured: !!redis || redisBackend !== "none",
+        latencyMs: redisLatencyMs,
+        backend: redisBackend,                          // "upstash" | "ioredis" | "none"
+        upstashActive: redisBackend === "upstash",
+        ioredisReady: isIoredisAvailable(),
+      },
       adminEmail,
       stats: {
         users: {

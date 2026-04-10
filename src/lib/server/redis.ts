@@ -106,8 +106,10 @@ if (global.__redisAvailable === undefined) global.__redisAvailable = false;
 let _ioredisAvailable = global.__redisAvailable;
 
 function createIoredisConn(): import("ioredis").Redis | undefined {
-  // Skip ioredis entirely if Upstash HTTP is available
-  if (resolveUpstashEnv()) return undefined;
+  // NOTE: ioredis is initialised even when Upstash HTTP is present so it can
+  // act as a true hot-standby.  When Upstash is healthy all ops go through it;
+  // if its circuit breaker trips (quota/outage) ioredis takes over seamlessly
+  // without falling all the way to the PostgreSQL L3 cache.
 
   // Detect TLS requirement: rediss:// URLs (Aiven, Redis Cloud, etc.) need
   // explicit TLS options. rejectUnauthorized:false handles self-signed certs
@@ -152,21 +154,42 @@ function createIoredisConn(): import("ioredis").Redis | undefined {
   return client;
 }
 
-// Singleton ioredis instance (reused across HMR reloads in dev)
+// Singleton ioredis instance (reused across HMR reloads in dev).
+// Intentionally initialised even when Upstash is present — ioredis acts as a
+// hot standby that activates automatically if the Upstash circuit breaker trips.
 export const redis: import("ioredis").Redis | undefined = (() => {
-  if (resolveUpstashEnv()) return undefined; // Upstash takes over
   if (global.__redisClient !== undefined) return global.__redisClient ?? undefined;
   const client = createIoredisConn();
   global.__redisClient = client ?? null;
   return client;
 })();
 
+// ── Eager pre-initialisation (cold-start optimisation) ────────────────────────
+// Kick off the Upstash HTTP client immediately at module load so the very first
+// incoming request does not pay the one-time initialisation cost.
+// ioredis is already connecting eagerly through the singleton above.
+void getUpstashClient();
+
 // ── Availability check ────────────────────────────────────────────────────────
 
+/** Returns true when at least one Redis backend (Upstash or ioredis) is ready. */
 export function isRedisAvailable(): boolean {
-  // Circuit breaker: Upstash is unavailable if limit is tripped
+  // Upstash: available if circuit is not tripped and client was created.
   if (!isUpstashCircuitOpen() && getUpstashClient()) return true;
+  // ioredis: fallback — active when Upstash is tripped or when only TCP is configured.
   return _ioredisAvailable || global.__redisAvailable;
+}
+
+/** Returns true when the ioredis TCP connection is ready (for diagnostics). */
+export function isIoredisAvailable(): boolean {
+  return _ioredisAvailable || global.__redisAvailable;
+}
+
+/** Returns the label of the currently active Redis backend (for diagnostics). */
+export function activeRedisBackend(): "upstash" | "ioredis" | "none" {
+  if (!isUpstashCircuitOpen() && getUpstashClient()) return "upstash";
+  if (_ioredisAvailable || global.__redisAvailable) return "ioredis";
+  return "none";
 }
 
 // ── Unified operations (Upstash preferred, ioredis fallback) ─────────────────

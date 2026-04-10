@@ -5646,3 +5646,52 @@ const labelType: "available" | "high_value" | "high_fee" =
 - 价格列表"溢价" badge 改为"高价"，颜色由 amber 改为 orange
 - 注册按钮: `available` 显示"立即注册"，其他显示"查看价格"，统一使用 primary 样式
 - 注意框: 统一使用中性 `bg-muted/30` 背景，不再使用 amber 背景
+
+---
+
+## Session — 2026-04-10: 冷启动全面优化 + 多层缓存自动切换
+
+### Vercel 存储现状（已连接到 next-whois 项目）
+| 存储 | 类型 | 环境变量 | 用途 |
+|------|------|---------|------|
+| upstash-kv-orange-cushion | Upstash HTTP REST | `wr_KV_REST_API_URL/TOKEN` | L2a 主 Redis |
+| redis-cordovan-cave | Redis TCP (ioredis) | `xrw_REDIS_URL` | L2b 热备 Redis |
+| supabase-indigo-elephant | PostgreSQL | `POSTGRES_*` | L3 备用缓存 |
+
+### 修复的关键 Bug：双 Redis 故障转移失效
+
+**原问题** (`redis.ts`):  
+`createIoredisConn()` 有一行 `if (resolveUpstashEnv()) return undefined` — Upstash 在线时 ioredis 完全不初始化。当 Upstash 超配额/故障触发熔断器时，直接跌到 PostgreSQL L3，`xrw_REDIS_URL` 白接了。
+
+**修复**: 移除该守卫，ioredis 现在与 Upstash 并行初始化，作为热备。
+
+### 缓存层架构（修改后）
+
+```
+请求到来
+  ↓
+L1: 进程内内存缓存 (60s TTL, 2000条, LRU淘汰)  ← 原30s/500条/FIFO
+  ↓ miss
+L2a: Upstash HTTP Redis (wr_KV_*) — serverless最优  ← 熔断器保护
+  ↓ Upstash故障/超配额时自动切换
+L2b: Aiven/ioredis TCP (xrw_REDIS_URL) — 热备  ← 原来永远不用！
+  ↓ 两个Redis都不可用时
+L3: PostgreSQL whois_cache表 (现在真正读取了)  ← 原来只写不读！
+  ↓ cache miss → 实际WHOIS查询
+```
+
+### 并发请求去重（新功能）
+`_inflight` Map: 同一域名并发 N 个请求，只发 1 次实际 WHOIS 查询，其余共享同一 Promise 结果。
+
+### 其他优化
+1. **模块预热**: `import("whoiser").catch(() => {})` — 服务启动时后台预加载 whoiser 模块，首次查询不再等模块解析
+2. **Upstash 预初始化**: `void getUpstashClient()` — 模块加载时立即初始化 Upstash 客户端
+3. **DNS 热身扩展**: 从 15 个服务器扩展到 35 个，覆盖欧洲、亚太、非洲 ccTLD
+4. **L3 真正可读**: `lookupWhoisWithCache` 和 `lookupWhoisCacheStreaming` 现在在 Redis 全不可用时读取 PostgreSQL 缓存
+5. **L3 写回**: Redis 不可用时 `setWhoisDbCache()` 自动写入 PostgreSQL
+6. **管理界面增强**: `/api/admin/system` 返回 `redis.backend / upstashActive / ioredisReady` 字段
+
+### 文件修改清单
+- `src/lib/server/redis.ts`: 移除 ioredis guard、eager init、新增 `activeRedisBackend()` / `isIoredisAvailable()`
+- `src/lib/whois/lookup.ts`: L1 提升 (60s/2000/LRU)、in-flight dedup、L3读取、模块预热、DNS扩展
+- `src/pages/api/admin/system.ts`: 导入新函数，健康检查返回 backend 类型信息
