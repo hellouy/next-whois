@@ -4,6 +4,7 @@ import {
   setDiscoveredServer,
   tryBuiltinServerForDomain,
   tryManualServerForDomain,
+  queryManualServerRacing,
   getStaticWhoisServer,
 } from "@/lib/whois/custom-servers";
 import { isWhoiserBypassed, recordWhoiserFailure, resetWhoiserFailureCounter } from "@/lib/whois/whoiser-bypass";
@@ -88,17 +89,37 @@ function extractRawFromData(data: Record<string, unknown>): WhoisRawResult | nul
 }
 
 /**
+ * Resolves to the first non-null result from any of the given promises.
+ * Returns null only when every promise resolves/rejects with null/error.
+ */
+function raceFirstNonNull(promises: Promise<WhoisRawResult | null>[]): Promise<WhoisRawResult | null> {
+  return new Promise<WhoisRawResult | null>((resolve) => {
+    if (promises.length === 0) { resolve(null); return; }
+    let pending = promises.length;
+    let resolved = false;
+    for (const p of promises) {
+      p.then((v) => {
+        if (resolved) return;
+        if (v !== null) { resolved = true; resolve(v); return; }
+        if (--pending === 0) resolve(null);
+      }).catch(() => {
+        if (!resolved && --pending === 0) resolve(null);
+      });
+    }
+  });
+}
+
+/**
  * Generic WHOIS lookup with the following priority order:
  *
  *   ① BUILTIN servers (.ba scraper, .bn) — whoiser cannot handle these.
- *   ② whoiser + static-map TCP race (skipped if TLD is auto-bypassed):
- *      - For TLDs in whois-servers.json: static TCP + whoiser run in parallel;
- *        first non-empty result wins (preserves original speed optimisation).
- *      - For TLDs NOT in the static map: whoiser only.
- *      - Success → reset failure counter and return.
- *      - Both fail → record failure; if ≥3 consecutive: mark TLD bypassed.
- *   ③ Admin manual DB server (source='manual') — fallback after whoiser fails
- *      or when TLD is bypassed.
+ *   ② whoiser + static-map TCP + admin manual server race (skipped if bypassed):
+ *      - All three run in parallel; first non-empty result wins.
+ *      - Manual server is always included so admin-configured servers are
+ *        preferred over whoiser's auto-discovery, not just a last resort.
+ *      - Success → reset whoiser failure counter (if whoiser/static won) and return.
+ *      - All fail → record failure; if ≥3 consecutive: mark TLD bypassed.
+ *   ③ Admin manual DB server (source='manual') — primary path when bypassed.
  *   ④ IANA TCP fallback — last resort server discovery.
  *   ⑤ Throw with the most descriptive error available.
  */
@@ -119,15 +140,23 @@ export async function tryGenericWhoisForDomain(
 
   let primaryError: unknown = null;
 
-  // ② whoiser + static-map TCP race (unless TLD is whoiser-bypassed)
+  // Start manual server query immediately (before bypass check) so it runs
+  // concurrently with whoiser and the static-map TCP query.  When the admin
+  // has configured a server for this TLD, it competes in the step ② race
+  // rather than being relegated to a post-whoiser fallback — this ensures
+  // the configured server is actually used instead of being shadowed by a
+  // whoiser auto-discovery result that may be lower quality.
+  let manualWon = false;
+  const manualRacingP: Promise<WhoisRawResult | null> = queryManualServerRacing(
+    domainToQuery, tld, tldSuffix, innerTimeout,
+  ).then((r) => { if (r) manualWon = true; return r; }).catch((): null => null);
+
+  // ② whoiser + static-map TCP + manual server race (unless TLD is bypassed)
   //    Bypass is set automatically after BYPASS_FAIL_THRESHOLD consecutive
   //    failures; it can also be set/cleared manually from the admin panel.
   const bypassed = await isWhoiserBypassed(tldSuffix);
 
   if (!bypassed) {
-    // For TLDs in whois-servers.json: kick off static TCP immediately in
-    // parallel with whoiser. Whichever returns a non-empty result first wins.
-    // This preserves the original speed optimisation for known ccTLDs.
     const staticServer = getStaticWhoisServer(tldSuffix);
 
     const staticP: Promise<WhoisRawResult | null> = staticServer
@@ -141,41 +170,21 @@ export async function tryGenericWhoisForDomain(
 
     const { whoisDomain } = await getWhoiser();
 
-    let winner: WhoisRawResult | null = null;
-
-    if (staticServer) {
-      const whoiserP = (async (): Promise<WhoisRawResult | null> => {
-        try {
-          const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
-          const result = extractRawFromData(data as Record<string, unknown>);
-          return result && result.raw.trim().length > 0 ? result : null;
-        } catch (err) {
-          primaryError = err;
-          return null;
-        }
-      })();
-
-      winner = await new Promise<WhoisRawResult | null>((resolve) => {
-        let pending = 2;
-        let resolved = false;
-        function handleResult(v: WhoisRawResult | null) {
-          if (resolved) return;
-          if (v !== null) { resolved = true; resolve(v); return; }
-          pending--;
-          if (pending === 0) resolve(null);
-        }
-        staticP.then(handleResult);
-        whoiserP.then(handleResult);
-      });
-    } else {
+    const whoiserP: Promise<WhoisRawResult | null> = (async (): Promise<WhoisRawResult | null> => {
       try {
         const data = await whoisDomain(domainToQuery, { raw: true, follow, timeout: innerTimeout });
         const result = extractRawFromData(data as Record<string, unknown>);
-        if (result && result.raw.trim().length > 0) winner = result;
+        return result && result.raw.trim().length > 0 ? result : null;
       } catch (err) {
         primaryError = err;
+        return null;
       }
-    }
+    })();
+
+    // All three run in parallel; first non-null result wins.
+    const candidates: Promise<WhoisRawResult | null>[] = [whoiserP, manualRacingP];
+    if (staticServer) candidates.push(staticP);
+    let winner = await raceFirstNonNull(candidates);
 
     if (winner) {
       // Discard results that are whoiser-internal network error strings rather
@@ -191,9 +200,9 @@ export async function tryGenericWhoisForDomain(
     }
 
     if (winner) {
-      // Reset rolling failure counter so that transient errors don't accumulate
-      // toward the bypass threshold. Fire-and-forget.
-      resetWhoiserFailureCounter(tldSuffix).catch(() => {});
+      // Only reset the whoiser failure counter if whoiser or the static-map
+      // server won — not when the manual server won (whoiser may still be broken).
+      if (!manualWon) resetWhoiserFailureCounter(tldSuffix).catch(() => {});
       return winner;
     }
 
@@ -202,8 +211,12 @@ export async function tryGenericWhoisForDomain(
     recordWhoiserFailure(tldSuffix).catch(() => {});
   }
 
-  // ③ Admin manual DB server (source='manual') — fallback for whoiser failures
-  //    and the primary path when TLD is bypassed.
+  // ③ Admin manual DB server (source='manual') — primary path when bypassed.
+  //    manualRacingP has already started; if it resolved with data, use it
+  //    directly.  Otherwise fall back to a fresh call with isUserServer=true
+  //    so errors are propagated clearly.
+  const manualQuick = await manualRacingP;
+  if (manualQuick) return manualQuick;
   try {
     const manualResult = await tryManualServerForDomain(
       domainToQuery, tld, tldSuffix, innerTimeout,

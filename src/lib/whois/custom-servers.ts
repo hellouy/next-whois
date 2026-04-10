@@ -632,3 +632,29 @@ export async function tryManualServerForDomain(
   // isUserServer=true: throw on failure so callers see a clear error.
   return executeServerEntry(entry, domainToQuery, true, innerTimeout);
 }
+
+/**
+ * Like tryManualServerForDomain but used in the parallel race (step ②).
+ * Uses isUserServer=false so failures return null instead of throwing,
+ * allowing other race competitors (whoiser, static) to still win.
+ * Called immediately before the bypass check so it runs concurrently.
+ */
+export async function queryManualServerRacing(
+  domainToQuery: string,
+  tld: string,
+  tldSuffix: string,
+  innerTimeout: number,
+): Promise<WhoisRawResult | null> {
+  const n1 = tld.toLowerCase().replace(/^\./, "");
+  const n2 = tldSuffix.toLowerCase().replace(/^\./, "");
+  if (BUILTIN_SERVER_TLDS.has(n1) || BUILTIN_SERVER_TLDS.has(n2)) return null;
+  const now = Date.now();
+  if (!_manualServersCacheShadow || now - _manualServersCacheShadowAt >= ALL_SERVERS_TTL_MS) {
+    _manualServersCacheShadow = await readManualDbServers();
+    _manualServersCacheShadowAt = now;
+  }
+  const entry = _manualServersCacheShadow[n1] ?? (n1 !== n2 ? _manualServersCacheShadow[n2] : null) ?? null;
+  if (!entry) return null;
+  // isUserServer=false → return null on failure (racing context, not sole fallback)
+  return executeServerEntry(entry, domainToQuery, false, innerTimeout).catch(() => null);
+}
