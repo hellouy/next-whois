@@ -161,7 +161,10 @@ export function isIPAddress(query: string): boolean {
 }
 
 export function isASNumber(query: string): boolean {
-  return /^AS\d+$/i.test(query);
+  // Match "AS12345" (with prefix) or bare numeric strings like "12345".
+  // Bare numbers are treated as AS numbers to match the behaviour in
+  // rdap_client.ts which also accepts plain digit strings for autnum lookups.
+  return /^AS\d+$/i.test(query) || /^\d+$/.test(query);
 }
 
 export function toAsciiDomain(domain: string): string {

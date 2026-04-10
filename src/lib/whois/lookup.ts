@@ -111,6 +111,8 @@ function isTransientLookupFailure(result: WhoisResult): boolean {
   if (err.includes("not available for this tld") || err.includes("not supported")) return false;
   // Definitive: DNS confirmed the domain is unregistered
   if (result.dnsProbe?.registrationStatus === "unregistered") return false;
+  // Definitive: RDAP authoritatively said the domain does not exist (HTTP 404)
+  if (err.includes("domain not found")) return false;
   // Everything else (timeout, connection reset, empty response, rate-limited)
   // is potentially transient — worth one automatic retry.
   return true;
@@ -300,7 +302,7 @@ export async function lookupWhoisCacheStreaming(
     }
   }
 
-  let result = await lookupWhoisStreaming(domain, onPartialResult);
+  let result = await lookupWhois(domain, onPartialResult);
   // Retry once on transient failures (same logic as lookupWhoisWithCache).
   // Pass onPartialResult to the retry so that if RDAP succeeds on the second
   // attempt the partial result is streamed immediately (clears the loading
@@ -308,7 +310,7 @@ export async function lookupWhoisCacheStreaming(
   if (isTransientLookupFailure(result)) {
     const jitter = 400 + Math.floor(Math.random() * 400);
     await new Promise((r) => setTimeout(r, jitter));
-    const retried = await lookupWhoisStreaming(domain, onPartialResult);
+    const retried = await lookupWhois(domain, onPartialResult);
     if (retried.status) result = retried;
   }
   if (result.status) {
@@ -320,20 +322,6 @@ export async function lookupWhoisCacheStreaming(
     return { ...result, cached: false, cachedAt: now, cacheTtl: ttl };
   }
   return { ...result, cached: false };
-}
-
-/**
- * Core streaming lookup — fires RDAP + WHOIS in parallel.
- * When RDAP resolves first with good data, `onPartialResult` is called
- * immediately with an RDAP-only result so the caller can stream it to the
- * client. The function then waits for WHOIS enrichment (short grace period)
- * before returning the fully merged final result.
- */
-async function lookupWhoisStreaming(
-  domain: string,
-  onPartialResult?: (partial: WhoisResult) => void,
-): Promise<WhoisResult> {
-  return lookupWhois(domain, onPartialResult);
 }
 
 export async function lookupWhois(domain: string, onPartialResult?: (partial: WhoisResult) => void): Promise<WhoisResult> {
@@ -519,7 +507,12 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       // Reuse the pre-converted RDAP result from the streaming partial if available —
       // avoids a second convertRdapToWhoisResult call (saves 50-200 ms).
       let result = _precomputedRdap ?? await convertRdapToWhoisResult(rdapData, domain);
-      if (whoisRawStr && !isIanaFallback(whoisRawStr)) {
+      // Only use WHOIS raw to enrich the RDAP result when the raw text is
+      // genuine WHOIS data — not an IANA bootstrap page and not a detected
+      // error (e.g. the "error: getaddrinfo ENOTFOUND" strings that whoiser
+      // embeds when it cannot reach the WHOIS server).  Storing error text
+      // as rawWhoisContent would pollute the "Raw WHOIS" tab for users.
+      if (whoisRawStr && !isIanaFallback(whoisRawStr) && !detectWhoisError(whoisRawStr)) {
         try {
           const whoisParsed = await analyzeWhois(whoisRawStr);
           result = mergeResults(result, whoisParsed);
@@ -587,9 +580,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapMsg = rdapSettled.status === "rejected" ? (rdapSettled.reason instanceof Error ? rdapSettled.reason.message : "") : "";
   const whoisReturnedEmpty = whoisData !== null && (!whoisData.raw || whoisData.raw.trim().length === 0);
 
-  const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout"
-    : /not supported|no.*server|no public/i.test(whoisMsg) ? "no_server"
-    : "no_server";
+  const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout" : "no_server";
   const errMsg = /not supported/i.test(whoisMsg)
     ? "WHOIS/RDAP not available for this TLD"
     : /cannot read properties/i.test(whoisMsg) || /cannot read properties/i.test(rdapMsg)

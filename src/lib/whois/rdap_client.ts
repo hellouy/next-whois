@@ -373,7 +373,10 @@ async function tryRdapWithUrl(
     }
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.ldhName || json?.handle ? json : null;
+    // Accept responses that carry any of: ldhName (ASCII domain), unicodeName
+    // (IDN domain), handle (IANA handle for IP/ASN), or rdapConformance (all
+    // spec-compliant RDAP responses must include this field).
+    return json?.ldhName || json?.unicodeName || json?.handle || json?.rdapConformance ? json : null;
   } catch {
     return null;
   }

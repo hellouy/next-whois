@@ -178,6 +178,19 @@ export async function tryGenericWhoisForDomain(
     }
 
     if (winner) {
+      // Discard results that are whoiser-internal network error strings rather
+      // than actual WHOIS data.  When whoiser cannot connect to the server (e.g.
+      // ENOTFOUND whois.nic.google, ECONNREFUSED, ETIMEDOUT) it sometimes
+      // embeds the Node.js error message in the result object, which passes the
+      // raw.trim().length > 0 check above and masquerades as valid WHOIS data.
+      // Such results start with "error: getaddrinfo …" or "connect E…".
+      if (/^error:\s*(?:getaddrinfo|connect\s+E(?:NOTFOUND|CONNREFUSED|CONNRESET|TIMEDOUT))/im.test(winner.raw.trimStart())) {
+        primaryError = primaryError ?? new Error(winner.raw.trim().slice(0, 120));
+        winner = null;
+      }
+    }
+
+    if (winner) {
       // Reset rolling failure counter so that transient errors don't accumulate
       // toward the bypass threshold. Fire-and-forget.
       resetWhoiserFailureCounter(tldSuffix).catch(() => {});
