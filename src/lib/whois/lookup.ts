@@ -250,6 +250,23 @@ const SLOW_WHOIS_TLDS: Readonly<Record<string, number>> = {
   mx:  9_000,  // whois.nic.mx — 3-6 s typical
   th:  9_000,  // whois.thnic.co.th — 3-6 s typical
 };
+/**
+ * TLDs that have no publicly accessible WHOIS or RDAP server at all.
+ * Queries for these TLDs skip the full WHOIS/RDAP timeout cycle (saves up to
+ * 20 s of guaranteed waiting) and go straight to DNS probe for availability.
+ * When DNS is also unreachable for these TLDs, we treat the domain as
+ * "likely unregistered" with low confidence rather than hard "LOOKUP FAILED".
+ */
+const NO_SERVER_TLDS = new Set<string>([
+  "hm",  // Heard Island & McDonald Islands — IANA managed, no public WHOIS/RDAP
+  "aq",  // Antarctica — IANA managed, no public WHOIS/RDAP
+  "bv",  // Bouvet Island — no public WHOIS/RDAP
+  "sj",  // Svalbard & Jan Mayen — no public WHOIS/RDAP
+  "eh",  // Western Sahara — no public WHOIS/RDAP
+  "tf",  // French Southern Territories — IANA managed, no public WHOIS/RDAP
+  "pm",  // Saint Pierre & Miquelon — no public WHOIS/RDAP
+]);
+
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
 
 /**
@@ -380,6 +397,30 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const innerTimeout = Math.max(baseInnerTimeout, tldExtraMs);
   const effectiveWhoisTimeout = innerTimeout > WHOIS_TIMEOUT ? innerTimeout + 300 : WHOIS_TIMEOUT;
   const follow = Math.min(Math.max(MAX_WHOIS_FOLLOW, 1), 2) as 1 | 2;
+
+  // ── Fast-fail for TLDs with no public WHOIS/RDAP server ──────────────────
+  // Skip the full timeout cycle and go straight to DNS probe.
+  // When DNS is also unreachable (allTimedOut), we use "unregistered" (low
+  // confidence) so the UI shows the available card rather than a hard error.
+  if (NO_SERVER_TLDS.has(tldSuffix)) {
+    recordFailure("no_server", `No public WHOIS/RDAP server for .${tldSuffix}`);
+    const rawDns = await probeDomain(domain).catch(() => undefined);
+    // When DNS is also unreachable for a no-server TLD, assume unregistered (low confidence).
+    // rawDns may be undefined on probe error; allTimedOut may be true on network failure.
+    let dnsProbe: Awaited<ReturnType<typeof probeDomain>>;
+    if (!rawDns) {
+      dnsProbe = { domain, registrationStatus: "unregistered", confidence: "low", signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null };
+    } else if (rawDns.registrationStatus === "unknown") {
+      dnsProbe = { ...rawDns, registrationStatus: "unregistered", confidence: "low" };
+    } else {
+      dnsProbe = rawDns;
+    }
+    return {
+      time: elapsed(), status: false, cached: false,
+      error: "WHOIS/RDAP not available for this TLD",
+      dnsProbe,
+    };
+  }
 
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
   // Reduced from 1200 → 900 ms: 900 ms is enough for most WHOIS servers to

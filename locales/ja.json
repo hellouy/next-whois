@@ -1682,6 +1682,7 @@
     "nav_tld_probe": "TLD プローブ",
     "nav_og_styles": "OGカード",
     "nav_system_label": "システム",
+    "nav_tld_speed": "TLD 速度統計",
     "nav_api": "API",
     "nav_settings": "設定",
     "nav_git_fix": "Git プッシュ修復",

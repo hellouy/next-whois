@@ -1683,6 +1683,7 @@
     "nav_tld_probe": "TLD Probe",
     "nav_og_styles": "OG Share Image",
     "nav_system_label": "System Monitor",
+    "nav_tld_speed": "TLD Speed Stats",
     "nav_api": "API Integration",
     "nav_db_export": "DB Export",
     "nav_settings": "Site Settings",

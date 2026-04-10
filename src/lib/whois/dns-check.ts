@@ -23,9 +23,36 @@ export type DnsSignal = {
 
 const DNS_TIMEOUT_MS = 5000;
 
-function withDnsTimeout<T>(promise: Promise<T>): Promise<T | null> {
+/**
+ * Wraps a DNS lookup promise with a timeout.
+ *
+ * Returns:
+ *  - The resolved value on success
+ *  - An empty array on DNS errors (ENOTFOUND = NXDOMAIN, ENODATA = no records of
+ *    this type, ESERVFAIL = registry error) — these are definitive "no records"
+ *    answers, distinct from a timeout.
+ *  - null on actual network timeout (DNS server unreachable / no response)
+ *
+ * This distinction is critical: NXDOMAIN (domain doesn't exist) must not be
+ * treated the same as a timeout (DNS unreachable) — the former means the domain
+ * is unregistered, the latter means we have no information.
+ */
+function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | null> {
   return Promise.race([
-    promise.catch(() => null),
+    promise.catch((e) => {
+      const code = (e as NodeJS.ErrnoException)?.code ?? "";
+      // Definitive DNS answers: domain doesn't exist or has no records of this type.
+      // Return an empty array so the caller knows we got a real response.
+      if (
+        code === "ENOTFOUND" ||  // NXDOMAIN — domain doesn't exist
+        code === "ENODATA"  ||  // Domain exists but no records of this type
+        code === "ESERVFAIL"    // Registry/resolver error — treat as no data
+      ) {
+        return [] as unknown as T;
+      }
+      // Everything else (ETIMEOUT, ECONNREFUSED, etc.) → treat as timeout / no info
+      return null;
+    }),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), DNS_TIMEOUT_MS)),
   ]);
 }

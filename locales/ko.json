@@ -1683,6 +1683,7 @@
     "nav_tld_probe": "TLD 프로브",
     "nav_og_styles": "OG 카드",
     "nav_system_label": "시스템",
+    "nav_tld_speed": "TLD 속도 통계",
     "nav_api": "API",
     "nav_settings": "설정",
     "nav_git_fix": "Git 푸시 수정",

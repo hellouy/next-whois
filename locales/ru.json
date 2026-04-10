@@ -1682,6 +1682,7 @@
     "nav_tld_probe": "Зондирование TLD",
     "nav_og_styles": "OG-карточки",
     "nav_system_label": "Система",
+    "nav_tld_speed": "Статистика скорости TLD",
     "nav_api": "API",
     "nav_settings": "Настройки",
     "nav_git_fix": "Исправление Git Push",
