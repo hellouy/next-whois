@@ -5,7 +5,8 @@
  * Keys can come from two sources (DB takes priority over env var):
  *   DB (site_settings table) via api_ai_*_key keys — set in Admin → API 接入
  *   Env vars: ZHIPU_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, DEEPSEEK_API_KEY,
- *             DASHSCOPE_API_KEY, MOONSHOT_API_KEY, SILICONFLOW_API_KEY
+ *             DASHSCOPE_API_KEY, MOONSHOT_API_KEY, SILICONFLOW_API_KEY,
+ *             QIANFAN_API_KEY
  *
  * Free providers supported:
  *   ZHIPU_API_KEY     → GLM-4-FlashX, GLM-4-Flash, GLM-4-Air  (bigmodel.cn, free quota)
@@ -15,6 +16,7 @@
  *   DASHSCOPE_API_KEY → Qwen-Turbo, Qwen-Long                    (dashscope.aliyun.com, free)
  *   MOONSHOT_API_KEY  → Kimi moonshot-v1-8k                      (platform.moonshot.cn, free)
  *   SILICONFLOW_API_KEY → Qwen2.5-7B, Llama-3.1-8B etc.         (siliconflow.cn, free)
+ *   QIANFAN_API_KEY   → ERNIE-Speed-8K, ERNIE-Lite-8K            (qianfan.baidu.com, free)
  */
 
 export interface AiProviderInfo {
@@ -44,6 +46,7 @@ export const AI_DB_KEY_MAP: Record<string, string> = {
   DASHSCOPE_API_KEY:   "api_ai_dashscope_key",
   MOONSHOT_API_KEY:    "api_ai_moonshot_key",
   SILICONFLOW_API_KEY: "api_ai_siliconflow_key",
+  QIANFAN_API_KEY:     "api_ai_qianfan_key",
 };
 
 // ─── In-process DB key cache (5 min TTL) ─────────────────────────────────────
@@ -156,6 +159,7 @@ function buildProviders(dbKeys: Record<string, string> = {}): AiProvider[] {
   const DASH     = key("DASHSCOPE_API_KEY");
   const MOON     = key("MOONSHOT_API_KEY");
   const SILI     = key("SILICONFLOW_API_KEY");
+  const QIANFAN  = key("QIANFAN_API_KEY");
 
   const all: AiProvider[] = [
     // ── Zhipu (primary, existing key) ────────────────────────────────────
@@ -259,6 +263,21 @@ function buildProviders(dbKeys: Record<string, string> = {}): AiProvider[] {
       configured: !!MOON, priority: 19, source: src("MOONSHOT_API_KEY"),
       chat: (msgs) => openAiCompatChat(
         "https://api.moonshot.cn/v1/chat/completions", MOON, "moonshot-v1-8k", msgs),
+    },
+    // ── Baidu Qianfan ERNIE (free models) ────────────────────────────────
+    {
+      id: "ernie-speed-8k", name: "ERNIE-Speed-8K", model: "ernie-speed-8k",
+      provider: "百度千帆 Qianfan", env_var: "QIANFAN_API_KEY", db_key: AI_DB_KEY_MAP.QIANFAN_API_KEY,
+      configured: !!QIANFAN, priority: 17, source: src("QIANFAN_API_KEY"),
+      chat: (msgs) => openAiCompatChat(
+        "https://qianfan.baidubce.com/v2/chat/completions", QIANFAN, "ernie-speed-8k", msgs),
+    },
+    {
+      id: "ernie-lite-8k", name: "ERNIE-Lite-8K", model: "ernie-lite-8k",
+      provider: "百度千帆 Qianfan", env_var: "QIANFAN_API_KEY", db_key: AI_DB_KEY_MAP.QIANFAN_API_KEY,
+      configured: !!QIANFAN, priority: 27, source: src("QIANFAN_API_KEY"),
+      chat: (msgs) => openAiCompatChat(
+        "https://qianfan.baidubce.com/v2/chat/completions", QIANFAN, "ernie-lite-8k", msgs),
     },
     // ── SiliconFlow (free, many open models) ─────────────────────────────
     {

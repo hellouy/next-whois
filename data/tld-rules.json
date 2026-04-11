@@ -1,1 +1,51 @@
-{"generated_at":"","count":0,"rules":{}}
+{
+  "generated_at": "2026-04-11T17:29:07.519Z",
+  "count": 3,
+  "rules": {
+    "ac": {
+      "grace_period_days": 30,
+      "redemption_period_days": 30,
+      "pending_delete_days": 5,
+      "total_release_days": 65,
+      "drop_hour": null,
+      "drop_minute": null,
+      "drop_second": null,
+      "drop_timezone": null,
+      "pre_expiry_days": 0,
+      "confidence": "ai",
+      "source_url": "http://www.nic.ac/domain-lifecycle",
+      "reasoning": "ccTLD注册局页面无具体政策数据",
+      "saved_at": "2026-04-11T17:27:57.002Z"
+    },
+    "ad": {
+      "grace_period_days": 30,
+      "redemption_period_days": 30,
+      "pending_delete_days": 5,
+      "total_release_days": 65,
+      "drop_hour": null,
+      "drop_minute": null,
+      "drop_second": null,
+      "drop_timezone": null,
+      "pre_expiry_days": 0,
+      "confidence": "ai",
+      "source_url": "https://www.domini.ad/domain-lifecycle",
+      "reasoning": "ccTLD注册局页面无具体政策数据",
+      "saved_at": "2026-04-11T17:28:28.856Z"
+    },
+    "af": {
+      "grace_period_days": 30,
+      "redemption_period_days": 30,
+      "pending_delete_days": 5,
+      "total_release_days": 65,
+      "drop_hour": null,
+      "drop_minute": null,
+      "drop_second": null,
+      "drop_timezone": null,
+      "pre_expiry_days": 0,
+      "confidence": "ai",
+      "source_url": "http://www.nic.af/domain-lifecycle",
+      "reasoning": "ccTLD注册局页面无具体政策数据",
+      "saved_at": "2026-04-11T17:29:07.519Z"
+    }
+  }
+}

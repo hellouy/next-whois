@@ -264,6 +264,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               dashscope:   ["https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-turbo"],
               moonshot:    ["https://api.moonshot.cn/v1/chat/completions", "moonshot-v1-8k"],
               siliconflow: ["https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct"],
+              qianfan:     ["https://qianfan.baidubce.com/v2/chat/completions", "ernie-speed-8k"],
             };
             const [endpoint, model] = endpoints[providerShort] ?? ["", ""];
             if (!endpoint) throw new Error("未知提供商");

@@ -62,7 +62,8 @@ const AI_PROVIDERS = [
   { id: "groq",        name: "Groq",               desc: "QwQ-32B / Llama-3.3-70B / Mixtral-8x7B / Gemma2-9B / Llama-3.1-8B", link: "https://console.groq.com/keys", color: "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400", priority: 4 },
   { id: "dashscope",   name: "阿里云 DashScope",   desc: "Qwen-Turbo / Qwen-Long",        link: "https://dashscope.aliyun.com/",           color: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-600 dark:text-yellow-400", priority: 5 },
   { id: "moonshot",    name: "月之暗面 Kimi",       desc: "moonshot-v1-8k",                link: "https://platform.moonshot.cn/",           color: "bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400", priority: 6 },
-  { id: "siliconflow", name: "硅基流动",            desc: "Qwen2.5-7B / Llama-3.1-8B",    link: "https://cloud.siliconflow.cn/account/ak", color: "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400",   priority: 7 },
+  { id: "qianfan",     name: "百度千帆",            desc: "ERNIE-Speed-8K / ERNIE-Lite-8K（免费）", link: "https://qianfan.cloud.baidu.com/", color: "bg-sky-100 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400",       priority: 7 },
+  { id: "siliconflow", name: "硅基流动",            desc: "Qwen2.5-7B / Llama-3.1-8B",    link: "https://cloud.siliconflow.cn/account/ak", color: "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400",   priority: 8 },
 ];
 
 // ─── Main component ──────────────────────────────────────────────────────────
