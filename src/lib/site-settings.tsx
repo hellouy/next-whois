@@ -165,6 +165,7 @@ export interface SiteSettings {
   expireddomains_min_length: string;
   expireddomains_tld_filter: string;
   expireddomains_rows: string;
+  expireddomains_prefix_list: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -309,7 +310,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   expireddomains_max_length: "4",
   expireddomains_min_length: "1",
   expireddomains_tld_filter: "",
-  expireddomains_rows: "100",
+  expireddomains_rows: "200",
+  expireddomains_prefix_list: "",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";

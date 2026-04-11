@@ -1,42 +1,43 @@
 /**
  * /api/admin/expired-domains-crawl
  *
- * Crawls member.expireddomains.net for short/high-value expired domain leads
- * using the admin's stored credentials.
+ * Crawls member.expireddomains.net for short/high-value expired domain leads.
  *
- * GET  ?action=list      → paginated list of stored leads
- * POST ?action=crawl     → trigger a live crawl and upsert results
- * PATCH                  → update a lead (seen / starred / notes)
- * DELETE ?id=            → delete one lead
- * DELETE ?action=clear   → clear all leads
+ * GET  ?action=list                 → paginated + filtered list of stored leads
+ * GET  ?action=stats                → length / TLD distribution counts
+ * POST ?action=crawl&mode=length    → crawl by min/max SLD length
+ * POST ?action=crawl&mode=prefix    → crawl each configured prefix in series
+ * POST ?action=crawl&prefix=ai      → crawl a single specific prefix
+ * PATCH                             → update a lead (seen / starred / notes)
+ * DELETE ?id=N                      → delete one lead
+ * DELETE ?action=clear              → delete all leads
+ * DELETE ?action=clear_prefix&prefix=ai → delete leads for a specific prefix
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run, isDbReady } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
-import { getSetting, getSettings } from "@/lib/server/site-settings-server";
+import { getSettings } from "@/lib/server/site-settings-server";
 import * as cheerio from "cheerio";
 
 export const config = { maxDuration: 60 };
 
 const BASE = "https://member.expireddomains.net";
 const LOGIN_URL = `${BASE}/login/`;
+const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 // ── Cookie helpers ────────────────────────────────────────────────────────────
 
 function extractCookies(res: Response): string[] {
-  // Node.js 18.14+ / undici exposes getSetCookie()
   if (typeof (res.headers as any).getSetCookie === "function") {
     return (res.headers as any).getSetCookie().map((c: string) => c.split(";")[0].trim());
   }
   const raw = res.headers.get("set-cookie");
   if (!raw) return [];
-  // Fallback: split on ", " boundary (works for simple cookies)
   return raw.split(/,(?=\s*\w+=)/).map((c) => c.split(";")[0].trim());
 }
 
 function cookieHeader(cookies: string[]): string {
-  // Deduplicate by name (last one wins)
   const map = new Map<string, string>();
   for (const c of cookies) {
     const [name] = c.split("=");
@@ -48,43 +49,34 @@ function cookieHeader(cookies: string[]): string {
 // ── Login ─────────────────────────────────────────────────────────────────────
 
 async function loginToExpiredDomains(username: string, password: string): Promise<string> {
-  const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
-  // 1. GET login page to collect cookies + CSRF token
   const getRes = await fetch(LOGIN_URL, {
-    headers: { "User-Agent": ua },
+    headers: { "User-Agent": UA },
     redirect: "follow",
   });
   const loginCookies = extractCookies(getRes);
   const html = await getRes.text();
-
-  // Extract Django CSRF token
   const csrfMatch = html.match(/name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/);
   const csrf = csrfMatch?.[1] ?? "";
 
-  // 2. POST credentials
-  const body = new URLSearchParams({ username, password, csrfmiddlewaretoken: csrf });
   const postRes = await fetch(LOGIN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       "Cookie": cookieHeader(loginCookies),
       "Referer": LOGIN_URL,
-      "User-Agent": ua,
+      "User-Agent": UA,
       "Origin": BASE,
     },
-    body: body.toString(),
+    body: new URLSearchParams({ username, password, csrfmiddlewaretoken: csrf }).toString(),
     redirect: "manual",
   });
 
   const postCookies = extractCookies(postRes);
   const allCookies = cookieHeader([...loginCookies, ...postCookies]);
 
-  // Verify we got a session cookie
   if (!allCookies.includes("sessionid")) {
     throw new Error("Login failed — check your expireddomains.net username and password");
   }
-
   return allCookies;
 }
 
@@ -106,7 +98,6 @@ function parseListing(html: string): ExpiredDomainRow[] {
   const $ = cheerio.load(html);
   const results: ExpiredDomainRow[] = [];
 
-  // expireddomains.net listing table has id="listing"
   const table = $("#listing");
   if (!table.length) return results;
 
@@ -114,17 +105,12 @@ function parseListing(html: string): ExpiredDomainRow[] {
     const cells = $(row).find("td");
     if (cells.length < 3) return;
 
-    // Domain is in the first <td class="field_domain"> or first anchor
     const domainCell = $(row).find(".field_domain a").first();
     let domain = domainCell.text().trim().toLowerCase();
-
-    // Fallback: first cell anchor
     if (!domain) {
       domain = $(cells.get(0)).find("a").first().text().trim().toLowerCase();
     }
     if (!domain || !domain.includes(".")) return;
-
-    // Strip www. prefix if present
     if (domain.startsWith("www.")) domain = domain.slice(4);
 
     const parts = domain.split(".");
@@ -133,7 +119,6 @@ function parseListing(html: string): ExpiredDomainRow[] {
     const tld = parts[parts.length - 1];
     const char_count = sld.length;
 
-    // Try to parse numeric columns (BL, DP are usually columns 3 & 4)
     const parseNum = (el: any): number | null => {
       const txt = $(el).text().trim().replace(/[^0-9]/g, "");
       const n = parseInt(txt, 10);
@@ -144,8 +129,7 @@ function parseListing(html: string): ExpiredDomainRow[] {
       return txt && txt !== "-" && txt !== "n/a" ? txt : null;
     };
 
-    // Column order on expireddomains.net combinedexpired:
-    // 0: domain, 1: len, 2: ACR, 3: CR, 4: BL, 5: DP, 6: Deleted, 7: Available, 8: Registered, ...
+    // Column order: 0:domain 1:len 2:ACR 3:CR 4:BL 5:DP 6:Deleted 7:Available
     const bl = parseNum(cells.get(4));
     const dp = parseNum(cells.get(5));
     const deleted_date = parseDate(cells.get(6));
@@ -157,33 +141,17 @@ function parseListing(html: string): ExpiredDomainRow[] {
   return results;
 }
 
-// ── Crawl logic ───────────────────────────────────────────────────────────────
+// ── Single page fetch + upsert ────────────────────────────────────────────────
 
-async function crawl(username: string, password: string, opts: {
-  maxLen: number;
-  minLen: number;
-  tldFilter: string;
-  rows: number;
-}): Promise<{ inserted: number; skipped: number; leads: ExpiredDomainRow[] }> {
-  const cookieStr = await loginToExpiredDomains(username, password);
-
-  const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
-  const params = new URLSearchParams({
-    o: "length",
-    r: "a",
-    rows: String(opts.rows),
-    fl: String(opts.minLen),
-    flength: String(opts.maxLen),
-    filterunregistered: "yes",
-  });
-  if (opts.tldFilter) params.set("ftld", opts.tldFilter);
-
-  const url = `${BASE}/domains/combinedexpired/?${params.toString()}`;
+async function fetchAndUpsert(
+  cookieStr: string,
+  urlParams: URLSearchParams,
+): Promise<{ inserted: number; updated: number; leads: ExpiredDomainRow[] }> {
+  const url = `${BASE}/domains/combinedexpired/?${urlParams.toString()}`;
   const res = await fetch(url, {
     headers: {
       "Cookie": cookieStr,
-      "User-Agent": ua,
+      "User-Agent": UA,
       "Referer": `${BASE}/domains/combinedexpired/`,
     },
   });
@@ -191,36 +159,70 @@ async function crawl(username: string, password: string, opts: {
   if (!res.ok) throw new Error(`Listing page returned HTTP ${res.status}`);
 
   const html = await res.text();
-  const leads = parseListing(html);
-  if (leads.length === 0) {
-    // Check if we were redirected to login (session lost)
-    if (html.includes("id_username") || html.includes("loginForm")) {
-      throw new Error("Session expired or login failed — please check credentials");
-    }
+
+  if (html.includes("id_username") || html.includes("loginForm")) {
+    throw new Error("Session expired or login failed — please re-check credentials");
   }
 
-  // Upsert into DB
+  const leads = parseListing(html);
   let inserted = 0;
-  let skipped = 0;
+  let updated = 0;
+
   for (const lead of leads) {
     const affected = await run(
       `INSERT INTO expired_domain_leads
          (domain, tld, sld, char_count, bl, dp, deleted_date, available_date, status, source, crawled_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'expireddomains.net',NOW())
        ON CONFLICT (domain) DO UPDATE SET
-         bl            = EXCLUDED.bl,
-         dp            = EXCLUDED.dp,
-         deleted_date  = EXCLUDED.deleted_date,
-         available_date= EXCLUDED.available_date,
-         crawled_at    = NOW()`,
+         bl             = EXCLUDED.bl,
+         dp             = EXCLUDED.dp,
+         deleted_date   = EXCLUDED.deleted_date,
+         available_date = EXCLUDED.available_date,
+         crawled_at     = NOW()`,
       [lead.domain, lead.tld, lead.sld, lead.char_count, lead.bl, lead.dp,
        lead.deleted_date, lead.available_date, lead.status],
     ).catch(() => 0);
     if (affected > 0) inserted++;
-    else skipped++;
+    else updated++;
   }
 
-  return { inserted, skipped, leads };
+  return { inserted, updated, leads };
+}
+
+// ── Crawl: length mode ────────────────────────────────────────────────────────
+
+async function crawlByLength(
+  cookieStr: string,
+  opts: { minLen: number; maxLen: number; tldFilter: string; rows: number },
+): Promise<{ inserted: number; updated: number; leads: ExpiredDomainRow[] }> {
+  const p = new URLSearchParams({
+    o: "length", r: "a",
+    rows: String(opts.rows),
+    fl: String(opts.minLen),
+    flength: String(opts.maxLen),
+    filterunregistered: "yes",
+  });
+  if (opts.tldFilter) p.set("ftld", opts.tldFilter);
+  return fetchAndUpsert(cookieStr, p);
+}
+
+// ── Crawl: prefix mode ────────────────────────────────────────────────────────
+
+async function crawlByPrefix(
+  cookieStr: string,
+  prefix: string,
+  opts: { tldFilter: string; rows: number },
+): Promise<{ inserted: number; updated: number; leads: ExpiredDomainRow[]; prefix: string }> {
+  const p = new URLSearchParams({
+    o: "bl", r: "d",                // sort by backlinks descending — highest value first
+    rows: String(opts.rows),
+    fldomain: prefix.trim().toLowerCase(),
+    fpre: "1",                       // prefix match (not substring)
+    filterunregistered: "yes",
+  });
+  if (opts.tldFilter) p.set("ftld", opts.tldFilter);
+  const result = await fetchAndUpsert(cookieStr, p);
+  return { ...result, prefix };
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -231,26 +233,71 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const action = req.query.action as string | undefined;
 
-  // ── GET: list stored leads ────────────────────────────────────────────────
+  // ── GET: list leads or stats ───────────────────────────────────────────────
   if (req.method === "GET") {
-    const page    = Math.max(1, parseInt(String(req.query.page  ?? "1")));
-    const limit   = Math.min(200, Math.max(10, parseInt(String(req.query.limit ?? "50"))));
-    const offset  = (page - 1) * limit;
-    const maxLen  = parseInt(String(req.query.maxLen ?? "0")) || 0;
-    const tld     = String(req.query.tld ?? "").trim().toLowerCase();
-    const onlyStar= req.query.starred === "1";
-    const onlyNew = req.query.unseen  === "1";
+
+    // ── Stats endpoint ──────────────────────────────────────────────────────
+    if (action === "stats") {
+      const [byLen, byTld, totRow] = await Promise.all([
+        many<{ char_count: number; cnt: string }>(
+          `SELECT char_count, COUNT(*)::text AS cnt
+           FROM expired_domain_leads
+           GROUP BY char_count ORDER BY char_count`,
+        ),
+        many<{ tld: string; cnt: string }>(
+          `SELECT tld, COUNT(*)::text AS cnt
+           FROM expired_domain_leads
+           GROUP BY tld ORDER BY cnt::int DESC LIMIT 15`,
+        ),
+        one<{ total: string; starred: string; unseen: string }>(
+          `SELECT
+             COUNT(*)::text                             AS total,
+             COUNT(*) FILTER (WHERE starred)::text      AS starred,
+             COUNT(*) FILTER (WHERE NOT seen)::text     AS unseen
+           FROM expired_domain_leads`,
+        ),
+      ]);
+      return res.json({
+        byLength: byLen,
+        byTld,
+        total:   parseInt(totRow?.total   ?? "0"),
+        starred: parseInt(totRow?.starred ?? "0"),
+        unseen:  parseInt(totRow?.unseen  ?? "0"),
+      });
+    }
+
+    // ── List endpoint ────────────────────────────────────────────────────────
+    const page      = Math.max(1, parseInt(String(req.query.page  ?? "1")));
+    const limit     = Math.min(200, Math.max(10, parseInt(String(req.query.limit ?? "50"))));
+    const offset    = (page - 1) * limit;
+    const exactLen  = parseInt(String(req.query.exactLen ?? "0")) || 0;
+    const maxLen    = parseInt(String(req.query.maxLen   ?? "0")) || 0;
+    const minBl     = parseInt(String(req.query.minBl    ?? "0")) || 0;
+    const tld       = String(req.query.tld     ?? "").trim().toLowerCase();
+    const prefix    = String(req.query.prefix  ?? "").trim().toLowerCase();
+    const onlyStar  = req.query.starred === "1";
+    const onlyNew   = req.query.unseen  === "1";
+    const sort      = String(req.query.sort ?? "value"); // value | newest | longest
 
     const conditions: string[] = [];
     const params: (string | number | boolean)[] = [];
     let idx = 1;
 
-    if (maxLen > 0) { conditions.push(`char_count <= $${idx++}`); params.push(maxLen); }
-    if (tld)        { conditions.push(`tld = $${idx++}`);         params.push(tld); }
-    if (onlyStar)   { conditions.push(`starred = true`); }
-    if (onlyNew)    { conditions.push(`seen = false`); }
+    if (exactLen > 0) { conditions.push(`char_count = $${idx++}`);    params.push(exactLen); }
+    else if (maxLen > 0) { conditions.push(`char_count <= $${idx++}`); params.push(maxLen); }
+    if (minBl > 0)    { conditions.push(`bl >= $${idx++}`);           params.push(minBl); }
+    if (tld)          { conditions.push(`tld = $${idx++}`);           params.push(tld); }
+    if (prefix)       { conditions.push(`sld LIKE $${idx++}`);        params.push(`${prefix}%`); }
+    if (onlyStar)     { conditions.push(`starred = true`); }
+    if (onlyNew)      { conditions.push(`seen = false`); }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const orderBy = sort === "newest"  ? "crawled_at DESC"
+                  : sort === "longest" ? "char_count DESC, bl DESC NULLS LAST"
+                  : sort === "bl"      ? "bl DESC NULLS LAST, char_count ASC"
+                  : sort === "dp"      ? "dp DESC NULLS LAST, char_count ASC"
+                  :                     "char_count ASC, bl DESC NULLS LAST, crawled_at DESC"; // default: value
 
     const [rows, countRow] = await Promise.all([
       many<{
@@ -259,7 +306,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         available_date: string | null; status: string; seen: boolean; starred: boolean;
         notes: string | null; crawled_at: string;
       }>(
-        `SELECT * FROM expired_domain_leads ${where} ORDER BY char_count ASC, bl DESC NULLS LAST, crawled_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+        `SELECT * FROM expired_domain_leads ${where}
+         ORDER BY ${orderBy}
+         LIMIT $${idx++} OFFSET $${idx++}`,
         [...params, limit, offset],
       ),
       one<{ total: string }>(
@@ -272,7 +321,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ leads: rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   }
 
-  // ── POST: trigger crawl ───────────────────────────────────────────────────
+  // ── POST: trigger crawl ────────────────────────────────────────────────────
   if (req.method === "POST" && action === "crawl") {
     const settings = await getSettings([
       "expireddomains_username",
@@ -281,6 +330,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "expireddomains_min_length",
       "expireddomains_tld_filter",
       "expireddomains_rows",
+      "expireddomains_prefix_list",
     ]);
 
     const username = settings.expireddomains_username?.trim();
@@ -290,21 +340,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "expireddomains.net 账号未配置，请先在设置中填写用户名和密码" });
     }
 
-    const maxLen    = parseInt(settings.expireddomains_max_length  || "4")  || 4;
-    const minLen    = parseInt(settings.expireddomains_min_length  || "1")  || 1;
     const tldFilter = settings.expireddomains_tld_filter?.trim() || "";
-    const rows      = Math.min(500, parseInt(settings.expireddomains_rows || "100") || 100);
+    const rows      = Math.min(500, parseInt(settings.expireddomains_rows || "200") || 200);
+    const mode      = String(req.query.mode ?? "length");
+
+    // Single-prefix crawl from the UI "crawl this prefix" button
+    const singlePrefix = String(req.query.prefix ?? "").trim().toLowerCase();
+
+    let cookieStr: string;
+    try {
+      cookieStr = await loginToExpiredDomains(username, password);
+    } catch (err: any) {
+      console.error("[expired-domains-crawl] login error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    // ── Prefix mode ──────────────────────────────────────────────────────────
+    if (mode === "prefix" || singlePrefix) {
+      const prefixesToCrawl: string[] = singlePrefix
+        ? [singlePrefix]
+        : (settings.expireddomains_prefix_list || "")
+            .split(",")
+            .map(p => p.trim().toLowerCase())
+            .filter(Boolean);
+
+      if (!prefixesToCrawl.length) {
+        return res.status(400).json({ error: "没有配置前缀列表，请在设置中添加前缀（如: ai,gpt,nft）" });
+      }
+
+      let totalInserted = 0;
+      let totalUpdated  = 0;
+      const results: { prefix: string; inserted: number; updated: number; count: number }[] = [];
+
+      for (const pfx of prefixesToCrawl) {
+        try {
+          const r = await crawlByPrefix(cookieStr, pfx, { tldFilter, rows });
+          totalInserted += r.inserted;
+          totalUpdated  += r.updated;
+          results.push({ prefix: pfx, inserted: r.inserted, updated: r.updated, count: r.leads.length });
+        } catch (err: any) {
+          console.error(`[expired-domains-crawl] prefix "${pfx}" error:`, err.message);
+          results.push({ prefix: pfx, inserted: 0, updated: 0, count: -1 });
+        }
+      }
+
+      return res.json({ ok: true, mode: "prefix", inserted: totalInserted, updated: totalUpdated, results });
+    }
+
+    // ── Length mode (default) ────────────────────────────────────────────────
+    const maxLen = parseInt(settings.expireddomains_max_length || "4") || 4;
+    const minLen = parseInt(settings.expireddomains_min_length || "1") || 1;
 
     try {
-      const result = await crawl(username, password, { maxLen, minLen, tldFilter, rows });
-      return res.json({ ok: true, ...result });
+      const result = await crawlByLength(cookieStr, { minLen, maxLen, tldFilter, rows });
+      return res.json({ ok: true, mode: "length", ...result });
     } catch (err: any) {
       console.error("[expired-domains-crawl]", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
 
-  // ── PATCH: update a lead ──────────────────────────────────────────────────
+  // ── PATCH: update a lead ───────────────────────────────────────────────────
   if (req.method === "PATCH") {
     const { id, seen, starred, notes } = req.body ?? {};
     if (!id) return res.status(400).json({ error: "id 必填" });
@@ -323,11 +419,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ ok: true });
   }
 
-  // ── DELETE: remove lead(s) ────────────────────────────────────────────────
+  // ── DELETE ─────────────────────────────────────────────────────────────────
   if (req.method === "DELETE") {
     if (action === "clear") {
       await run("DELETE FROM expired_domain_leads");
       return res.json({ ok: true });
+    }
+    if (action === "clear_prefix") {
+      const pfx = String(req.query.prefix ?? "").trim().toLowerCase();
+      if (!pfx) return res.status(400).json({ error: "prefix 必填" });
+      const n = await run("DELETE FROM expired_domain_leads WHERE sld LIKE $1", [`${pfx}%`]);
+      return res.json({ ok: true, deleted: n });
     }
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: "id 必填" });
