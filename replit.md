@@ -2,6 +2,39 @@
 
 ---
 
+## Session — 2026-04-11 (四): 7 项 Domain Lookup Core 优化 (T001–T007)
+
+所有 7 项优化均已完成，全程 0 TypeScript 错误。
+
+### T001 — IDN 缓存键规范化
+- `lookup.ts`：`lookupWhoisWithCache()` 在写入/读取 L1/L2 缓存前，将域名 Punycode 化（`domain.toLowerCase()` + `toASCII()`），确保 `例子.中国` 和 `xn--fsqu00a.xn--fiqs8s` 命中同一缓存条目。
+
+### T002 — IP/ASN RDAP 并行支持
+- `lookup.ts`：IP/ASN 分支同时发起 `lookupRdap()` 和 `lookupIpOrAsn()` 并行请求；RDAP 结果优先，WHOIS 原始文本作为补充。
+
+### T003 — Stale-While-Revalidate (SWR)
+- `lookup.ts`：新增 `SWR_THRESHOLD = 0.10`（缓存剩余生命不足 10% 时触发后台刷新）。`triggerBackgroundRefresh()` 使用 `_inflight` Map 防止重复刷新，完成后同时写入 L1 和 L2（Redis）。
+
+### T004 — DNS 探针无条件并行
+- `lookup.ts`：移除旧的 `_earlyDnsProbe`（仅在 WHOIS 失败时触发），改为 `unconditionalDnsProbe`，每次查询立即启动；成功路径通过 `getProbeForSuccess()` 与 500ms 定时器竞速获取结果。
+
+### T005 — 批量查询 API
+- 新增 `src/pages/api/lookup-batch.ts`：POST 端点，支持最多 20 个域名，并行调用 `lookupWhoisWithCache()`，使用与单查询 API 相同的分级速率限制。
+
+### T006 — WHOIS 速率限制持久化（Redis）
+- `src/lib/server/redis.ts`：新增 `setWhoisRateLimit(tld, ttl=60)` / `checkWhoisRateLimit(tld)`，key 格式 `whois_rl:{tld}`，TTL 60 秒。
+- `lookup.ts`：WHOIS promise 创建前检查限速；命中限速时跳过 WHOIS，`tldWhoisRateLimited = true`。
+
+### T007 — common_parser.ts 模块化
+- 将 1521 行的单体文件拆分为 5 个模块：
+  - `parsers/utils.ts` (148 行) — 字段清洗、HTML 实体解码、域名检测
+  - `parsers/date.ts` (153 行) — 日期格式解析、域名年龄计算、`applyParams()`
+  - `parsers/preprocessors.ts` (133 行) — .sm / .gg / .je 原始文本预处理
+  - `parsers/status-injection.ts` (345 行) — 从自由格式 WHOIS 文本注入合成状态
+  - `common_parser.ts` (728 行) — 精简的主调度层（减少 52%）
+
+---
+
 ## Session — 2026-04-11 (三): 全面功能审查与批量修复
 
 ### 发现与修复总览

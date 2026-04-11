@@ -1,0 +1,62 @@
+我发现的优化空间（按影响力排序）
+1. 🔴 IDN/Unicode 缓存 key 不统一（正确性问题）
+现状：缓存 key 是 whois:${domain}，查询 中文域名.com 和 xn--domain.com（同一个域名的 punycode 形式）会生成两个不同的 key，各自发起一次查询，缓存互相不命中。
+
+影响：IDN 域名查询效率差，还可能返回不一致的结果。
+
+修复方案：统一以 ASCII（punycode）形式作为 cache key，查询前先 toAsciiDomain()：
+
+const key = `whois:${toAsciiDomain(domain)}`;  // 目前 key 用的是原始 domain
+2. 🔴 IP/ASN 查询没有 RDAP（数据质量问题）
+现状：IP 地址和 AS 号查询走的是传统 WHOIS 文本协议（lookupIpOrAsn），需要 regex 解析非结构化文本。
+
+现实情况：ARIN、RIPE、APNIC、LACNIC、AFRINIC 五大 RIR 全部支持 RDAP，且 RDAP 返回标准 JSON，解析精度远高于 WHOIS 文本。
+
+修复方案：IP/ASN 也走 RDAP → WHOIS 并行路径，RDAP 优先。ARIN 的 RDAP 尤其数据丰富（包含组织、滥用联系、路由前缀等）。
+
+3. 🟡 没有 Stale-While-Revalidate（缓存过期时用户等待）
+现状：热门域名（google.com）的 TTL 是 12 小时，缓存过期后，下一个请求必须等待真实查询（4-12s）。
+
+优化方案：当 remainingTtl < cacheTtl * 10% 时（即"快到期"），立刻返回旧缓存，同时后台触发异步刷新。这样用户永远不等待，热门域名无感刷新。
+
+// 伪代码思路
+if (cachedResult && remainingTtl < cacheTtl * 0.1) {
+  doLookup().then(fresh => store(fresh)).catch(() => {});  // 异步刷新
+  return { ...cachedResult, stale: true };  // 立刻返回
+}
+4. 🟡 DNS 探测只在失败时启动（成功查询丢失 DNS 数据）
+现状：DNS probe（NS/A/MX/AAAA 记录）只在 RDAP+WHOIS 都失败时才运行，作为"注册状态判断的最后手段"。
+
+问题：成功的查询结果页面也显示 DNS 信息（当前由前端客户端再单独查），但如果查询过程中就顺便探测 DNS，就能在同一请求内返回，节省一个客户端 RTT。
+
+优化方案：对域名查询，无条件在后台并行启动 DNS probe，不影响主流程速度：
+
+const unconditionalDnsProbe = isDomainQuery ? probeDomain(domain) : null;
+合并进最终结果一起返回，前端就不用单独再请求了。
+
+5. 🟡 批量查询 API 缺失
+现状：每次只能查一个域名，没有批量端点。
+
+用户诉求：域名投资者、开发者经常需要一次检查 example.com / .net / .org / .io 等一批变体。
+
+优化方案：增加 /api/lookup-batch 接口，接受 domains[]（上限 10-20），内部并行调用 lookupWhoisWithCache，单次请求返回多个结果。
+
+6. 🟢 WHOIS 服务器限流未持久化追踪
+现状：检测到被 rate-limited 时（isWhoisRateLimited()），记录一次 failure 并返回错误，但不记忆"这台服务器现在在限流我"，下一个请求还是会继续打它。
+
+优化方案：在 Redis 记录每台 WHOIS server 的限流状态（key = whois_rl:${server}，TTL = 60s），限流窗口内的同 TLD 请求直接走 DNS probe 或第三方 API，避免反复被拒。
+
+7. 🟢 common_parser.ts 1520 行（维护性问题）
+现状：所有 TLD 的 WHOIS 文本解析逻辑都在一个文件里，非常难以单独为某个 TLD 改进解析规则。
+
+优化方向：按 TLD 家族或注册局拆分为模块（如 parser-verisign.ts、parser-cnnic.ts），主文件变成 dispatcher。这不是紧急问题，但长期来看可维护性会好很多。
+
+总结
+优先级	问题	影响
+🔴 高	IDN cache key 不一致	正确性 bug，影响中文/日文域名
+🔴 高	IP/ASN 缺 RDAP	IP 查询数据质量明显提升
+🟡 中	无 Stale-While-Revalidate	热门域名缓存到期时用户体验
+🟡 中	DNS probe 只在失败时启动	减少客户端额外请求
+🟡 中	缺批量查询 API	功能完整性
+🟢 低	WHOIS 限流未持久化	偶发被限频时的稳健性
+🟢 低	common_parser.ts 过大	长期

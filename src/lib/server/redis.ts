@@ -435,3 +435,32 @@ export async function setWhoisDbCache(key: string, value: string, ttlSeconds: nu
     );
   } catch { /* ignore */ }
 }
+
+// ── WHOIS rate-limit tracker ──────────────────────────────────────────────────
+// When a WHOIS server rate-limits a TLD, we record it in Redis so subsequent
+// queries for the same TLD skip the WHOIS call for the cooldown window, avoiding
+// repeated "too many requests" errors and saving timeout latency.
+// Key:  whois_rl:{tld}   Value: "1"   TTL: configurable (default 60 s)
+
+const WHOIS_RL_PREFIX = "whois_rl:";
+
+/**
+ * Record that a WHOIS server is currently rate-limiting queries for the given TLD.
+ * Subsequent calls to checkWhoisRateLimit() will return true until the TTL expires.
+ */
+export async function setWhoisRateLimit(tld: string, ttlSeconds = 60): Promise<void> {
+  if (!isRedisAvailable()) return;
+  const key = `${WHOIS_RL_PREFIX}${tld.toLowerCase()}`;
+  await setRedisValue(key, "1", ttlSeconds).catch(() => {});
+}
+
+/**
+ * Returns true when the given TLD's WHOIS server is known to be rate-limiting.
+ * Callers should skip the WHOIS query and go directly to RDAP / DNS probe.
+ */
+export async function checkWhoisRateLimit(tld: string): Promise<boolean> {
+  if (!isRedisAvailable()) return false;
+  const key = `${WHOIS_RL_PREFIX}${tld.toLowerCase()}`;
+  const val = await getRedisValue(key).catch(() => null);
+  return val === "1";
+}

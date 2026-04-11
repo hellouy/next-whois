@@ -6,6 +6,8 @@ import {
   isRedisAvailable,
   getWhoisDbCache,
   setWhoisDbCache,
+  setWhoisRateLimit,
+  checkWhoisRateLimit,
 } from "@/lib/server/redis";
 import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
@@ -105,6 +107,43 @@ function l1Set(key: string, value: WhoisResult) {
     if (oldest) _memCache.delete(oldest);
   }
   _memCache.set(key, { value, expiresAt: Date.now() + L1_TTL_MS });
+}
+
+// ── Stale-While-Revalidate ────────────────────────────────────────────────────
+// When a cached result has less than SWR_THRESHOLD of its TTL remaining, the
+// current request is served the stale (but valid) result immediately, while a
+// background refresh is triggered to repopulate the cache.  Hot domains never
+// stall users at cache-miss time — they always get a fast cached response.
+const SWR_THRESHOLD = 0.10; // Refresh when <10% of TTL remains
+
+/**
+ * Kick off a background cache refresh for a domain.
+ * Uses the in-flight map to avoid spawning duplicate refreshes when multiple
+ * requests see a stale entry within the same SWR window.
+ */
+function triggerBackgroundRefresh(domain: string): void {
+  const key = `whois:${toAsciiDomain(domain) || domain}`;
+  if (_inflight.has(key)) return;
+  const refreshPromise = lookupWhois(domain).then(async (result) => {
+    if (result.status) {
+      const ttl = computeSmartTtl(result);
+      const now = Date.now();
+      const toStore: WhoisResult = { ...result, cachedAt: now, cacheTtl: ttl };
+      l1Set(key, toStore);
+      if (ttl > 0) {
+        if (isRedisAvailable()) {
+          setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+        } else {
+          setWhoisDbCache(key, JSON.stringify(toStore), ttl).catch(() => {});
+        }
+      }
+    }
+    return result;
+  });
+  _inflight.set(key, refreshPromise);
+  refreshPromise.catch(() => {}).finally(() => {
+    if (_inflight.get(key) === refreshPromise) _inflight.delete(key);
+  });
 }
 
 /**
@@ -207,7 +246,10 @@ export async function lookupWhoisWithCache(
     };
   }
 
-  const key = `whois:${domain}`;
+  // T001: Normalize IDN domains to ACE/punycode before computing the cache key.
+  // This ensures e.g. "münchen.de" and "xn--mnchen-3ya.de" share the same
+  // cache entry, preventing duplicate lookups for identical domains.
+  const key = `whois:${toAsciiDomain(domain) || domain}`;
 
   if (!options.nocache) {
     // L1 — in-process memory (fastest, no network)
@@ -216,6 +258,11 @@ export async function lookupWhoisWithCache(
       // Compute remaining TTL locally — avoids an extra Redis round-trip on every
       // L1 cache hit. The result is accurate to within the L1 TTL window.
       const remainingTtl = l1ComputeRemainingTtl(l1Hit);
+      // T003 SWR: if this entry is within the stale window, refresh in the background
+      // so the *next* request gets a fresh result without blocking this one.
+      if (remainingTtl !== null && l1Hit.cacheTtl && remainingTtl < l1Hit.cacheTtl * SWR_THRESHOLD) {
+        triggerBackgroundRefresh(domain);
+      }
       return { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
     }
     // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
@@ -223,6 +270,10 @@ export async function lookupWhoisWithCache(
       const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
       if (l2) {
         l1Set(key, l2.value);
+        // T003 SWR: check stale condition from remaining Redis TTL
+        if (l2.remainingTtl !== null && l2.value.cacheTtl && l2.remainingTtl < l2.value.cacheTtl * SWR_THRESHOLD) {
+          triggerBackgroundRefresh(domain);
+        }
         return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
       }
     }
@@ -400,13 +451,18 @@ export async function lookupWhoisCacheStreaming(
     return r;
   }
 
-  const key = `whois:${domain}`;
+  // T001: Normalize IDN domains to ACE/punycode for stable cache key (see lookupWhoisWithCache).
+  const key = `whois:${toAsciiDomain(domain) || domain}`;
 
   if (!options.nocache) {
     // L1 — in-process memory (fastest, no network)
     const l1Hit = l1Get(key);
     if (l1Hit) {
       const remainingTtl = l1ComputeRemainingTtl(l1Hit);
+      // T003 SWR: trigger background refresh for stale entries without blocking.
+      if (remainingTtl !== null && l1Hit.cacheTtl && remainingTtl < l1Hit.cacheTtl * SWR_THRESHOLD) {
+        triggerBackgroundRefresh(domain);
+      }
       const r = { ...l1Hit, time: 0, cached: true, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
       // Cache hits are already complete — do NOT call onPartialResult here.
       // Emitting a partial chunk for a cache hit would cause the streaming
@@ -419,6 +475,10 @@ export async function lookupWhoisCacheStreaming(
       const l2 = await getJsonRedisValueWithTtl<WhoisResult>(key);
       if (l2) {
         l1Set(key, l2.value);
+        // T003 SWR: same stale check using remaining Redis TTL.
+        if (l2.remainingTtl !== null && l2.value.cacheTtl && l2.remainingTtl < l2.value.cacheTtl * SWR_THRESHOLD) {
+          triggerBackgroundRefresh(domain);
+        }
         const r = { ...l2.value, time: 0, cached: true, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
         // Same reasoning as L1: cache hits skip partial notification.
         return r;
@@ -519,27 +579,51 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const elapsed = () => (performance.now() - startTime) / 1000;
   const isDomainQuery = !isIPAddress(domain) && !isASNumber(domain);
 
-  // Holds a pre-started DNS probe promise (started when RDAP fails, so DNS runs
-  // in parallel with WHOIS rather than serially after it — saves up to 5 s on
-  // the failure path).
-  let _earlyDnsProbe: Promise<import("@/lib/whois/dns-check").DnsProbeResult | undefined> | null = null;
+  // T004: Start DNS probe unconditionally in parallel for domain queries.
+  // By the time RDAP/WHOIS completes (1-12 s), DNS should already be done
+  // (<500 ms), allowing us to include it in the success response for free —
+  // saving the client a separate DNS round-trip.
+  const unconditionalDnsProbe: Promise<import("@/lib/whois/dns-check").DnsProbeResult | undefined> | null =
+    isDomainQuery ? probeDomain(domain).catch(() => undefined) : null;
 
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
-    // Reuse the early DNS probe if it was started during the RDAP failure;
-    // otherwise start one now (fallback for paths that skipped the early start).
     const dnsProbe = isDomainQuery
-      ? await (_earlyDnsProbe ?? probeDomain(domain)).catch(() => undefined)
+      ? await (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined)
       : undefined;
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
 
-  // ── IP / ASN shortcut ─────────────────────────────────────────────────────
+  // ── IP / ASN path ─────────────────────────────────────────────────────────
+  // T002: Run RDAP and WHOIS in parallel. RDAP gives well-structured JSON;
+  // WHOIS gives raw text for the "Raw WHOIS" tab and fills gaps RDAP omits.
   if (!isDomainQuery) {
-    let whoisData: WhoisRawResult | null = null;
-    let whoisError: unknown = null;
-    try {
-      whoisData = await withTimeout(lookupIpOrAsn(domain), WHOIS_TIMEOUT);
-    } catch (e) { whoisError = e; }
+    const [rdapSettled, whoisSettled] = await Promise.allSettled([
+      withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS),
+      withTimeout(lookupIpOrAsn(domain), WHOIS_TIMEOUT),
+    ]);
+
+    const rdapData: RdapResponse | null =
+      rdapSettled.status === "fulfilled" &&
+      rdapSettled.value !== null &&
+      !("errorCode" in (rdapSettled.value as object))
+        ? (rdapSettled.value as RdapResponse)
+        : null;
+    const whoisData: WhoisRawResult | null =
+      whoisSettled.status === "fulfilled" ? whoisSettled.value : null;
+    const whoisErr =
+      whoisSettled.status === "rejected" ? whoisSettled.reason : null;
+
+    if (rdapData) {
+      try {
+        const result = await convertRdapToWhoisResult(rdapData, domain);
+        // Supplement with raw WHOIS text when available (fills in registrar details
+        // that RDAP/ARIN omit, and populates the "Raw WHOIS" tab).
+        if (whoisData?.raw) result.rawWhoisContent = whoisData.raw;
+        result.rawRdapContent = JSON.stringify(rdapData, null, 2);
+        return { time: elapsed(), status: true, cached: false, source: "rdap", result };
+      } catch { /* fall through to WHOIS-only */ }
+    }
+
     if (whoisData?.raw) {
       try {
         const result = await analyzeWhois(whoisData.raw);
@@ -548,7 +632,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         return failWithDns(e instanceof Error ? e.message : "Failed to parse response");
       }
     }
-    return failWithDns(whoisError instanceof Error ? whoisError.message : "Unknown error occurred");
+    return failWithDns(whoisErr instanceof Error ? whoisErr.message : "Unknown error occurred");
   }
 
   // ── Domain lookup ─────────────────────────────────────────────────────────
@@ -600,16 +684,23 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // respond while showing the final merged result ~300 ms sooner.
   const RDAP_WIN_WHOIS_GRACE_MS = 900;
 
+  // T006: Skip WHOIS entirely when this TLD's server is known to be rate-limiting.
+  // The flag is set on first detection and expires (via Redis TTL) after 60 s,
+  // automatically re-enabling WHOIS once the cooldown window clears.
+  const tldWhoisRateLimited = await checkWhoisRateLimit(tldSuffix).catch(() => false);
+
   // Start RDAP + WHOIS in parallel.
   // IMPORTANT: The outer withTimeout must use RDAP_OUTER_TIMEOUT_MS (12 s), NOT
   // RDAP_TIMEOUT (4 s), so per-TLD inner timeouts in rdap_client.ts (e.g. .rw=6s,
   // .ar=10s) fire BEFORE the outer wrapper cancels the promise.  RDAP_TIMEOUT is
   // kept for documentation; RDAP_OUTER_TIMEOUT_MS is the actual runtime value.
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
-  const whoisPromise = withTimeout(
-    tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
-    effectiveWhoisTimeout,
-  );
+  const whoisPromise = tldWhoisRateLimited
+    ? (Promise.resolve(null) as Promise<WhoisRawResult | null>)
+    : withTimeout(
+        tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
+        effectiveWhoisTimeout,
+      );
 
   // When RDAP finishes first with good data, only wait an additional grace period
   // for WHOIS to add raw text — then proceed rather than blocking until WHOIS_TIMEOUT.
@@ -660,22 +751,14 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       rdapSettled  = { status: "fulfilled", value: rdapVal };
       whoisSettled = whoisGraceResult;
     } else {
-      // RDAP failed/empty — start DNS probe NOW so it runs in parallel with WHOIS
-      // instead of serially after WHOIS times out (saves up to 5 s on failure path).
-      if (isDomainQuery) {
-        _earlyDnsProbe = probeDomain(domain).catch(() => undefined);
-      }
+      // RDAP failed/empty — unconditionalDnsProbe is already running in parallel.
       const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
       rdapSettled  = { status: "fulfilled", value: rdapVal };
       whoisSettled = w;
       void r; // already settled, just for symmetry
     }
   } else {
-    // WHOIS finished first — start DNS probe in parallel with the remaining RDAP wait
-    // so we have DNS data ready if RDAP also fails.
-    if (isDomainQuery) {
-      _earlyDnsProbe = probeDomain(domain).catch(() => undefined);
-    }
+    // WHOIS finished first — unconditionalDnsProbe is already running in parallel.
     const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
     rdapSettled  = r;
     whoisSettled = w;
@@ -705,7 +788,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const whoisHasData = !!(whoisData?.raw?.trim());
   if (rdapErrorCode === 404 && !whoisHasData) {
     const dnsProbe = isDomainQuery
-      ? await (_earlyDnsProbe ?? probeDomain(domain)).catch(() => undefined)
+      ? await (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined)
       : undefined;
     return {
       time: elapsed(), status: false, cached: false,
@@ -721,6 +804,13 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // then fall back to WHOIS-only; if neither succeeded, return error.
   const rdapRaw = rdapData ? JSON.stringify(rdapData, null, 2) : undefined;
   const whoisRawStr = whoisData?.raw || null;
+
+  // T004: Collect DNS probe result non-blockingly — it should already be resolved
+  // since DNS (<500 ms) is almost always faster than RDAP/WHOIS (1-12 s).
+  // We cap the wait at 500 ms to prevent a slow DNS server from delaying results.
+  const getProbeForSuccess = () => isDomainQuery && unconditionalDnsProbe
+    ? Promise.race([unconditionalDnsProbe, new Promise<undefined>(r => setTimeout(r, 500))])
+    : Promise.resolve(undefined);
 
   if (rdapData) {
     try {
@@ -741,7 +831,8 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       }
       if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       result.rawRdapContent = rdapRaw!;
-      return { time: elapsed(), status: true, cached: false, source: "rdap", result };
+      const dnsProbe = await getProbeForSuccess();
+      return { time: elapsed(), status: true, cached: false, source: "rdap", result, dnsProbe };
     } catch {}
   }
 
@@ -752,6 +843,8 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     }
     if (isWhoisRateLimited(whoisRawStr)) {
       recordFailure("rate_limited");
+      // T006: Persist rate-limit flag so subsequent queries skip WHOIS during cooldown.
+      setWhoisRateLimit(tldSuffix).catch(() => {});
       return failWithDns("WHOIS server temporarily rate-limited this query — please try again in a moment");
     }
     try {
@@ -771,7 +864,8 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
         if (rdapRaw) result.rawRdapContent = rdapRaw;
         clearTldFailureStats(tldSuffix).catch(() => {});
-        return { time: elapsed(), status: true, cached: false, source: "whois", result };
+        const dnsProbe = await getProbeForSuccess();
+        return { time: elapsed(), status: true, cached: false, source: "whois", result, dnsProbe };
       }
       const detectedError = detectWhoisError(whoisRawStr);
       if (detectedError || isEmptyResult(result)) {
@@ -790,7 +884,8 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       if (rdapRaw) result.rawRdapContent = rdapRaw;
       clearTldFailureStats(tldSuffix).catch(() => {});
-      return { time: elapsed(), status: true, cached: false, source: "whois", result };
+      const dnsProbe = await getProbeForSuccess();
+      return { time: elapsed(), status: true, cached: false, source: "whois", result, dnsProbe };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to parse WHOIS response";
       recordFailure("parse_error", msg);
