@@ -24,7 +24,7 @@ type BatchItem = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;

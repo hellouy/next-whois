@@ -31,6 +31,14 @@ import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { recordTldLookupFailure, getTldApiSource, clearTldFailureStats } from "@/lib/db";
 import { lookupViaThirdPartyApi, ThirdPartyApiSource } from "./third-party-api";
 
+// ── Built-in HTTP-scraper fallbacks ─────────────────────────────────────────
+// TLDs listed here have a known HTTP scraper and will automatically use it
+// even without admin configuration in the database.  This covers ccTLDs whose
+// native TCP WHOIS/RDAP always times out from cloud IPs.
+const BUILTIN_SCRAPERS: Record<string, ThirdPartyApiSource> = {
+  ph: "ph_web", // whois.dot.ph — TCP:43 times out; RDAP not available
+};
+
 warmupDnsCache([
   // gTLD / IANA / RIR
   "whois.verisign-grs.com", "whois.pir.org", "whois.iana.org",
@@ -298,11 +306,12 @@ export async function lookupWhoisWithCache(
   // ── Per-TLD third-party API override ────────────────────────────────────────
   // If the admin has configured a third-party API source for this TLD, use it
   // for ALL queries (skips local WHOIS/RDAP entirely).
+  // BUILTIN_SCRAPERS provides automatic fallbacks for TLDs with known HTTP scrapers.
   if (!isIPAddress(domain) && !isASNumber(domain)) {
     const parts = domain.toLowerCase().split(".");
     const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
     if (tld) {
-      const apiSrc = await getTldApiSource(tld).catch(() => null);
+      const apiSrc = (await getTldApiSource(tld).catch(() => null)) ?? BUILTIN_SCRAPERS[tld] ?? null;
       if (apiSrc) {
         const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
         if (r.status) {
@@ -508,7 +517,7 @@ export async function lookupWhoisCacheStreaming(
     const parts = domain.toLowerCase().split(".");
     const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
     if (tld) {
-      const apiSrc = await getTldApiSource(tld).catch(() => null);
+      const apiSrc = (await getTldApiSource(tld).catch(() => null)) ?? BUILTIN_SCRAPERS[tld] ?? null;
       if (apiSrc) {
         const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
         if (r.status) {

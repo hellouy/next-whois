@@ -508,7 +508,7 @@ async function executeServerEntry(
     if (scraperName === "nic-ph") {
       const nicPhResult = await lookupNicPh(domainToQuery);
       if (nicPhResult.success) {
-        return { raw: nicPhResult.raw, structured: {}, server: "whois.ph", registryUrl };
+        return { raw: nicPhResult.rawWhoisContent, structured: {}, server: "whois.dot.ph", registryUrl };
       }
       const nicPhFail = nicPhResult as { success: false; blocked: boolean; reason: string };
       throw new ScraperRequiredError(

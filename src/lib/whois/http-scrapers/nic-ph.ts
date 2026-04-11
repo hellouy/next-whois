@@ -1,29 +1,36 @@
 /**
  * HTTP WHOIS scraper for .ph ccTLD (Philippines)
- * Registry: Dot PH / Domain Administration Inc.
- * Website: https://www.nic.ph
+ * Registry: Dot PH (dotPH) — https://whois.dot.ph/
  *
  * Technical situation:
- * - TCP WHOIS (port 43) to whois.dot.ph may time out from non-PH cloud IPs
- * - RDAP: no public RDAP endpoint in IANA bootstrap
- * - HTTP WHOIS interface available at https://www.whois.ph/
- *   → returns HTML page with domain registration information
+ * - TCP WHOIS (port 43) to whois.dot.ph times out from non-PH cloud IPs
+ * - RDAP: no public RDAP endpoint in the IANA bootstrap
+ * - HTTP WHOIS available at https://whois.dot.ph/whois?search=<domain>
+ *   → server-rendered HTML; domain data is in a <pre> block inside #result-whois
+ *   → dates are injected by JavaScript: var createDate = moment('ISO_DATE')
+ *     so they must be extracted from the <script> source, not from the DOM text
+ *
+ * "Domain is available." in #alert-message  → domain not registered
  */
 
-const NIC_PH_WHOIS = "https://www.whois.ph/";
+import { load } from "cheerio";
+
+const DOTPH_WHOIS = "https://whois.dot.ph/whois";
 const TIMEOUT_MS = 9_000;
 
 export type NicPhResult =
   | {
       success: true;
-      status: string;
+      domain: string;
+      status: string[];
       registrant: string;
+      registrantOrg: string;
       registrar: string;
       createdDate: string;
       updatedDate: string;
       expiresDate: string;
       nameservers: string[];
-      raw: string;
+      rawWhoisContent: string;
     }
   | { success: false; blocked: boolean; reason: string };
 
@@ -36,131 +43,175 @@ function makeSignal(): AbortSignal {
   return ac.signal;
 }
 
-function extractText(html: string, pattern: RegExp): string {
-  const m = html.match(pattern);
-  return m ? m[1].trim() : "";
+/** Extract ISO date string from: var <varName> = moment('ISO_DATE').format(...) */
+function extractMomentDate(scripts: string, varName: string): string {
+  const re = new RegExp(`var\\s+${varName}\\s*=\\s*moment\\('([^']+)'\\)`);
+  const m = re.exec(scripts);
+  return m ? m[1] : "";
 }
 
-function extractAll(html: string, pattern: RegExp): string[] {
-  const results: string[] = [];
-  let m: RegExpExecArray | null;
-  const re = new RegExp(pattern.source, pattern.flags + (pattern.flags.includes("g") ? "" : "g"));
-  while ((m = re.exec(html)) !== null) {
-    if (m[1]) results.push(m[1].trim());
+/** Parse the first value for a key like "Registrar: Value" */
+function parseLine(lines: string[], key: string): string {
+  const prefix = key.toLowerCase() + ":";
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.toLowerCase().startsWith(prefix)) {
+      return t.slice(prefix.length).trim();
+    }
   }
-  return results;
+  return "";
+}
+
+/** Parse all values for a repeating key like "Name Server: ns1.example.com" */
+function parseAllLines(lines: string[], key: string): string[] {
+  const prefix = key.toLowerCase() + ":";
+  return lines
+    .map(l => l.trim())
+    .filter(l => l.toLowerCase().startsWith(prefix))
+    .map(l => l.slice(prefix.length).trim())
+    .filter(Boolean);
 }
 
 export async function lookupNicPh(domain: string): Promise<NicPhResult> {
-  const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//i, "").split("/")[0];
+  const cleanDomain = domain.toLowerCase()
+    .replace(/^https?:\/\//i, "")
+    .split("/")[0]
+    .trim();
 
   let html: string;
   try {
-    const url = `${NIC_PH_WHOIS}?d=${encodeURIComponent(cleanDomain)}`;
+    const url = `${DOTPH_WHOIS}?search=${encodeURIComponent(cleanDomain)}`;
     const res = await fetch(url, {
       signal: makeSignal(),
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; WhoisBot/1.0; +https://github.com/IANA-WHOIS/bot)",
-        Accept: "text/html,application/xhtml+xml",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        Referer: "https://whois.dot.ph/",
       },
       redirect: "follow",
     });
     if (!res.ok) {
-      return { success: false, blocked: res.status === 403, reason: `HTTP ${res.status}` };
+      return {
+        success: false,
+        blocked: res.status === 403 || res.status === 429,
+        reason: `HTTP ${res.status}`,
+      };
     }
     html = await res.text();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    const isTimeout = /timeout|aborted/i.test(msg);
-    return { success: false, blocked: isTimeout, reason: msg };
+    return {
+      success: false,
+      blocked: /timeout|aborted|timed out/i.test(msg),
+      reason: msg,
+    };
   }
 
-  const lower = html.toLowerCase();
+  const $ = load(html);
 
-  // Check if domain is not found / available
+  // Cloudflare / rate-limit check
   if (
-    lower.includes("not found") ||
-    lower.includes("no match") ||
-    lower.includes("domain name not registered") ||
-    lower.includes("no information available") ||
-    lower.includes("available for registration")
+    html.toLowerCase().includes("captcha") ||
+    html.toLowerCase().includes("too many requests") ||
+    html.toLowerCase().includes("access denied")
+  ) {
+    return { success: false, blocked: true, reason: "Rate limited or CAPTCHA required" };
+  }
+
+  // "Domain is available." in #alert-message → not registered
+  const alertText = $("#alert-message").text().trim().toLowerCase();
+  if (
+    alertText.includes("available") ||
+    alertText.includes("not found") ||
+    alertText.includes("does not exist")
   ) {
     return { success: false, blocked: false, reason: "Domain not found or not registered" };
   }
 
-  // Check for CAPTCHA / rate-limiting
-  if (lower.includes("captcha") || lower.includes("too many requests") || lower.includes("rate limit")) {
-    return { success: false, blocked: true, reason: "Rate limited or CAPTCHA required" };
+  // Grab the <pre> inside #result-whois
+  const preHtml = $("#result-whois pre").html() || "";
+  if (!preHtml) {
+    return {
+      success: false,
+      blocked: false,
+      reason: alertText.length > 0 ? alertText : "Unexpected response from whois.dot.ph",
+    };
   }
 
-  // Try to extract WHOIS data from the HTML
-
-  // Status — look for common patterns like "Status: Active" or "Domain Status:"
-  const status =
-    extractText(html, /Status[:\s]+<[^>]*>([^<]+)<\/[^>]+>/i) ||
-    extractText(html, /Status[:\s]+([A-Za-z][A-Za-z0-9 _-]*?)(?:<|\n|\r)/i) ||
-    extractText(html, /Domain\s+Status[:\s]+([A-Za-z][A-Za-z0-9 _-]*?)(?:<|\n|\r)/i) ||
-    "";
-
-  const registrant =
-    extractText(html, /Registrant[:\s]+<[^>]*>([^<]+)<\/[^>]+>/i) ||
-    extractText(html, /Registrant\s+Name[:\s]+([^\n<\r]+)/i) ||
-    "";
-
-  const registrar =
-    extractText(html, /Registrar[:\s]+<[^>]*>([^<]+)<\/[^>]+>/i) ||
-    extractText(html, /Registrar[:\s]+([^\n<\r]+)/i) ||
-    "";
-
-  const createdDate =
-    extractText(html, /Created?\s+Date[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n<\r]*)/i) ||
-    extractText(html, /Registration\s+Date[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n<\r]*)/i) ||
-    "";
-
-  const updatedDate =
-    extractText(html, /Updated?\s+Date[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n<\r]*)/i) ||
-    "";
-
-  const expiresDate =
-    extractText(html, /Expir(?:y|ation)\s+Date[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n<\r]*)/i) ||
-    extractText(html, /Expires?[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n<\r]*)/i) ||
-    "";
-
-  // Nameservers
-  const nameservers =
-    extractAll(html, /Name\s*Server[:\s]+([a-z0-9][\w.-]+\.[a-z]{2,})/i).filter(Boolean) ||
-    [];
-
-  // If we got at least some data, consider it a success
-  if (!registrant && !registrar && !status && nameservers.length === 0) {
-    return { success: false, blocked: false, reason: "Could not parse WHOIS response from NIC.PH" };
-  }
-
-  // Extract a text representation of the relevant section
-  const raw = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
+  // Convert <br> to newlines, strip remaining tags, decode HTML entities
+  const preText = preHtml
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/\s{3,}/g, "\n")
-    .trim()
-    .slice(0, 4000);
+    .replace(/&#x2F;/g, "/")
+    .replace(/&nbsp;/g, " ");
+
+  const lines = preText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+  // Dates are NOT in the visible HTML — they are injected by client-side JS:
+  //   var createDate = moment('2016-08-16T07:43:22Z').format(...)
+  // Extract the ISO timestamp directly from the <script> source.
+  const allScripts = $("script")
+    .map((_, el) => $(el).html() || "")
+    .get()
+    .join("\n");
+  const createdDate = extractMomentDate(allScripts, "createDate");
+  const expiresDate = extractMomentDate(allScripts, "expiryDate");
+  const updatedDate = extractMomentDate(allScripts, "updateDate");
+
+  // Parse key fields from the <pre> lines
+  const statusRaw    = parseLine(lines, "Status");
+  const statuses: string[] = statusRaw
+    ? statusRaw.split(",").map(s => s.trim()).filter(Boolean)
+    : ["Active"];
+
+  const registrar       = parseLine(lines, "Registrar");
+  const registrantName  = parseLine(lines, "Registrant Name");
+  const registrantOrg   = parseLine(lines, "Registrant Organization");
+  const nameservers     = parseAllLines(lines, "Name Server");
+
+  // Build a clean raw text with real dates filled in
+  const rawLines: string[] = [];
+  for (const line of lines) {
+    const t = line.toLowerCase();
+    if (t.startsWith("creation date:") && createdDate) {
+      rawLines.push(`Creation Date: ${createdDate}`);
+    } else if (t.startsWith("expiration date:") && expiresDate) {
+      rawLines.push(`Expiration Date: ${expiresDate}`);
+    } else if (t.startsWith("updated date:") && updatedDate) {
+      rawLines.push(`Updated Date: ${updatedDate}`);
+    } else if (t.startsWith("whois info for")) {
+      // skip header line
+    } else {
+      rawLines.push(line);
+    }
+  }
+  const rawWhoisContent = rawLines.join("\n").trim();
+
+  if (!registrar && nameservers.length === 0 && !statusRaw) {
+    return {
+      success: false,
+      blocked: false,
+      reason: "Could not parse WHOIS data from whois.dot.ph",
+    };
+  }
 
   return {
     success: true,
-    status: status || "Active",
-    registrant,
+    domain: cleanDomain,
+    status: statuses,
+    registrant: registrantName || registrantOrg || "Unknown",
+    registrantOrg: registrantOrg || registrantName || "Unknown",
     registrar,
     createdDate,
     updatedDate,
     expiresDate,
     nameservers,
-    raw,
+    rawWhoisContent,
   };
 }

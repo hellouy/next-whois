@@ -249,45 +249,57 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
   };
 }
 
-// ── ph_web adapter (NIC.PH web scraper) ────────────────────────────────────────
+// ── ph_web adapter (NIC.PH web scraper — whois.dot.ph) ─────────────────────────
 
 async function lookupViaPhWeb(domain: string): Promise<WhoisResult> {
   const start = Date.now();
-  const result = await lookupNicPh(domain);
+  const r = await lookupNicPh(domain);
   const elapsed = (Date.now() - start) / 1000;
 
-  if (!result.success) {
+  if (!r.success) {
+    // "Domain not found or not registered" → forward as definitive not-found
+    if (!r.blocked && r.reason.toLowerCase().includes("not found")) {
+      return {
+        status: false,
+        time: elapsed,
+        error: "Domain not found",
+        source: "whois.ph",
+      };
+    }
     return {
       status: false,
       time: elapsed,
-      error: result.blocked
-        ? "whois.ph 需要人机验证，无法自动查询"
-        : `NIC.PH 查询失败: ${result.reason}`,
+      error: r.blocked
+        ? "whois.dot.ph 需要人机验证，无法自动查询"
+        : `NIC.PH 查询失败: ${r.reason}`,
       source: "whois.ph",
     };
   }
 
-  const expirationDate = result.expiresDate || "Unknown";
-  const creationDate   = result.createdDate  || "Unknown";
+  const expirationDate = r.expiresDate || "Unknown";
+  const creationDate   = r.createdDate || "Unknown";
 
   const domainResult: WhoisAnalyzeResult = {
     ...initialWhoisAnalyzeResult,
     domain,
-    registrar:     result.registrar  || "Unknown",
-    registrarURL:  "https://www.nic.ph/",
-    ianaId:        "N/A",
-    whoisServer:   "whois.ph",
-    updatedDate:   result.updatedDate   || "Unknown",
+    registrar:              r.registrar              || "Unknown",
+    registrarURL:           "https://whois.dot.ph/",
+    ianaId:                 "N/A",
+    whoisServer:            "whois.dot.ph",
+    updatedDate:            r.updatedDate            || "Unknown",
     creationDate,
     expirationDate,
-    nameServers:   result.nameservers,
-    status:        [{ status: typeof result.status === "string" && result.status ? result.status : "Active", url: "" }],
-    registrantName: result.registrant || "Unknown",
-    registrantEmail: "Unknown",
-    registrantOrganization: "Unknown",
-    registrantCountry: "PH",
-    dnssec: "Unknown",
-    rawWhoisContent: result.raw,
+    nameServers:            r.nameservers,
+    // status is now string[] — map each to the {status, url} shape
+    status:                 r.status.length > 0
+                              ? r.status.map(s => ({ status: s, url: "" }))
+                              : [{ status: "Active", url: "" }],
+    registrantName:         r.registrant             || "Unknown",
+    registrantOrganization: r.registrantOrg          || "Unknown",
+    registrantCountry:      "PH",
+    registrantEmail:        "Unknown",
+    dnssec:                 "Unknown",
+    rawWhoisContent:        r.rawWhoisContent,
     remainingDays: expirationDate !== "Unknown" ? (() => {
       try { return Math.round((new Date(expirationDate).getTime() - Date.now()) / 86_400_000); } catch { return null; }
     })() : null,
