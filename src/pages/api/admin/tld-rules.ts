@@ -1003,7 +1003,7 @@ export default async function handler(
     // ── Purge all failed/no_data non-manual records ──────────────────────────
     if (body.action === "purge_failed") {
       const result = await run(
-        `DELETE FROM tld_rules WHERE scrape_status IN ('failed','no_data') AND manually_edited = FALSE`
+        `DELETE FROM tld_rules WHERE scrape_status IN ('failed','no_data','warn_defaults') AND manually_edited = FALSE`
       );
       invalidateLifecycleOverridesCache();
       return res.json({ ok: true, deleted: (result as any).rowCount ?? 0 });

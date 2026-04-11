@@ -1219,13 +1219,13 @@ export default function AdminTldRulesPage() {
     return rule.scrape_status === "ok";
   }
 
-  // Purge all failed/no_data records
+  // Purge all failed/no_data/warn_defaults records
   const [purging, setPurging] = React.useState(false);
   async function purgeFailed() {
     const batchWasRunning = BatchRunner.getState().status === "running";
     const msg = batchWasRunning
-      ? "批量爬取正在运行！删除后爬取器会立即重新写入这些记录。\n\n确定要强制停止爬取并删除全部失败/无数据记录吗？（手动录入的记录不受影响）"
-      : "确定要删除全部失败/无数据记录吗？（手动录入的记录不受影响）";
+      ? "批量爬取正在运行！删除后爬取器会立即重新写入这些记录。\n\n确定要强制停止爬取，并重置全部「失败 / 无数据 / 仅默认值」记录吗？（手动录入的记录不受影响）"
+      : "确定要重置全部「失败 / 无数据 / 仅默认值」记录吗？（手动录入的记录不受影响）\n\n这些记录将从数据库删除，下次批量抓取时会重新爬取。";
     if (!confirm(msg)) return;
     if (batchWasRunning) {
       BatchRunner.stop();
@@ -1240,7 +1240,7 @@ export default function AdminTldRulesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "清除失败");
-      toast.success(`已删除 ${data.deleted ?? 0} 条失败/无数据记录`);
+      toast.success(`已重置 ${data.deleted ?? 0} 条问题记录（失败 / 无数据 / 仅默认值）`);
       // Push changes to GitHub
       try {
         await fetch("/api/admin/git-force-push", {
@@ -1537,19 +1537,27 @@ export default function AdminTldRulesPage() {
                       ? `— 正在爬取 (${batch.items.filter(i=>i.status==="ok").length+batch.items.filter(i=>i.status==="error").length+batch.items.filter(i=>i.status==="skipped").length}/${batch.items.length})`
                       : batch.status === "done" ? "— 已完成"
                       : batch.status === "stopped" ? "— 已停止"
-                      : "— 点击「开始批量抓取」启动"}
+                      : "— 向下滚动可启动批量抓取"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs font-mono font-bold text-muted-foreground">{inDb} / {iana} 个</span>
-                  {batch.status === "running" && (
+                  {batch.status === "running" ? (
                     <button
                       onClick={() => { BatchRunner.stop(); toast.info("已停止批量抓取"); }}
-                      className="flex items-center gap-1 h-6 px-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors"
+                      className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-red-500 hover:bg-red-600 active:bg-red-700 text-white text-xs font-semibold transition-colors shadow-sm"
                     >
-                      <RiStopCircleLine className="w-3 h-3" />停止
+                      <RiStopCircleLine className="w-3.5 h-3.5" />停止爬取
                     </button>
-                  )}
+                  ) : batch.status === "stopped" ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-medium">
+                      <RiStopCircleLine className="w-3 h-3" />已停止
+                    </span>
+                  ) : batch.status === "done" ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 font-medium">
+                      <RiCheckboxCircleLine className="w-3 h-3" />已完成
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -1609,11 +1617,11 @@ export default function AdminTldRulesPage() {
               <button
                 onClick={purgeFailed}
                 disabled={purging}
-                title="删除全部失败/无数据记录（手动录入不受影响），并推送 GitHub"
+                title="重置全部失败/无数据/仅默认值记录（手动录入不受影响），并推送 GitHub"
                 className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 text-[11px] font-semibold disabled:opacity-50 transition-colors"
               >
                 {purging ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
-                删除全部失败记录
+                重置问题记录
               </button>
             </div>
             <div className="divide-y divide-border">
