@@ -1688,6 +1688,7 @@
     "nav_settings": "設定",
     "nav_tld_failures": "TLD エラー",
     "nav_notify_service": "プッシュチャンネル",
+    "nav_expired_domains": "失効ドメイン発掘",
     "nav_domain_access": "ドメインアクセス",
     "nav_db_export": "DBエクスポート",
     "nav_server_test": "サーバーテスト"

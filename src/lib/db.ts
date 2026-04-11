@@ -477,6 +477,26 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_query_logs_tld     ON query_logs (tld)`,
   `CREATE INDEX IF NOT EXISTS idx_query_logs_success ON query_logs (success)`,
+  `CREATE TABLE IF NOT EXISTS expired_domain_leads (
+    id            SERIAL       PRIMARY KEY,
+    domain        TEXT         NOT NULL UNIQUE,
+    tld           TEXT         NOT NULL DEFAULT '',
+    sld           TEXT         NOT NULL DEFAULT '',
+    char_count    INT          NOT NULL DEFAULT 0,
+    bl            INT,
+    dp            INT,
+    deleted_date  TEXT,
+    available_date TEXT,
+    status        TEXT         NOT NULL DEFAULT 'available',
+    source        TEXT         NOT NULL DEFAULT 'expireddomains.net',
+    seen          BOOLEAN      NOT NULL DEFAULT false,
+    starred       BOOLEAN      NOT NULL DEFAULT false,
+    notes         TEXT,
+    crawled_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_char   ON expired_domain_leads (char_count)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_tld    ON expired_domain_leads (tld)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_crawled ON expired_domain_leads (crawled_at DESC)`,
 ];
 
 /**

@@ -1691,6 +1691,7 @@
     "nav_server_test": "服务器测试",
     "nav_tld_failures": "后缀失败记录",
     "nav_notify_service": "推送渠道",
+    "nav_expired_domains": "过期域名挖掘",
     "nav_domain_access": "域名接入"
   },
   "common": {

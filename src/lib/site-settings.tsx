@@ -158,6 +158,13 @@ export interface SiteSettings {
   notify_wecom_webhook: string;
   notify_generic_webhook: string;
   notify_generic_webhook_method: string;
+  // Expired domain leads crawler
+  expireddomains_username: string;
+  expireddomains_password: string;
+  expireddomains_max_length: string;
+  expireddomains_min_length: string;
+  expireddomains_tld_filter: string;
+  expireddomains_rows: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -297,6 +304,12 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   notify_wecom_webhook: "",
   notify_generic_webhook: "",
   notify_generic_webhook_method: "POST",
+  expireddomains_username: "",
+  expireddomains_password: "",
+  expireddomains_max_length: "4",
+  expireddomains_min_length: "1",
+  expireddomains_tld_filter: "",
+  expireddomains_rows: "100",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";

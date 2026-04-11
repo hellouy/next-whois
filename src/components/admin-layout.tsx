@@ -59,6 +59,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/reminders",      labelKey: "admin.nav_reminders",      icon: RiBellLine,     activeIcon: RiBellFill },
       { href: "/admin/notify",          labelKey: "admin.nav_notify",          icon: RiMailSendLine,      activeIcon: RiMailSendLine },
       { href: "/admin/notify-service", labelKey: "admin.nav_notify_service", icon: RiNotification3Line, activeIcon: RiNotification3Line },
+      { href: "/admin/expired-domains", labelKey: "admin.nav_expired_domains", icon: RiGlobalLine,        activeIcon: RiGlobalLine },
     ],
   },
   {

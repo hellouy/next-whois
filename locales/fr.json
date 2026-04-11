@@ -1689,6 +1689,7 @@
     "nav_settings": "Paramètres",
     "nav_tld_failures": "Échecs TLD",
     "nav_notify_service": "Canaux Push",
+    "nav_expired_domains": "Domaines expirés",
     "nav_domain_access": "Accès Domaine",
     "nav_db_export": "Export DB",
     "nav_server_test": "Test serveur"

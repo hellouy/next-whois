@@ -1688,6 +1688,7 @@
     "nav_settings": "Настройки",
     "nav_tld_failures": "Ошибки TLD",
     "nav_notify_service": "Push-каналы",
+    "nav_expired_domains": "Истёкшие домены",
     "nav_domain_access": "Доступ к домену",
     "nav_db_export": "Экспорт БД",
     "nav_server_test": "Тест сервера"

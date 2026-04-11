@@ -1691,6 +1691,7 @@
     "nav_server_test": "Server Test",
     "nav_tld_failures": "TLD Failures",
     "nav_notify_service": "Push Channels",
+    "nav_expired_domains": "Expired Domain Leads",
     "nav_domain_access": "Domain Access"
   },
   "common": {

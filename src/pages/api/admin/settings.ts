@@ -33,6 +33,7 @@ const SERVER_ONLY_KEYS = new Set([
   "notify_feishu_webhook",
   "notify_wecom_webhook",
   "notify_generic_webhook",
+  "expireddomains_password",
 ]);
 
 let _rowsCache: { rows: { key: string; value: string }[]; ts: number } | null = null;
