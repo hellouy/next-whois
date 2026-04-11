@@ -267,8 +267,11 @@ export async function lookupWhoisWithCache(
           clearTldFailureStats(tld).catch(() => {});
           return { ...r, cached: false, cachedAt: now, cacheTtl: ttl };
         }
-        // Third-party failed — fall through to normal lookup so the user
-        // still gets some result rather than a blank error.
+        // Third-party was explicitly configured by the admin for this TLD —
+        // it means the native WHOIS/RDAP stack doesn't work here (.ba/.bb etc.).
+        // Return the third-party error directly instead of falling through to a
+        // guaranteed-to-fail (and slow) native lookup.
+        return { ...r, cached: false };
       }
     }
   }
@@ -460,6 +463,11 @@ export async function lookupWhoisCacheStreaming(
           onPartialResult?.({ ...r, cached: false, cachedAt: now, cacheTtl: ttl });
           return { ...r, cached: false, cachedAt: now, cacheTtl: ttl };
         }
+        // Admin explicitly configured this TLD for third-party — native lookup
+        // won't work here.  Return the third-party error directly so the caller
+        // gets an immediate response with no wasted WHOIS/RDAP timeout.
+        onPartialResult?.({ ...r, cached: false });
+        return { ...r, cached: false };
       }
     }
   }
