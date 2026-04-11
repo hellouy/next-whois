@@ -146,7 +146,7 @@ const FeedbackDrawer = dynamic(
 // client-side useEffect.  A "query" must have a dot (domain/IP), be an ASN
 // (AS12345), or be an IPv6 address.  Bare words like "zhouzhouw" are invalid.
 function looksLikeDomainQuery(t: string | undefined | null): boolean {
-  if (!t) return false;
+  if (!t || typeof t !== "string") return false;
   return (
     !t.startsWith(".") &&
     (t.includes(".") ||

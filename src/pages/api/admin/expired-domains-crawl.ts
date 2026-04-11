@@ -55,7 +55,11 @@ async function loginToExpiredDomains(username: string, password: string): Promis
   });
   const loginCookies = extractCookies(getRes);
   const html = await getRes.text();
-  const csrfMatch = html.match(/name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/);
+  // Match csrfmiddlewaretoken regardless of attribute order in the <input> tag
+  const csrfMatch =
+    html.match(/name=["']csrfmiddlewaretoken["'][^>]+value=["']([^"']+)["']/) ||
+    html.match(/value=["']([^"']+)["'][^>]+name=["']csrfmiddlewaretoken["']/) ||
+    html.match(/csrfmiddlewaretoken.*?value=["']([^"']+)["']/s);
   const csrf = csrfMatch?.[1] ?? "";
 
   const postRes = await fetch(LOGIN_URL, {
@@ -75,7 +79,12 @@ async function loginToExpiredDomains(username: string, password: string): Promis
   const allCookies = cookieHeader([...loginCookies, ...postCookies]);
 
   if (!allCookies.includes("sessionid")) {
-    throw new Error("Login failed — check your expireddomains.net username and password");
+    const hint = !csrf
+      ? " (CSRF token not found — the login page structure may have changed)"
+      : postRes.status !== 302 && postRes.status !== 200
+      ? ` (unexpected HTTP ${postRes.status} after POST)`
+      : "";
+    throw new Error(`Login failed — check your expireddomains.net username and password${hint}`);
   }
   return allCookies;
 }

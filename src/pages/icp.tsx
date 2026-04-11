@@ -214,17 +214,24 @@ function ApiStatusBadge({ status, latency, error, checking, onRefresh }: {
   checking: boolean; onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const fullTitle = checking
+    ? t("icp.check_status")
+    : status === "online"
+    ? `${t("icp.check_status")} · ${latency}ms`
+    : `${t("icp.offline")}${error ? `: ${error}` : ""}`;
+  // Visible label: keep short so it never crushes the page title on narrow screens
+  const visibleLabel = checking
+    ? t("icp.check_status")
+    : status === "online"
+    ? `${t("icp.check_status")}${latency != null ? ` · ${latency}ms` : ""}`
+    : t("icp.offline");
   return (
     <button
       onClick={onRefresh}
       disabled={checking}
-      title={
-        checking ? t("icp.check_status")
-          : status === "online" ? `${t("icp.check_status")} · ${latency}ms`
-          : `${t("icp.offline")}${error ? `: ${error}` : ""}`
-      }
+      title={fullTitle}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all select-none",
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all select-none shrink-0 max-w-[9rem] overflow-hidden",
         checking || status === "checking"
           ? "border-border/50 text-muted-foreground bg-muted/30"
           : status === "online"
@@ -233,16 +240,12 @@ function ApiStatusBadge({ status, latency, error, checking, onRefresh }: {
       )}
     >
       {checking
-        ? <RiLoader4Line className="w-3 h-3 animate-spin" />
+        ? <RiLoader4Line className="w-3 h-3 animate-spin shrink-0" />
         : status === "online"
-        ? <RiWifiLine className="w-3 h-3" />
-        : <RiWifiOffLine className="w-3 h-3" />}
-      {checking
-        ? t("icp.check_status")
-        : status === "online"
-        ? `${t("icp.check_status")}${latency != null ? ` · ${latency}ms` : ""}`
-        : `${t("icp.offline")}${error ? ` · ${error}` : ""}`}
-      {!checking && status === "offline" && <RiRefreshLine className="w-3 h-3 opacity-70" />}
+        ? <RiWifiLine className="w-3 h-3 shrink-0" />
+        : <RiWifiOffLine className="w-3 h-3 shrink-0" />}
+      <span className="truncate">{visibleLabel}</span>
+      {!checking && status === "offline" && <RiRefreshLine className="w-3 h-3 opacity-70 shrink-0" />}
     </button>
   );
 }
@@ -268,9 +271,9 @@ export default function IcpPage() {
     if (didInit.current || !router.isReady) return;
     didInit.current = true;
     const q = (router.query.q as string) || "";
-    const t = (router.query.type as IcpTypeId) || "web";
+    const typeParam = (router.query.type as IcpTypeId) || "web";
     if (q) setQuery(q);
-    if (ICP_TYPES.find(x => x.id === t)) setSelectedType(t);
+    if (ICP_TYPES.find(x => x.id === typeParam)) setSelectedType(typeParam);
   }, [router.isReady, router.query]);
 
   const handleSearch = React.useCallback(async (
