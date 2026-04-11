@@ -483,7 +483,15 @@ export default function AdminTldRulesPage() {
   // Purge all failed/no_data records
   const [purging, setPurging] = React.useState(false);
   async function purgeFailed() {
-    if (!confirm("确定要删除全部失败/无数据记录吗？（手动录入的记录不受影响）")) return;
+    const batchWasRunning = BatchRunner.getState().status === "running";
+    const msg = batchWasRunning
+      ? "批量爬取正在运行！删除后爬取器会立即重新写入这些记录。\n\n确定要强制停止爬取并删除全部失败/无数据记录吗？（手动录入的记录不受影响）"
+      : "确定要删除全部失败/无数据记录吗？（手动录入的记录不受影响）";
+    if (!confirm(msg)) return;
+    if (batchWasRunning) {
+      BatchRunner.stop();
+      toast.info("批量爬取已停止");
+    }
     setPurging(true);
     try {
       const res = await fetch("/api/admin/tld-rules", {

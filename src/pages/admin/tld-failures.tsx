@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import * as BatchRunner from "@/lib/batch-runner";
 import {
   RiLoader4Line, RiRefreshLine, RiSearchLine, RiAlertLine,
   RiCheckLine, RiServerLine,
@@ -13,6 +14,7 @@ import {
   RiArrowLeftLine, RiArrowRightLine,
   RiCheckboxLine, RiCheckboxBlankLine, RiEyeOffLine,
   RiExternalLinkLine, RiSettings3Line, RiFlashlightLine,
+  RiStopCircleLine, RiPlayCircleLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
@@ -123,6 +125,12 @@ export default function TldFailuresPage() {
   const [cfgPanels, setCfgPanels]   = React.useState<Record<string, CfgPanel>>({});
   const [settingApiSource, setSettingApiSource] = React.useState<string | null>(null);
   const [lookingUp, setLookingUp]   = React.useState<string | null>(null);
+
+  // ── Batch runner status (cross-page visibility) ──────────────────────────
+  const [, batchTick] = React.useReducer(n => n + 1, 0);
+  React.useEffect(() => BatchRunner.subscribe(batchTick), []);
+  const batch = BatchRunner.getState();
+  const batchRunning = batch.status === "running";
 
   function buildParams(overrides: Record<string, string | number> = {}) {
     const p: Record<string, string> = {
@@ -463,6 +471,26 @@ export default function TldFailuresPage() {
   return (
     <AdminLayout title="查询失败统计">
       <div className="space-y-4">
+
+        {/* ── Batch-scraper running banner ── */}
+        {batchRunning && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-200/70 dark:border-amber-800/40 bg-amber-50/80 dark:bg-amber-950/30">
+            <RiLoader4Line className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-spin" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">AI 批量爬取正在运行</span>
+              <span className="text-xs text-amber-600/80 dark:text-amber-500 ml-2">
+                ({batch.items.filter(i => i.status === "ok").length}/{batch.items.length} 完成)
+                — 删除或修改失败记录前，建议先停止爬取，否则被删记录会立即被重新写入
+              </span>
+            </div>
+            <button
+              onClick={() => { BatchRunner.stop(); toast.info("批量爬取已停止"); }}
+              className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-950/70 text-xs font-semibold shrink-0 transition-colors"
+            >
+              <RiStopCircleLine className="w-3.5 h-3.5" />停止爬取
+            </button>
+          </div>
+        )}
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
