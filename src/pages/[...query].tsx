@@ -1954,7 +1954,7 @@ export default function LookupPage({
                         <button
                           onClick={() => copy(result.domain || target)}
                           title={isChinese ? "复制域名" : "Copy domain"}
-                          className="mt-1 shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                          className="mt-1 shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
                         >
                           <RiFileCopyLine className="w-4 h-4" />
                         </button>
@@ -1982,7 +1982,10 @@ export default function LookupPage({
                             </Badge>
                           ) : (
                             <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-                              <div className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5" />
+                              <div className="relative mr-1.5 w-2 h-2 shrink-0">
+                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute opacity-60" />
+                                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                              </div>
                               {t("active")}
                             </Badge>
                           )
