@@ -177,12 +177,13 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/"
-              onClick={e => { e.preventDefault(); router.push("/"); }}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:scale-[0.96] touch-manipulation">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:opacity-70 touch-manipulation">
               <RiSearchLine className="w-3.5 h-3.5" />
               <span>返回首页</span>
-            </Link>
+            </button>
             {isAdminUser && (
               <Link href="/admin"
                 className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors px-3 py-1.5 rounded-lg font-semibold active:scale-[0.96]">

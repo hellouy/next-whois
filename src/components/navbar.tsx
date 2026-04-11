@@ -702,6 +702,7 @@ function UserButton() {
   const { data: session, status } = useSession();
   const { t } = useTranslation();
   const settings = useSiteSettings();
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -800,13 +801,13 @@ function UserButton() {
                 <p className="text-[9px] font-bold text-violet-600 dark:text-violet-400 mt-0.5 uppercase tracking-wider">{t("founder")} · {t("nav_admin")}</p>
               )}
             </div>
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
+            <button
+              type="button"
+              onClick={() => { setOpen(false); router.push("/"); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
             >
               <RiHome3Line className="w-3.5 h-3.5 text-muted-foreground" />首页
-            </Link>
+            </button>
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
@@ -884,15 +885,14 @@ export function Navbar() {
           "border border-primary/25 border-dashed",
         )}
       >
-        <motion.div {...TAP}>
-          <Link
-            href="/"
-            className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 transition-colors flex items-center touch-manipulation select-none"
-          >
-            <span suppressHydrationWarning>{logoText}</span>
-            <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
-          </Link>
-        </motion.div>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 active:opacity-70 transition-colors flex items-center touch-manipulation select-none"
+        >
+          <span suppressHydrationWarning>{logoText}</span>
+          <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
+        </button>
 
         <div className="h-4 w-[1px] bg-primary/10" />
 
