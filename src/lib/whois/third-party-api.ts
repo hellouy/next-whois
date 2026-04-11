@@ -5,6 +5,7 @@
  */
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "./types";
 import { many } from "@/lib/db-query";
+import { lookupNicPh } from "./http-scrapers/nic-ph";
 
 // Keep well under Vercel's 10s Hobby-plan function limit.
 const TIMEOUT_MS = 9_000;
@@ -186,15 +187,82 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
   };
 }
 
+// ── ph_web adapter (NIC.PH web scraper) ────────────────────────────────────────
+
+async function lookupViaPhWeb(domain: string): Promise<WhoisResult> {
+  const start = Date.now();
+  const result = await lookupNicPh(domain);
+  const elapsed = (Date.now() - start) / 1000;
+
+  if (!result.success) {
+    return {
+      status: false,
+      time: elapsed,
+      error: result.blocked
+        ? "whois.ph 需要人机验证，无法自动查询"
+        : `NIC.PH 查询失败: ${result.reason}`,
+      source: "whois.ph",
+    };
+  }
+
+  const expirationDate = result.expiresDate || "Unknown";
+  const creationDate   = result.createdDate  || "Unknown";
+
+  const domainResult: WhoisAnalyzeResult = {
+    ...initialWhoisAnalyzeResult,
+    domain,
+    registrar:     result.registrar  || "Unknown",
+    registrarURL:  "https://www.nic.ph/",
+    ianaId:        "N/A",
+    whoisServer:   "whois.ph",
+    updatedDate:   result.updatedDate   || "Unknown",
+    creationDate,
+    expirationDate,
+    nameServers:   result.nameservers,
+    status:        [{ status: result.status || "Active", url: "" }],
+    registrantName: result.registrant || "Unknown",
+    registrantEmail: "Unknown",
+    registrantOrganization: "Unknown",
+    registrantCountry: "PH",
+    dnssec: "Unknown",
+    rawWhoisContent: result.raw,
+    remainingDays: expirationDate !== "Unknown" ? (() => {
+      try { return Math.round((new Date(expirationDate).getTime() - Date.now()) / 86_400_000); } catch { return null; }
+    })() : null,
+    domainAge: creationDate !== "Unknown" ? (() => {
+      try { return Math.round((Date.now() - new Date(creationDate).getTime()) / 86_400_000); } catch { return null; }
+    })() : null,
+    registerPrice: null, renewPrice: null, negotiable: null,
+    cidr: "", inetNum: "", inet6Num: "", netRange: "", netName: "", netType: "", originAS: "",
+    registryDomainId: "Unknown",
+    registrantProvince: "Unknown", registrantCity: "Unknown",
+    registrantAddress: "Unknown", registrantPostalCode: "Unknown",
+    registrantPhone: "Unknown", registrantFax: "Unknown",
+    adminName: "Unknown", adminOrganization: "Unknown",
+    adminCountry: "Unknown", adminEmail: "Unknown", adminPhone: "Unknown",
+    techName: "Unknown", techOrganization: "Unknown",
+    techEmail: "Unknown", techPhone: "Unknown",
+    abuseEmail: "Unknown", abusePhone: "Unknown",
+  };
+
+  return {
+    status: true,
+    time: elapsed,
+    source: "whois.ph",
+    result: domainResult,
+  };
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
-export type ThirdPartyApiSource = "tianhu" | "yisi";
+export type ThirdPartyApiSource = "tianhu" | "yisi" | "ph_web";
 
 export async function lookupViaThirdPartyApi(
   domain: string,
   source: ThirdPartyApiSource,
 ): Promise<WhoisResult> {
-  if (source === "tianhu") return lookupViaTianhu(domain);
-  if (source === "yisi")   return lookupViaYisi(domain);
+  if (source === "tianhu")  return lookupViaTianhu(domain);
+  if (source === "yisi")    return lookupViaYisi(domain);
+  if (source === "ph_web")  return lookupViaPhWeb(domain);
   return { status: false, time: 0, error: `未知 API 源: ${source}` };
 }

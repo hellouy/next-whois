@@ -57,7 +57,7 @@ export function getDomainRegistrationStatus(
     "server-update-prohibited",
   ]);
 
-  const allStatusCodes = result.status.map((s) => s.status.toLowerCase().trim());
+  const allStatusCodes = result.status.map((s) => String(s.status ?? "").toLowerCase().trim());
   const allStatusText = allStatusCodes.join(" ");
 
   // Build a separate text excluding EPP lock statuses for the prohibit check

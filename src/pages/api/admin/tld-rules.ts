@@ -993,12 +993,23 @@ export default async function handler(
     return res.json({ ok: true, tld: cleanTld, manually_edited: true });
   }
 
-  // DELETE — remove a rule
+  // DELETE — remove a rule, or purge all failed records
   if (req.method === "DELETE") {
     const session = await requireAdmin(req, res);
     if (!session) return;
 
-    const { tld } = req.body as { tld?: string };
+    const body = req.body as { tld?: string; action?: string };
+
+    // ── Purge all failed/no_data non-manual records ──────────────────────────
+    if (body.action === "purge_failed") {
+      const result = await run(
+        `DELETE FROM tld_rules WHERE scrape_status IN ('failed','no_data') AND manually_edited = FALSE`
+      );
+      invalidateLifecycleOverridesCache();
+      return res.json({ ok: true, deleted: (result as any).rowCount ?? 0 });
+    }
+
+    const { tld } = body;
     if (!tld) return res.status(400).json({ error: "tld is required" });
     const cleanTld = tld.toLowerCase().replace(/^\./, "");
     await run("DELETE FROM tld_rules WHERE tld=$1", [cleanTld]);

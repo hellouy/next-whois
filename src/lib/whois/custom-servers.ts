@@ -5,6 +5,7 @@ import { WhoisRawResult } from "@/lib/whois/types";
 import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
 import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
+import { lookupNicPh } from "@/lib/whois/http-scrapers/nic-ph";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
 export type TcpServerEntry = {
@@ -74,7 +75,7 @@ export function getStaticWhoisServer(tld: string): string | null {
 }
 
 /** Exported so admin pages can identify which TLDs are handled by built-in logic. */
-export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba"]);
+export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba","ph","com.ph","net.ph","org.ph","edu.ph","gov.ph","mil.ph"]);
 
 const BUILTIN_SERVERS: CustomServerMap = {
   bn: "whois.bnnic.bn",
@@ -85,6 +86,13 @@ const BUILTIN_SERVERS: CustomServerMap = {
   "gov.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "edu.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "mil.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
+  ph:        { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "com.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "net.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "org.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "edu.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "gov.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  "mil.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
 };
 
 function readFileServers(): CustomServerMap {
@@ -495,6 +503,20 @@ async function executeServerEntry(
           : `nic.ba scraper error: ${nicBaFail.reason}`,
         registryUrl,
         nicBaFail.blocked,
+      );
+    }
+    if (scraperName === "nic-ph") {
+      const nicPhResult = await lookupNicPh(domainToQuery);
+      if (nicPhResult.success) {
+        return { raw: nicPhResult.raw, structured: {}, server: "whois.ph", registryUrl };
+      }
+      const nicPhFail = nicPhResult as { success: false; blocked: boolean; reason: string };
+      throw new ScraperRequiredError(
+        nicPhFail.blocked
+          ? "whois.ph requires verification — automated WHOIS lookup is not available, please check the registry directly"
+          : `nic.ph scraper error: ${nicPhFail.reason}`,
+        registryUrl,
+        nicPhFail.blocked,
       );
     }
     throw new ScraperRequiredError(`No scraper implementation for "${scraperName}"`, customEntry.registryUrl);

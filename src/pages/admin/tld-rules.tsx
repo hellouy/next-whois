@@ -480,6 +480,36 @@ export default function AdminTldRulesPage() {
     return rule.scrape_status === "ok";
   }
 
+  // Purge all failed/no_data records
+  const [purging, setPurging] = React.useState(false);
+  async function purgeFailed() {
+    if (!confirm("确定要删除全部失败/无数据记录吗？（手动录入的记录不受影响）")) return;
+    setPurging(true);
+    try {
+      const res = await fetch("/api/admin/tld-rules", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "purge_failed" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "清除失败");
+      toast.success(`已删除 ${data.deleted ?? 0} 条失败/无数据记录`);
+      // Push changes to GitHub
+      try {
+        await fetch("/api/admin/git-force-push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "push", message: "chore: purge failed TLD scrape records" }),
+        });
+      } catch {}
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "清除失败");
+    } finally {
+      setPurging(false);
+    }
+  }
+
   // Single TLD retry scrape (for failed/warn records)
   const [retrying, setRetrying] = React.useState<string | null>(null);
   async function handleRetry(tld: string) {
@@ -814,6 +844,16 @@ export default function AdminTldRulesPage() {
               <span className="text-xs text-muted-foreground">
                 — 失败、默认值或已穷尽重试的 TLD，建议手动录入或重置后再次抓取
               </span>
+              <div className="flex-1" />
+              <button
+                onClick={purgeFailed}
+                disabled={purging}
+                title="删除全部失败/无数据记录（手动录入不受影响），并推送 GitHub"
+                className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 text-[11px] font-semibold disabled:opacity-50 transition-colors"
+              >
+                {purging ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
+                删除全部失败记录
+              </button>
             </div>
             <div className="divide-y divide-border">
               {rules
