@@ -2,6 +2,222 @@
 
 ---
 
+## 项目架构全览（2026-04-11 更新）
+
+### 一、项目简介
+
+这是一个企业级 **WHOIS / RDAP 域名信息查询与管理平台**（fork 自 next-whois-ui），部署在 **Vercel**，数据库使用 **Supabase (PostgreSQL)**，缓存使用 **Aiven Redis**（通过 Vercel 集成）。
+
+---
+
+### 二、技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 框架 | Next.js 14（Pages Router）|
+| 前端 | React 18 + Tailwind CSS + Shadcn UI + Framer Motion |
+| 数据库 | Supabase / PostgreSQL（via `pg` 直连 + `@supabase/supabase-js` HTTP fallback）|
+| 缓存 | 三层：L1 内存 LRU（60s/2000条）→ L2 Redis（Upstash HTTP 或 ioredis TCP）→ L3 PostgreSQL |
+| 认证 | NextAuth.js v4（JWT + Credentials Provider）|
+| 邮件 | Nodemailer（SMTP，配置在 DB site_settings）|
+| 支付 | Stripe / PayPal / Alipay / XunhuPay |
+| 域名查询 | whoiser + node-rdap + 自定义解析器 |
+| 国际化 | next-i18next（EN/ZH-CN/ZH-TW/DE/FR/JA/KO/RU）|
+| OG 图片 | Satori |
+| 版本 | v3.35 |
+
+---
+
+### 三、功能模块
+
+#### 公开页面
+| 路由 | 功能 |
+|------|------|
+| `/` | 主页：搜索框 + 统计 + 工具快捷入口 |
+| `/[...query]` | 域名/IP/ASN 查询结果页（WHOIS + RDAP 双协议）|
+| `/dns` | DNS 记录查询工具 |
+| `/ip` | IP 地理位置与 ASN 查询 |
+| `/ssl` | SSL 证书检测 |
+| `/icp` | 中国 ICP 备案查询 |
+| `/tlds` | 支持的 TLD 列表 |
+| `/stamp` | 域名 Stamp（可分享的域名证书）|
+| `/login` `/register` `/forgot-password` | 用户认证 |
+| `/dashboard` | 用户控制台（历史记录、订阅、Stamps）|
+| `/remind` | 域名到期提醒设置 |
+
+#### 管理后台（`/admin/*`）
+| 路由 | 功能 |
+|------|------|
+| `/admin` | 总览 Dashboard |
+| `/admin/users` | 用户管理（手动开关 subscription / email_verified）|
+| `/admin/payment/orders` `/plans` | 支付订单 + 套餐配置 |
+| `/admin/tld-rules` | TLD WHOIS 服务器与解析规则配置 |
+| `/admin/query-logs` | 实时查询日志 + 错误率监控 |
+| `/admin/settings` | 站点全局配置（SEO/功能开关/CAPTCHA/通知）|
+
+#### 核心 API 路由
+| 端点 | 功能 |
+|------|------|
+| `/api/lookup-stream` | 主查询接口（NDJSON 流式返回，RDAP 先返回再补充 WHOIS）|
+| `/api/lookup` | 标准 JSON 查询接口（三档速率限制）|
+| `/api/lookup-batch` | 批量查询（最多 20 个域名并行）|
+| `/api/dns/records` | DNS 记录查询 |
+| `/api/ssl/cert` | SSL 证书分析 |
+| `/api/ip/lookup` | IP 地理位置查询 |
+| `/api/icp/query` | ICP 备案查询 |
+| `/api/payment/*` | 支付创建 + Webhook 处理 |
+| `/api/auth/[...nextauth]` | NextAuth 认证 |
+| `/api/remind/submit` | 提交域名到期提醒 |
+| `/api/og-image` | 动态 OG 图片生成 |
+| `/api/admin/*` | 管理后台 API（全部受 `requireAdmin()` 保护）|
+
+---
+
+### 四、数据库 Schema（核心表）
+
+| 表名 | 用途 |
+|------|------|
+| `users` | 用户账号、密码哈希、订阅状态、余额（分）|
+| `search_history` | 查询记录（含 user_id、域名注册状态、价值等级）|
+| `query_logs` | 高频查询性能日志（30天自动清理）|
+| `stamps` | 域名 Stamp 证书数据 |
+| `reminders` | 域名到期提醒（days_before + phase_flags）|
+| `tld_rules` | TLD WHOIS/RDAP 服务器配置与宽限期规则 |
+| `tld_registry_info` | TLD 注册局元数据 |
+| `payment_plans` | 订阅套餐定义 |
+| `payment_orders` | 订单记录 |
+| `balance_transactions` | 余额变动审计日志 |
+| `email_queue` | 邮件发送队列（可靠投递）|
+| `site_settings` | 站点动态配置（替代 .env 中的业务配置）|
+| `verify_codes` | 邮件验证码（Redis 主存 / DB 兜底）|
+| `whois_cache` | L3 数据库缓存（Redis 不可用时兜底）|
+
+**迁移策略**：`scripts/migrate.js` 使用 `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ADD COLUMN IF NOT EXISTS`，幂等安全，应用启动时自动执行 `getDbReady()`。
+
+---
+
+### 五、缓存系统
+
+```
+请求 → L1 内存 LRU (60s, 2000条, 含 in-flight 去重)
+           ↓ miss
+       L2 Redis (Upstash HTTP 优先 / ioredis TCP 备用, 含熔断器)
+           ↓ miss 或 Redis 不可用
+       L3 PostgreSQL whois_cache 表
+           ↓ miss
+       外部 WHOIS / RDAP 服务器
+```
+
+**Smart TTL**：已注册域名 1h–12h（按到期时间动态调整），未注册 300s，IP/ASN 24h。
+
+**Stale-While-Revalidate**：缓存剩余生命 < 10% 时立即返回旧数据，后台触发刷新。
+
+---
+
+### 六、认证与权限
+
+- **JWT 会话**：NextAuth v4 Credentials Provider
+- **用户角色**：匿名 → 注册用户 → 订阅用户（subscription_access）→ 管理员（isAdmin）
+- **管理员判定**：异步查询 `site_settings.admin_email`，支持动态更新
+- **防暴力破解**：Redis 记录失败次数，10次/15min → 锁定30min
+- **全局限流**：IP 级别 20次/10min
+- **CAPTCHA**：Cloudflare Turnstile / Google reCAPTCHA / hCaptcha / MTCaptcha（可选）
+- **邮件验证**：注册 + 邮箱变更均需 6 位数验证码（Redis 主存，DB 兜底，60s 冷却）
+
+---
+
+### 七、速率限制（查询 API）
+
+| 用户类型 | 限额 |
+|----------|------|
+| 匿名 | 40 req/min |
+| 已登录（免费）| 120 req/min |
+| 订阅用户 | 300 req/min |
+| 同源请求 | 无限制 |
+
+---
+
+### 八、后台脚本与 Workflows
+
+| Workflow | 命令 | 频率 | 功能 |
+|----------|------|------|------|
+| Start application | `pnpm run dev` | 常驻 | 主 Next.js 应用 |
+| Keep Alive | `node scripts/keep-alive.mjs` | 每4分钟 | ping Supabase DB，防连接池超时 |
+| Alert Check | `node scripts/check-failure-rate.mjs` | 每60分钟 | 查询日志分析，检测失败率/慢查询/骤增，推送告警 |
+
+**告警触发条件**：TLD 失败率 > 20%（≥5次查询）/ 平均耗时 > 5s（≥3次未命中）/ 最近30分钟耗时是前30分钟的2倍以上。
+
+**告警推送**：`ALERT_WEBHOOK_URL`（Discord 或 Slack），未配置时打印到控制台。
+
+---
+
+### 九、环境变量（Replit Secrets 已配置）
+
+| 变量名 | 状态 | 用途 |
+|--------|------|------|
+| `SUPABASE_DATABASE_URL` | ✅ 已配置 | Supabase PostgreSQL 连接地址（主数据库）|
+| `VERCEL_TOKEN` | ✅ 已配置 | Vercel API Token（部署/域名管理）|
+| `GITHUB_TOKEN` | ✅ 已配置 | GitHub Classic Token（CI/代码同步）|
+| `DATABASE_URL` | ✅ Replit 内置 | Replit 内置 PostgreSQL（本地开发备用）|
+| `SESSION_SECRET` | ✅ 已配置 | 会话加密密钥 |
+
+#### 还需在 Vercel 项目环境变量中配置（生产环境）
+
+| 变量名 | 用途 |
+|--------|------|
+| `NEXTAUTH_SECRET` | NextAuth JWT 加密密钥 |
+| `NEXTAUTH_URL` | 站点 canonical URL |
+| `ADMIN_EMAIL` | 管理员邮箱（未配置则后台不可用）|
+| `POSTGRES_URL` / `SUPABASE_DATABASE_URL` | 生产数据库连接 |
+| `REDIS_URL` | Aiven Redis 连接（L2 缓存）|
+| `NEXT_PUBLIC_BASE_URL` | 站点公开 URL |
+| `CRON_SECRET` | 保护 cron 端点 |
+| `RESEND_API_KEY` | 邮件发送（可选，也可用 SMTP）|
+| `ALERT_WEBHOOK_URL` | Discord/Slack 告警 Webhook（可选）|
+| `YISI_API_KEY` | 第三方 WHOIS API（可选）|
+| `ICP_API_BASE` | ICP 备案查询 API 地址（可选）|
+
+---
+
+### 十、site_settings（数据库动态配置，通过 /admin/settings 管理）
+
+| 分类 | 配置项 |
+|------|--------|
+| 品牌 | site_title, site_logo_text, site_icon_url, site_announcement |
+| 功能开关 | enable_dns, enable_ssl, enable_icp, enable_remind, maintenance_mode, query_only_mode |
+| 认证 | allow_registration, require_login, require_invite_code |
+| CAPTCHA | captcha_provider, captcha_site_key, captcha_secret_key |
+| 支付 | payment_stripe_sk, payment_paypal_client_id, payment_alipay_appid, payment_xunhupay_secret |
+| 通知 | notify_bark_url, notify_telegram_token, notify_dingding_webhook |
+| 分析 | analytics_google, analytics_umami, custom_head_script |
+| SMTP | smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from |
+
+---
+
+### 十一、关键文件索引
+
+| 文件 | 用途 |
+|------|------|
+| `src/lib/db.ts` | DB 连接池 + Schema 定义 + 自动迁移 |
+| `src/lib/db-query.ts` | 查询辅助（one/many/run/withTransaction）|
+| `src/lib/supabase.ts` | Supabase HTTP 客户端（TCP 被阻时兜底）|
+| `src/lib/server/redis.ts` | Redis 多后端 + 熔断器 + L3 DB 缓存 |
+| `src/lib/whois/lookup.ts` | 查询主入口，L1 缓存 + SWR + Smart TTL |
+| `src/lib/whois/parsers/` | WHOIS 文本解析器（模块化，5个子模块）|
+| `src/lib/auth.ts` | NextAuth 配置 |
+| `src/lib/admin-server.ts` | 管理员身份验证（isAdminEmail）|
+| `src/lib/site-settings.tsx` | 动态站点配置读取与缓存 |
+| `src/lib/email.ts` | 邮件发送（Resend / SMTP 双通道）|
+| `src/lib/payment.ts` | 多支付渠道集成 |
+| `src/pages/api/lookup-stream.ts` | 流式查询主端点 |
+| `src/pages/api/lookup.ts` | 标准查询端点（含三档限流）|
+| `src/pages/api/lookup-batch.ts` | 批量查询端点 |
+| `scripts/keep-alive.mjs` | DB 保活脚本 |
+| `scripts/check-failure-rate.mjs` | 告警监控脚本 |
+| `scripts/migrate.js` | 数据库迁移脚本 |
+
+---
+
 ## Session — 2026-04-11 (四): 7 项 Domain Lookup Core 优化 (T001–T007)
 
 所有 7 项优化均已完成，全程 0 TypeScript 错误。
