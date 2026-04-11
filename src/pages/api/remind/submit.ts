@@ -156,7 +156,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [cleanDomain, cleanEmail],
     );
 
+    if (existing && existing.active) {
+      // Already subscribed and active — tell the client so it can show a friendly message
+      return res.status(409).json({ code: "ALREADY_SUBSCRIBED", error: "Already subscribed" });
+    }
+
     if (existing) {
+      // Previously cancelled — allow re-subscribe by updating the record
       reminderId = existing.id;
       cancelTok  = existing.cancel_token || cancelToken;
       await run(

@@ -23,6 +23,8 @@ import {
   RiExchangeDollarFill,
   RiDeleteBin2Line,
   RiShoppingCartLine,
+  RiNotification3Line,
+  RiArrowRightLine,
 } from "@remixicon/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { computeLifecycle } from "@/lib/lifecycle";
@@ -85,6 +87,7 @@ export function DomainReminderDialog({
   const [email, setEmail] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [done, setDone] = React.useState(false);
+  const [alreadySubscribed, setAlreadySubscribed] = React.useState(false);
   const [selectedThresholds, setSelectedThresholds] = React.useState<number[]>(DEFAULT_REMINDER_THRESHOLDS);
 
   const [lcFeedbackOpen, setLcFeedbackOpen] = React.useState(false);
@@ -99,7 +102,12 @@ export function DomainReminderDialog({
   }
 
   React.useEffect(() => {
-    if (open) { setEmail(userEmail || ""); setDone(false); setSelectedThresholds(DEFAULT_REMINDER_THRESHOLDS); }
+    if (open) {
+      setEmail(userEmail || "");
+      setDone(false);
+      setAlreadySubscribed(false);
+      setSelectedThresholds(DEFAULT_REMINDER_THRESHOLDS);
+    }
   }, [open, userEmail]);
 
   const isRestricted = regStatusType === "prohibited" || regStatusType === "reserved";
@@ -128,7 +136,11 @@ export function DomainReminderDialog({
         setDone(true);
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.error || (isZh ? "提交失败，请重试" : "Submission failed"));
+        if (errData.code === "ALREADY_SUBSCRIBED") {
+          setAlreadySubscribed(true);
+        } else {
+          toast.error(errData.error || (isZh ? "提交失败，请重试" : "Submission failed"));
+        }
       }
     } catch {
       toast.error(isZh ? "网络错误" : "Network error");
@@ -274,8 +286,50 @@ export function DomainReminderDialog({
 
           <AnimatePresence mode="wait" initial={false}>
 
-            {/* ── Success ── */}
-            {done ? (
+            {/* ── Already subscribed ── */}
+            {alreadySubscribed ? (
+              <motion.div
+                key="already"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                className="py-7 text-center space-y-4"
+              >
+                <div className="relative w-16 h-16 mx-auto">
+                  <div className="relative w-16 h-16 bg-sky-500/10 border-2 border-sky-400/30 rounded-full flex items-center justify-center">
+                    <RiNotification3Line className="w-7 h-7 text-sky-500" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-bold text-[15px] text-foreground">
+                    {isZh ? "您已订阅该域名" : "Already Subscribed"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-[280px] mx-auto">
+                    {isZh
+                      ? "您已订阅对该域名的监控提醒，如需修改或取消订阅，请前往用户中心管理。"
+                      : "You've already subscribed to this domain. Manage or cancel your subscription in the user center."}
+                  </p>
+                </div>
+                <a
+                  href="/dashboard?tab=subscriptions"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-600 dark:text-sky-400 text-xs font-semibold hover:bg-sky-500/20 transition-colors"
+                >
+                  {isZh ? "前往用户中心" : "Go to User Center"}
+                  <RiArrowRightLine className="w-3.5 h-3.5" />
+                </a>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setAlreadySubscribed(false)}
+                    className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                  >
+                    {isZh ? "← 返回" : "← Back"}
+                  </button>
+                </div>
+              </motion.div>
+
+            ) : done ? (
               <motion.div
                 key="done"
                 initial={{ opacity: 0, scale: 0.96 }}
