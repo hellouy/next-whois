@@ -1440,7 +1440,7 @@ export default function LookupPage({
                     href={result.registerPrice.externalLink}
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
+                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} suppressHydrationWarning />
                     <span
                       className={cn(
                         "text-[11px] sm:text-xs font-normal",
@@ -1460,7 +1460,7 @@ export default function LookupPage({
                     target="_blank"
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
+                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} suppressHydrationWarning />
                     <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                       {t("renew_price")}
                       {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
@@ -2023,7 +2023,7 @@ export default function LookupPage({
                               href={result.registerPrice.externalLink}
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
+                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} suppressHydrationWarning />
                               <span className={cn("text-[11px] font-normal", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("register_price")}
                                 {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
@@ -2038,7 +2038,7 @@ export default function LookupPage({
                               target="_blank"
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
+                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} suppressHydrationWarning />
                               <span className={cn("text-[11px] font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("renew_price")}
                                 {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
@@ -2134,52 +2134,6 @@ export default function LookupPage({
                       <div className="flex items-center gap-2 mt-2">
                         <span suppressHydrationWarning className="text-[10px] text-muted-foreground font-mono">
                           {(time ?? 0).toFixed(2)}s
-                          {cached && (
-                            <>
-                              {" · "}
-                              {cachedAt && typeof window !== "undefined" ? (() => {
-                                const ageMs = Date.now() - cachedAt;
-                                const ageMins = Math.floor(ageMs / 60_000);
-                                const ageHrs = Math.floor(ageMs / 3_600_000);
-                                const isStale = ageMs > 10 * 60 * 1000;
-                                const ageStr = ageHrs >= 1
-                                  ? isChinese ? `${ageHrs}小时前缓存` : `cached ${ageHrs}h ago`
-                                  : ageMins >= 1
-                                    ? isChinese ? `${ageMins}分钟前缓存` : `cached ${ageMins}m ago`
-                                    : isChinese ? "刚刚缓存" : "cached just now";
-                                return (
-                                  <>
-                                    <span
-                                      suppressHydrationWarning
-                                      title={new Date(cachedAt).toLocaleString()}
-                                      className={isStale ? "text-amber-500/80" : ""}
-                                    >
-                                      {ageStr}
-                                    </span>
-                                    {isStale && (
-                                      <button
-                                        onClick={handleRefresh}
-                                        suppressHydrationWarning
-                                        title={isChinese ? "数据已过期，点击重新查询" : "Data may be stale — click to refresh"}
-                                        className="ml-0.5 inline-flex items-center text-amber-500/70 hover:text-amber-500 transition-colors"
-                                      >
-                                        <RiLoopLeftLine className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </>
-                                );
-                              })() : t("cached")}
-                              {cacheTtl && cacheTtl > 0 && (
-                                <span className="opacity-60">
-                                  {" "}(TTL {cacheTtl >= 3600
-                                    ? `${Math.round(cacheTtl / 3600)}h`
-                                    : cacheTtl >= 60
-                                      ? `${Math.round(cacheTtl / 60)}m`
-                                      : `${cacheTtl}s`})
-                                </span>
-                              )}
-                            </>
-                          )}
                           {data.source && (
                             <>
                               {" · "}
