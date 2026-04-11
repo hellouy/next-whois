@@ -77,7 +77,7 @@ const BUILTIN_TOOLS: BuiltinTool[] = [
 export default function ToolsPage() {
   const { t } = useTranslation();
   const settings = useSiteSettings();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
 
   const visibleTools = BUILTIN_TOOLS.filter(
     (tool) =>

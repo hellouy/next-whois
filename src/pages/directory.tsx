@@ -49,7 +49,7 @@ export default function NavPage() {
   const { t, locale } = useTranslation();
   const { data: session } = useSession();
   const settings = useSiteSettings();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
 
   const [clicks, setClicks] = React.useState<Record<string, number>>(() => {
     const cached = getCached<Record<string, number>>("tool_clicks", 60_000);

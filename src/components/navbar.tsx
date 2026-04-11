@@ -346,7 +346,7 @@ export function NavDrawer() {
   const settings = useSiteSettings();
   const { t, locale } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const logoText = settings.site_logo_text || "X.RW";
+  const logoText = settings.site_logo_text || "WHOIS";
 
   // ── History sub-panel state ────────────────────────────────────────────
   const [histMounted, setHistMounted] = React.useState(false);
@@ -842,7 +842,7 @@ export function Navbar() {
   // Pass pathname so the hook resets to visible on every page navigation.
   const isVisible = useScrollDirection(router.pathname);
   const settings = useSiteSettings();
-  const logoText = settings.site_logo_text || "X.RW";
+  const logoText = settings.site_logo_text || "WHOIS";
   const { t } = useTranslation();
 
   // Publish current nav height as a CSS variable so the layout (paddingTop on

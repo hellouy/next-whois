@@ -80,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(503).json({ error: "Verification service is temporarily unavailable, please try again later" });
   }
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   try {
     await sendEmailDirect(
       cleanEmail,

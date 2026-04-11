@@ -37,7 +37,7 @@ export default function LinksPage() {
   const { locale } = useTranslation();
   const settings = useSiteSettings();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
   const pageTitle = settings.links_title || (isChinese ? "友情链接" : "Friendly Links");
 
   const [links, setLinks] = React.useState<FriendlyLink[]>([]);

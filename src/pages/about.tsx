@@ -202,7 +202,7 @@ export default function AboutPage() {
   const { locale } = useTranslation();
   const settings = useSiteSettings();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
   const pageTitle = settings.about_title || (isChinese ? "关于我们" : "About");
 
   const introZh = settings.about_content || `${siteName} 是一款面向域名投资者、技术人员与网站运营者的专业查询工具，支持域名 WHOIS/RDAP、IP 地址、ASN 自治系统、CIDR 网段、DNS 记录及 SSL 证书查询。提供到期提醒、品牌认领、域名工具箱等增值功能，助力你高效管理与评估域名资产。`;

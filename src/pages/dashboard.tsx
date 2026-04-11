@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Head><title key="title">{`${t("nav_dashboard")} · ${siteSettings.site_logo_text || "X.RW"}`}</title></Head>
+      <Head><title key="title">{`${t("nav_dashboard")} · ${siteSettings.site_logo_text || "WHOIS"}`}</title></Head>
 
       {showClaimGuide && <ClaimGuideModal onClose={() => setShowClaimGuide(false)} />}
       {showSubscribeGuide && <SubscribeGuideModal onClose={() => setShowSubscribeGuide(false)} />}

@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
 
   try {
     await sendEmail({

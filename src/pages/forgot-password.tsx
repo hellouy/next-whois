@@ -12,7 +12,7 @@ import { useSiteSettings } from "@/lib/site-settings";
 export default function ForgotPasswordPage() {
   const { t } = useTranslation();
   const settings = useSiteSettings();
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
   const [email, setEmail] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);

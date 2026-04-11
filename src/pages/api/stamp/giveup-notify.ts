@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     : (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://x.rw");
   const verifyUrl = `${appBase}/stamp?domain=${encodeURIComponent(domain)}`;
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   const userRow = await one<{ locale: string | null }>(
     "SELECT locale FROM users WHERE email = $1",
     [email],

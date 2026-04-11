@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await setRedisValue(storeKey, code, 600);
   await setRedisValue(rateLimitKey, "1", 60);
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   try {
     await sendEmail({
       to: cleanNew,

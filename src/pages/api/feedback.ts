@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const issueLabels      = validatedIssues.map((k) => ISSUE_LABELS[k]).join("、");
   const ts               = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   await sendEmail({
     to: ADMIN_EMAIL,
     subject: `[反馈] ${cleanQuery} — ${issueLabels}`,

@@ -336,7 +336,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!to) return res.status(400).json({ error: "No recipient email specified" });
 
-  const siteName  = await getSiteLabel().catch(() => "X.RW");
+  const siteName  = await getSiteLabel().catch(() => "WHOIS");
   const templates = buildTemplates(siteName);
 
   const targets = template === "all"

@@ -105,7 +105,7 @@ export default function IpPage() {
   const router = useRouter();
   const settings = useSiteSettings();
   const { t } = useTranslation();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
   const [query, setQuery] = React.useState("");
   const [result, setResult] = React.useState<IpResult | null>(null);
   const [loading, setLoading] = React.useState(false);

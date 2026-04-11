@@ -33,7 +33,7 @@ export async function getSiteLabel(): Promise<string> {
 
 // ── Shared primitives ────────────────────────────────────────────────────────
 
-function emailLayout(body: string, siteName = "X.RW", opts?: { langCode?: string; autoSentText?: string }): string {
+function emailLayout(body: string, siteName = "WHOIS", opts?: { langCode?: string; autoSentText?: string }): string {
   const year = new Date().getFullYear();
   const langCode   = opts?.langCode ?? "und";
   const autoSent   = opts?.autoSentText ?? `This email was sent automatically by ${siteName}. Please do not reply.`;
@@ -164,7 +164,7 @@ function actionRow(btnHref: string, btnLabel: string, cancelHref?: string, btnCo
 // ──────────────────────────────────────────────────────────────────────────────
 // 1. Welcome email
 // ──────────────────────────────────────────────────────────────────────────────
-export function welcomeHtml({ name, email, siteName = "X.RW", locale }: {
+export function welcomeHtml({ name, email, siteName = "WHOIS", locale }: {
   name?: string | null; email: string; siteName?: string; locale?: string;
 }): string {
   const s = getEmailStrings(locale);
@@ -234,7 +234,7 @@ export interface SubscriptionEmailParams {
 }
 
 export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?: string; locale?: string }): string {
-  const siteName  = p.siteName || "X.RW";
+  const siteName  = p.siteName || "WHOIS";
   const s         = getEmailStrings(p.locale);
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
   const isRestricted = p.regStatusType === "prohibited" || p.regStatusType === "reserved";
@@ -336,7 +336,7 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
 // 3. Expiry reminder email
 // ──────────────────────────────────────────────────────────────────────────────
 export function reminderHtml({
-  domain, expirationDate, daysLeft, cancelToken, siteName = "X.RW",
+  domain, expirationDate, daysLeft, cancelToken, siteName = "WHOIS",
   registrar, creationDate, nameservers, locale,
 }: {
   domain: string; expirationDate: string | null; daysLeft: number; cancelToken: string; siteName?: string;
@@ -414,7 +414,7 @@ export interface PhaseEventEmailParams {
 }
 
 export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; locale?: string }): string {
-  const siteName  = p.siteName || "X.RW";
+  const siteName  = p.siteName || "WHOIS";
   const s         = getEmailStrings(p.locale);
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
   const expiryStr  = fmtEmailDate(p.expirationDate, s);
@@ -514,7 +514,7 @@ export interface DropApproachingParams {
 }
 
 export function dropApproachingHtml(p: DropApproachingParams & { siteName?: string; locale?: string }): string {
-  const siteName  = p.siteName || "X.RW";
+  const siteName  = p.siteName || "WHOIS";
   const s         = getEmailStrings(p.locale);
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
   const expiryStr = fmtEmailDate(p.expirationDate, s);
@@ -569,7 +569,7 @@ export interface DomainDroppedParams {
 }
 
 export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; locale?: string }): string {
-  const siteName  = p.siteName || "X.RW";
+  const siteName  = p.siteName || "WHOIS";
   const s         = getEmailStrings(p.locale);
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
   const expiryStr = fmtEmailDate(p.expirationDate, s);
@@ -629,7 +629,7 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
 // ──────────────────────────────────────────────────────────────────────────────
 // 6. Password reset email
 // ──────────────────────────────────────────────────────────────────────────────
-export function passwordResetHtml({ resetUrl, siteName = "X.RW", locale }: {
+export function passwordResetHtml({ resetUrl, siteName = "WHOIS", locale }: {
   resetUrl: string; siteName?: string; locale?: string;
 }): string {
   const s = getEmailStrings(locale);
@@ -662,7 +662,7 @@ export function passwordResetHtml({ resetUrl, siteName = "X.RW", locale }: {
 // ──────────────────────────────────────────────────────────────────────────────
 // 7. Admin test / notification email  (admin-only — stays in English/Chinese)
 // ──────────────────────────────────────────────────────────────────────────────
-export function adminNotifyHtml({ subject, body, siteName = "X.RW" }: {
+export function adminNotifyHtml({ subject, body, siteName = "WHOIS" }: {
   subject: string; body: string; siteName?: string;
 }): string {
   return emailLayout(`
@@ -675,7 +675,7 @@ export function adminNotifyHtml({ subject, body, siteName = "X.RW" }: {
 // 8. Feedback notification email (sent to admin — stays in Chinese)
 // ──────────────────────────────────────────────────────────────────────────────
 export function feedbackHtml({
-  query, queryType, issueLabels, description, email, ip, ts, siteName = "X.RW",
+  query, queryType, issueLabels, description, email, ip, ts, siteName = "WHOIS",
 }: {
   query: string; queryType: string; issueLabels: string; description?: string;
   email?: string; ip: string; ts: string; siteName?: string;
@@ -728,7 +728,7 @@ export interface HighValueAlertParams {
 }
 
 export function highValueAlertHtml(p: HighValueAlertParams & { siteName?: string }): string {
-  const siteName = p.siteName || "X.RW";
+  const siteName = p.siteName || "WHOIS";
   const ALERT_COLOR = p.score >= 80 ? "#dc2626" : p.score >= 60 ? "#d97706" : "#7c3aed";
   const tierBg      = p.score >= 80 ? "#fef2f2" : p.score >= 60 ? "#fffbeb" : "#ede9fe";
   const tierColor   = p.score >= 80 ? "#991b1b" : p.score >= 60 ? "#92400e" : "#5b21b6";
@@ -826,7 +826,7 @@ export function highValueAlertHtml(p: HighValueAlertParams & { siteName?: string
 // 10. Stamp DNS verification timeout (sent to user)
 // ──────────────────────────────────────────────────────────────────────────────
 export function stampVerifyTimeoutHtml({
-  domain, fileContent, verifyUrl, siteName = "X.RW", locale,
+  domain, fileContent, verifyUrl, siteName = "WHOIS", locale,
 }: {
   domain: string; fileContent: string; verifyUrl: string; siteName?: string; locale?: string;
 }): string {
@@ -864,7 +864,7 @@ export function stampVerifyTimeoutHtml({
 // ──────────────────────────────────────────────────────────────────────────────
 // 11. Password changed notification
 // ──────────────────────────────────────────────────────────────────────────────
-export function passwordChangedHtml({ siteName = "X.RW", locale, changedAt, name, email }: {
+export function passwordChangedHtml({ siteName = "WHOIS", locale, changedAt, name, email }: {
   siteName?: string; locale?: string; changedAt?: string; name?: string | null; email?: string;
 }): string {
   const s      = getEmailStrings(locale);
@@ -901,7 +901,7 @@ export function passwordChangedHtml({ siteName = "X.RW", locale, changedAt, name
 // ──────────────────────────────────────────────────────────────────────────────
 // 12. Email verification code
 // ──────────────────────────────────────────────────────────────────────────────
-export function verifyCodeHtml({ code, siteName = "X.RW", locale, email }: {
+export function verifyCodeHtml({ code, siteName = "WHOIS", locale, email }: {
   code: string; siteName?: string; locale?: string; email?: string;
 }): string {
   const s = getEmailStrings(locale);
@@ -929,7 +929,7 @@ export function verifyCodeHtml({ code, siteName = "X.RW", locale, email }: {
 // ──────────────────────────────────────────────────────────────────────────────
 // 13. Admin broadcast message (admin → all users)
 // ──────────────────────────────────────────────────────────────────────────────
-export function adminBroadcastHtml({ subject, body, bodyHtml, siteName = "X.RW", locale }: {
+export function adminBroadcastHtml({ subject, body, bodyHtml, siteName = "WHOIS", locale }: {
   subject: string; body?: string; bodyHtml?: string; siteName?: string; locale?: string;
 }): string {
   const s       = getEmailStrings(locale);
@@ -947,7 +947,7 @@ export function adminBroadcastHtml({ subject, body, bodyHtml, siteName = "X.RW",
 // ──────────────────────────────────────────────────────────────────────────────
 // 14. Payment confirmation
 // ──────────────────────────────────────────────────────────────────────────────
-export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency = "USD", orderId, siteName = "X.RW", locale, name, email }: {
+export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency = "USD", orderId, siteName = "WHOIS", locale, name, email }: {
   plan?: string; planName?: string; expiresAt?: string | null; amount?: number | string | null;
   currency?: string; orderId?: string; siteName?: string; locale?: string; name?: string | null; email?: string;
 }): string {

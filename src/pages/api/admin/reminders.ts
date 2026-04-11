@@ -114,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         if (!reminder) return res.status(404).json({ error: "未找到该订阅记录" });
 
-        const siteName = await getSiteLabel().catch(() => "X.RW");
+        const siteName = await getSiteLabel().catch(() => "WHOIS");
         const daysLeft = reminder.expiration_date
           ? Math.ceil((new Date(reminder.expiration_date).getTime() - Date.now()) / 86_400_000)
           : 0;

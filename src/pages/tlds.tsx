@@ -265,7 +265,7 @@ export default function TldsPage() {
   const { locale, t } = useTranslation();
   const settings = useSiteSettings();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
 
   const [tab, setTab] = React.useState<TabType>("tlds");
 

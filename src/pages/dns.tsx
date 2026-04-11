@@ -347,7 +347,7 @@ export default function DnsPage() {
   const router = useRouter();
   const settings = useSiteSettings();
   const { t } = useTranslation();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
   const [domain, setDomain] = React.useState("");
   const [activeTypes, setActiveTypes] = React.useState<RecordType[]>(["A"]);
   const [results, setResults] = React.useState<DnsResult[]>([]);

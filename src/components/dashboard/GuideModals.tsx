@@ -180,7 +180,7 @@ export function ClaimGuideModal({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <form onSubmit={handleSearch} className="flex gap-2">
-        <Input value={domain} onChange={e => setDomain(e.target.value)} placeholder="x.rw" className="h-9 rounded-xl text-sm font-mono flex-1" />
+        <Input value={domain} onChange={e => setDomain(e.target.value)} placeholder="example.com" className="h-9 rounded-xl text-sm font-mono flex-1" />
         <Button type="submit" size="sm" className="h-9 rounded-xl px-3 gap-1 shrink-0 touch-manipulation">
           {t("dashboard.go_btn")} <RiArrowRightLine className="w-3.5 h-3.5" />
         </Button>
@@ -229,7 +229,7 @@ export function SubscribeGuideModal({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <form onSubmit={handleSearch} className="flex gap-2">
-        <Input value={domain} onChange={e => setDomain(e.target.value)} placeholder="x.rw" className="h-9 rounded-xl text-sm font-mono flex-1" />
+        <Input value={domain} onChange={e => setDomain(e.target.value)} placeholder="example.com" className="h-9 rounded-xl text-sm font-mono flex-1" />
         <Button type="submit" size="sm" className="h-9 rounded-xl px-3 gap-1 shrink-0 touch-manipulation">
           {t("dashboard.go_btn")} <RiArrowRightLine className="w-3.5 h-3.5" />
         </Button>

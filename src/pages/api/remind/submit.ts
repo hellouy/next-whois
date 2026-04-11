@@ -232,7 +232,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     registry:        lc.cfg.registry,
   } : undefined;
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   const isRestricted = regStatusType === "prohibited" || regStatusType === "reserved";
   const locale = localeFromCookieHeader(req.headers.cookie) || "zh";
   const s = getEmailStrings(locale);

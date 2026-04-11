@@ -80,7 +80,7 @@ export async function maybeSendHighValueAlert(
     }
   }
 
-  const siteName = await getSiteLabel().catch(() => "X.RW");
+  const siteName = await getSiteLabel().catch(() => "WHOIS");
   const html = highValueAlertHtml({
     domain: query,
     score: scoreResult.score,

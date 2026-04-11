@@ -2,6 +2,48 @@
 
 ---
 
+## Session — 2026-04-11 (三): 全面功能审查与批量修复
+
+### 发现与修复总览
+
+#### 1. 遗漏的 50+ 处品牌硬编码 (X.RW fallback)
+
+上次开源清理只覆盖了部分文件，此次发现还有 50+ 处 `|| "X.RW"` / `.catch(() => "X.RW")` / `siteName = "X.RW"` 默认值散落在 33 个文件中：
+
+**受影响文件（全部修改为 `"WHOIS"` 或 `"WHOIS"` 兜底）：**
+- 前端页面（16 个）：`about`, `changelog`, `dashboard`, `directory`, `dns`, `faq`, `feedback`, `forgot-password`, `http`, `icp`, `ip`, `links`, `privacy`, `reset-password`, `ssl`, `terms`, `tlds`, `tools`
+- 组件（2 个）：`navbar.tsx`（两处），`StampLandingPage.tsx`
+- API 路由（13 个）：`reminders`, `test-email`, `users-bulk`, `send-reset`, `feedback`, `remind/process`, `remind/submit`, `stamp/giveup-notify`, `user/contact`, `user/forgot-password`, `send-email-change-code`, `send-verify-code`
+- 库（2 个）：`email.ts`（8 处函数默认参数 + p.siteName 兜底），`save-search-record.ts`
+- 组件：`GuideModals.tsx` 的 `placeholder="x.rw"` → `"example.com"`
+
+#### 2. SSRF 安全漏洞修复 (`tld-rules.ts`)
+
+**问题**：管理员传入的 `source_url` 未做验证就传给 `fetch()`，可触发 SSRF（访问内网服务）。
+
+**修复**：新增 `validatePublicUrl()` 函数，强制校验：
+- 必须是 `http:` 或 `https:` 协议
+- 禁止私有 IP / loopback 地址（`127.x`, `10.x`, `192.168.x`, `172.16-31.x`, `localhost`, `::1` 等）
+- 如果 source_url 不合法，直接返回 400
+
+#### 3. 开发环境 HMR 说明（非真实 Bug）
+
+截图工具测试时发现多个使用 `ScrollArea` 的页面（docs、faq、icp、sponsor 等）在开发环境中显示 "Element type is invalid" 错误。根因是 Next.js Fast Refresh 在文件编辑后产生的热更新循环，导致 `scroll-area.tsx` 模块暂时 "disposed"。
+
+**确认**：服务端 HTTP 检查显示所有页面返回 200（`/404` 正确返回 404）。该问题**不影响生产环境**。
+
+#### 4. API 安全审计结论
+
+| 项目 | 状态 |
+|------|------|
+| SQL 注入风险 | **安全** — 全程使用参数化查询 |
+| SSRF 风险 | **已修复** (tld-rules.ts source_url 验证) |
+| JSON.parse 安全性 | **安全** — subscriptions.ts 各处均已 try-catch |
+| locale 验证 | **安全** — update-locale.ts 使用 normalizeEmailLocale 校验 |
+| 管理员操作 | 已有 requireAdmin 守卫 |
+
+---
+
 ## Session — 2026-04-11 (续): 开源准备 + 全面程序审查与 Bug 修复
 
 ### 开源准备 — 清除所有 X.RW / x.rw 硬编码品牌引用

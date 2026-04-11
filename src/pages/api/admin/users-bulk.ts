@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           `SELECT id, email FROM users WHERE id IN (${placeholders}) AND email != $${ids.length + 1}`,
           [...ids, adminEmail]
         );
-        const siteName = await getSiteLabel().catch(() => "X.RW");
+        const siteName = await getSiteLabel().catch(() => "WHOIS");
         let sent = 0;
         const failedEmails: string[] = [];
         const settledResults = await Promise.allSettled(rows.map(async (row) => {

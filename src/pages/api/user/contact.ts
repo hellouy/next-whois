@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const userEmail = session.user.email;
   const userName  = (session.user as any)?.name || userEmail;
-  const siteName  = await getSiteLabel().catch(() => "X.RW");
+  const siteName  = await getSiteLabel().catch(() => "WHOIS");
   const isMember  = !!(session.user as any)?.subscriptionAccess;
 
   const CATEGORY_COLORS: Record<string, string> = {

@@ -17,7 +17,7 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const settings = useSiteSettings();
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
   const { token } = router.query;
   const [password, setPassword] = React.useState("");
   const [confirm, setConfirm] = React.useState("");

@@ -13,6 +13,26 @@ import { join } from "path";
 import { callProviderWithFallback } from "@/lib/server/ai-providers";
 import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
 
+// ─── SSRF protection: only allow public HTTP/HTTPS URLs ───────────────────────
+const PRIVATE_IP_RE =
+  /^(localhost|127\.\d+\.\d+\.\d+|::1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|fc[0-9a-f]{2}:|fd[0-9a-f]{2}:)/i;
+
+function validatePublicUrl(raw: string): { ok: true; url: string } | { ok: false; error: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, error: "Invalid URL format" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, error: "Only http:// and https:// URLs are allowed" };
+  }
+  if (PRIVATE_IP_RE.test(parsed.hostname)) {
+    return { ok: false, error: "Private or loopback addresses are not allowed" };
+  }
+  return { ok: true, url: parsed.toString() };
+}
+
 // ─── Local JSON file cache (best-effort, fails silently in read-only envs) ────
 const LOCAL_CACHE_PATH = join(process.cwd(), "data", "tld-rules.json");
 
@@ -707,9 +727,13 @@ export default async function handler(
       return res.status(400).json({ error: "tld is required" });
     }
     const cleanTld = tld.toLowerCase().replace(/^\./, "");
-    // Default to IANA root-db page if no URL supplied
-    const cleanUrl = (source_url ?? "").trim() ||
-      `https://www.iana.org/domains/root/db/${cleanTld}.html`;
+    // Default to IANA root-db page if no URL supplied; validate user-supplied URLs
+    const rawUrl = (source_url ?? "").trim();
+    if (rawUrl) {
+      const check = validatePublicUrl(rawUrl);
+      if (!check.ok) return res.status(400).json({ error: check.error });
+    }
+    const cleanUrl = rawUrl || `https://www.iana.org/domains/root/db/${cleanTld}.html`;
 
     // ── Skip check ────────────────────────────────────────────────────────
     // Skip only if: manually edited (always protected) or scrape_status='ok' (real data already scraped).

@@ -39,7 +39,7 @@ export function StampLandingPage() {
   const sl = (key: StampKey) => t(`stamp.${key}` as TranslationKey);
   const { data: session, status: authStatus } = useSession();
   const settings = useSiteSettings();
-  const siteName = settings.site_logo_text || "X.RW";
+  const siteName = settings.site_logo_text || "WHOIS";
   const [query, setQuery] = React.useState("");
   const [myStamps, setMyStamps] = React.useState<{
     id: string; domain: string; tag_name: string; tag_style: string;

@@ -111,7 +111,7 @@ export default function SslPage() {
   const router = useRouter();
   const settings = useSiteSettings();
   const { t } = useTranslation();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
   const [hostname, setHostname] = React.useState("");
   const [result, setResult] = React.useState<SslResult | null>(null);
   const [loading, setLoading] = React.useState(false);

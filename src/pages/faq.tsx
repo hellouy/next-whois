@@ -108,7 +108,7 @@ export default function FaqPage() {
   const settings = useSiteSettings();
   const { locale, t } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const siteName = settings.site_logo_text || settings.site_title || "X.RW";
+  const siteName = settings.site_logo_text || settings.site_title || "WHOIS";
   const pageTitle = t("nav_faq");
 
   return (

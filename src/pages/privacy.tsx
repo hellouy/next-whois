@@ -57,7 +57,7 @@ export default function PrivacyPage() {
   const settings = useSiteSettings();
   const { locale, t } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
-  const siteName = settings.site_logo_text || settings.site_title || "X.RW";
+  const siteName = settings.site_logo_text || settings.site_title || "WHOIS";
   const pageTitle = t("nav_privacy");
   const contactEmail = settings.about_contact_email || settings.admin_email || "";
 

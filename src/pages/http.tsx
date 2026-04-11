@@ -119,7 +119,7 @@ export default function HttpCheckPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const settings = useSiteSettings();
-  const siteLabel = settings.site_logo_text || "X.RW";
+  const siteLabel = settings.site_logo_text || "WHOIS";
 
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
