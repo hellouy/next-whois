@@ -148,15 +148,39 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
     return { status: false, time: (Date.now() - start) / 1000, error: j.error || "亿思云查询失败", source: "YISI.YUN" };
   }
 
+  // YISI.YUN returns j.result with camelCase field names
   const d = j.result ?? {};
-  const expirationDate = d.expiration_date ?? "Unknown";
-  const creationDate   = d.creation_date   ?? "Unknown";
+
+  // If the domain was not found, return a definitive "not found" result
+  // so the UI shows "未注册" rather than a registered card with all-Unknown fields.
+  if (d.domainNotFound === true || d.domainReserved === false && d.registrar === "Unknown" && !d.creationDate) {
+    const raw = typeof d.rawWhoisContent === "string" ? d.rawWhoisContent : JSON.stringify(d, null, 2);
+    return {
+      status: false,
+      time: (Date.now() - start) / 1000,
+      error: "Domain not found",
+      source: "YISI.YUN",
+      result: {
+        ...initialWhoisAnalyzeResult,
+        domain,
+        rawWhoisContent: raw,
+        registerPrice: d.registerPrice ?? null,
+        renewPrice: d.renewPrice ?? null,
+        negotiable: null,
+        cidr: "", inetNum: "", inet6Num: "", netRange: "", netName: "", netType: "", originAS: "",
+      } as WhoisAnalyzeResult,
+    };
+  }
+
+  // YISI.YUN uses camelCase field names directly in j.result
+  const expirationDate = d.expirationDate ?? "Unknown";
+  const creationDate   = d.creationDate   ?? "Unknown";
 
   const statuses: string[] = (() => {
-    const raw = Array.isArray(d.status)
+    const rawStatus = Array.isArray(d.status)
       ? d.status
       : typeof d.status === "string" ? [d.status] : [];
-    return raw.map((s: unknown): string => {
+    return rawStatus.map((s: unknown): string => {
       if (typeof s === "string") return s;
       if (s && typeof s === "object") {
         const o = s as Record<string, unknown>;
@@ -168,34 +192,48 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
     }).filter((s: string) => s.length > 0);
   })();
 
-  const raw = typeof d.raw === "string" ? d.raw : JSON.stringify(d, null, 2);
+  // nameServers: YISI returns an array of strings
+  const nameServers: string[] = Array.isArray(d.nameServers)
+    ? d.nameServers.map((ns: unknown) => (typeof ns === "string" ? ns : String(ns)))
+    : [];
+
+  // rawWhoisContent: prefer the dedicated field, fall back to serialised result
+  const raw = typeof d.rawWhoisContent === "string" && d.rawWhoisContent.trim().length > 0
+    ? d.rawWhoisContent
+    : JSON.stringify(d, null, 2);
 
   const result: WhoisAnalyzeResult = {
     ...initialWhoisAnalyzeResult,
     domain,
-    registrar:       d.registrar       ?? "Unknown",
-    registrarURL:    d.registrar_url   ?? "Unknown",
-    ianaId:          d.iana_id         ?? "N/A",
-    whoisServer:     "yisi.yun",
-    updatedDate:     d.updated_date    ?? "Unknown",
+    registrar:       d.registrar              ?? "Unknown",
+    registrarURL:    d.registrarURL            ?? "Unknown",
+    ianaId:          d.ianaId                 ?? "N/A",
+    whoisServer:     d.whoisServer             ?? "yisi.yun",
+    updatedDate:     d.updatedDate             ?? "Unknown",
     creationDate,
     expirationDate,
-    nameServers:     Array.isArray(d.name_servers) ? d.name_servers : [],
+    nameServers,
     status:          statuses.map(s => ({ status: s, url: "" })),
-    registrantName:  d.registrant_name ?? "Unknown",
-    registrantEmail: d.registrant_email ?? "Unknown",
-    registrantOrganization: d.registrant_org ?? "Unknown",
-    registrantCountry: d.registrant_country ?? "Unknown",
-    dnssec:          d.dnssec          ?? "Unknown",
+    registrantOrganization: d.registrantOrganization ?? "Unknown",
+    registrantCountry:      d.registrantCountry      ?? "Unknown",
+    registrantProvince:     d.registrantProvince     ?? "Unknown",
+    registrantCity:         d.registrantCity         ?? "Unknown",
+    registrantPhone:        d.registrantPhone        ?? "Unknown",
+    registrantEmail:        d.registrantEmail        ?? "Unknown",
+    registrantName:         d.registrantName         ?? "Unknown",
+    dnssec:          d.dnssec                 ?? "Unknown",
     rawWhoisContent: raw,
     remainingDays:   expirationDate !== "Unknown" ? remainingDays(expirationDate) : null,
     domainAge:       creationDate   !== "Unknown" ? domainAge(creationDate)       : null,
-    registerPrice: null, renewPrice: null, negotiable: null,
-    cidr: "", inetNum: "", inet6Num: "", netRange: "", netName: "", netType: "", originAS: "",
+    registerPrice:   d.registerPrice ?? null,
+    renewPrice:      d.renewPrice    ?? null,
+    negotiable: null,
+    cidr: d.cidr ?? "", inetNum: d.inetNum ?? "", inet6Num: d.inet6Num ?? "",
+    netRange: d.netRange ?? "", netName: d.netName ?? "", netType: d.netType ?? "",
+    originAS: d.originAS ?? "",
     registryDomainId: "Unknown",
-    registrantProvince: "Unknown", registrantCity: "Unknown",
     registrantAddress: "Unknown", registrantPostalCode: "Unknown",
-    registrantPhone: "Unknown", registrantFax: "Unknown",
+    registrantFax: "Unknown",
     adminName: "Unknown", adminOrganization: "Unknown",
     adminCountry: "Unknown", adminEmail: "Unknown", adminPhone: "Unknown",
     techName: "Unknown", techOrganization: "Unknown",
