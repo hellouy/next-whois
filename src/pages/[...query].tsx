@@ -1280,7 +1280,7 @@ export default function LookupPage({
           const domainAge = isRegistered && typeof r.domainAge === "number" ? r.domainAge : null;
           const regStatus = !status
             ? "unknown"
-            : r?.status?.some(s => s.status?.toLowerCase().includes("reserved")) ? "reserved"
+            : r?.status?.some(s => typeof s.status === "string" && s.status.toLowerCase().includes("reserved")) ? "reserved"
             : r ? "registered" : "unknown";
 
           const isZhMeta = locale.startsWith("zh");

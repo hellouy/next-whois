@@ -64,9 +64,21 @@ async function lookupViaTianhu(domain: string): Promise<WhoisResult> {
   const expirationDate = domainInfo.expiration_date ?? "Unknown";
   const creationDate   = domainInfo.creation_date   ?? "Unknown";
 
-  const statuses: string[] = Array.isArray(domainInfo.status)
-    ? domainInfo.status
-    : typeof domainInfo.status === "string" ? [domainInfo.status] : [];
+  const statuses: string[] = (() => {
+    const raw = Array.isArray(domainInfo.status)
+      ? domainInfo.status
+      : typeof domainInfo.status === "string" ? [domainInfo.status] : [];
+    return raw.map((s: unknown): string => {
+      if (typeof s === "string") return s;
+      if (s && typeof s === "object") {
+        const o = s as Record<string, unknown>;
+        if (typeof o.code === "string") return o.code;
+        if (typeof o.status === "string") return o.status;
+        if (typeof o.name === "string") return o.name;
+      }
+      return "";
+    }).filter((s: string) => s.length > 0);
+  })();
 
   const result: WhoisAnalyzeResult = {
     ...initialWhoisAnalyzeResult,
@@ -140,9 +152,21 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
   const expirationDate = d.expiration_date ?? "Unknown";
   const creationDate   = d.creation_date   ?? "Unknown";
 
-  const statuses: string[] = Array.isArray(d.status)
-    ? d.status
-    : typeof d.status === "string" ? [d.status] : [];
+  const statuses: string[] = (() => {
+    const raw = Array.isArray(d.status)
+      ? d.status
+      : typeof d.status === "string" ? [d.status] : [];
+    return raw.map((s: unknown): string => {
+      if (typeof s === "string") return s;
+      if (s && typeof s === "object") {
+        const o = s as Record<string, unknown>;
+        if (typeof o.code === "string") return o.code;
+        if (typeof o.status === "string") return o.status;
+        if (typeof o.name === "string") return o.name;
+      }
+      return "";
+    }).filter((s: string) => s.length > 0);
+  })();
 
   const raw = typeof d.raw === "string" ? d.raw : JSON.stringify(d, null, 2);
 
@@ -219,7 +243,7 @@ async function lookupViaPhWeb(domain: string): Promise<WhoisResult> {
     creationDate,
     expirationDate,
     nameServers:   result.nameservers,
-    status:        [{ status: result.status || "Active", url: "" }],
+    status:        [{ status: typeof result.status === "string" && result.status ? result.status : "Active", url: "" }],
     registrantName: result.registrant || "Unknown",
     registrantEmail: "Unknown",
     registrantOrganization: "Unknown",

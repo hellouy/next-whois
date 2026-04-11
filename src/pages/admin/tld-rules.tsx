@@ -31,6 +31,8 @@ import {
   RiSettings3Line,
   RiAddLine,
   RiCheckLine,
+  RiSparklingLine,
+  RiArrowRightLine,
 } from "@remixicon/react";
 import { LIFECYCLE_TABLE } from "@/lib/lifecycle";
 import IANA_TLDS from "@/data/iana-tlds.json";
@@ -344,6 +346,37 @@ function LifecycleTabInline() {
   const [syncing, setSyncing] = React.useState(false);
   const [syncResult, setSyncResult] = React.useState<{ refreshed: number; skipped: number; failed: number } | null>(null);
 
+  // AI → lifecycle sync state
+  const [aiSyncStats, setAiSyncStats] = React.useState<{ ai_ok: number; already_overridden: number; would_import: number } | null>(null);
+  const [aiSyncLoading, setAiSyncLoading] = React.useState(false);
+  const [aiSyncing, setAiSyncing] = React.useState(false);
+  const [aiSyncResult, setAiSyncResult] = React.useState<{ imported: number; skipped: number; message: string } | null>(null);
+
+  async function loadAiSyncStats() {
+    setAiSyncLoading(true);
+    try {
+      const res = await fetch("/api/admin/tld-lifecycle-sync");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "加载失败");
+      setAiSyncStats(data);
+    } catch { /* silent */ }
+    finally { setAiSyncLoading(false); }
+  }
+
+  async function handleAiSync() {
+    if (!confirm(`确认将 AI 抓取的数据批量导入生命周期规则库？已有手动修正的 TLD 将被跳过。`)) return;
+    setAiSyncing(true); setAiSyncResult(null);
+    try {
+      const res = await fetch("/api/admin/tld-lifecycle-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "导入失败");
+      setAiSyncResult({ imported: data.imported ?? 0, skipped: data.skipped ?? 0, message: data.message ?? "" });
+      toast.success(data.message ?? `已导入 ${data.imported} 条`);
+      await loadOverrides(); await loadAiSyncStats();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "导入失败"); }
+    finally { setAiSyncing(false); }
+  }
+
   async function handleSubSync(tld?: string) {
     setSyncing(true); setSyncResult(null);
     try {
@@ -495,6 +528,8 @@ function LifecycleTabInline() {
   const th = "py-2.5 px-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wide";
   const tdC = "py-2.5 px-3 text-sm";
 
+  React.useEffect(() => { loadAiSyncStats(); }, []);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -502,6 +537,46 @@ function LifecycleTabInline() {
         <Button size="sm" variant="outline" onClick={loadOverrides} disabled={loading} className="h-8 rounded-xl">
           <RiRefreshLine className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} />刷新
         </Button>
+      </div>
+
+      {/* AI → lifecycle import panel */}
+      <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-3.5 space-y-2.5">
+        <div className="flex items-center gap-2">
+          <RiSparklingLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <p className="text-[12px] font-semibold text-emerald-800 dark:text-emerald-300">AI 抓取数据 → 生命周期规则库</p>
+          {aiSyncLoading && <RiLoader4Line className="w-3 h-3 animate-spin text-muted-foreground ml-1" />}
+          {aiSyncStats && (
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              AI已确认 <strong className="text-foreground">{aiSyncStats.ai_ok}</strong>
+              {" · "}已修正 <strong className="text-emerald-600 dark:text-emerald-400">{aiSyncStats.already_overridden}</strong>
+              {aiSyncStats.would_import > 0 && (
+                <> · 可新增 <strong className="text-sky-600 dark:text-sky-400">{aiSyncStats.would_import}</strong></>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={loadAiSyncStats} disabled={aiSyncLoading}
+            className="h-7 text-[11px] rounded-lg border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50">
+            {aiSyncLoading ? <RiLoader4Line className="w-3 h-3 animate-spin mr-1" /> : <RiRefreshLine className="w-3 h-3 mr-1" />}
+            检查
+          </Button>
+          <Button size="sm" onClick={handleAiSync}
+            disabled={aiSyncing || !aiSyncStats || aiSyncStats.would_import === 0}
+            className="h-7 text-[11px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+            {aiSyncing ? <RiLoader4Line className="w-3 h-3 animate-spin mr-1" /> : <RiArrowRightLine className="w-3 h-3 mr-1" />}
+            {aiSyncing ? "导入中…" : `一键导入 ${aiSyncStats?.would_import ?? 0} 条`}
+          </Button>
+          {aiSyncResult && (
+            <span className="text-[11px] text-muted-foreground">
+              已导入 <span className="font-semibold text-emerald-600 dark:text-emerald-400">{aiSyncResult.imported}</span>
+              {" · "}跳过 {aiSyncResult.skipped}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground/70">
+          将 AI 批量抓取（已确认）的宽限期/赎回期/待删期数据写入生命周期规则库，已有手动修正的 TLD 自动跳过。
+        </p>
       </div>
 
       {/* Subscription sync */}
