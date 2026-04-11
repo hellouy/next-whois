@@ -178,7 +178,7 @@ export default function DashboardPage() {
             <Link href="/"
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:scale-[0.96]">
               <RiSearchLine className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">查询域名</span>
+              <span>返回首页</span>
             </Link>
             {isAdminUser && (
               <Link href="/admin"

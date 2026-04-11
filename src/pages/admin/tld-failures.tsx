@@ -12,6 +12,7 @@ import {
   RiProhibitedLine, RiWifiLine, RiCloseLine,
   RiArrowLeftLine, RiArrowRightLine,
   RiCheckboxLine, RiCheckboxBlankLine, RiEyeOffLine,
+  RiExternalLinkLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
@@ -66,6 +67,19 @@ type TestPanel = {
   loading: boolean;
 };
 
+type ApiPanelResult = {
+  ok: boolean;
+  details?: string;
+  error?: string;
+  raw?: string;
+};
+
+type ApiPanel = {
+  service: "tianhu" | "nazhumi" | "miqingju" | "yisi";
+  result: ApiPanelResult | null;
+  loading: boolean;
+};
+
 export default function TldFailuresPage() {
   const [rows, setRows]           = React.useState<TldFailureRow[]>([]);
   const [summary, setSummary]     = React.useState<Summary[]>([]);
@@ -95,6 +109,7 @@ export default function TldFailuresPage() {
   const [resettingBypass, setResettingBypass]     = React.useState<string | null>(null);
   const [resettingAllBypasses, setResettingAllBypasses] = React.useState(false);
   const [testPanels, setTestPanels] = React.useState<Record<string, TestPanel>>({});
+  const [apiPanels, setApiPanels]   = React.useState<Record<string, ApiPanel>>({});
 
   function buildParams(overrides: Record<string, string | number> = {}) {
     const p: Record<string, string> = {
@@ -279,6 +294,42 @@ export default function TldFailuresPage() {
       updateTestPanel(tld, {
         loading: false,
         result: { ok: false, method: "?", error: e?.message || "网络错误", elapsedMs: 0 },
+      });
+    }
+  }
+
+  // ── Third-party API panel ────────────────────────────────────────────────
+  function openApiPanel(tld: string) {
+    setApiPanels(prev => ({
+      ...prev,
+      [tld]: prev[tld] ?? { service: "tianhu", result: null, loading: false },
+    }));
+  }
+
+  function closeApiPanel(tld: string) {
+    setApiPanels(prev => { const n = { ...prev }; delete n[tld]; return n; });
+  }
+
+  function updateApiPanel(tld: string, patch: Partial<ApiPanel>) {
+    setApiPanels(prev => ({ ...prev, [tld]: { ...prev[tld], ...patch } }));
+  }
+
+  async function runApiLookup(tld: string) {
+    const panel = apiPanels[tld];
+    if (!panel) return;
+    updateApiPanel(tld, { loading: true, result: null });
+    try {
+      const r = await fetch("/api/admin/third-party-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, service: panel.service }),
+      });
+      const data: ApiPanelResult = await r.json();
+      updateApiPanel(tld, { result: data, loading: false });
+    } catch (e: any) {
+      updateApiPanel(tld, {
+        loading: false,
+        result: { ok: false, error: e?.message || "网络错误" },
       });
     }
   }
@@ -491,6 +542,7 @@ export default function TldFailuresPage() {
                 const repairInfo = REPAIR_STATUS[row.repair_status ?? "pending"] ?? REPAIR_STATUS.pending;
                 const isEditing  = editingNotes === row.tld;
                 const testPanel  = testPanels[row.tld];
+                const apiPanel   = apiPanels[row.tld];
                 const isSelected = selected.has(row.tld);
 
                 return (
@@ -673,6 +725,72 @@ export default function TldFailuresPage() {
                       </div>
                     )}
 
+                    {/* Third-party API lookup panel */}
+                    {apiPanel && (
+                      <div className="border border-border/60 rounded-xl bg-muted/20 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5">
+                            <RiExternalLinkLine className="w-3.5 h-3.5 text-violet-500" />
+                            第三方 API 查询 · example.{row.tld}
+                          </span>
+                          <button onClick={() => closeApiPanel(row.tld)} className="text-muted-foreground/60 hover:text-foreground transition-colors">
+                            <RiCloseLine className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex gap-1 flex-wrap">
+                          {(["tianhu", "nazhumi", "miqingju", "yisi"] as const).map(svc => {
+                            const labels: Record<string, string> = { tianhu: "天虎", nazhumi: "哪煮米", miqingju: "米情局", yisi: "亿思云" };
+                            return (
+                              <button
+                                key={svc}
+                                onClick={() => updateApiPanel(row.tld, { service: svc, result: null })}
+                                className={cn(
+                                  "px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all",
+                                  apiPanel.service === svc
+                                    ? "bg-violet-500 text-white border-violet-500"
+                                    : "border-border/60 text-muted-foreground hover:border-violet-400/60 bg-background",
+                                )}
+                              >
+                                {labels[svc]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => runApiLookup(row.tld)}
+                          disabled={apiPanel.loading}
+                          className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[11px] font-semibold transition-colors"
+                        >
+                          {apiPanel.loading ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiExternalLinkLine className="w-3 h-3" />}
+                          {apiPanel.loading ? "查询中…" : "发起查询"}
+                        </button>
+                        {apiPanel.result && (
+                          <div className={cn(
+                            "rounded-xl border p-3 space-y-1.5",
+                            apiPanel.result.ok
+                              ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/30"
+                              : "bg-red-50/50 dark:bg-red-950/20 border-red-200/60 dark:border-red-800/30",
+                          )}>
+                            <div className="flex items-center gap-2">
+                              {apiPanel.result.ok
+                                ? <RiCheckLine className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                : <RiErrorWarningLine className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                              <span className={cn("text-[11px] font-semibold", apiPanel.result.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
+                                {apiPanel.result.ok ? "查询成功" : "查询失败"}
+                              </span>
+                            </div>
+                            {apiPanel.result.details && <p className="text-[10px] text-foreground/70 leading-relaxed">{apiPanel.result.details}</p>}
+                            {apiPanel.result.error && <p className="text-[10px] text-red-600 dark:text-red-400 break-all">{apiPanel.result.error}</p>}
+                            {apiPanel.result.raw && (
+                              <pre className="text-[10px] font-mono text-foreground/70 bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-32 leading-relaxed">
+                                {apiPanel.result.raw}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5 border-t border-border/40">
                       {(["in_progress", "fixed", "wont_fix"] as const).map(status => {
@@ -705,6 +823,17 @@ export default function TldFailuresPage() {
                           {row.admin_notes ? "编辑备注" : "添加备注"}
                         </button>
                       )}
+                      <button
+                        onClick={() => apiPanel ? closeApiPanel(row.tld) : openApiPanel(row.tld)}
+                        className={cn(
+                          "text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1 transition-all",
+                          apiPanel
+                            ? "border-violet-400/60 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400"
+                            : "border-border/60 text-muted-foreground hover:border-violet-400/60 hover:text-violet-600",
+                        )}
+                      >
+                        <RiExternalLinkLine className="w-2.5 h-2.5" />第三方查询
+                      </button>
                       <button
                         onClick={() => testPanel ? closeTestPanel(row.tld) : openTestPanel(row.tld)}
                         className={cn(

@@ -31,6 +31,11 @@ interface AiProviderStatus {
 interface ApiState {
   nazhumi_enabled: boolean;
   miqingju_enabled: boolean;
+  tianhu_enabled: boolean;
+  yisi_enabled: boolean;
+  yisi_key_configured?: boolean;
+  yisi_key_from_env?: boolean;
+  yisi_key_masked?: string;
   ai_providers: Record<string, AiProviderStatus>;
 }
 
@@ -44,6 +49,8 @@ interface TestResult {
 const DEFAULT_STATE: ApiState = {
   nazhumi_enabled: true,
   miqingju_enabled: true,
+  tianhu_enabled: true,
+  yisi_enabled: true,
   ai_providers: {},
 };
 
@@ -73,6 +80,11 @@ export default function AdminApiPage() {
   const [aiSaving, setAiSaving] = useState<string | null>(null);
   const [aiDeleting, setAiDeleting] = useState<string | null>(null);
 
+  // Yisi key input state
+  const [yisiKeyInput, setYisiKeyInput] = useState("");
+  const [yisiShowKey, setYisiShowKey] = useState(false);
+  const [yisiSaving, setYisiSaving] = useState(false);
+
   useEffect(() => {
     fetch("/api/admin/api-keys")
       .then((r) => r.json())
@@ -92,6 +104,8 @@ export default function AdminApiPage() {
       const body: Record<string, unknown> = {
         nazhumi_enabled: state.nazhumi_enabled,
         miqingju_enabled: state.miqingju_enabled,
+        tianhu_enabled: state.tianhu_enabled,
+        yisi_enabled: state.yisi_enabled,
       };
 
       const r = await fetch("/api/admin/api-keys", {
@@ -129,6 +143,35 @@ export default function AdminApiPage() {
     }
   }
 
+  async function handleYisiKeySave() {
+    const keyVal = yisiKeyInput.trim();
+    if (!keyVal || keyVal.includes("••••")) return;
+    setYisiSaving(true);
+    try {
+      const r = await fetch("/api/admin/api-keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nazhumi_enabled: state.nazhumi_enabled,
+          miqingju_enabled: state.miqingju_enabled,
+          tianhu_enabled: state.tianhu_enabled,
+          yisi_enabled: state.yisi_enabled,
+          yisi_key: keyVal,
+        }),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "保存失败");
+      const masked = keyVal.length > 8 ? keyVal.slice(0, 4) + "••••" + keyVal.slice(-4) : "••••••••";
+      setState(s => ({ ...s, yisi_key_configured: true, yisi_key_from_env: false, yisi_key_masked: masked }));
+      setYisiKeyInput("");
+      toast.success("亿思云 API Key 已保存，即时生效");
+    } catch (e: any) {
+      toast.error(e.message || "保存失败");
+    } finally {
+      setYisiSaving(false);
+    }
+  }
+
   async function handleAiKeySave(providerId: string) {
     const keyVal = aiKeyInputs[providerId]?.trim();
     if (!keyVal || keyVal.includes("••••")) return;
@@ -140,6 +183,8 @@ export default function AdminApiPage() {
         body: JSON.stringify({
           nazhumi_enabled: state.nazhumi_enabled,
           miqingju_enabled: state.miqingju_enabled,
+          tianhu_enabled: state.tianhu_enabled,
+          yisi_enabled: state.yisi_enabled,
           ai_keys: { [providerId]: keyVal },
         }),
       });
@@ -448,6 +493,92 @@ export default function AdminApiPage() {
             testResult={testResult("miqingju")}
           />
 
+          <ServiceCard
+            color="bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400"
+            dot="bg-orange-500"
+            name="天虎"
+            name_en="tian.hu"
+            desc="WHOIS 查询（免费公开接口，覆盖主流 TLD）"
+            link="https://tian.hu"
+            apiDocsLink="https://tian.hu"
+            noKey
+            enabled={state.tianhu_enabled}
+            onToggle={(v) => setState((s) => ({ ...s, tianhu_enabled: v }))}
+            onTest={() => handleTest("tianhu")}
+            testing={testing === "tianhu"}
+            testResult={testResult("tianhu")}
+          />
+
+          <ServiceCard
+            color="bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400"
+            dot="bg-violet-500"
+            name="亿思云"
+            name_en="yisi.yun"
+            desc="WHOIS 查询（需要 API Key，覆盖冷门 TLD）"
+            link="https://yisi.yun"
+            enabled={state.yisi_enabled}
+            onToggle={(v) => setState((s) => ({ ...s, yisi_enabled: v }))}
+            onTest={() => handleTest("yisi")}
+            testing={testing === "yisi"}
+            testResult={testResult("yisi")}
+          >
+            {/* Yisi API Key management */}
+            <div className="space-y-2">
+              {state.yisi_key_configured && !yisiKeyInput ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm font-mono text-muted-foreground">
+                    <span>{state.yisi_key_masked}</span>
+                    {state.yisi_key_from_env && (
+                      <span className="text-[10px] text-muted-foreground/60 ml-1">来自环境变量</span>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setYisiKeyInput(" ")}
+                  >
+                    更换
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={yisiShowKey ? "text" : "password"}
+                      value={yisiKeyInput.trim() === "" ? "" : yisiKeyInput}
+                      onChange={e => setYisiKeyInput(e.target.value)}
+                      placeholder="粘贴亿思云 API Key…"
+                      className="pr-8 text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setYisiShowKey(v => !v)}
+                    >
+                      {yisiShowKey ? <RiEyeOffLine className="h-3.5 w-3.5" /> : <RiEyeLine className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={!yisiKeyInput.trim() || yisiKeyInput.trim().includes("••••") || yisiSaving}
+                    onClick={handleYisiKeySave}
+                  >
+                    {yisiSaving ? <RiLoader4Line className="mr-1.5 h-4 w-4 animate-spin" /> : <RiSaveLine className="mr-1.5 h-4 w-4" />}
+                    保存
+                  </Button>
+                  {state.yisi_key_configured && (
+                    <Button variant="ghost" size="sm" onClick={() => setYisiKeyInput("")}>取消</Button>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <RiInformationLine className="h-3.5 w-3.5 shrink-0" />
+                DB Key 保存后即时生效。也可通过环境变量 <code className="font-mono text-[11px]">YISI_API_KEY</code> 配置。
+              </p>
+            </div>
+          </ServiceCard>
+
         </section>
       </div>
     </AdminLayout>
@@ -469,6 +600,7 @@ function ServiceCard({
   onTest,
   testing,
   testResult,
+  children,
 }: {
   color: string;
   dot: string;
@@ -483,6 +615,7 @@ function ServiceCard({
   onTest: () => void;
   testing: boolean;
   testResult?: TestResult;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -547,6 +680,8 @@ function ServiceCard({
             )}
           </p>
         )}
+
+        {children}
 
         {testResult && <TestResultBanner result={testResult} />}
 

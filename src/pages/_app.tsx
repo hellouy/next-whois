@@ -490,6 +490,7 @@ const STABLE_KEY_PAGES = new Set([
   "/",            // homepage — relies on search-box spinner + progress bar for feedback
   "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback",
   "/[...query]",  // domain WHOIS results — skeleton handles loading feedback
+  "/dashboard",   // user dashboard — full-page layout, instant transition avoids blank flash
 ]);
 
 // Regular pages (about, login, privacy, etc.) get a subtle y slide-up on enter.
@@ -536,7 +537,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   React.useEffect(() => {
     const isQueryPagePath = (p: string) =>
       p !== "/" && !p.startsWith("/admin") && !p.startsWith("/api") && p.split("/").length >= 2;
-    const OTHER_STABLE = new Set(["/", "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback"]);
+    const OTHER_STABLE = new Set(["/", "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback", "/dashboard"]);
     const onStart = (url: string) => {
       // Extract pathname from url (may include query string / hash)
       const dest = url.split("?")[0].split("#")[0];

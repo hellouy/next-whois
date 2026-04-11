@@ -623,7 +623,8 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
 
         {/* OG Card Live Preview */}
         {(() => {
-          const previewImg  = s.og_image_twitter || s.og_image || "";
+          const customImg   = s.og_image_twitter || s.og_image || "";
+          const previewImg  = customImg || "/api/og-image";
           const previewTitle = s.site_title || s.site_logo_text || "站点标题";
           const previewDesc  = s.site_description || "站点描述";
           const previewSite  = s.og_url ? s.og_url.replace(/^https?:\/\//, "").replace(/\/$/, "") : (s.og_site_name || "example.com");
@@ -631,39 +632,40 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
 
           return (
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">实时预览 · Twitter/X 分享卡片</p>
-              <div className="rounded-2xl border border-border/80 overflow-hidden bg-card max-w-sm shadow-sm">
-                {previewImg ? (
-                  isLarge ? (
-                    <div className="w-full h-36 bg-muted/40 overflow-hidden">
-                      <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    </div>
-                  ) : (
-                    <div className="flex items-stretch">
-                      <div className="w-20 h-20 shrink-0 bg-muted/40 overflow-hidden">
-                        <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                      </div>
-                      <div className="p-2.5 flex flex-col justify-center min-w-0">
-                        <p className="text-[11px] text-muted-foreground/60 truncate">{previewSite}</p>
-                        <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
-                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <div className="w-full h-24 bg-muted/30 flex items-center justify-center">
-                    <RiImageLine className="w-6 h-6 text-muted-foreground/30" />
-                  </div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">实时预览 · Twitter/X 分享卡片</p>
+                {!customImg && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-700/40 rounded-full px-2 py-0.5 font-medium">
+                    使用默认 OG 图
+                  </span>
                 )}
-                {isLarge && (
-                  <div className="p-3 border-t border-border/60">
-                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wide truncate">{previewSite}</p>
-                    <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
-                    <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
+              </div>
+              <div className="rounded-2xl border border-border/80 overflow-hidden bg-card max-w-sm shadow-sm">
+                {isLarge ? (
+                  <>
+                    <div className="w-full h-36 bg-muted/40 overflow-hidden">
+                      <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = "/og-banner.png"; }} />
+                    </div>
+                    <div className="p-3 border-t border-border/60">
+                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wide truncate">{previewSite}</p>
+                      <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
+                      <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-stretch">
+                    <div className="w-20 h-20 shrink-0 bg-muted/40 overflow-hidden">
+                      <img src={previewImg} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = "/og-banner.png"; }} />
+                    </div>
+                    <div className="p-2.5 flex flex-col justify-center min-w-0">
+                      <p className="text-[11px] text-muted-foreground/60 truncate">{previewSite}</p>
+                      <p className="text-xs font-semibold line-clamp-1 mt-0.5">{previewTitle}</p>
+                      <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{previewDesc}</p>
+                    </div>
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground">修改下方字段后预览实时更新</p>
+              <p className="text-[10px] text-muted-foreground">修改下方字段后预览实时更新 · 留空时自动使用站点默认 OG 图</p>
             </div>
           );
         })()}

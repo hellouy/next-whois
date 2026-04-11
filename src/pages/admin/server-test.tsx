@@ -13,9 +13,18 @@ import {
   RiAddLine,
   RiTimeLine,
   RiInformationLine,
+  RiExternalLinkLine,
 } from "@remixicon/react";
 
-type ServerType = "tcp" | "http";
+type ServerType = "tcp" | "http" | "api";
+type ApiService = "tianhu" | "nazhumi" | "miqingju" | "yisi";
+
+type ApiTestResult = {
+  ok: boolean;
+  details?: string;
+  error?: string;
+  raw?: string;
+};
 
 type TestResult = {
   ok: boolean;
@@ -39,6 +48,10 @@ export default function ServerTestPage() {
   const [result, setResult] = React.useState<TestResult | null>(null);
 
   const [saving, setSaving] = React.useState(false);
+
+  const [apiService, setApiService] = React.useState<ApiService>("tianhu");
+  const [apiResult, setApiResult] = React.useState<ApiTestResult | null>(null);
+  const [apiTesting, setApiTesting] = React.useState(false);
 
   const normalizedTld = tld.trim().toLowerCase().replace(/^\./, "");
 
@@ -69,7 +82,28 @@ export default function ServerTestPage() {
     if (!normalizedTld) return false;
     if (serverType === "tcp") return tcpHost.trim().length > 0;
     if (serverType === "http") return httpUrl.trim().length > 0;
+    if (serverType === "api") return true;
     return false;
+  }
+
+  async function runApiTest() {
+    if (!normalizedTld) return;
+    setApiTesting(true);
+    setApiResult(null);
+    try {
+      const r = await fetch("/api/admin/third-party-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld: normalizedTld, service: apiService }),
+      });
+      const data: ApiTestResult = await r.json();
+      setApiResult(data);
+      if (!data.ok) toast.error(data.error || "查询失败");
+    } catch {
+      toast.error("请求失败，请检查网络");
+    } finally {
+      setApiTesting(false);
+    }
   }
 
   async function runTest() {
@@ -167,20 +201,26 @@ export default function ServerTestPage() {
 
             {/* Server type selector */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">服务器类型</label>
-              <div className="flex gap-2">
-                {(["tcp", "http"] as ServerType[]).map(type => (
+              <label className="text-xs font-semibold text-muted-foreground">查询方式</label>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { type: "tcp", label: "TCP WHOIS" },
+                  { type: "http", label: "HTTP / RDAP" },
+                  { type: "api", label: "第三方 API" },
+                ] as { type: ServerType; label: string }[]).map(({ type, label }) => (
                   <button
                     key={type}
-                    onClick={() => { setServerType(type); setResult(null); }}
+                    onClick={() => { setServerType(type); setResult(null); setApiResult(null); }}
                     className={cn(
-                      "flex-1 h-9 rounded-xl text-sm font-semibold border transition-all",
+                      "flex-1 h-9 rounded-xl text-sm font-semibold border transition-all min-w-[6rem]",
                       serverType === type
-                        ? "bg-primary text-primary-foreground border-primary"
+                        ? type === "api"
+                          ? "bg-violet-500 text-white border-violet-500"
+                          : "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
                     )}
                   >
-                    {type === "tcp" ? "TCP WHOIS (端口 43)" : "HTTP / RDAP"}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -229,7 +269,53 @@ export default function ServerTestPage() {
               </div>
             )}
 
+            {/* Third-party API selector */}
+            {serverType === "api" && (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-muted-foreground">选择 API 服务商</label>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { id: "tianhu",   label: "天虎",   desc: "免费" },
+                    { id: "nazhumi",  label: "哪煮米", desc: "价格比价" },
+                    { id: "miqingju",label: "米情局", desc: "价格比价" },
+                    { id: "yisi",     label: "亿思云", desc: "需 Key" },
+                  ] as { id: ApiService; label: string; desc: string }[]).map(({ id, label, desc }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setApiService(id); setApiResult(null); }}
+                      className={cn(
+                        "flex-1 h-9 rounded-xl text-sm font-semibold border transition-all min-w-[5rem] flex flex-col items-center justify-center leading-tight",
+                        apiService === id
+                          ? "bg-violet-500 text-white border-violet-500"
+                          : "bg-background border-border text-muted-foreground hover:border-violet-400/60 hover:text-foreground"
+                      )}
+                    >
+                      <span>{label}</span>
+                      <span className={cn("text-[9px]", apiService === id ? "text-white/70" : "text-muted-foreground/60")}>{desc}</span>
+                    </button>
+                  ))}
+                </div>
+                {normalizedTld && (
+                  <p className="text-[10px] text-muted-foreground">
+                    将查询：<code className="font-mono">example.{normalizedTld}</code>
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Test button */}
+            {serverType === "api" ? (
+              <Button
+                onClick={runApiTest}
+                disabled={apiTesting || !normalizedTld}
+                className="w-full h-10 rounded-xl gap-2 bg-violet-500 hover:bg-violet-600 text-white"
+              >
+                {apiTesting
+                  ? <RiLoader4Line className="w-4 h-4 animate-spin" />
+                  : <RiExternalLinkLine className="w-4 h-4" />}
+                {apiTesting ? "查询中…" : "发起查询"}
+              </Button>
+            ) : (
             <Button
               onClick={runTest}
               disabled={testing || !isFormValid()}
@@ -240,6 +326,7 @@ export default function ServerTestPage() {
                 : <RiWifiLine className="w-4 h-4" />}
               {testing ? "测试中…" : "测试连接"}
             </Button>
+            )}
           </div>
         </div>
 
@@ -326,11 +413,66 @@ export default function ServerTestPage() {
           </div>
         )}
 
+        {/* Third-party API result panel */}
+        {apiResult && serverType === "api" && (
+          <div className={cn(
+            "glass-panel border rounded-2xl overflow-hidden",
+            apiResult.ok
+              ? "border-violet-200 dark:border-violet-800/40"
+              : "border-red-200 dark:border-red-800/40"
+          )}>
+            <div className={cn(
+              "px-5 py-3 flex items-center gap-3 border-b",
+              apiResult.ok
+                ? "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200/60 dark:border-violet-800/30"
+                : "bg-red-50/60 dark:bg-red-950/20 border-red-200/60 dark:border-red-800/30"
+            )}>
+              <div className={cn(
+                "w-7 h-7 rounded-xl flex items-center justify-center shrink-0",
+                apiResult.ok
+                  ? "bg-violet-100 dark:bg-violet-950/40 text-violet-600"
+                  : "bg-red-100 dark:bg-red-950/40 text-red-600"
+              )}>
+                {apiResult.ok
+                  ? <RiCheckLine className="w-4 h-4" />
+                  : <RiErrorWarningLine className="w-4 h-4" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn("text-sm font-bold", apiResult.ok ? "text-violet-700 dark:text-violet-400" : "text-red-700 dark:text-red-400")}>
+                  {apiResult.ok ? "查询成功" : "查询失败"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  服务商：{({ tianhu: "天虎", nazhumi: "哪煮米", miqingju: "米情局", yisi: "亿思云" } as Record<string, string>)[apiService]}
+                </p>
+              </div>
+            </div>
+            {apiResult.details && (
+              <div className="px-5 py-3 border-b border-border/50">
+                <p className="text-xs text-foreground/80">{apiResult.details}</p>
+              </div>
+            )}
+            {apiResult.error && (
+              <div className="px-5 py-3 border-b border-border/50 flex items-start gap-2">
+                <RiErrorWarningLine className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-600 dark:text-red-400 break-all">{apiResult.error}</p>
+              </div>
+            )}
+            {apiResult.raw && (
+              <div className="px-5 py-4">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">原始响应</p>
+                <pre className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap break-all bg-muted/40 rounded-xl px-4 py-3 text-foreground/80 overflow-auto max-h-56">
+                  {apiResult.raw}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Info note about scrapers */}
         <div className="flex items-start gap-2 bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/50 dark:border-sky-800/30 rounded-xl px-4 py-3">
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <p className="text-xs text-sky-700 dark:text-sky-400">
-            <strong>注意：</strong>爬虫类型（Scraper）服务器无法通过此页面测试连通性，请直接在域名管理页面手动配置。本工具仅支持 TCP WHOIS 和 HTTP/RDAP 类型的实时连接验证。
+            <strong>注意：</strong>爬虫类型（Scraper）服务器无法通过此页面测试连通性，请直接在域名管理页面手动配置。TCP WHOIS 和 HTTP/RDAP 仅测试连接可用性；第三方 API 会发起实际查询并返回结果。
           </p>
         </div>
 
