@@ -10,8 +10,47 @@ import {
   RiGlobalLine,
   RiLightbulbFlashLine,
 } from "@remixicon/react";
-import { toSearchURI } from "@/lib/utils";
+import { toSearchURI, isValidDomainTld } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+
+// Non-domain extensions that commonly appear in URL paths (file paths, API routes, etc.)
+const NON_DOMAIN_EXTS = new Set([
+  "tsx", "ts", "js", "jsx", "mjs", "cjs", "vue", "svelte",
+  "json", "json5", "jsonc", "yaml", "yml", "toml", "env", "lock",
+  "md", "mdx", "txt", "rst", "log", "csv", "xml",
+  "html", "htm", "css", "scss", "sass", "less",
+  "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif",
+  "ttf", "woff", "woff2", "eot", "otf",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "tar", "gz",
+  "sh", "bash", "py", "rb", "php", "go", "rs", "java", "kt", "swift", "c", "cpp", "h",
+  "map", "d", "min",
+]);
+
+/**
+ * Returns true only when `path` looks like a genuine domain/IP query:
+ *  - no slash (rules out file paths)
+ *  - only domain-legal characters
+ *  - TLD is not a known file extension
+ *  - TLD passes ICANN validation via isValidDomainTld
+ */
+function looksLikeDomainQuery(path: string): boolean {
+  if (!path || !path.includes(".")) return false;
+  // Slashes → file/URL path, not a standalone domain
+  if (path.includes("/")) return false;
+  // Spaces are never valid in a domain
+  if (path.includes(" ")) return false;
+  // Only allow characters legal in domain names / IPs / ASNs
+  if (!/^[a-zA-Z0-9._:[\]-]+$/.test(path)) return false;
+  const parts = path.split(".");
+  if (parts.length < 2) return false;
+  const tld = parts[parts.length - 1].toLowerCase();
+  // TLD must be at least 2 characters
+  if (tld.length < 2) return false;
+  // Reject known file/code extensions
+  if (NON_DOMAIN_EXTS.has(tld)) return false;
+  // Delegate final check to the ICANN-aware validator
+  return isValidDomainTld(path);
+}
 
 const FUN_FACTS_ZH = [
   "世界上第一个 404 错误发生在 1992 年的欧洲核子研究中心（CERN），来自 Room 404 这个房间。",
@@ -204,7 +243,7 @@ export default function NotFoundPage() {
     setRandomFact(facts[Math.floor(Math.random() * facts.length)]);
   }, [locale]);
 
-  const looksLikeDomain = rawPath.includes(".");
+  const looksLikeDomain = looksLikeDomainQuery(rawPath);
 
   const terminalLines = useMemo(() => {
     const p = rawPath || "unknown";
@@ -302,7 +341,9 @@ export default function NotFoundPage() {
                     {t("not_found.title")}
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    {t("not_found.subtitle")}
+                    {looksLikeDomain
+                      ? t("not_found.subtitle")
+                      : t("not_found.subtitle_path")}
                   </p>
                 </motion.div>
 

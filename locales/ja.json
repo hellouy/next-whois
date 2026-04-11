@@ -766,6 +766,7 @@
   "not_found": {
     "title": "ページが見つかりません",
     "subtitle": "DNS クエリ完了 — このルートは登録されていません。",
+    "subtitle_path": "このページは存在しません。URLをご確認ください。",
     "domain_hint": "ドメインのようです。検索しますか？",
     "search_placeholder": "実際のドメインを検索…",
     "search_btn": "検索",

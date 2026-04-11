@@ -767,6 +767,7 @@
   "not_found": {
     "title": "頁面不存在",
     "subtitle": "DNS 查詢已完成，但此路由從未被註冊過。",
+    "subtitle_path": "此頁面路由不存在，請檢查連結是否正確。",
     "domain_hint": "看起來像是網域，要搜尋它嗎？",
     "search_placeholder": "搜尋一個真實的網域…",
     "search_btn": "查詢",

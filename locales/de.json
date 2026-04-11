@@ -767,6 +767,7 @@
   "not_found": {
     "title": "Seite nicht gefunden",
     "subtitle": "DNS-Abfrage abgeschlossen — diese Route wurde nie registriert.",
+    "subtitle_path": "Diese Seite existiert nicht. Bitte überprüfen Sie die URL.",
     "domain_hint": "Sieht wie eine Domain aus. Als Domain suchen?",
     "search_placeholder": "Echte Domain suchen…",
     "search_btn": "Suchen",

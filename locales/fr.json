@@ -767,6 +767,7 @@
   "not_found": {
     "title": "Page introuvable",
     "subtitle": "Requête DNS terminée — cette route n'a jamais été enregistrée.",
+    "subtitle_path": "Cette page n'existe pas. Veuillez vérifier l'URL.",
     "domain_hint": "Ça ressemble à un domaine. Voulez-vous le rechercher ?",
     "search_placeholder": "Rechercher un vrai domaine…",
     "search_btn": "Chercher",

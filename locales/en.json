@@ -767,6 +767,7 @@
   "not_found": {
     "title": "Page Not Found",
     "subtitle": "DNS lookup complete — this route was never registered.",
+    "subtitle_path": "This page route does not exist. Please check the URL.",
     "domain_hint": "Looks like a domain. Try searching for it:",
     "search_placeholder": "Search a real domain…",
     "search_btn": "Search",

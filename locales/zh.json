@@ -767,6 +767,7 @@
   "not_found": {
     "title": "页面不存在",
     "subtitle": "DNS 查询已完成，但此路由从未被注册过。",
+    "subtitle_path": "此页面路由不存在，请检查链接是否正确。",
     "domain_hint": "看起来像是域名，要搜索它吗？",
     "search_placeholder": "搜索一个真实的域名…",
     "search_btn": "查询",

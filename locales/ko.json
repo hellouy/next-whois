@@ -767,6 +767,7 @@
   "not_found": {
     "title": "페이지를 찾을 수 없음",
     "subtitle": "DNS 조회 완료 — 이 경로는 등록된 적이 없습니다.",
+    "subtitle_path": "이 페이지는 존재하지 않습니다. URL을 확인해 주세요.",
     "domain_hint": "도메인처럼 보입니다. 검색해 볼까요?",
     "search_placeholder": "실제 도메인 검색…",
     "search_btn": "검색",
