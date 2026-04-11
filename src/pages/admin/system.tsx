@@ -9,7 +9,7 @@ import {
   RiErrorWarningLine, RiFeedbackLine, RiBarChartLine,
   RiCalendarLine, RiServerLine, RiMoneyDollarCircleLine,
   RiDeleteBinLine, RiTimeLine, RiShieldLine, RiFlashlightLine,
-  RiToolsLine, RiSparklingLine,
+  RiToolsLine, RiSparklingLine, RiGitBranchLine, RiUploadCloud2Line,
 } from "@remixicon/react";
 
 type SystemData = {
@@ -56,6 +56,10 @@ export default function AdminSystemPage() {
   const [confirmTrigger, setConfirmTrigger] = React.useState(false);
   const [confirmClear, setConfirmClear] = React.useState(false);
 
+  const [gitPushing, setGitPushing] = React.useState(false);
+  const [gitResult, setGitResult] = React.useState<{ sha?: string; files?: number } | null>(null);
+  const [confirmGitPush, setConfirmGitPush] = React.useState(false);
+
   function load() {
     setLoading(true);
     fetch("/api/admin/system")
@@ -101,6 +105,29 @@ export default function AdminSystemPage() {
       toast.error("操作失败");
     } finally {
       setClearingRateLimit(false);
+    }
+  }
+
+  async function gitForcePush() {
+    setConfirmGitPush(false);
+    setGitPushing(true);
+    setGitResult(null);
+    try {
+      const r = await fetch("/api/admin/git-force-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "push", message: "chore: sync from Replit admin" }),
+      });
+      const d = await r.json();
+      if (d.error) toast.error(d.error);
+      else {
+        setGitResult({ sha: d.sha, files: d.files });
+        toast.success(`已推送 ${d.files} 个文件到 GitHub（${d.sha}）`);
+      }
+    } catch {
+      toast.error("推送失败");
+    } finally {
+      setGitPushing(false);
     }
   }
 
@@ -391,6 +418,40 @@ export default function AdminSystemPage() {
                       className="w-full h-8 rounded-lg text-xs gap-2 mt-1">
                       {clearingRateLimit ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiDeleteBinLine className="w-3.5 h-3.5" />}
                       {clearingRateLimit ? "清理中…" : "清理过期记录"}
+                    </Button>
+                  )}
+                </div>
+
+                {/* GitHub Force Push */}
+                <div className="border border-border rounded-xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <RiGitBranchLine className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-semibold">同步推送到 GitHub</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    当本地 Git 面板卡住时，直接通过 GitHub API 将所有文件推送到远程仓库
+                  </p>
+                  {gitResult && (
+                    <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-2.5 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
+                      ✓ 已推送 {gitResult.files} 个文件 · commit {gitResult.sha}
+                    </div>
+                  )}
+                  {confirmGitPush ? (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">将创建新提交覆盖 GitHub 同名文件</span>
+                      <Button size="sm" variant="outline" onClick={gitForcePush} disabled={gitPushing}
+                        className="h-7 px-2.5 rounded-lg text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                        {gitPushing ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : "确认推送"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmGitPush(false)} disabled={gitPushing}
+                        className="h-7 px-2.5 rounded-lg text-xs">取消</Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setConfirmGitPush(true)} disabled={gitPushing}
+                      className="w-full h-8 rounded-lg text-xs gap-2 mt-1">
+                      {gitPushing
+                        ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />推送中…</>
+                        : <><RiUploadCloud2Line className="w-3.5 h-3.5" />推送到 GitHub</>}
                     </Button>
                   )}
                 </div>
