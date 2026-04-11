@@ -180,7 +180,8 @@ const ACTION_GROUPS: ActionGroup[] = [
     items: [
       { href: "/admin/reminders",        label: "到期提醒",    desc: "域名监控与续费订阅管理",     icon: RiBellLine,           color: "text-cyan-500" },
       { href: "/admin/notify",           label: "邮件推送",    desc: "向用户发送群发通知邮件",     icon: RiMailSendLine,       color: "text-blue-400" },
-      { href: "/admin/notify-service",   label: "通知服务",    desc: "Bark·Telegram·钉钉·飞书·Webhook", icon: RiNotification3Line, color: "text-indigo-500" },
+      { href: "/admin/notify-service",   label: "通知渠道",    desc: "Bark·Telegram·钉钉·飞书·Webhook", icon: RiNotification3Line, color: "text-indigo-500" },
+      { href: "/admin/expired-domains",  label: "过期域名挖掘", desc: "抓取短域名·高价值·AI前缀域名", icon: RiGlobalLine,    color: "text-emerald-600" },
       { href: "/admin/feedback",         label: "用户反馈",    desc: "处理与回应用户反馈",         icon: RiFeedbackLine,   color: "text-rose-500" },
       { href: "/admin/search-records",   label: "查询记录",    desc: "浏览、统计、清理历史记录",   icon: RiSearchLine,     color: "text-emerald-500" },
     ],
