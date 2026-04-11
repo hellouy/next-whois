@@ -17,7 +17,6 @@ import Head from "next/head";
 import { Button } from "@/components/ui/button";
 import {
   RiCameraLine,
-  RiFileCopyLine,
   RiExternalLinkLine,
   RiLinkM,
   RiShareLine,
@@ -1951,13 +1950,6 @@ export default function LookupPage({
                         >
                           {result.domain || displayTarget}
                         </motion.h2>
-                        <button
-                          onClick={() => copy(result.domain || target)}
-                          title={isChinese ? "复制域名" : "Copy domain"}
-                          className="mt-1 shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
-                        >
-                          <RiFileCopyLine className="w-4 h-4" />
-                        </button>
                       </div>
                       {result.domainPunycode && (
                         <p
