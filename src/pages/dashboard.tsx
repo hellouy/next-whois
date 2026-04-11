@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -23,6 +24,7 @@ import { invalidateDashCache } from "@/lib/dashboard-cache";
 import { useDashboard } from "@/hooks/useDashboard";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const siteSettings = useSiteSettings();
   const {
     session, status, locale, t, paymentEnabled,
@@ -176,7 +178,8 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link href="/"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:scale-[0.96]">
+              onClick={e => { e.preventDefault(); router.push("/"); }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:scale-[0.96] touch-manipulation">
               <RiSearchLine className="w-3.5 h-3.5" />
               <span>返回首页</span>
             </Link>

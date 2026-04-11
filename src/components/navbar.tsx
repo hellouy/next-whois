@@ -25,6 +25,7 @@ import {
   RiCompassLine,
   RiWifiLine,
   RiArrowLeftSLine,
+  RiHome3Line,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -799,6 +800,13 @@ function UserButton() {
                 <p className="text-[9px] font-bold text-violet-600 dark:text-violet-400 mt-0.5 uppercase tracking-wider">{t("founder")} · {t("nav_admin")}</p>
               )}
             </div>
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
+            >
+              <RiHome3Line className="w-3.5 h-3.5 text-muted-foreground" />首页
+            </Link>
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}

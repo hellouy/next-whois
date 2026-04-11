@@ -636,7 +636,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  style={{ willChange: isStablePage ? "opacity" : "opacity, transform" }}
+                  style={isStablePage ? undefined : { willChange: "opacity, transform" }}
                 >
                   <ErrorBoundary>
                     <Component {...pageProps} />
