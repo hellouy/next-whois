@@ -1238,6 +1238,7 @@
     "checkout_order_summary": "注文概要",
     "checkout_validity": "有効期間",
     "checkout_total": "合計",
+    "balance_credit": "残高チャージ",
     "checkout_pay_now": "今すぐ支払う",
     "checkout_pay_amount": "{{amount}} を支払う",
     "checkout_paying": "支払いページへ移動中…",

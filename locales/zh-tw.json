@@ -1239,6 +1239,7 @@
     "checkout_order_summary": "訂單明細",
     "checkout_validity": "有效期",
     "checkout_total": "合計",
+    "balance_credit": "餘額充值",
     "checkout_pay_now": "立即付款",
     "checkout_pay_amount": "付款 {{amount}}",
     "checkout_paying": "正在跳轉付款…",

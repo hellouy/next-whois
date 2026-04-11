@@ -1239,6 +1239,7 @@
     "checkout_order_summary": "Bestellübersicht",
     "checkout_validity": "Gültigkeit",
     "checkout_total": "Gesamt",
+    "balance_credit": "Gutschrift",
     "checkout_pay_now": "Jetzt bezahlen",
     "checkout_pay_amount": "{{amount}} bezahlen",
     "checkout_paying": "Weiterleitung zur Zahlung…",

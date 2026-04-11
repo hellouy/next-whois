@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!validProviders.includes(provider)) return res.status(400).json({ error: "Unsupported payment method" });
 
   const providerEnabled = await getSetting(`payment_${provider}_enabled`);
-  if (!providerEnabled) return res.status(400).json({ error: "This payment method is not enabled" });
+  if (providerEnabled !== "1") return res.status(400).json({ error: "This payment method is not enabled" });
 
   try {
     const { order, plan } = await createOrder({

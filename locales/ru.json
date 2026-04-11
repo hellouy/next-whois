@@ -1238,6 +1238,7 @@
     "checkout_order_summary": "Сводка заказа",
     "checkout_validity": "Срок действия",
     "checkout_total": "Итого",
+    "balance_credit": "Пополнение баланса",
     "checkout_pay_now": "Оплатить сейчас",
     "checkout_pay_amount": "Оплатить {{amount}}",
     "checkout_paying": "Перенаправление на оплату…",

@@ -100,7 +100,6 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
 
         // Resolve admin email early — used for bypass decisions below
-        const { isAdminEmail } = await import("@/lib/admin-server");
         const isAdm = await isAdminEmail(email);
 
         // Admin: proactively clear any stale brute-force lock so prior

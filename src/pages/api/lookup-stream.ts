@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { lookupWhoisCacheStreaming } from "@/lib/whois/lookup";
-import { WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
+import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
@@ -8,15 +8,19 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { getSetting } from "@/lib/server/site-settings-server";
-import { cleanDomain } from "@/lib/utils";
+import { logQuery } from "@/lib/db";
 
 export const config = {
   maxDuration: 30,
 };
 
-const RATE_LIMIT      = 40;
-const RATE_WINDOW_MS  = 60_000;
-const MAX_QUERY_LENGTH = 300;
+// Tiered rate limits per 60 s per IP — mirrors /api/lookup.ts tiers so
+// authenticated and subscribed users get the same higher quotas on both endpoints.
+const RATE_LIMIT_ANON   = 40;   // unauthenticated / external API-key users
+const RATE_LIMIT_AUTHED = 120;  // logged-in free accounts
+const RATE_LIMIT_SUB    = 300;  // active subscription holders
+const RATE_WINDOW_MS    = 60_000;
+const MAX_QUERY_LENGTH  = 300;
 
 /**
  * Streaming WHOIS lookup endpoint — returns NDJSON (newline-delimited JSON).
@@ -30,13 +34,14 @@ const MAX_QUERY_LENGTH = 300;
  * For cache hits or WHOIS-only TLDs, a single line is sent and the
  * connection closes immediately (behaves identically to /api/lookup).
  *
- * The client should use response.body ReadableStream + TextDecoder to
- * consume each newline-delimited JSON object as it arrives.
- *
  * Latency optimization: the WHOIS/RDAP lookup is started immediately after
  * input validation — before awaiting the session/settings check.  The
  * session check runs in parallel with the first RDAP round-trip, saving
  * 50-300 ms on every request.  If auth fails, the lookup is abandoned.
+ *
+ * CN reserved SLDs are detected synchronously before the lookup starts so
+ * no network request is wasted.  Rate limiting is applied after auth so the
+ * correct tier (anon/authed/subscribed) is used, matching /api/lookup.ts.
  */
 export default async function handler(
   req: NextApiRequest,
@@ -45,18 +50,6 @@ export default async function handler(
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
     return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const ip = getClientIp(req);
-  const sameOrigin = isSameOriginRequest(req);
-  const { allowed, remaining, resetMs } = sameOrigin
-    ? { allowed: true, remaining: RATE_LIMIT, resetMs: 0 }
-    : rateLimit(ip, RATE_LIMIT, RATE_WINDOW_MS);
-  res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT));
-  res.setHeader("X-RateLimit-Remaining", String(remaining));
-  res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
-  if (!allowed) {
-    return res.status(429).json({ error: "Too many requests — please slow down" });
   }
 
   const query = req.query.query || req.query.q;
@@ -72,32 +65,31 @@ export default async function handler(
   }
 
   const nocache = req.query.nocache === "1";
+  const ip = getClientIp(req);
+  const sameOrigin = isSameOriginRequest(req);
+
+  // ── CN reserved SLD check — synchronous, zero network cost ───────────────
+  // Province, functional, and system-reserved .cn SLDs never need a WHOIS
+  // lookup.  Detecting them here (before starting the lookup) avoids wasting
+  // a network request and keeps latency near-zero for these queries.
+  const cnReserved = getCnReservedSldInfo(trimmed);
 
   // ── Earliest possible lookup start ───────────────────────────────────────
   // Begin the WHOIS/RDAP lookup immediately after input validation — before
   // the API-key check and session check — so those auth round-trips run in
   // parallel with the first RDAP/WHOIS network requests.
-  // For same-origin requests enforceApiKey is instant; for external API users
-  // the lookup now gets a ~50-200 ms head start during the key verification.
-  //
-  // We use a mutable callback ref: initially it buffers the partial result;
-  // after the auth check passes and response headers are sent, it is upgraded
-  // to write directly to the response stream.
+  // Skip for CN reserved domains (synthetic result, no lookup needed).
   let _lookupAborted = false;
   let _bufferedPartial: WhoisResult | null = null;
   let _onPartial: (p: WhoisResult) => void = (p) => { _bufferedPartial = p; };
 
-  const lookupPromise = lookupWhoisCacheStreaming(
+  const lookupPromise = cnReserved ? null : lookupWhoisCacheStreaming(
     trimmed,
     { nocache },
     (partial) => { if (!_lookupAborted) _onPartial(partial); },
   );
 
   // ── API-key check + auth check (runs in parallel with the lookup above) ──
-  // enforceApiKey must resolve before streaming headers are sent — it can write
-  // its own error response (401/403) if the key is missing or invalid.  Run it
-  // in parallel with the session / require_login checks so both auth concerns
-  // resolve together while the lookup is already in-flight.
   const keyOk = await enforceApiKey(req, res, "api");
   if (!keyOk) { _lookupAborted = true; return; }
 
@@ -105,12 +97,58 @@ export default async function handler(
     getServerSession(req, res, authOptions).catch(() => null),
     getSetting("require_login"),
   ]);
-  const userId    = (session?.user as any)?.id    ?? null;
-  const userEmail = session?.user?.email           ?? null;
+  const userId       = (session?.user as any)?.id    ?? null;
+  const userEmail    = session?.user?.email           ?? null;
+  const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
+
+  // ── Tiered rate limiting — applied after auth so the correct quota applies ─
+  // Same-origin (the site itself) is always exempt.
+  const tierLimit = sameOrigin    ? RATE_LIMIT_SUB
+                  : isSubscribed  ? RATE_LIMIT_SUB
+                  : userEmail     ? RATE_LIMIT_AUTHED
+                  :                 RATE_LIMIT_ANON;
+  const tierKey   = sameOrigin    ? `${ip}:origin`
+                  : isSubscribed  ? `${ip}:sub`
+                  : userEmail     ? `${ip}:auth`
+                  :                 `${ip}:anon`;
+
+  const { allowed, remaining, resetMs } = sameOrigin
+    ? { allowed: true, remaining: tierLimit, resetMs: 0 }
+    : rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+
+  res.setHeader("X-RateLimit-Limit", String(tierLimit));
+  res.setHeader("X-RateLimit-Remaining", String(remaining));
+  res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
+
+  if (!allowed) {
+    _lookupAborted = true;
+    return res.status(429).json({ error: "Too many requests — please slow down" });
+  }
 
   if (requireLogin === "1" && !userEmail) {
     _lookupAborted = true;
     return res.status(401).json({ error: "Please log in to perform queries" });
+  }
+
+  // ── CN reserved SLD — return synthetic NDJSON result without streaming ────
+  if (cnReserved) {
+    const tldParts = trimmed.toLowerCase().split(".");
+    const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
+    const syntheticResult: WhoisAnalyzeResult = {
+      ...initialWhoisAnalyzeResult,
+      domain: trimmed,
+      status: [{ status: "registry-reserved", url: "" }],
+      rawWhoisContent: `[CN Reserved] ${cnReserved.descZh}`,
+    };
+    saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail).catch(() => {});
+    logQuery({ domain: trimmed, tld, success: true, cached: false, durationMs: 0, errorCode: null, source: "whois" }).catch(() => {});
+    res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
+    res.write(JSON.stringify({
+      time: 0, status: true, cached: false, cacheTtl: 43200, source: "whois",
+      result: syntheticResult, partial: false,
+    }) + "\n");
+    return res.end();
   }
 
   // ── Set up NDJSON streaming response ─────────────────────────────────────
@@ -150,8 +188,11 @@ export default async function handler(
     writeChunk({ ...bufferedPartial, result: bufferedPartial.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
   }
 
+  const tldParts = trimmed.toLowerCase().split(".");
+  const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
+
   try {
-    const finalResult = await lookupPromise;
+    const finalResult = await lookupPromise!;
 
     finalSent = true;
 
@@ -165,6 +206,15 @@ export default async function handler(
       partial: false,
     });
 
+    logQuery({
+      domain: trimmed, tld,
+      success: finalResult.status,
+      cached: finalResult.cached ?? false,
+      durationMs: (finalResult.time ?? 0) * 1000,
+      errorCode: finalResult.status ? null : (finalResult.error?.slice(0, 60) ?? null),
+      source: finalResult.source ?? null,
+    }).catch(() => {});
+
     if (finalResult.status) {
       saveSearchRecord(
         trimmed,
@@ -176,14 +226,19 @@ export default async function handler(
     }
   } catch (err) {
     if (!finalSent) {
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
       writeChunk({
         time: 0,
         status: false,
         cached: false,
-        error: err instanceof Error ? err.message : "Unknown error",
+        error: errMsg,
         partial: false,
         result: { ...initialWhoisAnalyzeResult },
       });
+      logQuery({
+        domain: trimmed, tld, success: false, cached: false,
+        durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
+      }).catch(() => {});
     }
   } finally {
     res.end();

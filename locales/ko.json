@@ -1239,6 +1239,7 @@
     "checkout_order_summary": "주문 요약",
     "checkout_validity": "유효 기간",
     "checkout_total": "합계",
+    "balance_credit": "잔액 충전",
     "checkout_pay_now": "지금 결제",
     "checkout_pay_amount": "{{amount}} 결제",
     "checkout_paying": "결제 페이지로 이동 중…",

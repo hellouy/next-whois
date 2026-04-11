@@ -187,7 +187,7 @@ export default function PaymentCheckout() {
                         )}
                         {(p.balance_grant_cents ?? 0) > 0 && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-medium">
-                            +¥{(p.balance_grant_cents / 100).toFixed(0)} 余额
+                            +{sym}{(p.balance_grant_cents / 100).toFixed(0)} {t("payment.balance_credit")}
                           </span>
                         )}
                       </div>
@@ -277,8 +277,8 @@ export default function PaymentCheckout() {
                 </div>
                 {(plan.balance_grant_cents ?? 0) > 0 && (
                   <div className="flex justify-between text-[11px] text-amber-600 dark:text-amber-400">
-                    <span>余额充值</span>
-                    <span className="font-medium">+¥{(plan.balance_grant_cents / 100).toFixed(2)}</span>
+                    <span>{t("payment.balance_credit")}</span>
+                    <span className="font-medium">+{sym}{(plan.balance_grant_cents / 100).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="border-t border-border/40 pt-2 flex justify-between font-bold">

@@ -1239,6 +1239,7 @@
     "checkout_order_summary": "Order Summary",
     "checkout_validity": "Validity",
     "checkout_total": "Total",
+    "balance_credit": "Balance Credit",
     "checkout_pay_now": "Pay Now",
     "checkout_pay_amount": "Pay {{amount}}",
     "checkout_paying": "Redirecting to payment…",

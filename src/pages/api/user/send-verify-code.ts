@@ -32,6 +32,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const cleanEmail = String(email).toLowerCase().trim();
 
+  // Per-IP rate limit: max 10 code requests per 10 minutes per IP address.
+  // This prevents an attacker from using one IP to spray code requests across
+  // thousands of email addresses (email bombing / enumeration at scale).
+  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+  const ipRl = await checkRateLimit(`verify:ip:${ip}`, 10, 10 * 60_000);
+  if (!ipRl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
+
   if (await isDbReady()) {
     const regSetting = await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'allow_registration'");
     const allowReg = !regSetting || regSetting.value === "1";
@@ -41,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existing) return res.status(409).json({ error: "This email is already registered" });
   }
 
-  // Rate limit: max 1 code per 60 s (Redis-preferred, DB fallback via checkRateLimit)
+  // Per-email rate limit: max 1 code per 60 s (Redis-preferred, DB fallback via checkRateLimit)
   if (isRedisAvailable()) {
     const rateLimitKey = `verify:rate:${cleanEmail}`;
     const recentlySent = await getRedisValue(rateLimitKey);

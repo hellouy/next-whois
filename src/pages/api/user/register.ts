@@ -69,12 +69,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const cleanEmail = String(email).toLowerCase().trim();
-  const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
-  if (existing) return res.status(409).json({ error: "This email is already registered" });
 
-  // Resolve verification code: Redis first, DB fallback.
-  // NOTE: storedCode being null means either the code was never sent or it expired —
-  // we ALWAYS require a valid code to prevent unauthenticated registration.
+  // Resolve and validate the verification code BEFORE checking email existence.
+  // This ordering matters for security: if we checked email existence first, an
+  // attacker could probe whether any address is registered by submitting with no
+  // code and reading the error message (409 = registered, 400 = not registered).
+  // By checking the code first, probing requires possessing a valid code — which
+  // requires access to the inbox — making enumeration practically infeasible.
   let storedCode: string | null = null;
   if (isRedisAvailable()) {
     storedCode = await getRedisValue(`verify:register:${cleanEmail}`);
@@ -95,6 +96,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!verifyCode?.trim()) return res.status(400).json({ error: "Please enter the email verification code" });
   if (String(verifyCode).trim() !== storedCode)
     return res.status(400).json({ error: "Incorrect or expired verification code" });
+
+  // Code is valid — now check for duplicate email.
+  const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
+  if (existing) return res.status(409).json({ error: "This email is already registered" });
 
   const id = randomBytes(8).toString("hex");
   const passwordHash = await hash(String(password), 12);
