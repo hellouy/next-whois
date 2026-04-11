@@ -35,6 +35,59 @@ type SystemData = {
 
 type OptimizeItem = { op: string; label: string; count?: number; deleted?: number; status?: string; error?: string };
 
+function GitUnlockPanel() {
+  const [unlocking, setUnlocking] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; deleted: number; notFound: number; results: Record<string, string> } | null>(null);
+
+  async function tryUnlock() {
+    setUnlocking(true);
+    setResult(null);
+    try {
+      const r = await fetch("/api/admin/git-unlock", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const d = await r.json();
+      setResult(d);
+      if (d.deleted > 0) toast.success(`已删除 ${d.deleted} 个 Git 锁文件，请刷新 Git 面板`);
+      else if (d.notFound === Object.keys(d.results).length) toast.success("Git 锁文件不存在，面板应正常");
+      else toast.error("自动解锁未能完全成功，请在电脑 Shell 执行命令");
+    } catch { toast.error("请求失败"); }
+    finally { setUnlocking(false); }
+  }
+
+  return (
+    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 px-2.5 py-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <RiLockLine className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Git 面板卡住（INDEX_LOCKED）？</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={tryUnlock} disabled={unlocking}
+          className="h-6 px-2 rounded-lg text-[10px] gap-1 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 shrink-0">
+          {unlocking ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiLockLine className="w-3 h-3" />}
+          {unlocking ? "解锁中…" : "一键解锁"}
+        </Button>
+      </div>
+      {result && (
+        <div className={cn("text-[10px] font-mono rounded px-2 py-1",
+          result.deleted > 0
+            ? "bg-emerald-100/60 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+            : "bg-red-100/60 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+        )}>
+          {result.deleted > 0
+            ? `✓ 已删除 ${result.deleted} 个锁文件，请刷新 Replit Git 面板`
+            : result.notFound === Object.keys(result.results).length
+              ? "✓ 锁文件不存在，Git 面板应恢复正常"
+              : "✗ 自动解锁受限，请在电脑 Shell 执行以下命令："}
+        </div>
+      )}
+      {(!result || (result && result.deleted === 0 && result.notFound < Object.keys(result.results).length)) && (
+        <code className="block text-[10px] font-mono text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/20 rounded px-2 py-1 break-all select-all">
+          rm -f .git/index.lock .git/MERGE_HEAD .git/MERGE_MODE .git/MERGE_MSG
+        </code>
+      )}
+    </div>
+  );
+}
+
 function StatItem({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color?: string }) {
   return (
     <div className="text-center p-3">
@@ -528,16 +581,8 @@ export default function AdminSystemPage() {
                     </div>
                   )}
 
-                  {/* Git lock warning */}
-                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 px-2.5 py-2 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <RiLockLine className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Git 面板锁定？在 Shell 执行以下命令解锁：</p>
-                    </div>
-                    <code className="block text-[10px] font-mono text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/20 rounded px-2 py-1 break-all select-all">
-                      rm -f .git/index.lock .git/MERGE_HEAD .git/MERGE_MODE .git/MERGE_MSG
-                    </code>
-                  </div>
+                  {/* Git lock warning + unlock button */}
+                  <GitUnlockPanel />
 
                   {gitResult && (
                     <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-2.5 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
