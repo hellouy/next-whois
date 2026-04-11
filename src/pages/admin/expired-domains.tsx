@@ -277,9 +277,9 @@ export default function ExpiredDomainsPage() {
     setSavingSettings(true);
     try {
       const r = await fetch("/api/admin/settings", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings }),
+        body: JSON.stringify(settings),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "保存失败");
