@@ -1688,7 +1688,7 @@
     "nav_db_export": "DB Export",
     "nav_settings": "Site Settings",
     "nav_server_test": "Server Test",
-    "nav_git_fix": "Repo Tools",
+    "nav_tld_failures": "TLD Failures",
     "nav_notify_service": "Push Channels",
     "nav_domain_access": "Domain Access"
   },

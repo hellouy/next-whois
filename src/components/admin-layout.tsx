@@ -29,6 +29,7 @@ import {
   RiWifiLine,
   RiNotification3Line,
   RiNetworkLine,
+  RiAlertLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -65,6 +66,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
       { href: "/admin/domains",        labelKey: "admin.nav_domains",        icon: RiGlobalLine,     activeIcon: RiGlobalLine },
+      { href: "/admin/tld-failures",   labelKey: "admin.nav_tld_failures",   icon: RiAlertLine,      activeIcon: RiAlertLine },
       { href: "/admin/tld-rules",      labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
       { href: "/admin/api",            labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
       { href: "/admin/access-control", labelKey: "admin.nav_access_control", icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
@@ -88,7 +90,6 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/tld-speed",   labelKey: "admin.nav_tld_speed",     icon: RiTimeLine,      activeIcon: RiTimeLine },
       { href: "/admin/server-test", labelKey: "admin.nav_server_test",   icon: RiWifiLine,      activeIcon: RiWifiLine },
       { href: "/admin/db-export",   labelKey: "admin.nav_db_export",     icon: RiDownloadLine,  activeIcon: RiDownloadLine },
-      { href: "/admin/git-fix",     labelKey: "admin.nav_git_fix",       icon: RiGithubLine,    activeIcon: RiGithubLine },
       { href: "/admin/settings",    labelKey: "admin.nav_settings",      icon: RiSettings4Line, activeIcon: RiSettings4Fill },
     ],
   },

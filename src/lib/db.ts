@@ -787,7 +787,24 @@ export async function clearTldFailureStats(tld: string): Promise<void> {
   const client = await db.connect().catch(() => null);
   if (!client) return;
   try {
-    await client.query("DELETE FROM tld_fallback_stats WHERE tld = $1", [key]);
+    // When a tld_api_source is configured, preserve the row (and the config)
+    // but reset fail_count to 0 so the TLD disappears from the failures list.
+    // Only hard-delete rows that have no third-party override — those are pure
+    // failure records with nothing worth keeping.
+    await client.query(
+      `UPDATE tld_fallback_stats
+         SET fail_count = 0, repair_status = 'fixed', repaired_at = NOW()
+       WHERE tld = $1 AND tld_api_source IS NOT NULL`,
+      [key],
+    );
+    await client.query(
+      `DELETE FROM tld_fallback_stats
+       WHERE tld = $1 AND tld_api_source IS NULL`,
+      [key],
+    );
+    // Clear the in-memory cache so any subsequent getTldApiSource() call reads
+    // fresh data instead of returning a stale value from a now-deleted row.
+    _tldApiSourceCache.delete(key);
   } catch {
     // Silently ignore
   } finally {

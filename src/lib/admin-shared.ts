@@ -1,4 +1,7 @@
-if (!process.env.ADMIN_EMAIL) {
+// Warn once per process — not on every hot-reload or API call.
+let _warnedOnce = false;
+if (!process.env.ADMIN_EMAIL && !_warnedOnce) {
+  _warnedOnce = true;
   console.warn(
     "[admin] ADMIN_EMAIL environment variable is not set. " +
     "Please configure it to secure the admin account."

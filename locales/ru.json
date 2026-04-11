@@ -1685,7 +1685,7 @@
     "nav_tld_speed": "Статистика скорости TLD",
     "nav_api": "API",
     "nav_settings": "Настройки",
-    "nav_git_fix": "Исправление Git Push",
+    "nav_tld_failures": "Ошибки TLD",
     "nav_notify_service": "Push-каналы",
     "nav_domain_access": "Доступ к домену",
     "nav_db_export": "Экспорт БД",

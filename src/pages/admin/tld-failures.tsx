@@ -937,7 +937,7 @@ export default function TldFailuresPage() {
                       >
                         <RiWifiLine className="w-2.5 h-2.5" />测试连接
                       </button>
-                      <a href="/admin/domains?tab=failures" className="text-[10px] px-2 py-1 rounded-lg border border-border/60 text-sky-600 dark:text-sky-400 hover:border-sky-400/60 flex items-center gap-1">
+                      <a href="/admin/domains" className="text-[10px] px-2 py-1 rounded-lg border border-border/60 text-sky-600 dark:text-sky-400 hover:border-sky-400/60 flex items-center gap-1">
                         <RiServerLine className="w-2.5 h-2.5" />配置服务器
                       </a>
                       {row.whoiser_bypass && (
