@@ -628,15 +628,25 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
               <ErrorBoundary>
                 <Component {...pageProps} />
               </ErrorBoundary>
+            ) : isStablePage ? (
+              // Stable pages (homepage, dashboard, result, etc.) manage their own
+              // loading feedback.  We render them directly — no AnimatePresence wrapper
+              // — because stablePageVariants used exit:{opacity:1} which is identical
+              // to the animate state.  Framer Motion mode="wait" never fires
+              // onExitComplete for a no-op exit, so the incoming page never mounts.
+              // Using a key ensures React properly unmounts the old page on navigation.
+              <ErrorBoundary key={router.pathname}>
+                <Component {...pageProps} />
+              </ErrorBoundary>
             ) : (
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={animationKey}
-                  variants={isStablePage ? stablePageVariants : pageVariants}
+                  variants={pageVariants}
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  style={isStablePage ? undefined : { willChange: "opacity, transform" }}
+                  style={{ willChange: "opacity, transform" }}
                 >
                   <ErrorBoundary>
                     <Component {...pageProps} />
