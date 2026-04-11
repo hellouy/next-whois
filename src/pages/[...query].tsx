@@ -1982,10 +1982,7 @@ export default function LookupPage({
                             </Badge>
                           ) : (
                             <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-                              <div className="relative mr-1.5 w-2 h-2 shrink-0">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute opacity-60" />
-                                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                              </div>
+                              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5" />
                               {t("active")}
                             </Badge>
                           )
