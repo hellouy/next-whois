@@ -110,6 +110,7 @@ export default function TldFailuresPage() {
   const [resettingAllBypasses, setResettingAllBypasses] = React.useState(false);
   const [testPanels, setTestPanels] = React.useState<Record<string, TestPanel>>({});
   const [apiPanels, setApiPanels]   = React.useState<Record<string, ApiPanel>>({});
+  const [settingApiSource, setSettingApiSource] = React.useState<string | null>(null);
 
   function buildParams(overrides: Record<string, string | number> = {}) {
     const p: Record<string, string> = {
@@ -331,6 +332,27 @@ export default function TldFailuresPage() {
         loading: false,
         result: { ok: false, error: e?.message || "网络错误" },
       });
+    }
+  }
+
+  // ── Per-TLD API source management ───────────────────────────────────────
+  async function applyTldApiSource(tld: string, source: string | null) {
+    setSettingApiSource(tld);
+    try {
+      const r = await fetch("/api/admin/tld-api-source", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, source }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setRows(prev => prev.map(row =>
+        row.tld === tld ? { ...row, tld_api_source: source } : row,
+      ));
+      toast.success(source ? `已将 .${tld} 设为默认 ${source === "tianhu" ? "天虎" : "亿思云"} API 查询` : `已清除 .${tld} 的第三方 API 设置`);
+    } catch {
+      toast.error("操作失败，请重试");
+    } finally {
+      setSettingApiSource(null);
     }
   }
 
@@ -583,6 +605,12 @@ export default function TldFailuresPage() {
                             <RiProhibitedLine className="w-2.5 h-2.5" />whoiser 旁路
                           </span>
                         )}
+                        {row.tld_api_source && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 font-semibold shrink-0 flex items-center gap-0.5">
+                            <RiExternalLinkLine className="w-2.5 h-2.5" />
+                            {row.tld_api_source === "tianhu" ? "天虎 API" : row.tld_api_source === "yisi" ? "亿思云 API" : row.tld_api_source}
+                          </span>
+                        )}
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0", repairInfo.cls)}>{repairInfo.label}</span>
                       </div>
 
@@ -756,14 +784,41 @@ export default function TldFailuresPage() {
                             );
                           })}
                         </div>
-                        <button
-                          onClick={() => runApiLookup(row.tld)}
-                          disabled={apiPanel.loading}
-                          className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[11px] font-semibold transition-colors"
-                        >
-                          {apiPanel.loading ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiExternalLinkLine className="w-3 h-3" />}
-                          {apiPanel.loading ? "查询中…" : "发起查询"}
-                        </button>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => runApiLookup(row.tld)}
+                            disabled={apiPanel.loading}
+                            className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[11px] font-semibold transition-colors"
+                          >
+                            {apiPanel.loading ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiExternalLinkLine className="w-3 h-3" />}
+                            {apiPanel.loading ? "查询中…" : "发起查询"}
+                          </button>
+                          {/* Quick-set buttons: only for tianhu and yisi (WHOIS APIs) */}
+                          {(["tianhu", "yisi"] as const).includes(apiPanel.service) && (() => {
+                            const isActive = row.tld_api_source === apiPanel.service;
+                            const isBusy   = settingApiSource === row.tld;
+                            const labels: Record<string, string> = { tianhu: "天虎", yisi: "亿思云" };
+                            return isActive ? (
+                              <button
+                                onClick={() => applyTldApiSource(row.tld, null)}
+                                disabled={isBusy}
+                                className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-semibold disabled:opacity-50 transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
+                              >
+                                {isBusy ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiCloseLine className="w-2.5 h-2.5" />}
+                                取消 {labels[apiPanel.service]} 默认
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => applyTldApiSource(row.tld, apiPanel.service)}
+                                disabled={isBusy}
+                                className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 text-[10px] font-semibold disabled:opacity-50 transition-colors hover:bg-violet-100 dark:hover:bg-violet-950/50"
+                              >
+                                {isBusy ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiExternalLinkLine className="w-2.5 h-2.5" />}
+                                设为 {labels[apiPanel.service]} 默认
+                              </button>
+                            );
+                          })()}
+                        </div>
                         {apiPanel.result && (
                           <div className={cn(
                             "rounded-xl border p-3 space-y-1.5",

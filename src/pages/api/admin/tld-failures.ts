@@ -16,6 +16,7 @@ export type TldFailureRow = {
   admin_notes: string | null;
   repaired_at: string | null;
   whoiser_bypass: boolean;
+  tld_api_source: string | null;
   this_week_count?: number;
   prev_week_count?: number;
 };
@@ -84,6 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            f.admin_notes,
            f.repaired_at::text,
            COALESCE(f.whoiser_bypass, false) AS whoiser_bypass,
+           f.tld_api_source,
            (c.tld IS NOT NULL) AS has_custom_server,
            c.source AS custom_server_source
          FROM tld_fallback_stats f

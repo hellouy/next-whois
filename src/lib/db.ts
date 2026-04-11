@@ -357,6 +357,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes    TEXT`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repaired_at    TIMESTAMPTZ`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS whoiser_bypass BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS tld_api_source TEXT`,
   `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source          TEXT`,
   `ALTER TABLE users             ADD COLUMN IF NOT EXISTS locale          TEXT NOT NULL DEFAULT 'zh'`,
 ];
@@ -717,6 +718,57 @@ export async function logQuery(entry: {
     );
   } catch {
     // Silently ignore — never disrupt the query path
+  } finally {
+    client.release();
+  }
+}
+
+// ── Per-TLD third-party API source ────────────────────────────────────────────
+
+/**
+ * In-process cache so every WHOIS lookup doesn't hit the DB.
+ * Keys are normalised TLDs (no dot). Populated on first miss, cleared on write.
+ */
+const _tldApiSourceCache = new Map<string, { src: string | null; at: number }>();
+const TLD_API_CACHE_TTL = 120_000; // 2 minutes
+
+export async function getTldApiSource(tld: string): Promise<string | null> {
+  const key = tld.toLowerCase().replace(/^\./, "");
+  const cached = _tldApiSourceCache.get(key);
+  if (cached && Date.now() - cached.at < TLD_API_CACHE_TTL) return cached.src;
+  const db = await getDbReady().catch(() => null);
+  if (!db) return null;
+  const client = await db.connect().catch(() => null);
+  if (!client) return null;
+  try {
+    const r = await client.query(
+      "SELECT tld_api_source FROM tld_fallback_stats WHERE tld = $1",
+      [key],
+    );
+    const src = (r.rows[0]?.tld_api_source as string | null) ?? null;
+    _tldApiSourceCache.set(key, { src, at: Date.now() });
+    return src;
+  } catch {
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function setTldApiSource(tld: string, source: string | null): Promise<void> {
+  const key = tld.toLowerCase().replace(/^\./, "");
+  _tldApiSourceCache.delete(key);
+  const db = await getDbReady().catch(() => null);
+  if (!db) return;
+  const client = await db.connect().catch(() => null);
+  if (!client) return;
+  try {
+    await client.query(
+      `INSERT INTO tld_fallback_stats (tld, fail_count, last_fail_at, tld_api_source)
+       VALUES ($1, 0, NOW(), $2)
+       ON CONFLICT (tld) DO UPDATE SET tld_api_source = $2`,
+      [key, source],
+    );
   } finally {
     client.release();
   }

@@ -26,7 +26,8 @@ import {
 import { ScraperRequiredError } from "@/lib/whois/custom-servers";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
-import { recordTldLookupFailure } from "@/lib/db";
+import { recordTldLookupFailure, getTldApiSource } from "@/lib/db";
+import { lookupViaThirdPartyApi, ThirdPartyApiSource } from "./third-party-api";
 
 warmupDnsCache([
   // gTLD / IANA / RIR
@@ -242,6 +243,32 @@ export async function lookupWhoisWithCache(
   }
 
   if (options.cacheOnly) return { time: 0, status: false, cached: false };
+
+  // ── Per-TLD third-party API override ────────────────────────────────────────
+  // If the admin has configured a third-party API source for this TLD, use it
+  // for ALL queries (skips local WHOIS/RDAP entirely).
+  if (!isIPAddress(domain) && !isASNumber(domain)) {
+    const parts = domain.toLowerCase().split(".");
+    const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
+    if (tld) {
+      const apiSrc = await getTldApiSource(tld).catch(() => null);
+      if (apiSrc) {
+        const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
+        if (r.status) {
+          const ttl = 3600; // 1-hour TTL for third-party results
+          const now = Date.now();
+          const toStore: WhoisResult = { ...r, cachedAt: now, cacheTtl: ttl };
+          l1Set(key, toStore);
+          if (isRedisAvailable()) {
+            setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+          }
+          return { ...r, cached: false, cachedAt: now, cacheTtl: ttl };
+        }
+        // Third-party failed — fall through to normal lookup so the user
+        // still gets some result rather than a blank error.
+      }
+    }
+  }
 
   const doLookup = async (): Promise<WhoisResult> => {
     let result = await lookupWhois(domain);
