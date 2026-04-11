@@ -775,6 +775,27 @@ export async function setTldApiSource(tld: string, source: string | null): Promi
 }
 
 /**
+ * Delete a TLD's failure stats row.  Called after a successful third-party
+ * API lookup proves the TLD can be handled — the row no longer needs to appear
+ * in the admin failures list.
+ * Fire-and-forget — never throws.
+ */
+export async function clearTldFailureStats(tld: string): Promise<void> {
+  const key = tld.toLowerCase().replace(/^\./, "");
+  const db = await getDbReady().catch(() => null);
+  if (!db) return;
+  const client = await db.connect().catch(() => null);
+  if (!client) return;
+  try {
+    await client.query("DELETE FROM tld_fallback_stats WHERE tld = $1", [key]);
+  } catch {
+    // Silently ignore
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Record a TLD lookup failure for admin review.
  * Fire-and-forget — never throws, never blocks the main query path.
  */

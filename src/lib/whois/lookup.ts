@@ -26,7 +26,7 @@ import {
 import { ScraperRequiredError } from "@/lib/whois/custom-servers";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
-import { recordTldLookupFailure, getTldApiSource } from "@/lib/db";
+import { recordTldLookupFailure, getTldApiSource, clearTldFailureStats } from "@/lib/db";
 import { lookupViaThirdPartyApi, ThirdPartyApiSource } from "./third-party-api";
 
 warmupDnsCache([
@@ -262,6 +262,9 @@ export async function lookupWhoisWithCache(
           if (isRedisAvailable()) {
             setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
           }
+          // Third-party API proved it can handle this TLD — auto-remove the
+          // failure stats record so it disappears from the admin failures list.
+          clearTldFailureStats(tld).catch(() => {});
           return { ...r, cached: false, cachedAt: now, cacheTtl: ttl };
         }
         // Third-party failed — fall through to normal lookup so the user

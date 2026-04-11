@@ -868,6 +868,42 @@ export default function TldFailuresPage() {
                           </button>
                         );
                       })}
+
+                      {/* ── Per-TLD API source quick-set ─────────────────── */}
+                      <div className="h-3 w-px bg-border/60 mx-0.5 shrink-0" />
+                      {(["tianhu", "yisi"] as const).map(src => {
+                        const label = src === "tianhu" ? "天虎" : "亿思云";
+                        const isActive = row.tld_api_source === src;
+                        const isBusy   = settingApiSource === row.tld;
+                        return (
+                          <button
+                            key={src}
+                            onClick={() => applyTldApiSource(row.tld, isActive ? null : src)}
+                            disabled={isBusy}
+                            title={isActive ? `取消 ${label} API 路由，点击清除` : `将 .${row.tld} 的所有查询路由至 ${label} API`}
+                            className={cn(
+                              "text-[10px] px-2 py-1 rounded-lg border font-semibold flex items-center gap-0.5 transition-all disabled:opacity-50",
+                              isActive
+                                ? "bg-violet-100 dark:bg-violet-950/40 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+                                : "border-border/60 text-muted-foreground hover:border-violet-400/60 hover:text-violet-600 bg-background",
+                            )}
+                          >
+                            {isBusy ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiExternalLinkLine className="w-2.5 h-2.5" />}
+                            {label}{isActive ? " ✓" : ""}
+                          </button>
+                        );
+                      })}
+                      {row.tld_api_source && (
+                        <button
+                          onClick={() => applyTldApiSource(row.tld, null)}
+                          disabled={settingApiSource === row.tld}
+                          title="清除第三方 API 路由设置"
+                          className="text-[10px] px-1.5 py-1 rounded-lg border border-border/60 text-muted-foreground hover:border-red-400/60 hover:text-red-500 flex items-center gap-0.5 transition-all disabled:opacity-50 bg-background"
+                        >
+                          <RiCloseLine className="w-2.5 h-2.5" />清除
+                        </button>
+                      )}
+
                       <div className="flex-1" />
                       {!isEditing && (
                         <button
