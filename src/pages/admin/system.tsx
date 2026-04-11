@@ -3,6 +3,7 @@ import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import {
   RiLoader4Line, RiRefreshLine, RiDatabase2Line, RiSearchLine,
   RiShieldCheckLine, RiBellLine, RiUserLine, RiCheckLine,
@@ -10,6 +11,7 @@ import {
   RiCalendarLine, RiServerLine, RiMoneyDollarCircleLine,
   RiDeleteBinLine, RiTimeLine, RiShieldLine, RiFlashlightLine,
   RiToolsLine, RiSparklingLine, RiGitBranchLine, RiUploadCloud2Line,
+  RiSettings3Line, RiLockLine,
 } from "@remixicon/react";
 
 type SystemData = {
@@ -59,6 +61,12 @@ export default function AdminSystemPage() {
   const [gitPushing, setGitPushing] = React.useState(false);
   const [gitResult, setGitResult] = React.useState<{ sha?: string; files?: number } | null>(null);
   const [confirmGitPush, setConfirmGitPush] = React.useState(false);
+  const [gitStatus, setGitStatus] = React.useState<{ hasToken: boolean; repo: string | null; latestSha: string | null } | null>(null);
+  const [gitStatusLoading, setGitStatusLoading] = React.useState(false);
+  const [gitToken, setGitToken] = React.useState("");
+  const [gitRepo, setGitRepo] = React.useState("");
+  const [savingGitConfig, setSavingGitConfig] = React.useState(false);
+  const [showGitConfig, setShowGitConfig] = React.useState(false);
 
   function load() {
     setLoading(true);
@@ -108,6 +116,41 @@ export default function AdminSystemPage() {
     }
   }
 
+  async function loadGitStatus() {
+    setGitStatusLoading(true);
+    try {
+      const r = await fetch("/api/admin/git-force-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status" }),
+      });
+      const d = await r.json();
+      setGitStatus(d);
+      if (!d.hasToken) setShowGitConfig(true);
+    } catch { /* ignore */ }
+    finally { setGitStatusLoading(false); }
+  }
+
+  async function saveGitConfig() {
+    setSavingGitConfig(true);
+    try {
+      const r = await fetch("/api/admin/git-force-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_config", token: gitToken || undefined, repo: gitRepo || undefined }),
+      });
+      const d = await r.json();
+      if (d.error) toast.error(d.error);
+      else {
+        toast.success("配置已保存");
+        setGitToken("");
+        setShowGitConfig(false);
+        loadGitStatus();
+      }
+    } catch { toast.error("保存失败"); }
+    finally { setSavingGitConfig(false); }
+  }
+
   async function gitForcePush() {
     setConfirmGitPush(false);
     setGitPushing(true);
@@ -119,10 +162,13 @@ export default function AdminSystemPage() {
         body: JSON.stringify({ action: "push", message: "chore: sync from Replit admin" }),
       });
       const d = await r.json();
-      if (d.error) toast.error(d.error);
-      else {
+      if (d.error) {
+        toast.error(d.error);
+        if (d.error.includes("Token") || d.error.includes("token")) setShowGitConfig(true);
+      } else {
         setGitResult({ sha: d.sha, files: d.files });
         toast.success(`已推送 ${d.files} 个文件到 GitHub（${d.sha}）`);
+        loadGitStatus();
       }
     } catch {
       toast.error("推送失败");
@@ -130,6 +176,8 @@ export default function AdminSystemPage() {
       setGitPushing(false);
     }
   }
+
+  React.useEffect(() => { loadGitStatus(); }, []);
 
   async function loadOptPreview() {
     setOptPreviewLoading(true);
@@ -423,22 +471,84 @@ export default function AdminSystemPage() {
                 </div>
 
                 {/* GitHub Force Push */}
-                <div className="border border-border rounded-xl p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <RiGitBranchLine className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm font-semibold">同步推送到 GitHub</p>
+                <div className="border border-border rounded-xl p-4 space-y-2 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <RiGitBranchLine className="w-4 h-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">同步推送到 GitHub</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {gitStatusLoading ? (
+                        <RiLoader4Line className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      ) : gitStatus ? (
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
+                          gitStatus.hasToken
+                            ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40"
+                            : "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200/60 dark:border-red-800/40"
+                        )}>
+                          {gitStatus.hasToken ? `已配置 · ${gitStatus.repo ?? ""}` : "未配置 Token"}
+                        </span>
+                      ) : null}
+                      <Button size="sm" variant="ghost" onClick={() => setShowGitConfig(v => !v)}
+                        className="h-6 w-6 p-0 rounded-lg">
+                        <RiSettings3Line className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
+
                   <p className="text-xs text-muted-foreground">
-                    当本地 Git 面板卡住时，直接通过 GitHub API 将所有文件推送到远程仓库
+                    Git 面板卡住时，通过 GitHub API 直接将本地文件推送到远程仓库
                   </p>
+
+                  {/* Config panel */}
+                  {showGitConfig && (
+                    <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">GitHub 配置</p>
+                      <div className="space-y-1.5">
+                        <Input
+                          type="password"
+                          placeholder="GitHub Token（ghp_...）留空则不修改"
+                          value={gitToken}
+                          onChange={e => setGitToken(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          type="text"
+                          placeholder={`仓库（${gitStatus?.repo ?? "owner/repo"}）留空则不修改`}
+                          value={gitRepo}
+                          onChange={e => setGitRepo(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <Button size="sm" onClick={saveGitConfig} disabled={savingGitConfig || (!gitToken && !gitRepo)}
+                        className="w-full h-7 rounded-lg text-xs gap-1.5">
+                        {savingGitConfig ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : null}
+                        保存配置
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Git lock warning */}
+                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 px-2.5 py-2 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <RiLockLine className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Git 面板锁定？在 Shell 执行以下命令解锁：</p>
+                    </div>
+                    <code className="block text-[10px] font-mono text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/20 rounded px-2 py-1 break-all select-all">
+                      rm -f .git/index.lock .git/MERGE_HEAD .git/MERGE_MODE .git/MERGE_MSG
+                    </code>
+                  </div>
+
                   {gitResult && (
                     <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-2.5 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
                       ✓ 已推送 {gitResult.files} 个文件 · commit {gitResult.sha}
+                      {gitStatus?.latestSha && <span className="ml-2 text-muted-foreground">（GitHub: {gitStatus.latestSha}）</span>}
                     </div>
                   )}
+
                   {confirmGitPush ? (
                     <div className="flex items-center gap-2 flex-wrap pt-1">
-                      <span className="text-xs text-amber-600 dark:text-amber-400">将创建新提交覆盖 GitHub 同名文件</span>
+                      <span className="text-xs text-amber-600 dark:text-amber-400">将创建新提交同步到 GitHub</span>
                       <Button size="sm" variant="outline" onClick={gitForcePush} disabled={gitPushing}
                         className="h-7 px-2.5 rounded-lg text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
                         {gitPushing ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : "确认推送"}
@@ -447,8 +557,9 @@ export default function AdminSystemPage() {
                         className="h-7 px-2.5 rounded-lg text-xs">取消</Button>
                     </div>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => setConfirmGitPush(true)} disabled={gitPushing}
-                      className="w-full h-8 rounded-lg text-xs gap-2 mt-1">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmGitPush(true)}
+                      disabled={gitPushing || !gitStatus?.hasToken}
+                      className="w-full h-8 rounded-lg text-xs gap-2">
                       {gitPushing
                         ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />推送中…</>
                         : <><RiUploadCloud2Line className="w-3.5 h-3.5" />推送到 GitHub</>}
