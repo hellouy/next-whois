@@ -1560,7 +1560,7 @@ export default function LookupPage({
                   <>
                     <div className="glass-panel border border-emerald-400/40 bg-emerald-50/30 dark:bg-emerald-950/20 rounded-xl p-6 sm:p-8 relative overflow-hidden">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <Badge
                               variant="outline"
@@ -1569,7 +1569,7 @@ export default function LookupPage({
                               {queryType}
                             </Badge>
                           </div>
-                          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-1 uppercase">
+                          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-1 uppercase break-all">
                             {displayTarget}
                           </h2>
                           <p className="text-muted-foreground text-sm mt-2 max-w-sm leading-relaxed">
@@ -1942,9 +1942,9 @@ export default function LookupPage({
                           </button>
                         ) : null}
                       </div>
-                      <div className="flex items-start gap-2 mb-1">
+                      <div className="flex items-start gap-2 mb-1 min-w-0">
                         <motion.h2
-                          className="text-3xl sm:text-4xl font-bold tracking-tight cursor-pointer hover:opacity-80 transition-opacity uppercase select-none"
+                          className="flex-1 min-w-0 text-3xl sm:text-4xl font-bold tracking-tight cursor-pointer hover:opacity-80 transition-opacity uppercase select-none break-all"
                           onClick={() => copy(result.domain || target)}
                           whileTap={{ scale: 0.97 }}
                           transition={{ type: "spring", stiffness: 500, damping: 30 }}
