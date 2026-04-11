@@ -30,6 +30,7 @@ import {
   RiNotification3Line,
   RiNetworkLine,
   RiAlertLine,
+  RiBarChartLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -49,6 +50,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/stamps",           labelKey: "admin.nav_stamps",    icon: RiShieldCheckLine,activeIcon: RiShieldCheckFill },
       { href: "/admin/payment/plans",    labelKey: "admin.nav_plans",     icon: RiBankCardLine,   activeIcon: RiBankCardFill },
       { href: "/admin/payment/orders",   labelKey: "admin.nav_orders",    icon: RiBillLine,       activeIcon: RiBillLine },
+      { href: "/admin/access-control",   labelKey: "admin.nav_access_control", icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
     ],
   },
   {
@@ -67,11 +69,9 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
     titleKey: "admin.nav_config",
     items: [
       { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
-      { href: "/admin/domains",        labelKey: "admin.nav_domains",        icon: RiGlobalLine,     activeIcon: RiGlobalLine },
-      { href: "/admin/tld-failures",   labelKey: "admin.nav_tld_failures",   icon: RiAlertLine,      activeIcon: RiAlertLine },
       { href: "/admin/tld-rules",      labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
+      { href: "/admin/tld-failures",   labelKey: "admin.nav_tld_failures",   icon: RiBarChartLine,   activeIcon: RiBarChartLine },
       { href: "/admin/api",            labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
-      { href: "/admin/access-control", labelKey: "admin.nav_access_control", icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
     ],
   },
   {
@@ -100,10 +100,10 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
 const NAV_FLAT: NavItem[] = NAV_GROUPS.flatMap(g => g.items);
 
 const BOTTOM_PINNED: NavItem[] = [
-  { href: "/admin",                labelKey: "admin.nav_overview",        icon: RiDashboardLine,  activeIcon: RiDashboardFill, exact: true },
-  { href: "/admin/search-records", labelKey: "admin.nav_search_records",  icon: RiSearchLine,     activeIcon: RiSearchFill },
-  { href: "/admin/feedback",       labelKey: "admin.nav_feedback",        icon: RiFeedbackLine,   activeIcon: RiFeedbackFill },
-  { href: "/admin/settings",       labelKey: "admin.nav_settings",        icon: RiSettings4Line,  activeIcon: RiSettings4Fill },
+  { href: "/admin",               labelKey: "admin.nav_overview",       icon: RiDashboardLine,  activeIcon: RiDashboardFill,  exact: true },
+  { href: "/admin/users",         labelKey: "admin.nav_users",          icon: RiUserLine,       activeIcon: RiUserFill },
+  { href: "/admin/query-logs",    labelKey: "admin.nav_query_logs",     icon: RiHistoryLine,    activeIcon: RiHistoryLine },
+  { href: "/admin/tld-rules",     labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
 ];
 
 export function AdminLayout({ children, title }: { children: React.ReactNode; title?: string }) {
@@ -308,13 +308,19 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
           />
         )}
 
-        {/* Drawer panel */}
+        {/* Drawer panel — bottom sheet style, full width */}
         <div className={cn(
-          "fixed top-0 right-0 bottom-0 z-50 w-72 bg-background border-l border-border flex flex-col shadow-2xl transition-transform duration-300 ease-out",
-          drawerOpen ? "translate-x-0" : "translate-x-full"
+          "fixed left-0 right-0 bottom-0 z-50 bg-background border-t border-border flex flex-col shadow-2xl transition-transform duration-300 ease-out rounded-t-2xl",
+          "max-h-[85vh]",
+          drawerOpen ? "translate-y-0" : "translate-y-full"
         )}>
+          {/* Handle bar */}
+          <div className="flex justify-center pt-3 pb-1 shrink-0">
+            <div className="w-10 h-1 rounded-full bg-border" />
+          </div>
+
           {/* Drawer header */}
-          <div className="flex items-center gap-3 px-5 h-14 border-b border-border shrink-0">
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-border/60 shrink-0">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
               <RiShieldUserLine className="w-3.5 h-3.5 text-white" />
             </div>
@@ -330,14 +336,14 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
             </button>
           </div>
 
-          {/* Drawer nav — scrollable */}
-          <div className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
+          {/* Drawer nav — compact grid cards, scrollable */}
+          <div className="flex-1 overflow-y-auto py-3 px-4 space-y-4">
             {NAV_GROUPS.map(group => (
               <div key={group.titleKey}>
-                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest px-3 mb-1.5">
+                <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-2 px-0.5">
                   {t(group.titleKey as any)}
                 </p>
-                <div className="space-y-0.5">
+                <div className="grid grid-cols-4 gap-1.5">
                   {group.items.map(({ href, labelKey, icon: Icon, activeIcon: ActiveIcon, exact }) => {
                     const active = isActive(href, exact);
                     return (
@@ -345,35 +351,38 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
                         key={href}
                         onClick={() => navigate(href)}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left",
+                          "flex flex-col items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all active:scale-95",
                           active
-                            ? "bg-primary/10 text-primary border border-primary/20"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            ? "bg-primary/10 text-primary border border-primary/25"
+                            : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                         )}
                       >
-                        {active ? <ActiveIcon className="w-4 h-4 shrink-0" /> : <Icon className="w-4 h-4 shrink-0" />}
-                        {t(labelKey as any)}
-                        {active && (
-                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                        )}
+                        {active
+                          ? <ActiveIcon className="w-5 h-5 shrink-0" />
+                          : <Icon className="w-5 h-5 shrink-0" />}
+                        <span className="text-[10px] font-semibold leading-tight text-center line-clamp-2">
+                          {t(labelKey as any)}
+                        </span>
+                        {active && <span className="w-1 h-1 rounded-full bg-primary shrink-0" />}
                       </button>
                     );
                   })}
                 </div>
               </div>
             ))}
-          </div>
 
-          {/* Drawer footer */}
-          <div className="shrink-0 px-3 py-4 border-t border-border/60">
+            {/* Back to site */}
             <button
               onClick={() => { setDrawerOpen(false); navigate("/"); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all border border-border/50 mt-1"
             >
               <RiArrowLeftLine className="w-4 h-4 shrink-0" />
               {t("admin.back_to_site")}
             </button>
           </div>
+
+          {/* Safe area bottom */}
+          <div className="h-safe-bottom shrink-0" />
         </div>
       </div>
     </>

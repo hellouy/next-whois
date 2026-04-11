@@ -15,7 +15,7 @@ import {
   RiLinksLine, RiImageLine, RiHeart3Line, RiHistoryLine,
   RiGlobalLine, RiMailSendLine, RiDownloadLine,
   RiBillLine, RiAlertLine, RiBarChartLine,
-  RiNotification3Line, RiNetworkLine,
+  RiNotification3Line, RiNetworkLine, RiWifiLine,
 } from "@remixicon/react";
 
 type Stats = {
@@ -191,13 +191,14 @@ const ACTION_GROUPS: ActionGroup[] = [
     label: "域名与接入",
     accentColor: "text-blue-500",
     items: [
-      { href: "/admin/domain-access",    label: "域名接入",     desc: "接入监控总览与 TLD 分布",   icon: RiNetworkLine,    color: "text-blue-500" },
-      { href: "/admin/domains",          label: "域名生命周期", desc: "注册·宽限·赎回·删除节点",   icon: RiGlobalLine,     color: "text-blue-600" },
-      { href: "/admin/tld-rules",        label: "后缀解析规则", desc: "WHOIS / RDAP 规则定制",     icon: RiCodeBoxLine,    color: "text-teal-500" },
-      { href: "/admin/tld-failures",     label: "查询失败统计", desc: "后缀查询失败分析与修复",    icon: RiAlertLine,      color: "text-amber-500" },
-      { href: "/admin/query-logs",       label: "查询日志",     desc: "实时请求日志与错误率监控",  icon: RiHistoryLine,    color: "text-sky-500" },
-      { href: "/admin/api",              label: "API 集成",     desc: "AI Key · 第三方数据源配置", icon: RiPlugLine,       color: "text-orange-500" },
-      { href: "/admin/hot-prefixes",     label: "热门搜索词",   desc: "首页推荐查询词条管理",      icon: RiFireLine,       color: "text-red-500" },
+      { href: "/admin/domain-access",           label: "域名接入",     desc: "接入监控总览与 TLD 分布",    icon: RiNetworkLine,    color: "text-blue-500" },
+      { href: "/admin/tld-rules",               label: "TLD 规则",     desc: "AI爬取·WHOIS/RDAP 规则定制", icon: RiCodeBoxLine,    color: "text-teal-500" },
+      { href: "/admin/tld-rules?inner=failures",label: "查询失败记录", desc: "后缀失败分析·一键添加服务器", icon: RiAlertLine,      color: "text-amber-500" },
+      { href: "/admin/tld-failures",            label: "失败详细统计", desc: "完整失败统计·repair·第三方API",icon: RiBarChartLine,   color: "text-orange-500" },
+      { href: "/admin/tld-rules?inner=lifecycle",label: "生命周期设置", desc: "宽限期·赎回期·用户纠错审核",  icon: RiTimeLine,       color: "text-blue-600" },
+      { href: "/admin/query-logs",              label: "查询日志",     desc: "实时请求日志与错误率监控",   icon: RiHistoryLine,    color: "text-sky-500" },
+      { href: "/admin/api",                     label: "API 集成",     desc: "AI Key · 第三方数据源配置",  icon: RiPlugLine,       color: "text-orange-500" },
+      { href: "/admin/hot-prefixes",            label: "热门搜索词",   desc: "首页推荐查询词条管理",       icon: RiFireLine,       color: "text-red-500" },
     ],
   },
   {
@@ -216,9 +217,11 @@ const ACTION_GROUPS: ActionGroup[] = [
     label: "系统与设置",
     accentColor: "text-gray-500",
     items: [
-      { href: "/admin/settings",         label: "网站设置",    desc: "标题、公告、功能开关",      icon: RiSettings4Line,  color: "text-blue-500" },
-      { href: "/admin/system",           label: "系统监控",    desc: "数据库连接与运行状态",      icon: RiServerLine,     color: "text-gray-500" },
-      { href: "/admin/db-export",        label: "数据导出",    desc: "导出数据库记录与备份",      icon: RiDownloadLine,   color: "text-green-600" },
+      { href: "/admin/settings",    label: "网站设置",  desc: "标题、公告、功能开关",       icon: RiSettings4Line, color: "text-blue-500" },
+      { href: "/admin/system",      label: "系统监控",  desc: "数据库连接与运行状态",       icon: RiServerLine,    color: "text-gray-500" },
+      { href: "/admin/tld-speed",   label: "服务器测速", desc: "WHOIS 服务器延迟与可达性",  icon: RiWifiLine,      color: "text-cyan-500" },
+      { href: "/admin/server-test", label: "服务器测试", desc: "手动测试 WHOIS/RDAP 接入",  icon: RiPlugLine,      color: "text-violet-500" },
+      { href: "/admin/db-export",   label: "数据导出",  desc: "导出数据库记录与备份",       icon: RiDownloadLine,  color: "text-green-600" },
     ],
   },
 ];
