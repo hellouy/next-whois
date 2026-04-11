@@ -1972,12 +1972,18 @@ export default function LookupPage({
                         {result.remainingDays !== null ? (
                           result.remainingDays <= 0 ? (
                             <Badge className="bg-red-500 hover:bg-red-600 text-white border-0">
-                              <div className="w-2 h-2 rounded-full bg-white/80 animate-pulse mr-1.5" />
+                              <div className="relative mr-1.5 w-2 h-2 shrink-0" suppressHydrationWarning>
+                                <div className="w-2 h-2 rounded-full bg-white/80 animate-ping absolute opacity-75" suppressHydrationWarning />
+                                <div className="w-2 h-2 rounded-full bg-white/90" suppressHydrationWarning />
+                              </div>
                               {t("expired")}
                             </Badge>
                           ) : result.remainingDays <= 60 ? (
                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0">
-                              <div className="w-2 h-2 rounded-full bg-white/80 animate-pulse mr-1.5" />
+                              <div className="relative mr-1.5 w-2 h-2 shrink-0" suppressHydrationWarning>
+                                <div className="w-2 h-2 rounded-full bg-white/80 animate-ping absolute opacity-75" suppressHydrationWarning />
+                                <div className="w-2 h-2 rounded-full bg-white/90" suppressHydrationWarning />
+                              </div>
                               {t("expiring_soon")}
                             </Badge>
                           ) : (
