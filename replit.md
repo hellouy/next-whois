@@ -637,6 +637,27 @@ Main query page reduced from **6,711 → 5,383 lines** (~20% reduction).
 
 ## Vercel Serverless + Redis Optimization (2026-04-01, v3.32)
 
+### Performance Optimizations (v3.35.0)
+
+**Stats API — Query Consolidation + In-Process Cache** (`src/pages/api/admin/stats.ts`):
+- Replaced 26+ individual `COUNT(*)` queries with 4 aggregate queries using conditional aggregation (`FILTER (WHERE ...)`)
+- Added module-level in-process cache with 3-minute TTL — repeated admin overview visits are instant
+- Cache bust via `?refresh=1` query param (used by the manual refresh button)
+- Added `Cache-Control: private, max-age=60, stale-while-revalidate=120` and `X-Cache: HIT/MISS` headers
+
+**DB Indexes — Expired Domain Leads** (`src/lib/db.ts`):
+- `idx_expired_domain_leads_bl` on `(bl DESC NULLS LAST)` — fast sort by backlinks
+- `idx_expired_domain_leads_sld` on `(sld text_pattern_ops)` — fast `LIKE 'prefix%'` prefix filtering
+- `idx_expired_domain_leads_starred` — partial index on `starred=true` rows only
+- `idx_expired_domain_leads_unseen` — partial index on `seen=false` rows only
+
+**Client-Side Page Cache** (`src/lib/page-cache.ts`):
+- New module-level `Map<string, CacheEntry>` that survives Next.js page navigations
+- API: `getPageCache<T>(key)`, `setPageCache(key, data, ttlMs)`, `clearPageCache(key?)`
+- Admin overview (`/admin/index.tsx`): stats initialized from cache, skips fetch on re-visit
+- Expired domains page: lead stats panel initialized from cache, skips fetch on re-visit
+- Default TTL: 2-3 minutes depending on page
+
 ### Upstash HTTP Client (major Vercel fix)
 **`src/lib/server/redis.ts`** — complete rewrite:
 - **Primary**: `@upstash/redis` HTTP client (stateless, zero persistent TCP connections, Vercel-safe). Auto-detected via `wr_KV_REST_API_URL` + `wr_KV_REST_API_TOKEN` env vars (supports `wr_`, `xrw_`, unprefixed prefixes)

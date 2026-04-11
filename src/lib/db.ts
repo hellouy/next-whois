@@ -494,9 +494,13 @@ const CREATE_INDEXES = [
     notes         TEXT,
     crawled_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
-  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_char   ON expired_domain_leads (char_count)`,
-  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_tld    ON expired_domain_leads (tld)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_char    ON expired_domain_leads (char_count)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_tld     ON expired_domain_leads (tld)`,
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_crawled ON expired_domain_leads (crawled_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_bl      ON expired_domain_leads (bl DESC NULLS LAST)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_sld     ON expired_domain_leads (sld text_pattern_ops)`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_starred ON expired_domain_leads (starred) WHERE starred = true`,
+  `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_unseen  ON expired_domain_leads (seen) WHERE seen = false`,
 ];
 
 /**

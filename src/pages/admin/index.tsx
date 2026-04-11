@@ -1,6 +1,7 @@
 import React from "react";
 import { useRouter } from "next/router";
 import { AdminLayout } from "@/components/admin-layout";
+import { getPageCache, setPageCache } from "@/lib/page-cache";
 import { cn } from "@/lib/utils";
 import {
   RiUserLine, RiShieldCheckLine, RiBellLine, RiSearchLine,
@@ -224,24 +225,32 @@ const ACTION_GROUPS: ActionGroup[] = [
 
 export default function AdminIndexPage() {
   const router = useRouter();
-  const [stats, setStats] = React.useState<Stats | null>(null);
+  const [stats, setStats] = React.useState<Stats | null>(() => getPageCache<Stats>("admin_stats"));
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
 
-  function loadStats() {
+  function loadStats(force = false) {
     setRefreshing(true);
     setError(null);
-    fetch("/api/admin/stats")
+    const url = force ? "/api/admin/stats?refresh=1" : "/api/admin/stats";
+    fetch(url)
       .then(r => r.json())
       .then(data => {
         if (data.error) setError(data.error);
-        else setStats(data);
+        else {
+          setStats(data);
+          setPageCache("admin_stats", data, 3 * 60_000);
+        }
       })
       .catch(() => setError("加载失败"))
       .finally(() => setRefreshing(false));
   }
 
-  React.useEffect(() => { loadStats(); }, []);
+  React.useEffect(() => {
+    // Skip fetch if we already have fresh cached data
+    if (stats) return;
+    loadStats();
+  }, []);
 
   return (
     <AdminLayout title="概览">
@@ -254,7 +263,7 @@ export default function AdminIndexPage() {
             <p className="text-xs text-muted-foreground mt-0.5">数据实时汇总 · 快捷导航</p>
           </div>
           <button
-            onClick={loadStats}
+            onClick={() => loadStats(true)}
             disabled={refreshing}
             className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title="刷新统计"

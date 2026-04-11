@@ -5,6 +5,7 @@
  */
 import React from "react";
 import { AdminLayout } from "@/components/admin-layout";
+import { getPageCache, setPageCache } from "@/lib/page-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -104,7 +105,7 @@ export default function ExpiredDomainsPage() {
   const [total, setTotal]               = React.useState(0);
   const [page, setPage]                 = React.useState(1);
   const [loading, setLoading]           = React.useState(true);
-  const [stats, setStats]               = React.useState<Stats | null>(null);
+  const [stats, setStats]               = React.useState<Stats | null>(() => getPageCache<Stats>("expired_lead_stats"));
   const [showStats, setShowStats]       = React.useState(false);
 
   // Filters
@@ -175,11 +176,17 @@ export default function ExpiredDomainsPage() {
     try {
       const r = await fetch("/api/admin/expired-domains-crawl?action=stats");
       const d = await r.json();
-      if (r.ok) setStats(d);
+      if (r.ok) {
+        setStats(d);
+        setPageCache("expired_lead_stats", d, 2 * 60_000);
+      }
     } catch {}
   }, []);
 
-  React.useEffect(() => { loadStats(); }, []);
+  React.useEffect(() => {
+    // Only fetch stats if we don't already have a fresh cached copy
+    if (!stats) loadStats();
+  }, []);
 
   // ── Crawl: length mode ─────────────────────────────────────────────────────
   async function handleCrawlLength() {
