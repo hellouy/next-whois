@@ -118,7 +118,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // lt: removed — rdap.domreg.lt NXDOMAIN; WHOIS via whois.domreg.lt works
   // lu: removed — rdap.dns.lu NXDOMAIN; WHOIS via whois.dns.lu works
   // lv: removed — rdap.nic.lv NXDOMAIN; WHOIS via whois.nic.lv works
-  // me: removed — rdap.nic.me NXDOMAIN; WHOIS via whois.nic.me works
+  me: "https://rdap.identitydigital.services/rdap/",  // rdap.nic.me NXDOMAIN; TCP whois.nic.me blocked from cloud IPs → Identity Digital RDAP
   nl: "https://rdap.sidn.nl/",
   no: "https://rdap.norid.no/",
   pl: "https://rdap.dns.pl/",
