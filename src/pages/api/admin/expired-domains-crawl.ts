@@ -59,7 +59,7 @@ async function loginToExpiredDomains(username: string, password: string): Promis
   const csrfMatch =
     html.match(/name=["']csrfmiddlewaretoken["'][^>]+value=["']([^"']+)["']/) ||
     html.match(/value=["']([^"']+)["'][^>]+name=["']csrfmiddlewaretoken["']/) ||
-    html.match(/csrfmiddlewaretoken.*?value=["']([^"']+)["']/s);
+    html.match(/csrfmiddlewaretoken[\s\S]*?value=["']([^"']+)["']/);
   const csrf = csrfMatch?.[1] ?? "";
 
   const postRes = await fetch(LOGIN_URL, {

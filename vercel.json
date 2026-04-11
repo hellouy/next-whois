@@ -39,6 +39,9 @@
     "src/pages/api/admin/git-force-push.ts": {
       "maxDuration": 60
     },
+    "src/pages/api/admin/expired-domains-crawl.ts": {
+      "maxDuration": 60
+    },
     "src/pages/api/admin/changelog-sync.ts": {
       "maxDuration": 30
     },

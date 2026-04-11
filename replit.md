@@ -2,6 +2,53 @@
 
 ---
 
+## Session — 2026-04-11: ICP 布局修复 + 查询页防崩溃 + 爬虫改进 + 上线前全面审计
+
+### 1. ICP 页面布局修复 — ApiStatusBadge 压缩标题问题
+
+**问题**: ICP 服务离线时，`ApiStatusBadge` 展示完整错误信息（如 "MIIT 服务异常 (code 500)，备用服务: 查询失败"），导致 flex 布局中标题容器被压缩到极小宽度，中文字符逐字竖向排列。
+
+**修复 (`src/pages/icp.tsx`)**:
+- `ApiStatusBadge` 可见标签仅显示简短状态（`t("icp.offline")`）；完整错误保留在 `title` tooltip 中
+- 按钮添加 `shrink-0 max-w-[9rem] overflow-hidden`，内部文字用 `<span className="truncate">` 包裹
+- 内部图标全部添加 `shrink-0`，防止图标在极窄时被压缩
+
+### 2. icp.tsx 变量遮蔽修复
+
+**问题**: `useEffect` 内 `const t = (router.query.type as IcpTypeId) || "web"` 遮蔽了外层 `const { t } = useTranslation()` 的翻译函数，代码逻辑混乱。
+
+**修复**: 将内层变量重命名为 `const typeParam`。
+
+### 3. `t.startsWith` 崩溃防御加固 (`src/pages/[...query].tsx`)
+
+`looksLikeDomainQuery` 函数新增 `typeof t !== "string"` 双重守卫，防止运行时传入非字符串 truthy 值时崩溃。
+
+### 4. 爬虫登录健壮性改进 (`src/pages/api/admin/expired-domains-crawl.ts`)
+
+- **CSRF 提取**: 由单一正则改为三重匹配，支持 `name=` 在前/`value=` 在前/跨行三种 HTML 属性顺序
+- **错误提示**: 登录失败时增加具体原因（CSRF token 未找到 / 非预期 HTTP 状态码）
+
+### 5. vercel.json 补充 expired-domains-crawl 超时配置
+
+`src/pages/api/admin/expired-domains-crawl.ts` 在文件内已有 `export const config = { maxDuration: 60 }`，但未在 `vercel.json` `functions` 中声明。已补充 `"maxDuration": 60`，确保 Vercel 平台正确识别。
+
+### 6. 全面上线前审计结果
+
+| 检查项 | 状态 |
+|--------|------|
+| TypeScript 编译 (`pnpm tsc --noEmit`) | **0 错误** ✓ |
+| 所有 8 个 locale 文件含 `not_found.subtitle_path` | ✓ |
+| `expired_domain_leads` 7 个索引已在 `db.ts` | ✓ |
+| Stats API 4 聚合查询 + 3 分钟内存缓存 | ✓ |
+| Admin 页面 page-cache 模块 | ✓ |
+| vercel.json JSON 有效性 | ✓ |
+| 无硬编码 Secret/密钥 | ✓ |
+| 爬虫函数超时已在 vercel.json 中声明 | ✓ |
+| 运行时无崩溃 (home / ICP / query / 404 页) | ✓ |
+| ADMIN_EMAIL 警告 | dev 环境预期，生产需在 Vercel 环境变量中设置 |
+
+---
+
 ## Session — 2026-04-09 (六): 漏洞审计修复 (Vulnerability Audit Hardening)
 
 ### 1. 依赖升级 — nodemailer CVE 修复
