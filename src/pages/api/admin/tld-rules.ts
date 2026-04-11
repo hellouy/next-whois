@@ -655,7 +655,7 @@ export default async function handler(
       return res.json({
         generated_at: new Date().toISOString(),
         count: rows.length,
-        source: "x.rw tld_rules DB",
+        source: "tld_rules DB",
         rules: Object.fromEntries(rows.map((r) => [r.tld, r])),
       });
     }

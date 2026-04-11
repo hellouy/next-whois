@@ -2,6 +2,7 @@ import type { NextPageContext } from "next";
 import Head from "next/head";
 import Link from "next/link";
 import { RiAlertLine } from "@remixicon/react";
+import { siteTitle } from "@/lib/seo";
 
 interface ErrorProps {
   statusCode?: number;
@@ -26,7 +27,7 @@ function ErrorPage({ statusCode, message }: ErrorProps) {
   return (
     <>
       <Head>
-        <title>{`${statusCode ?? "Error"} – X.RW`}</title>
+        <title>{`${statusCode ?? "Error"} – ${siteTitle}`}</title>
       </Head>
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
         <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center mb-5">

@@ -472,7 +472,7 @@ export default function AdminNotifyServicePage() {
             </div>
             <div className="bg-muted/40 rounded-xl px-4 py-3 text-[11px] text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">发送格式（JSON Body）:</p>
-              <pre className="font-mono text-[10px]">{`{ "title": "...", "body": "...", "timestamp": 0, "source": "x.rw" }`}</pre>
+              <pre className="font-mono text-[10px]">{`{ "title": "...", "body": "...", "timestamp": 0, "source": "your-site.com" }`}</pre>
             </div>
           </div>
           <TestButton

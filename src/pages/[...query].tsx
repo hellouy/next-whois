@@ -1585,7 +1585,7 @@ export default function LookupPage({
                             {t("registered_no_whois")}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground font-mono">
-                            {time.toFixed(2)}s
+                            {(time ?? 0).toFixed(2)}s
                           </span>
                         </div>
                       </div>
@@ -1712,7 +1712,7 @@ export default function LookupPage({
                       </a>
                       {/* Google site: check if this page is indexed */}
                       <a
-                        href={`https://www.google.com/search?q=site:x.rw/${encodeURIComponent(displayTarget)}`}
+                        href={`https://www.google.com/search?q=site:${origin ? new URL(origin).host : ""}/${encodeURIComponent(displayTarget)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
@@ -1724,7 +1724,7 @@ export default function LookupPage({
                       </a>
                       {/* Bing site: check */}
                       <a
-                        href={`https://www.bing.com/search?q=site:x.rw/${encodeURIComponent(displayTarget)}`}
+                        href={`https://www.bing.com/search?q=site:${origin ? new URL(origin).host : ""}/${encodeURIComponent(displayTarget)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted/60 text-xs font-medium transition-colors"
@@ -1814,7 +1814,7 @@ export default function LookupPage({
                         <span className="text-muted-foreground font-mono uppercase">
                           {t("time")}
                         </span>
-                        <span className="font-mono">{time.toFixed(2)}s</span>
+                        <span className="font-mono">{(time ?? 0).toFixed(2)}s</span>
                       </div>
                     </div>
                   </div>
@@ -2005,7 +2005,7 @@ export default function LookupPage({
                             <RiTimeLine className="w-3 h-3 text-primary shrink-0" />
                             <span className="text-[11px] font-normal text-primary">
                               {result.domainAge === 0 ? "<1" : result.domainAge}{" "}
-                              {result.domainAge === 1 ? t("year") : t("years")}
+                              {result.domainAge <= 1 ? t("year") : t("years")}
                             </span>
                           </div>
                         )}
@@ -2130,7 +2130,7 @@ export default function LookupPage({
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-[10px] text-muted-foreground font-mono">
-                          {time.toFixed(2)}s
+                          {(time ?? 0).toFixed(2)}s
                           {cached && (
                             <>
                               {" · "}

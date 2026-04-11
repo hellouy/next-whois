@@ -97,8 +97,8 @@ function fmt(n: number): string {
 const DEFAULT_TITLE       = "RDAP+WHOIS 域名查询 · 免费在线域名信息查询工具";
 const DEFAULT_DESC        = "免费在线 WHOIS / RDAP 域名查询工具，支持查询域名注册信息、注册商、注册日期、到期时间、DNS、状态等，支持国际域名和 IP 地址查询。";
 const DEFAULT_KEYWORDS    = "whois查询, rdap, 域名查询, 域名注册信息, 域名到期, whois工具, 域名信息, ip查询, 域名状态";
-const DEFAULT_LOGO        = "X.RW";
-const DEFAULT_TAGLINE     = "NiC.RW 提供技术支持";
+const DEFAULT_LOGO        = "WHOIS";
+const DEFAULT_TAGLINE     = "专业的 WHOIS / RDAP 查询工具";
 
 const DEFAULT_SEO: HomeSeo = {
   title:             DEFAULT_TITLE,

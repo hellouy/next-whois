@@ -1,7 +1,7 @@
 {
   "name": "next-whois-ui",
   "version": "3.35.0",
-  "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "next dev -p 5000 -H 0.0.0.0",
     "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",

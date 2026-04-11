@@ -2,6 +2,49 @@
 
 ---
 
+## Session — 2026-04-11 (续): 开源准备 + 全面程序审查与 Bug 修复
+
+### 开源准备 — 清除所有 X.RW / x.rw 硬编码品牌引用
+
+**已修复的文件（共 15+ 处）：**
+
+| 文件 | 问题 | 修复 |
+|------|------|------|
+| `src/pages/api/admin/send-reset.ts` | `https://x.rw` 写死为密码重置邮件 Base URL 兜底 | 改为 `NEXT_PUBLIC_SITE_URL` → `NEXTAUTH_URL` → `""` |
+| `src/pages/api/admin/notify-test.ts` | `X.RW` 写死在推送通知测试消息中 | 改为从 DB 读取 `site_logo_text` |
+| `src/pages/api/admin/tld-registry.ts` | User-Agent 写死 `+https://x.rw` | 改为 `NEXT_PUBLIC_SITE_URL` 环境变量 |
+| `src/pages/api/admin/tld-rules.ts` | `source: "x.rw tld_rules DB"` | 改为 `"tld_rules DB"` |
+| `src/pages/_error.tsx` | `X.RW` 写死在错误页 `<title>` | 改为使用 `siteTitle` 常量 |
+| `src/lib/seo.ts` | SEO 默认值含 `X.RW` | 改为通用值 |
+| `src/lib/site-settings.tsx` | DEFAULT_SETTINGS 含 `X.RW` | 改为通用默认值 (`WHOIS`, `RDAP+WHOIS Lookup` 等) |
+| `src/lib/email.ts` | `getSiteLabel()` 和 `withSenderName()` 兜底值 | 改为 `"WHOIS"` |
+| `src/pages/[...query].tsx` | Google/Bing `site:x.rw/` 写死搜索链接 | 改为 `origin` SSR prop 动态生成 |
+| `src/pages/index.tsx` | `DEFAULT_LOGO = "X.RW"`, `DEFAULT_TAGLINE = "NiC.RW..."` | 改为通用值 |
+| `src/pages/login.tsx`, `register.tsx`, `sponsor.tsx` | `site_title` 兜底值含 `X.RW` | 改为 `"RDAP+WHOIS Lookup"` |
+| `src/pages/docs.tsx` | `X.RW v{VERSION}` 写死在文档页底部 | 改为 `{siteLabel}` 动态值 |
+| `src/pages/remind/index.tsx` | `X.RW` 写死在域名监控预览 UI | 改为 `"example.com"` |
+| `src/components/dashboard/GuideModals.tsx` | `X.RW` 写死在引导预览 UI | 改为 `"example.com"` |
+| `src/pages/admin/notify-service.tsx` | 示例 JSON `"source": "x.rw"` | 改为 `"your-site.com"` |
+
+**package.json**: 移除 `private: true`，添加 `"license": "MIT"`。
+**LICENSE 文件**: 已存在，MIT 授权（Copyright ProgramZmh）✓
+
+### Bug 修复
+
+**高危: 余额更新缺乏事务保护 (`src/pages/api/admin/users.ts`)**
+- `UPDATE users` 和 `INSERT INTO balance_transactions` 未在同一事务内
+- 修复: 改为 `withTransaction()` 包裹，保证余额变动和日志记录原子性
+
+**中危: 查询时长显示崩溃风险 (`src/pages/[...query].tsx`)**
+- `time.toFixed(2)` 在 `time` 为 undefined 时会崩溃
+- 修复: 改为 `(time ?? 0).toFixed(2)`（3 处）
+
+**低危: domainAge 复数本地化错误 (`src/pages/[...query].tsx`)**
+- `domainAge === 0` 时显示 `"<1 years"` 应为 `"<1 year"`
+- 修复: 条件改为 `domainAge <= 1 ? t("year") : t("years")`
+
+---
+
 ## Session — 2026-04-11: ICP 布局修复 + 查询页防崩溃 + 爬虫改进 + 上线前全面审计
 
 ### 1. ICP 页面布局修复 — ApiStatusBadge 压缩标题问题

@@ -3,7 +3,7 @@ import { strEnv } from "@/lib/env";
 
 export const siteTitle = strEnv(
   "NEXT_PUBLIC_SITE_TITLE",
-  "X.RW · RDAP+WHOIS - Domain Lookup Tool",
+  "RDAP+WHOIS - Domain Lookup Tool",
 );
 export const siteDescription = strEnv(
   "NEXT_PUBLIC_SITE_DESCRIPTION",
@@ -11,7 +11,7 @@ export const siteDescription = strEnv(
 );
 export const siteKeywords = strEnv(
   "NEXT_PUBLIC_SITE_KEYWORDS",
-  "Whois, RDAP, Lookup, Domain, IPv4, IPv6, ASN, CIDR, X.RW",
+  "Whois, RDAP, Lookup, Domain, IPv4, IPv6, ASN, CIDR",
 );
 
 const configuredUrl = strEnv("NEXT_PUBLIC_SITE_URL", "");

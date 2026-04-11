@@ -81,7 +81,7 @@ export async function parseIanaPage(tld: string): Promise<TldRegistryInfo> {
   try {
     const resp = await fetch(iana_url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; next-whois-ui/3.23 IANA-crawler; +https://x.rw)",
+        "User-Agent": `Mozilla/5.0 (compatible; next-whois-ui/3.23 IANA-crawler; +${process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://github.com/next-whois-ui/next-whois-ui"})`,
         Accept: "text/html,*/*;q=0.9",
       },
       signal: AbortSignal.timeout(14_000),

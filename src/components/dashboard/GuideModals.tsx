@@ -85,7 +85,7 @@ function MiniMockup({ highlightClaim }: { highlightClaim: boolean }) {
       <div className="rounded-lg border border-border bg-background shadow-sm">
         <div className="px-3 pt-2.5 pb-1.5">
           <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-1">DOMAIN</p>
-          <p className="text-sm font-bold font-mono leading-none">X.RW</p>
+          <p className="text-sm font-bold font-mono leading-none">example.com</p>
           <div className="flex items-center gap-1.5 mt-1.5">
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-semibold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
               <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />Active

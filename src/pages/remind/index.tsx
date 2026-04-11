@@ -697,7 +697,7 @@ export default function RemindPage() {
   const { t, locale } = useTranslation();
   const { data: session, status } = useSession();
   const siteSettings = useSiteSettings();
-  const siteName = siteSettings.site_logo_text || "X.RW";
+  const siteName = siteSettings.site_logo_text || "WHOIS";
   const [searchQuery, setSearchQuery] = React.useState("");
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
   const [loadingSubs, setLoadingSubs] = React.useState(false);
@@ -846,7 +846,7 @@ export default function RemindPage() {
             <div className="rounded-xl border border-border bg-background shadow-sm overflow-hidden">
               <div className="px-4 pt-3.5 pb-2 space-y-1.5">
                 <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/50">DOMAIN</p>
-                <p className="text-sm font-bold font-mono tracking-tight">X.RW</p>
+                <p className="text-sm font-bold font-mono tracking-tight">example.com</p>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active

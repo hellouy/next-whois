@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { many, one, run } from "@/lib/db-query";
+import { many, one, run, withTransaction } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { isAdminEmail } from "@/lib/admin-server";
 
@@ -130,15 +130,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (balance_adjustment !== undefined && balance_adjustment !== 0) {
         const adjCents = Math.round(Number(balance_adjustment));
         if (!isNaN(adjCents)) {
-          await run(
-            "UPDATE users SET balance_cents = GREATEST(0, balance_cents + $1), updated_at = NOW() WHERE id = $2",
-            [adjCents, id]
-          );
-          await run(
-            `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
-             VALUES ($1, $2, $3, $4)`,
-            [id, Math.abs(adjCents), adjCents > 0 ? "recharge" : "deduct", balance_note?.trim() || (adjCents > 0 ? "管理员充值" : "管理员扣款")]
-          );
+          await withTransaction(async (client) => {
+            await client.run(
+              "UPDATE users SET balance_cents = GREATEST(0, balance_cents + $1), updated_at = NOW() WHERE id = $2",
+              [adjCents, id]
+            );
+            await client.run(
+              `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
+               VALUES ($1, $2, $3, $4)`,
+              [id, Math.abs(adjCents), adjCents > 0 ? "recharge" : "deduct", balance_note?.trim() || (adjCents > 0 ? "管理员充值" : "管理员扣款")]
+            );
+          });
         }
       }
 

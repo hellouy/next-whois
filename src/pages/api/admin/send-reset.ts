@@ -8,8 +8,9 @@ import { isAdminEmail } from "@/lib/admin-server";
 const RESET_EXPIRES_MINUTES = 60;
 const SITE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXTAUTH_URL ||
-  "https://x.rw";
+  "";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();

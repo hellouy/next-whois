@@ -23,9 +23,9 @@ export async function getSiteLabel(): Promise<string> {
     const row = await one<{ value: string }>(
       "SELECT value FROM site_settings WHERE key = 'site_logo_text'"
     );
-    _labelCache = (row?.value?.trim()) || "X.RW";
+    _labelCache = (row?.value?.trim()) || "WHOIS";
   } catch {
-    _labelCache = "X.RW";
+    _labelCache = "WHOIS";
   }
   _labelCacheAt = Date.now();
   return _labelCache!;
@@ -1036,7 +1036,7 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
 
 function withSenderName(email: string, name: string): string {
   if (!email || email.includes("<")) return email;
-  const safeName = name.replace(/[<>"]/g, "").trim() || "X.RW";
+  const safeName = name.replace(/[<>"]/g, "").trim() || "WHOIS";
   return `${safeName} <${email}>`;
 }
 

@@ -424,7 +424,7 @@ export default function SponsorPage() {
   const isChinese = locale === "zh" || locale === "zh-tw";
   const router = useRouter();
   const { data: session } = useSession();
-  const siteName = settings.site_title || "X.RW · RDAP+WHOIS";
+  const siteName = settings.site_title || "RDAP+WHOIS Lookup";
 
   const SPONSOR_TTL = 2 * 60_000;
   const [sponsors, setSponsors] = React.useState<Sponsor[]>(

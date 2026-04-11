@@ -93,7 +93,7 @@ export default function LoginPage() {
     }
   }
 
-  const logoText = settings.site_logo_text || "X.RW";
+  const logoText = settings.site_logo_text || "WHOIS";
   const subtitle = settings.site_subtitle || "RDAP+WHOIS";
 
   // Hide the login form while the session is loading (avoids a flash of the
@@ -102,7 +102,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <Head><title key="title">{`${t("auth.login_page_title")} · ${settings.site_title || "X.RW · RDAP+WHOIS"}`}</title></Head>
+      <Head><title key="title">{`${t("auth.login_page_title")} · ${settings.site_title || "RDAP+WHOIS Lookup"}`}</title></Head>
       <div className="min-h-screen flex items-center justify-center px-4 py-16 relative overflow-hidden">
         {/* Ambient glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full bg-primary/5 dark:bg-primary/8 blur-[80px] pointer-events-none" />

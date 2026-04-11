@@ -38,8 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!session) return;
 
   const { channel } = req.body as { channel: string };
-  const testTitle = "X.RW 通知测试";
-  const testBody = "这是一条来自 X.RW 后台的测试通知消息，发送时间: " + new Date().toLocaleString("zh-CN");
+  const siteName = (await getSetting("site_logo_text")) || process.env.NEXT_PUBLIC_SITE_TITLE || "WHOIS Lookup";
+  const testTitle = `${siteName} 通知测试`;
+  const testBody = `这是一条来自 ${siteName} 后台的测试通知消息，发送时间: ` + new Date().toLocaleString("zh-CN");
 
   try {
     let message = "";
@@ -93,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           title: testTitle,
           body: testBody,
           timestamp: Date.now(),
-          source: "x.rw",
+          source: siteName,
         });
         break;
       }
