@@ -1440,7 +1440,7 @@ export default function LookupPage({
                     href={result.registerPrice.externalLink}
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
+                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
                     <span
                       className={cn(
                         "text-[11px] sm:text-xs font-normal",
@@ -1460,7 +1460,7 @@ export default function LookupPage({
                     target="_blank"
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
+                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
                     <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                       {t("renew_price")}
                       {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
@@ -1469,7 +1469,7 @@ export default function LookupPage({
                 )}
               {result.negotiable !== null && (
                 <div className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1">
-                  <RiExchangeDollarFill className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <RiExchangeDollarFill className="w-3 h-3 text-amber-400 shrink-0" suppressHydrationWarning />
                   <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
                     {t("negotiable")}
                     <span className={result.negotiable ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}>
@@ -1982,7 +1982,10 @@ export default function LookupPage({
                             </Badge>
                           ) : (
                             <Badge className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-                              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5" />
+                              <div className="relative mr-1.5 w-2 h-2 shrink-0" suppressHydrationWarning>
+                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute opacity-75" suppressHydrationWarning />
+                                <div className="w-2 h-2 rounded-full bg-emerald-400" suppressHydrationWarning />
+                              </div>
                               {t("active")}
                             </Badge>
                           )
@@ -2020,7 +2023,7 @@ export default function LookupPage({
                               href={result.registerPrice.externalLink}
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
+                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
                               <span className={cn("text-[11px] font-normal", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("register_price")}
                                 {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
@@ -2035,7 +2038,7 @@ export default function LookupPage({
                               target="_blank"
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")} />
+                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
                               <span className={cn("text-[11px] font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
                                 {t("renew_price")}
                                 {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
@@ -2044,7 +2047,7 @@ export default function LookupPage({
                           )}
                         {result.negotiable !== null && (
                           <div className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1">
-                            <RiExchangeDollarFill className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <RiExchangeDollarFill className="w-3 h-3 text-amber-400 shrink-0" suppressHydrationWarning />
                             <span className="text-[11px] font-normal text-muted-foreground">
                               {t("negotiable")}
                               <span className={result.negotiable ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}>
