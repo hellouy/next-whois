@@ -789,15 +789,29 @@ export default function AdminTldRulesPage() {
           return (
             <div className="border rounded-xl bg-card overflow-hidden">
               {/* Header row */}
-              <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <RiRobot2Line className="w-4 h-4 text-violet-500" />
+              <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/30 gap-2 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  <RiRobot2Line className={cn("w-4 h-4 shrink-0", batch.status === "running" ? "text-violet-500 animate-pulse" : "text-violet-500")} />
                   <span className="font-medium text-sm">AI 批量抓取进度</span>
-                  <span className="text-xs text-muted-foreground">
-                    — 后台批量爬取器 (Batch Scrape TLDs 工作流) 正在自动运行
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    {batch.status === "running"
+                      ? `— 正在爬取 (${batch.items.filter(i=>i.status==="ok").length+batch.items.filter(i=>i.status==="error").length+batch.items.filter(i=>i.status==="skipped").length}/${batch.items.length})`
+                      : batch.status === "done" ? "— 已完成"
+                      : batch.status === "stopped" ? "— 已停止"
+                      : "— 点击"开始批量抓取"启动"}
                   </span>
                 </div>
-                <span className="text-xs font-mono font-bold text-muted-foreground">{inDb} / {iana} 个</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-mono font-bold text-muted-foreground">{inDb} / {iana} 个</span>
+                  {batch.status === "running" && (
+                    <button
+                      onClick={() => { BatchRunner.stop(); toast.info("已停止批量抓取"); }}
+                      className="flex items-center gap-1 h-6 px-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold transition-colors"
+                    >
+                      <RiStopCircleLine className="w-3 h-3" />停止
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="px-5 py-4 space-y-3">
