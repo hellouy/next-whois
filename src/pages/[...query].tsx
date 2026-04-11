@@ -1439,11 +1439,11 @@ export default function LookupPage({
                     href={result.registerPrice.externalLink}
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} suppressHydrationWarning />
+                    <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
                     <span
                       className={cn(
                         "text-[11px] sm:text-xs font-normal",
-                        result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground",
+                        result.registerPrice.isPremium ? "text-amber-500" : "text-sky-600 dark:text-sky-400",
                       )}
                     >
                       {t("register_price")}
@@ -1459,8 +1459,8 @@ export default function LookupPage({
                     target="_blank"
                     className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                   >
-                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} suppressHydrationWarning />
-                    <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
+                    <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
+                    <span className={cn("text-[11px] sm:text-xs font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-600 dark:text-teal-400")}>
                       {t("renew_price")}
                       {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
                     </span>
@@ -2021,8 +2021,8 @@ export default function LookupPage({
                               href={result.registerPrice.externalLink}
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} suppressHydrationWarning />
-                              <span className={cn("text-[11px] font-normal", result.registerPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
+                              <RiBillLine className={cn("w-3 h-3 shrink-0", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-500")} />
+                              <span className={cn("text-[11px] font-normal", result.registerPrice.isPremium ? "text-amber-500" : "text-sky-600 dark:text-sky-400")}>
                                 {t("register_price")}
                                 {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
                               </span>
@@ -2036,8 +2036,8 @@ export default function LookupPage({
                               target="_blank"
                               className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
-                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} suppressHydrationWarning />
-                              <span className={cn("text-[11px] font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-muted-foreground")}>
+                              <RiExchangeDollarFill className={cn("w-3 h-3 shrink-0", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-500")} />
+                              <span className={cn("text-[11px] font-normal", result.renewPrice.isPremium ? "text-amber-500" : "text-teal-600 dark:text-teal-400")}>
                                 {t("renew_price")}
                                 {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
                               </span>
