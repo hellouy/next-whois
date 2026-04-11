@@ -18,3 +18,10 @@ export function setCached<T>(key: string, data: T): void {
 export function invalidateCache(key: string): void {
   store.delete(key);
 }
+
+/** Invalidate all cache entries whose key starts with the given prefix. */
+export function invalidateCachePrefix(prefix: string): void {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) store.delete(key);
+  }
+}

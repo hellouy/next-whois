@@ -42,6 +42,17 @@ import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { CompareRow } from "@/pages/api/admin/tld-lifecycle-compare";
+import { getCached, setCached } from "@/lib/client-cache";
+
+// ── Client-side cache keys & TTLs (module-level, shared by all sub-components) ─
+const CACHE_RULES      = "admin:tld-rules";        // rules + scrapeStats, 3 min
+const CACHE_MODELS     = "admin:ai-models";         // AI providers, 5 min
+const CACHE_IANA       = "admin:tld-list";          // IANA gTLD list, 30 min
+const CACHE_LIFECYCLE  = "admin:tld-lifecycle";     // lifecycle overrides, 5 min
+const TTL_RULES      = 3 * 60_000;
+const TTL_MODELS     = 5 * 60_000;
+const TTL_IANA       = 30 * 60_000;
+const TTL_LIFECYCLE  = 5 * 60_000;
 
 /* ── Types borrowed from domains.tsx ──────────────────────────────────────── */
 type DbOverride = {
@@ -311,8 +322,12 @@ function DayBadge({ label, current, suggested }: { label: string; current: numbe
 
 /* ── LifecycleTabInline ─────────────────────────────────────────────────── */
 function LifecycleTabInline() {
-  const [overrides, setOverrides] = React.useState<DbOverride[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [overrides, setOverrides] = React.useState<DbOverride[]>(
+    () => getCached<{ overrides: DbOverride[] }>(CACHE_LIFECYCLE, TTL_LIFECYCLE)?.overrides ?? []
+  );
+  const [loading, setLoading] = React.useState(
+    () => !getCached(CACHE_LIFECYCLE, TTL_LIFECYCLE)
+  );
   const [search, setSearch] = React.useState("");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingRow, setEditingRow] = React.useState<TldRow | null>(null);
@@ -382,17 +397,23 @@ function LifecycleTabInline() {
     finally { setFbActing(null); }
   }
 
-  async function loadOverrides() {
-    setLoading(true);
+  async function loadOverrides(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch("/api/admin/tld-lifecycle");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "加载失败");
-      setOverrides(data.overrides ?? []);
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "加载失败"); }
+      const overrides = data.overrides ?? [];
+      setCached(CACHE_LIFECYCLE, { overrides });
+      setOverrides(overrides);
+    } catch (e: unknown) { if (!silent) toast.error(e instanceof Error ? e.message : "加载失败"); }
     finally { setLoading(false); }
   }
-  React.useEffect(() => { loadOverrides(); }, []);
+  React.useEffect(() => {
+    const hasCached = !!getCached(CACHE_LIFECYCLE, TTL_LIFECYCLE);
+    loadOverrides(hasCached);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allTlds: TldRow[] = React.useMemo(() => {
     const map: Record<string, DbOverride> = {};
@@ -746,9 +767,16 @@ const FAIL_REASON_META: Record<string, { label: string; color: string }> = {
   parse_error:  { label: "解析失败",  color: "text-blue-600   bg-blue-50   dark:bg-blue-950/40   border-blue-200   dark:border-blue-800"   },
 };
 
+const CACHE_FAILURES = "admin:tld-failures";
+const TTL_FAILURES   = 2 * 60_000; // 2 min
+
 function FailuresTabInline() {
-  const [rows, setRows] = React.useState<TldFailureRow[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const [rows, setRows] = React.useState<TldFailureRow[]>(
+    () => getCached<{ rows: TldFailureRow[] }>(CACHE_FAILURES, TTL_FAILURES)?.rows ?? []
+  );
+  const [loading, setLoading] = React.useState(
+    () => !getCached(CACHE_FAILURES, TTL_FAILURES)
+  );
   const [search, setSearch] = React.useState("");
   const [resettingTld, setResettingTld] = React.useState<string | null>(null);
   const [clearingAll, setClearingAll] = React.useState(false);
@@ -757,16 +785,22 @@ function FailuresTabInline() {
   const [addServer, setAddServer] = React.useState("");
   const [adding, setAdding] = React.useState(false);
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const r = await fetch("/api/admin/tld-failures");
       const d = await r.json();
-      setRows(d.rows ?? []);
-    } catch { toast.error("加载失败"); }
+      const rows = d.rows ?? [];
+      setCached(CACHE_FAILURES, { rows });
+      setRows(rows);
+    } catch { if (!silent) toast.error("加载失败"); }
     finally { setLoading(false); }
   }
-  React.useEffect(() => { load(); }, []);
+  React.useEffect(() => {
+    const hasCached = !!getCached(CACHE_FAILURES, TTL_FAILURES);
+    load(hasCached);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function resetTld(tld: string) {
     if (!confirm(`确认重置 .${tld} 的失败记录？`)) return;
@@ -992,9 +1026,15 @@ export default function AdminTldRulesPage() {
     else if (innerParam === "lifecycle") setTab("lifecycle");
   }, [innerParam]);
 
-  const [rules, setRules] = React.useState<TldRule[]>([]);
-  const [scrapeStats, setScrapeStats] = React.useState<ScrapeStats | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [rules, setRules] = React.useState<TldRule[]>(
+    () => getCached<{ rules: TldRule[]; stats: ScrapeStats | null }>(CACHE_RULES, TTL_RULES)?.rules ?? []
+  );
+  const [scrapeStats, setScrapeStats] = React.useState<ScrapeStats | null>(
+    () => getCached<{ rules: TldRule[]; stats: ScrapeStats | null }>(CACHE_RULES, TTL_RULES)?.stats ?? null
+  );
+  const [loading, setLoading] = React.useState(
+    () => !getCached(CACHE_RULES, TTL_RULES) // show spinner only on cache miss
+  );
   const [search, setSearch] = React.useState("");
   const [scraping, setScraping] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
@@ -1010,7 +1050,9 @@ export default function AdminTldRulesPage() {
   const [saving, setSaving] = React.useState(false);
 
   // AI model state
-  const [aiModels, setAiModels] = React.useState<AiModelInfo[]>([]);
+  const [aiModels, setAiModels] = React.useState<AiModelInfo[]>(
+    () => getCached<{ providers: AiModelInfo[] }>(CACHE_MODELS, TTL_MODELS)?.providers ?? []
+  );
   const [selectedModel, setSelectedModel] = React.useState<string>(""); // "" = auto (priority order)
   const [batchModel, setBatchModel] = React.useState<string>("");
 
@@ -1020,9 +1062,13 @@ export default function AdminTldRulesPage() {
   const batch = BatchRunner.getState();
 
   // IANA gTLD list (dynamically fetched, 1000+)
-  const [ianaGtlds, setIanaGtlds] = React.useState<{ tld: string }[]>([]);
+  const [ianaGtlds, setIanaGtlds] = React.useState<{ tld: string }[]>(
+    () => getCached<{ tlds: { tld: string }[]; fetched_at: string | null }>(CACHE_IANA, TTL_IANA)?.tlds ?? []
+  );
   const [ianaLoading, setIanaLoading] = React.useState(false);
-  const [ianaFetchedAt, setIanaFetchedAt] = React.useState<string | null>(null);
+  const [ianaFetchedAt, setIanaFetchedAt] = React.useState<string | null>(
+    () => getCached<{ tlds: { tld: string }[]; fetched_at: string | null }>(CACHE_IANA, TTL_IANA)?.fetched_at ?? null
+  );
 
   // Compare state
   const [compareData, setCompareData] = React.useState<CompareData | null>(null);
@@ -1032,16 +1078,19 @@ export default function AdminTldRulesPage() {
   const [showOnlyScraped, setShowOnlyScraped] = React.useState(false);
   const [showOnlyDefaults, setShowOnlyDefaults] = React.useState(false);
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch("/api/admin/tld-rules");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "加载失败");
-      setRules(data.rules ?? []);
-      if (data.stats) setScrapeStats(data.stats);
+      const rules = data.rules ?? [];
+      const stats = data.stats ?? null;
+      setCached(CACHE_RULES, { rules, stats });
+      setRules(rules);
+      if (stats) setScrapeStats(stats);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "加载失败");
+      if (!silent) toast.error(e instanceof Error ? e.message : "加载失败");
     } finally {
       setLoading(false);
     }
@@ -1061,27 +1110,52 @@ export default function AdminTldRulesPage() {
     }
   }
 
-  React.useEffect(() => { load(); }, []);
+  // On mount: instant cache hit → silent background refresh; cache miss → full load
+  React.useEffect(() => {
+    const hasCachedRules = !!getCached(CACHE_RULES, TTL_RULES);
+    load(hasCachedRules /* silent if cache hit */);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   React.useEffect(() => { if (tab === "compare" && !compareData) loadCompare(); }, [tab]);
 
-  // Load AI model list on mount
+  // Load AI model list on mount (always refresh, but show cached instantly)
   React.useEffect(() => {
     fetch("/api/admin/ai-models")
       .then(r => r.json())
-      .then(d => { if (d.providers) setAiModels(d.providers); })
+      .then(d => { if (d.providers) { setCached(CACHE_MODELS, { providers: d.providers }); setAiModels(d.providers); } })
       .catch(() => {});
   }, []);
 
-  // Load full IANA gTLD list when gtld tab opens (1000+)
+  // Load full IANA gTLD list when gtld tab opens (1000+, cached 30 min)
   React.useEffect(() => {
-    if (tab !== "gtld" || ianaGtlds.length > 0) return;
+    if (tab !== "gtld") return;
+    const hasCached = !!getCached(CACHE_IANA, TTL_IANA);
+    if (hasCached) {
+      // Already initialized from cache; silent background refresh
+      fetch("/api/admin/tld-list")
+        .then(r => r.json())
+        .then(d => {
+          if (d.tlds) {
+            const tlds = (d.tlds as string[]).map(t => ({ tld: t }));
+            const fetched_at = d.fetched_at ?? null;
+            setCached(CACHE_IANA, { tlds, fetched_at });
+            setIanaGtlds(tlds);
+            setIanaFetchedAt(fetched_at);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
     setIanaLoading(true);
     fetch("/api/admin/tld-list")
       .then(r => r.json())
       .then(d => {
         if (d.tlds) {
-          setIanaGtlds((d.tlds as string[]).map(t => ({ tld: t })));
-          setIanaFetchedAt(d.fetched_at ?? null);
+          const tlds = (d.tlds as string[]).map(t => ({ tld: t }));
+          const fetched_at = d.fetched_at ?? null;
+          setCached(CACHE_IANA, { tlds, fetched_at });
+          setIanaGtlds(tlds);
+          setIanaFetchedAt(fetched_at);
         } else {
           throw new Error(d.error || "加载失败");
         }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { getCached, setCached } from "@/lib/client-cache";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import {
 import type { TldSpeedStats, TldSpeedRow } from "@/pages/api/admin/tld-speed-stats";
 import type { TldScanResult } from "@/pages/api/admin/tld-batch-scan";
 
+const SPEED_CACHE_TTL = 2 * 60_000; // 2 min per parameter set
 const HOURS_OPTIONS = [1, 6, 24, 72, 168];
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "avg_ms",   label: "平均耗时" },
@@ -45,17 +47,36 @@ export default function TldSpeedPage() {
   const [search, setSearch] = useState("");
   const [minQry, setMinQry] = useState(3);
 
-  const [data, setData]       = useState<TldSpeedStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `admin:tld-speed:${hours}:${sort}:${minQry}`;
+
+  const [data, setData]       = useState<TldSpeedStats | null>(
+    () => getCached<TldSpeedStats>(cacheKey, SPEED_CACHE_TTL)
+  );
+  const [loading, setLoading] = useState(
+    () => !getCached<TldSpeedStats>(cacheKey, SPEED_CACHE_TTL)
+  );
   const fetchRef = useRef(0);
 
   const loadStats = useCallback(() => {
-    setLoading(true);
+    const key = `admin:tld-speed:${hours}:${sort}:${minQry}`;
+    const cached = getCached<TldSpeedStats>(key, SPEED_CACHE_TTL);
+    if (cached) {
+      setData(cached);   // instant cache hit
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const id = ++fetchRef.current;
     fetch(`/api/admin/tld-speed-stats?hours=${hours}&sort=${sort}&min_queries=${minQry}&limit=200`)
       .then(r => r.json())
-      .then((d: TldSpeedStats) => { if (fetchRef.current === id) { setData(d); setLoading(false); } })
+      .then((d: TldSpeedStats) => {
+        if (fetchRef.current !== id) return;
+        setCached(key, d);
+        setData(d);
+        setLoading(false);
+      })
       .catch(() => { if (fetchRef.current === id) setLoading(false); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hours, sort, minQry]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
