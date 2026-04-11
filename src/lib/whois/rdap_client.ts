@@ -239,7 +239,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // ag: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   // ai: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   ar: "https://rdap.nic.ar/",                      // IANA-confirmed; slow → see RDAP_TLD_TIMEOUT_MS
-  // bb: removed — rdap.nic.bb ENOTFOUND; WHOIS whois.telecoms-barbados.gov.bb also ENOTFOUND
+  bb: "https://rdap.centralnic.com/bb/",             // CentralNic manages .bb; whois.telecoms.gov.bb TCP times out from cloud IPs
   // bm: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; WHOIS deprecated Aug 2025, all TCP timeouts
   br: "https://rdap.registro.br/",                 // IANA-confirmed; HTTP 403 from cloud → fail-fast to WHOIS
   // bz: moved to GTLD_RDAP_BOOTSTRAP — IdentityDigital; rdap.nic.bz ECONNREFUSED

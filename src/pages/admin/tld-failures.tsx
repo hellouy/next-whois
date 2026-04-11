@@ -14,9 +14,20 @@ import {
   RiArrowLeftLine, RiArrowRightLine,
   RiCheckboxLine, RiCheckboxBlankLine, RiEyeOffLine,
   RiExternalLinkLine, RiSettings3Line, RiFlashlightLine,
-  RiStopCircleLine, RiPlayCircleLine,
+  RiStopCircleLine, RiPlayCircleLine, RiScanLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
+
+type ScanResult = {
+  tld: string;
+  status: "ok" | "fail";
+  method: string | null;
+  server: string | null;
+  elapsed_ms: number;
+  error: string | null;
+  saved: boolean;
+};
+type ScanSummary = { total: number; found: number; saved: number; failed: number };
 
 const REASON_COLORS: Record<string, { label: string; cls: string }> = {
   iana_fallback:  { label: "无服务器", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
@@ -125,6 +136,12 @@ export default function TldFailuresPage() {
   const [cfgPanels, setCfgPanels]   = React.useState<Record<string, CfgPanel>>({});
   const [settingApiSource, setSettingApiSource] = React.useState<string | null>(null);
   const [lookingUp, setLookingUp]   = React.useState<string | null>(null);
+
+  // ── Batch auto-scan state ────────────────────────────────────────────────
+  const [scanning, setScanning]         = React.useState(false);
+  const [scanResults, setScanResults]   = React.useState<ScanResult[] | null>(null);
+  const [scanSummary, setScanSummary]   = React.useState<ScanSummary | null>(null);
+  const [showScanPanel, setShowScanPanel] = React.useState(false);
 
   // ── Batch runner status (cross-page visibility) ──────────────────────────
   const [, batchTick] = React.useReducer(n => n + 1, 0);
@@ -448,6 +465,40 @@ export default function TldFailuresPage() {
     }
   }
 
+  // ── Batch auto-scan ──────────────────────────────────────────────────────
+  async function startBatchScan(mode: "current" | "db" | "uncovered") {
+    setScanning(true);
+    setScanResults(null);
+    setScanSummary(null);
+    setShowScanPanel(true);
+    try {
+      const body = mode === "current"
+        ? { tlds: rows.map(r => r.tld), timeout_ms: 8000 }
+        : mode === "uncovered"
+        ? { source: "uncovered", limit: 100, timeout_ms: 8000 }
+        : { limit: 100, timeout_ms: 8000 };
+      const r = await fetch("/api/admin/tld-batch-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { toast.error(`扫描失败: HTTP ${r.status}`); return; }
+      const d = await r.json();
+      setScanResults(d.results ?? []);
+      setScanSummary(d.summary ?? null);
+      if ((d.summary?.found ?? 0) > 0) {
+        toast.success(`扫描完成：发现 ${d.summary.found} 个可用服务器，已保存 ${d.summary.saved} 个`);
+        load(page);
+      } else {
+        toast.info(`扫描完成：共扫描 ${d.summary?.total ?? 0} 个，未发现新服务器`);
+      }
+    } catch (e: any) {
+      toast.error(`扫描失败: ${e?.message || "网络错误"}`);
+    } finally {
+      setScanning(false);
+    }
+  }
+
   // ── Selection helpers ────────────────────────────────────────────────────
   function toggleSelect(tld: string) {
     setSelected(prev => {
@@ -541,6 +592,50 @@ export default function TldFailuresPage() {
               </button>
             )}
 
+            {/* Batch scan buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => startBatchScan("db")}
+                disabled={scanning}
+                title="从数据库取出最多100个失败TLD，自动发现RDAP/WHOIS服务器并保存"
+                className={cn(
+                  "flex items-center gap-1.5 h-8 px-3 rounded-l-xl border text-xs font-semibold transition-colors",
+                  scanning
+                    ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400"
+                    : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50",
+                )}
+              >
+                {scanning ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiScanLine className="w-3.5 h-3.5" />}
+                批量扫描修复
+              </button>
+              <button
+                onClick={() => startBatchScan("current")}
+                disabled={scanning || rows.length === 0}
+                title="仅扫描当前页显示的TLD"
+                className="flex items-center gap-1.5 h-8 px-2 border-y border-r-0 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors disabled:opacity-40"
+              >
+                当前页
+              </button>
+              <button
+                onClick={() => startBatchScan("uncovered")}
+                disabled={scanning}
+                title="从TLD规则库中找出从未查询过的TLD并扫描"
+                className="flex items-center gap-1.5 h-8 px-2 rounded-r-xl border border-l-0 border-emerald-200/60 dark:border-emerald-800/40 text-sky-600 dark:text-sky-400 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors disabled:opacity-40"
+              >
+                未查询
+              </button>
+            </div>
+            {scanResults !== null && (
+              <button
+                onClick={() => setShowScanPanel(v => !v)}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl border border-border/60 text-xs font-semibold text-muted-foreground hover:border-primary/50 transition-colors"
+              >
+                <RiServerLine className="w-3.5 h-3.5" />
+                {showScanPanel ? "隐藏扫描结果" : "查看扫描结果"}
+                {scanSummary && <span className="ml-1 text-emerald-600 dark:text-emerald-400">({scanSummary.found}/{scanSummary.total})</span>}
+              </button>
+            )}
+
             <button
               onClick={clearAll}
               disabled={clearingAll || total === 0}
@@ -555,6 +650,63 @@ export default function TldFailuresPage() {
             </button>
           </div>
         </div>
+
+        {/* ── Batch scan progress / results panel ── */}
+        {(scanning || (showScanPanel && scanResults !== null)) && (
+          <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-950/20 overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-emerald-200/60 dark:border-emerald-800/30">
+              {scanning
+                ? <RiLoader4Line className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-spin shrink-0" />
+                : <RiScanLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 flex-1">
+                {scanning ? "批量扫描进行中，请稍候…" : "批量扫描结果"}
+              </span>
+              {scanSummary && !scanning && (
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-muted-foreground">共 {scanSummary.total}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">✓ 发现 {scanSummary.found}</span>
+                  <span className="text-sky-600 dark:text-sky-400 font-semibold">已保存 {scanSummary.saved}</span>
+                  <span className="text-muted-foreground">失败 {scanSummary.failed}</span>
+                </div>
+              )}
+              {!scanning && (
+                <button onClick={() => setShowScanPanel(false)} className="ml-2 p-1 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                  <RiCloseLine className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {scanResults && scanResults.length > 0 && (
+              <div className="divide-y divide-emerald-100 dark:divide-emerald-900/30 max-h-64 overflow-y-auto">
+                {scanResults.map(r => (
+                  <div key={r.tld} className="flex items-center gap-3 px-4 py-2 text-xs">
+                    <span className={cn(
+                      "font-mono font-semibold w-20 shrink-0",
+                      r.status === "ok" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+                    )}>.{r.tld}</span>
+                    {r.status === "ok" ? (
+                      <>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">✓</span>
+                        <span className="text-muted-foreground truncate flex-1">{r.method} — {r.server}</span>
+                        {r.saved && <span className="text-sky-600 dark:text-sky-400 shrink-0">已保存</span>}
+                        <span className="text-muted-foreground shrink-0">{r.elapsed_ms}ms</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-red-500">✗</span>
+                        <span className="text-muted-foreground truncate flex-1">{r.error || "未找到可用服务器"}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {scanning && (
+              <div className="px-4 py-3 text-xs text-emerald-600/80 dark:text-emerald-500">
+                正在通过 IANA RDAP、IANA WHOIS 转介、常见 URL 规律和 TCP 探测逐一扫描，每批 3 个并发，请等待…
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Summary pills ── */}
         {summary.length > 0 && (
@@ -638,6 +790,7 @@ export default function TldFailuresPage() {
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <div className="text-xs text-sky-700 dark:text-sky-400 space-y-0.5">
             <p><strong>失败原因：</strong>无服务器 = IANA未收录；超时 = 无法连接；解析失败 = 响应无法识别；速率限制 = 被拒绝</p>
+            <p><strong>批量扫描修复：</strong>自动通过 IANA RDAP 引导、IANA WHOIS 转介、常见 URL 规律、TCP 探测等策略发现服务器并保存。「未查询」扫描 TLD 规则库中从未查询过的后缀。</p>
             <p>勾选多行后点「清零已选」可批量清除。手动填写后的条目可用「隐藏手动填写」过滤。</p>
           </div>
         </div>

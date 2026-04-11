@@ -256,10 +256,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const db = await getDbReady();
   if (!db) return res.status(503).json({ error: "Database unavailable" });
 
-  let { tlds, limit = 30, timeout_ms = 6000 } = req.body as {
+  let { tlds, limit = 30, timeout_ms = 6000, source = "failed" } = req.body as {
     tlds?: string[];
     limit?: number;
     timeout_ms?: number;
+    source?: "failed" | "uncovered";
   };
 
   limit      = Math.min(Math.max(limit, 1), 100);
@@ -272,18 +273,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (tlds && tlds.length > 0) return [] as string[];
       const client = await db.connect();
       try {
-        const { rows } = await client.query<{ tld: string }>(
-          `SELECT f.tld FROM tld_fallback_stats f
-           LEFT JOIN custom_whois_servers c ON c.tld = f.tld
-           WHERE f.fail_reason IN ('no_server', 'iana_fallback', 'timeout')
-             AND (f.repair_status IS NULL OR f.repair_status = 'pending')
-             AND c.tld IS NULL
-             AND char_length(f.tld) BETWEEN 2 AND 10
-             AND f.tld ~ '^[a-z]+$'
-           ORDER BY f.fail_count DESC
-           LIMIT $1`,
-          [limit],
-        );
+        let query: string;
+        if (source === "uncovered") {
+          // TLDs in tld_rules that have never been queried (no failure stats, no custom server)
+          query = `
+            SELECT r.tld FROM tld_rules r
+            LEFT JOIN tld_fallback_stats f ON f.tld = r.tld
+            LEFT JOIN custom_whois_servers c ON c.tld = r.tld
+            WHERE f.tld IS NULL
+              AND c.tld IS NULL
+              AND char_length(r.tld) BETWEEN 2 AND 10
+              AND r.tld ~ '^[a-z]+'
+            ORDER BY r.tld
+            LIMIT $1`;
+        } else {
+          // Default: failed TLDs with no repair attempted
+          query = `
+            SELECT f.tld FROM tld_fallback_stats f
+            LEFT JOIN custom_whois_servers c ON c.tld = f.tld
+            WHERE f.fail_reason IN ('no_server', 'iana_fallback', 'timeout')
+              AND (f.repair_status IS NULL OR f.repair_status = 'pending')
+              AND c.tld IS NULL
+              AND char_length(f.tld) BETWEEN 2 AND 10
+              AND f.tld ~ '^[a-z]+$'
+            ORDER BY f.fail_count DESC
+            LIMIT $1`;
+        }
+        const { rows } = await client.query<{ tld: string }>(query, [limit]);
         return rows.map(r => r.tld);
       } finally {
         client.release();
