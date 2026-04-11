@@ -1046,10 +1046,18 @@ async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: 
   const transporter = nodemailer.default.createTransport({
     host: smtp.host,
     port: smtp.port,
-    secure: smtp.secure === "ssl",
-    requireTLS: smtp.secure === "starttls",
+    // ssl: port 465 — encrypted from the start
+    // starttls: port 587/25 — upgrade after greeting
+    // none: plain-text (internal SMTP relay, no TLS at all)
+    secure:       smtp.secure === "ssl",
+    requireTLS:   smtp.secure === "starttls",
+    ignoreTLS:    smtp.secure === "none",
     auth: { user: smtp.user, pass: smtp.pass },
     tls: { rejectUnauthorized: false },
+    // Prevent indefinite hangs when the SMTP host is unreachable or slow
+    connectionTimeout: 30_000,  // 30s to establish TCP connection
+    greetingTimeout:   15_000,  // 15s to receive SMTP banner after connecting
+    socketTimeout:     30_000,  // 30s of inactivity during DATA transfer
   });
   await transporter.sendMail({ from: withSenderName(smtp.from, siteLabel), to, subject, html });
 }

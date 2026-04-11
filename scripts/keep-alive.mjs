@@ -68,15 +68,32 @@ if (!DB_URL) {
     sslConfig = { rejectUnauthorized: false };
   }
 
-  const pool = new pg.Pool({ connectionString: DB_URL, max: 1, ssl: sslConfig });
+  const poolOpts = { connectionString: DB_URL, max: 1, ssl: sslConfig,
+                     connectionTimeoutMillis: 15_000, idleTimeoutMillis: 30_000 };
+  let pool = new pg.Pool(poolOpts);
+  let consecutiveFails = 0;
+  const MAX_FAILS_BEFORE_RESET = 3;
 
   async function ping() {
     const t0 = Date.now();
     try {
       await pool.query("SELECT 1");
-      console.log(`[keep-alive] ${new Date().toISOString()} ✓ DB ping OK (${Date.now() - t0}ms)`);
+      if (consecutiveFails > 0) {
+        console.log(`[keep-alive] ${new Date().toISOString()} ✓ DB recovered after ${consecutiveFails} failure(s) (${Date.now() - t0}ms)`);
+      } else {
+        console.log(`[keep-alive] ${new Date().toISOString()} ✓ DB ping OK (${Date.now() - t0}ms)`);
+      }
+      consecutiveFails = 0;
     } catch (err) {
-      console.error(`[keep-alive] ${new Date().toISOString()} ✗ DB ping failed:`, err.message);
+      consecutiveFails++;
+      console.error(`[keep-alive] ${new Date().toISOString()} ✗ DB ping failed (#${consecutiveFails}):`, err.message);
+      // Recreate the pool after repeated failures — clears stale connections
+      if (consecutiveFails >= MAX_FAILS_BEFORE_RESET) {
+        console.warn(`[keep-alive] ${new Date().toISOString()} ⚠ Recreating DB pool after ${consecutiveFails} consecutive failures`);
+        await pool.end().catch(() => {});
+        pool = new pg.Pool(poolOpts);
+        consecutiveFails = 0;
+      }
     }
   }
 
