@@ -10,7 +10,7 @@ const RESET_EXPIRES_MINUTES = 60;
 const SITE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ||
   process.env.NEXTAUTH_URL ||
-  "https://x.rw";
+  "https://example.com";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);

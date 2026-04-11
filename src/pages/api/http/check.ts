@@ -203,7 +203,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   const MAX_REDIRECTS = 8;
   const TIMEOUT_MS    = 10000;
-  const UA = "Mozilla/5.0 (compatible; X.RW-HTTPChecker/1.0; +https://x.rw)";
+  const UA = "Mozilla/5.0 (compatible; WHOIS-HTTPChecker/1.0; +https://example.com)";
 
   const redirectChain: { url: string; status: number }[] = [];
   let currentUrl = rawUrl;

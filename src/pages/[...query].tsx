@@ -2129,7 +2129,7 @@ export default function LookupPage({
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                        <span suppressHydrationWarning className="text-[10px] text-muted-foreground font-mono">
                           {(time ?? 0).toFixed(2)}s
                           {cached && (
                             <>

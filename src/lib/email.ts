@@ -10,7 +10,7 @@ const PRIMARY    = "#7c3aed";   // violet-600
 const PRIMARY_LT = "#8b5cf6";   // violet-500
 const DARK       = "#0f172a";   // slate-900
 const FONT       = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-const BASE_URL   = () => process.env.NEXT_PUBLIC_BASE_URL || "https://x.rw";
+const BASE_URL   = () => process.env.NEXT_PUBLIC_BASE_URL || "https://example.com";
 
 // ── Server-side site label (cached, reads from DB) ───────────────────────────
 let _labelCache: string | null = null;

@@ -129,7 +129,7 @@ export function StampFormCard({
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 block">
               {s("link_label")} <span className="normal-case tracking-normal font-normal text-muted-foreground/60">{s("optional")}</span>
             </Label>
-            <Input value={form.link} onChange={(e) => onUpdate("link", e.target.value)} placeholder="https://x.rw" type="text" inputMode="url" />
+            <Input value={form.link} onChange={(e) => onUpdate("link", e.target.value)} placeholder="https://example.com" type="text" inputMode="url" />
           </div>
         ) : (
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted/50 border border-dashed border-border">
