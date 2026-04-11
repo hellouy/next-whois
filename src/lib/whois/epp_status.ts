@@ -909,6 +909,7 @@ function normalizeStatusKey(status: string): string {
 }
 
 export function getEppStatusInfo(status: string): EppStatusInfo | null {
+  if (typeof status !== "string" || !status) return null;
   const withAccents = status.toLowerCase().replace(/[\s_\-/]/g, "");
   if (EPP_STATUS_MAP[withAccents]) return EPP_STATUS_MAP[withAccents];
   const normalized = normalizeStatusKey(status);

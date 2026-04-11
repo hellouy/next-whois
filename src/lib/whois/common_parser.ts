@@ -1050,7 +1050,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
   {
     const rawLow = data.toLowerCase();
     const hasStatusCode = (code: string) =>
-      result.status.some((s) => s.status.toLowerCase().includes(code));
+      result.status.some((s) => typeof s.status === "string" && s.status.toLowerCase().includes(code));
 
     // ── RESERVED ─────────────────────────────────────────────────────────────
     // Domain is held by the registry and not available for public registration.

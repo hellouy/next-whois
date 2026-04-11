@@ -700,10 +700,16 @@ export async function convertRdapToWhoisResult(
         )
       : null;
 
-  const status: DomainStatusProps[] = (rdapData.status || []).map((s) => ({
-    status: s,
-    url: "https://icann.org/epp",
-  }));
+  const status: DomainStatusProps[] = (rdapData.status || [])
+    .map((s) => {
+      const str = typeof s === "string" ? s
+        : s && typeof (s as Record<string, unknown>).value === "string" ? (s as Record<string, unknown>).value as string
+        : s && typeof (s as Record<string, unknown>).status === "string" ? (s as Record<string, unknown>).status as string
+        : typeof s === "number" ? String(s)
+        : "";
+      return str ? { status: str, url: "https://icann.org/epp" } : null;
+    })
+    .filter((s): s is DomainStatusProps => s !== null);
 
   const nameServers = (rdapData.nameservers || []).map(
     (ns) => (ns.ldhName || ns.unicodeName || "Unknown").split(/\s+/)[0],

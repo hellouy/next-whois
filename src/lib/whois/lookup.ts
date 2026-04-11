@@ -770,6 +770,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         if (!result.domain) result.domain = rawExtracted;
         if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
         if (rdapRaw) result.rawRdapContent = rdapRaw;
+        clearTldFailureStats(tldSuffix).catch(() => {});
         return { time: elapsed(), status: true, cached: false, source: "whois", result };
       }
       const detectedError = detectWhoisError(whoisRawStr);
@@ -788,6 +789,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       }
       if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       if (rdapRaw) result.rawRdapContent = rdapRaw;
+      clearTldFailureStats(tldSuffix).catch(() => {});
       return { time: elapsed(), status: true, cached: false, source: "whois", result };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to parse WHOIS response";
