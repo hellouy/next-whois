@@ -6,7 +6,19 @@
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "./types";
 import { many } from "@/lib/db-query";
 
-const TIMEOUT_MS = 12_000;
+// Keep well under Vercel's 10s Hobby-plan function limit.
+const TIMEOUT_MS = 9_000;
+
+function makeAbortSignal(): AbortSignal {
+  // AbortSignal.timeout() is Node 17.3+ / modern browsers.  Fall back to
+  // AbortController + setTimeout so the code works everywhere.
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return (AbortSignal as any).timeout(TIMEOUT_MS);
+  }
+  const ac = new AbortController();
+  setTimeout(() => ac.abort(), TIMEOUT_MS);
+  return ac.signal;
+}
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -33,7 +45,7 @@ async function lookupViaTianhu(domain: string): Promise<WhoisResult> {
   const start = Date.now();
   const r = await fetch(
     `https://api.tian.hu/whois/${encodeURIComponent(domain)}`,
-    { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" } },
+    { signal: makeAbortSignal(), headers: { Accept: "application/json" } },
   );
   if (!r.ok) return { status: false, time: (Date.now() - start) / 1000, error: `天虎 HTTP ${r.status}`, source: "tian.hu" };
 
@@ -113,10 +125,11 @@ async function lookupViaYisi(domain: string): Promise<WhoisResult> {
   const r = await fetch(
     `https://yisi.yun/api/lookup?query=${encodeURIComponent(domain)}`,
     {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: makeAbortSignal(),
       headers: { Accept: "application/json", "x-api-key": apiKey },
     },
   );
+  if (!r.ok) return { status: false, time: (Date.now() - start) / 1000, error: `亿思云 HTTP ${r.status}`, source: "YISI.YUN" };
   const j = await r.json();
   if (!j.status) {
     return { status: false, time: (Date.now() - start) / 1000, error: j.error || "亿思云查询失败", source: "YISI.YUN" };

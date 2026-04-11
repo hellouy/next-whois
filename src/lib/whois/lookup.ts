@@ -440,6 +440,30 @@ export async function lookupWhoisCacheStreaming(
     if (inflight) return inflight;
   }
 
+  // ── Per-TLD third-party API override (mirrors lookupWhoisWithCache) ──────────
+  if (!isIPAddress(domain) && !isASNumber(domain)) {
+    const parts = domain.toLowerCase().split(".");
+    const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
+    if (tld) {
+      const apiSrc = await getTldApiSource(tld).catch(() => null);
+      if (apiSrc) {
+        const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
+        if (r.status) {
+          const ttl = 3600;
+          const now = Date.now();
+          const toStore: WhoisResult = { ...r, cachedAt: now, cacheTtl: ttl };
+          l1Set(key, toStore);
+          if (isRedisAvailable()) {
+            setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+          }
+          clearTldFailureStats(tld).catch(() => {});
+          onPartialResult?.({ ...r, cached: false, cachedAt: now, cacheTtl: ttl });
+          return { ...r, cached: false, cachedAt: now, cacheTtl: ttl };
+        }
+      }
+    }
+  }
+
   const doLookup = async (): Promise<WhoisResult> => {
     let result = await lookupWhois(domain, onPartialResult);
     // Retry once on transient failures (same logic as lookupWhoisWithCache).

@@ -794,8 +794,9 @@ export default function TldFailuresPage() {
                             {apiPanel.loading ? "查询中…" : "发起查询"}
                           </button>
                           {/* Quick-set buttons: only for tianhu and yisi (WHOIS APIs) */}
-                          {(["tianhu", "yisi"] as const).includes(apiPanel.service) && (() => {
-                            const isActive = row.tld_api_source === apiPanel.service;
+                          {(apiPanel.service === "tianhu" || apiPanel.service === "yisi") && (() => {
+                            const svc    = apiPanel.service as "tianhu" | "yisi";
+                            const isActive = row.tld_api_source === svc;
                             const isBusy   = settingApiSource === row.tld;
                             const labels: Record<string, string> = { tianhu: "天虎", yisi: "亿思云" };
                             return isActive ? (
@@ -805,16 +806,16 @@ export default function TldFailuresPage() {
                                 className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-semibold disabled:opacity-50 transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
                               >
                                 {isBusy ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiCloseLine className="w-2.5 h-2.5" />}
-                                取消 {labels[apiPanel.service]} 默认
+                                取消 {labels[svc]} 默认
                               </button>
                             ) : (
                               <button
-                                onClick={() => applyTldApiSource(row.tld, apiPanel.service)}
+                                onClick={() => applyTldApiSource(row.tld, svc)}
                                 disabled={isBusy}
                                 className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 text-[10px] font-semibold disabled:opacity-50 transition-colors hover:bg-violet-100 dark:hover:bg-violet-950/50"
                               >
                                 {isBusy ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiExternalLinkLine className="w-2.5 h-2.5" />}
-                                设为 {labels[apiPanel.service]} 默认
+                                设为 {labels[svc]} 默认
                               </button>
                             );
                           })()}

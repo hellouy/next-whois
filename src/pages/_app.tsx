@@ -509,15 +509,6 @@ const pageVariants = {
   },
 };
 
-// Stable-key pages (result, DNS, IP…) manage their own skeleton/spinner loading
-// feedback internally.  Enter and exit are instant with no opacity change so
-// there is never a blank frame when swapping between stable pages — the new
-// page mounts at full opacity the same frame the old page unmounts.
-const stablePageVariants = {
-  initial: { opacity: 1 },
-  animate: { opacity: 1, transition: { duration: 0 } },
-  exit:    { opacity: 1, transition: { duration: 0 } },
-};
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   const origin: string = (pageProps as any).origin || process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -630,11 +621,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
               </ErrorBoundary>
             ) : isStablePage ? (
               // Stable pages (homepage, dashboard, result, etc.) manage their own
-              // loading feedback.  We render them directly — no AnimatePresence wrapper
-              // — because stablePageVariants used exit:{opacity:1} which is identical
-              // to the animate state.  Framer Motion mode="wait" never fires
-              // onExitComplete for a no-op exit, so the incoming page never mounts.
-              // Using a key ensures React properly unmounts the old page on navigation.
+              // loading feedback.  They are rendered directly without AnimatePresence
+              // because Framer Motion mode="wait" only calls onExitComplete when the
+              // exit animation actually changes something — a no-op exit (opacity stays
+              // at 1) never fires it, so the incoming page would never mount.
+              // A stable `key` ensures React unmounts the old page on navigation.
               <ErrorBoundary key={router.pathname}>
                 <Component {...pageProps} />
               </ErrorBoundary>
