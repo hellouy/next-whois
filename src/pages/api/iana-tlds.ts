@@ -1,5 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAllCustomServers } from "@/lib/whois/custom-servers";
+import {
+  isRedisAvailable,
+  getJsonRedisValue,
+  setJsonRedisValue,
+} from "@/lib/server/redis";
+
+const REDIS_IANA_KEY = "iana_tlds:v2";
+const REDIS_IANA_TTL = 43_200; // 12 hours — shared across all Vercel instances
 
 export type TldInfo = {
   tld: string;
@@ -281,8 +289,22 @@ const CACHE_TTL = 86400 * 1000;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
 
+  // L1: in-process memory cache (per-instance, instant)
   if (cache && Date.now() - cache.at < CACHE_TTL) {
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=86400");
     return res.status(200).json(cache.data);
+  }
+
+  // L2: Redis cache (shared across all Vercel serverless instances)
+  if (isRedisAvailable()) {
+    try {
+      const cached = await getJsonRedisValue<IanaTldsResponse>(REDIS_IANA_KEY);
+      if (cached) {
+        cache = { data: cached, at: Date.now() };
+        res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=86400");
+        return res.status(200).json(cached);
+      }
+    } catch { /* ignore — fall through to fetch */ }
   }
 
   try {
@@ -356,7 +378,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result: IanaTldsResponse = { tlds, total: tlds.length, ccTldCount, gTldCount };
     cache = { data: result, at: Date.now() };
 
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    // Write to Redis so other Vercel instances skip the IANA fetch
+    if (isRedisAvailable()) {
+      setJsonRedisValue(REDIS_IANA_KEY, result, REDIS_IANA_TTL).catch(() => {});
+    }
+
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=86400");
     return res.status(200).json(result);
   } catch (e) {
     return res.status(500).json({ error: "Failed to fetch IANA TLD list" });
