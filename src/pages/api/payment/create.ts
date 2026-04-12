@@ -5,7 +5,7 @@ import { createOrder, type PaymentProvider } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
 import { many } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getSetting } from "@/lib/server/site-settings-server";
+import { getSetting, getSiteUrl } from "@/lib/server/site-settings-server";
 import Stripe from "stripe";
 
 export const config = { maxDuration: 15 };
@@ -47,9 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       provider,
     });
 
+    const dbSiteUrl = await getSiteUrl().catch(() => "");
     const proto = req.headers["x-forwarded-proto"] ?? "https";
     const host = req.headers["x-forwarded-host"] ?? req.headers.host;
-    const baseUrl = `${proto}://${host}`;
+    const baseUrl = dbSiteUrl || `${proto}://${host}`;
 
     if (provider === "stripe") {
       const stripeKey = (await getSetting("payment_stripe_sk")) || process.env.STRIPE_SECRET_KEY || "";

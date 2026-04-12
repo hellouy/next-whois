@@ -96,11 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      for (const [key, value] of updates) {
+      if (updates.length > 0) {
+        const placeholders = updates.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, NOW())`).join(", ");
+        const flatParams = updates.flatMap(([k, v]) => [k, v]);
         await run(
-          `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-           ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-          [key, value],
+          `INSERT INTO site_settings (key, value, updated_at) VALUES ${placeholders}
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          flatParams,
         );
       }
 

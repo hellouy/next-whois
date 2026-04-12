@@ -140,8 +140,8 @@ export default async function handler(
       status: [{ status: "registry-reserved", url: "" }],
       rawWhoisContent: `[CN Reserved] ${cnReserved.descZh}`,
     };
-    saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail).catch(() => {});
-    logQuery({ domain: trimmed, tld, success: true, cached: false, durationMs: 0, errorCode: null, source: "whois" }).catch(() => {});
+    saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail).catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
+    logQuery({ domain: trimmed, tld, success: true, cached: false, durationMs: 0, errorCode: null, source: "whois" }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
     res.setHeader("Content-Type", "application/x-ndjson");
     res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
     res.write(JSON.stringify({
@@ -213,7 +213,7 @@ export default async function handler(
       durationMs: (finalResult.time ?? 0) * 1000,
       errorCode: finalResult.status ? null : (finalResult.error?.slice(0, 60) ?? null),
       source: finalResult.source ?? null,
-    }).catch(() => {});
+    }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
 
     if (finalResult.status) {
       saveSearchRecord(
@@ -222,7 +222,7 @@ export default async function handler(
         finalResult.dnsProbe,
         userId,
         userEmail,
-      ).catch(() => {});
+      ).catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
     }
   } catch (err) {
     if (!finalSent) {
@@ -238,7 +238,7 @@ export default async function handler(
       logQuery({
         domain: trimmed, tld, success: false, cached: false,
         durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
-      }).catch(() => {});
+      }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
     }
   } finally {
     res.end();
