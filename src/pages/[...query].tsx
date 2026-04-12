@@ -115,7 +115,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useSearchHotkeys } from "@/hooks/useSearchHotkeys";
-import dynamic from "next/dynamic";
 import { REGISTRAR_ICONS } from "@/data/query-page/registrar-icons";
 import { NS_BRANDS } from "@/data/query-page/ns-brands";
 import { GLOBE_COUNTRY_COORDS } from "@/data/query-page/globe-coords";
@@ -134,12 +133,7 @@ import { DomainReminderDialog } from "@/components/query/DomainReminderDialog";
 import { AvailableDomainCard, DomainFavicon } from "@/components/query/AvailableDomainCard";
 import { RegistrationStatusType } from "@/lib/domain-status-types";
 import { getDomainRegistrationStatus, DomainStatusInfoCard } from "@/components/query/DomainStatusHelpers";
-
-// Lazy-loaded: only needed when the user opens the feedback panel
-const FeedbackDrawer = dynamic(
-  () => import("@/components/feedback-drawer").then((m) => ({ default: m.FeedbackDrawer })),
-  { ssr: false, loading: () => null }
-);
+import { FeedbackDrawer } from "@/components/feedback-drawer";
 
 // Shared validity check used by both getServerSideProps (SSR) and the
 // client-side useEffect.  A "query" must have a dot (domain/IP), be an ASN
@@ -846,6 +840,8 @@ export default function LookupPage({
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [expandStatus, setExpandStatus] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
   const suppressNextLoad = React.useRef(false);
   // Track if the first client-side fetch has completed to avoid flicker:
@@ -2310,7 +2306,7 @@ export default function LookupPage({
                       document.body
                     )}
 
-                    {enableFeedback && (
+                    {mounted && enableFeedback && (
                     <FeedbackDrawer
                       open={feedbackOpen}
                       onOpenChange={setFeedbackOpen}
@@ -2319,7 +2315,7 @@ export default function LookupPage({
                     />
                     )}
 
-                    {enableRemind && (
+                    {mounted && enableRemind && (
                     <DomainReminderDialog
                       domain={result.domain || target}
                       expirationDate={result.expirationDate}

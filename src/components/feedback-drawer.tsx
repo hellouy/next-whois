@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import {
   Drawer,
@@ -217,3 +215,5 @@ export function FeedbackDrawer({ open, onOpenChange, query, queryType }: Props) 
     </Drawer>
   );
 }
+
+export default FeedbackDrawer;
