@@ -17,7 +17,7 @@ import {
 type SystemData = {
   ok: boolean;
   db: { ok: boolean; latencyMs?: number | null };
-  redis: { ok: boolean; configured: boolean; latencyMs: number | null };
+  redis: { ok: boolean; configured: boolean; latencyMs: number | null; backend?: "upstash" | "ioredis" | "none"; upstashActive?: boolean; ioredisReady?: boolean };
   adminEmail?: string;
   stats: {
     users: { total: number; disabled: number; subscribed: number };
@@ -338,16 +338,28 @@ export default function AdminSystemPage() {
                   <RiFlashlightLine className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">Redis 缓存</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold">Redis 缓存</p>
+                    {data.redis?.configured && data.redis.backend && data.redis.backend !== "none" && (
+                      <span className={cn(
+                        "text-[9px] px-1.5 py-0.5 rounded-full border font-mono",
+                        data.redis.upstashActive
+                          ? "bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 border-violet-200/60"
+                          : "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200/60"
+                      )}>
+                        {data.redis.upstashActive ? "Upstash HTTP" : "ioredis TCP"}
+                      </span>
+                    )}
+                  </div>
                   <p className={cn("text-xs mt-0.5",
                     !data.redis?.configured ? "text-muted-foreground" :
                     data.redis.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"
                   )}>
                     {!data.redis?.configured
-                      ? "未配置（降级为 DB 限速）"
+                      ? "未配置（降级为 DB 缓存）"
                       : data.redis.ok
-                      ? `连接正常 · ${data.redis.latencyMs ?? "-"}ms`
-                      : "连接异常"}
+                      ? `连接正常${data.redis.latencyMs != null ? ` · ${data.redis.latencyMs}ms` : ""}${data.redis.upstashActive ? " · Serverless" : ""}`
+                      : "连接异常，已降级至 DB"}
                   </p>
                 </div>
               </div>
