@@ -320,9 +320,16 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
                 ))}
               </div>
 
+              {/* Privacy / Terms / FAQ links — above copyright */}
+              <div className="flex items-center justify-center gap-4 mt-2">
+                <Link href="/faq"     className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">{t("nav_faq")}</Link>
+                <Link href="/privacy" className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">{t("nav_privacy")}</Link>
+                <Link href="/terms"   className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">{t("nav_terms")}</Link>
+              </div>
+
               {/* Footer copyright — compact single line for mobile */}
               {settings.site_footer && (
-                <p className="mt-2 text-center text-[10px] text-muted-foreground/30 leading-tight" suppressHydrationWarning>
+                <p className="mt-1 text-center text-[10px] text-muted-foreground/30 leading-tight" suppressHydrationWarning>
                   {settings.site_footer}
                 </p>
               )}
