@@ -596,8 +596,14 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     isDomainQuery ? probeDomain(domain).catch(() => undefined) : null;
 
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
+    // Cap DNS probe wait at 500 ms — same as getProbeForSuccess() on the success path.
+    // Without this cap, checkSsl() (4 s timeout) can delay error responses by up to
+    // 4 s when the failed domain still has A/AAAA records in DNS.
     const dnsProbe = isDomainQuery
-      ? await (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined)
+      ? await Promise.race([
+          (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined),
+          new Promise<undefined>((r) => setTimeout(r, 500)),
+        ])
       : undefined;
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
@@ -688,12 +694,40 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     };
   }
 
+  // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
+  // Reduced 1200 → 900 → 400 ms: WHOIS for most TLDs responds within 300 ms
+  // of RDAP, so 400 ms still captures the enrichment while returning the final
+  // result ~500 ms sooner than the old 900 ms cap.
+  const RDAP_WIN_WHOIS_GRACE_MS = 400;
+
+  // Grace period (ms) RDAP gets to complete after WHOIS already succeeded.
+  // Previously we called Promise.allSettled which waited up to RDAP_OUTER_TIMEOUT_MS
+  // (12 s) even when WHOIS was already done.  With an 800 ms cap:
+  //   • If RDAP finishes within 800 ms of WHOIS → we still get the structured JSON
+  //   • If RDAP is slow / unreachable → we return WHOIS-only 800 ms after WHOIS
+  //     instead of waiting potentially seconds longer.
+  const WHOIS_WIN_RDAP_GRACE_MS = 800;
+
+  // ── Fire RDAP immediately ─────────────────────────────────────────────────
+  // RDAP is started here — BEFORE the manual-server check and the rate-limit
+  // check — so it runs in background while those awaits complete (~30-100 ms
+  // total).  Previously both awaits ran sequentially first, delaying RDAP start
+  // by ~30-100 ms.  If the manual server succeeds, rdapPromise is simply
+  // abandoned (no harm: the fetch is a cheap no-op from the resolver's view).
+  // IMPORTANT: The outer withTimeout must use RDAP_OUTER_TIMEOUT_MS (12 s), NOT
+  // RDAP_TIMEOUT (4 s), so per-TLD inner timeouts in rdap_client.ts (e.g. .rw=6s,
+  // .ar=10s) fire BEFORE the outer wrapper cancels the promise.
+  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
+
   // ── Admin-configured manual WHOIS server: direct query, skip RDAP ────────
   // When the admin has explicitly added a custom server (source='manual') for
-  // this TLD, query it immediately and return — RDAP + whoiser cascade are not
-  // started, saving 2-8 s per call on ccTLDs where RDAP is unavailable.
-  // queryManualServerRacing (isUserServer=false) returns null on failure so we
-  // fall through gracefully to the standard RDAP+WHOIS flow when it doesn't work.
+  // this TLD, query it immediately and return.
+  // RDAP is already running above; if manual succeeds we return early and the
+  // RDAP fetch is quietly abandoned.  If manual fails we fall through to the
+  // standard race using the already-warm rdapPromise — saving the manual-server
+  // wait time (1-8 s) from RDAP's budget.
+  // queryManualServerRacing (isUserServer=false) returns null when no manual
+  // server is configured for this TLD (common case — fast DB lookup).
   {
     const manualEarly = await queryManualServerRacing(domainToQuery, tld, tldSuffix, innerTimeout);
     if (manualEarly !== null) {
@@ -734,31 +768,12 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     }
   }
 
-  // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
-  // Reduced 1200 → 900 → 400 ms: WHOIS for most TLDs responds within 300 ms
-  // of RDAP, so 400 ms still captures the enrichment while returning the final
-  // result ~500 ms sooner than the old 900 ms cap.
-  const RDAP_WIN_WHOIS_GRACE_MS = 400;
-
-  // Grace period (ms) RDAP gets to complete after WHOIS already succeeded.
-  // Previously we called Promise.allSettled which waited up to RDAP_OUTER_TIMEOUT_MS
-  // (12 s) even when WHOIS was already done.  With an 800 ms cap:
-  //   • If RDAP finishes within 800 ms of WHOIS → we still get the structured JSON
-  //   • If RDAP is slow / unreachable → we return WHOIS-only 800 ms after WHOIS
-  //     instead of waiting potentially seconds longer.
-  const WHOIS_WIN_RDAP_GRACE_MS = 800;
-
   // T006: Skip WHOIS entirely when this TLD's server is known to be rate-limiting.
   // The flag is set on first detection and expires (via Redis TTL) after 60 s,
   // automatically re-enabling WHOIS once the cooldown window clears.
+  // NOTE: RDAP is already running above, so this Redis check runs in parallel
+  // with the live RDAP fetch rather than sequentially before it.
   const tldWhoisRateLimited = await checkWhoisRateLimit(tldSuffix).catch(() => false);
-
-  // Start RDAP + WHOIS in parallel.
-  // IMPORTANT: The outer withTimeout must use RDAP_OUTER_TIMEOUT_MS (12 s), NOT
-  // RDAP_TIMEOUT (4 s), so per-TLD inner timeouts in rdap_client.ts (e.g. .rw=6s,
-  // .ar=10s) fire BEFORE the outer wrapper cancels the promise.  RDAP_TIMEOUT is
-  // kept for documentation; RDAP_OUTER_TIMEOUT_MS is the actual runtime value.
-  const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
   const whoisPromise = tldWhoisRateLimited
     ? (Promise.resolve(null) as Promise<WhoisRawResult | null>)
     : withTimeout(

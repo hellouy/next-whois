@@ -59,9 +59,9 @@ function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | n
 
 async function checkSsl(domain: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(false), 4000);
+    const timeout = setTimeout(() => resolve(false), 2000);
     const req = https.request(
-      { hostname: domain, port: 443, method: "HEAD", path: "/", timeout: 3500 },
+      { hostname: domain, port: 443, method: "HEAD", path: "/", timeout: 1500 },
       () => {
         clearTimeout(timeout);
         resolve(true);
