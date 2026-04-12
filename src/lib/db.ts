@@ -369,7 +369,10 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_reminders_domain         ON reminders (domain)`,
   `CREATE INDEX IF NOT EXISTS idx_stamps_email             ON stamps (email)`,
   `CREATE INDEX IF NOT EXISTS idx_stamps_domain            ON stamps (domain)`,
-  `CREATE INDEX IF NOT EXISTS idx_search_history_user_id   ON search_history (user_id)`,
+  // idx_search_history_user supersedes idx_search_history_user_id (covers both user_id lookup + ordering)
+  `DROP INDEX IF EXISTS idx_search_history_user_id`,
+  `CREATE INDEX IF NOT EXISTS idx_search_history_user      ON search_history (user_id, created_at DESC)`,
+  `DROP INDEX IF EXISTS whois_cache_expires_idx`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_created   ON search_history (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_query     ON search_history (query)`,
   `CREATE INDEX IF NOT EXISTS idx_search_history_lower_q   ON search_history (LOWER(query))`,
