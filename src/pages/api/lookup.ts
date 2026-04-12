@@ -140,7 +140,7 @@ export default async function handler(
 
   if (!status) {
     logQuery({ domain: trimmed, tld, success: false, cached: false, durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null }).catch(() => {});
-    return res.status(500).json({ time, status, error, dnsProbe, registryUrl });
+    return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
   }
 
   // Record every successful lookup — logged-in or anonymous, cached or fresh.

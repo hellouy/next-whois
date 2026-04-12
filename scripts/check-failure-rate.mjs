@@ -93,22 +93,26 @@ function tag(label) {
 async function analyse() {
   const [failureRows, slowRows, trendRows] = await Promise.all([
     // 1. TLD failure rate in the past hour
+    // Note: "Domain not found" is excluded — it indicates unregistered domains,
+    // not infrastructure failures. Only real lookup errors (WHOIS server
+    // unreachable, timeouts, parse failures, etc.) are counted.
     pool.query(`
       SELECT
         tld,
-        COUNT(*)                                      AS total,
-        COUNT(*) FILTER (WHERE NOT success)           AS failures,
+        COUNT(*)                                                                         AS total,
+        COUNT(*) FILTER (WHERE NOT success AND error_code != 'Domain not found')         AS failures,
         ROUND(
-          COUNT(*) FILTER (WHERE NOT success)::numeric
+          COUNT(*) FILTER (WHERE NOT success AND error_code != 'Domain not found')::numeric
           / COUNT(*) * 100, 1
-        )                                             AS pct,
-        MODE() WITHIN GROUP (ORDER BY error_code)     AS top_error
+        )                                                                                AS pct,
+        MODE() WITHIN GROUP (ORDER BY error_code)
+          FILTER (WHERE NOT success AND error_code != 'Domain not found')               AS top_error
       FROM query_logs
       WHERE created_at > NOW() - INTERVAL '1 hour'
       GROUP BY tld
       HAVING
         COUNT(*) >= $1
-        AND COUNT(*) FILTER (WHERE NOT success)::numeric / COUNT(*) >= $2
+        AND COUNT(*) FILTER (WHERE NOT success AND error_code != 'Domain not found')::numeric / COUNT(*) >= $2
       ORDER BY pct DESC
       LIMIT 10
     `, [MIN_QUERIES, FAILURE_THRESHOLD]),
