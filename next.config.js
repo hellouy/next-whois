@@ -65,19 +65,24 @@ const nextConfig = {
     minimumCacheTTL: 86400,
   },
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
     return [
       {
         // Apply security headers to all pages and API routes
         source: '/(.*)',
         headers: SECURITY_HEADERS,
       },
-      {
-        // Next.js build artifacts are content-addressed — safe to cache forever
+      // In production, Next.js static assets are content-addressed (hash in
+      // filename) so they can be cached indefinitely.  In development the same
+      // paths are reused across recompilations, so "immutable" caching causes
+      // the browser to serve stale webpack chunks and breaks HMR (the browser
+      // keeps requesting old hot-update manifests → 404 → infinite full reload).
+      ...(isDev ? [] : [{
         source: '/_next/static/(.*)',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
-      },
+      }]),
       {
         // Icons and images in /public are mostly stable
         source: '/(icons|images)/(.*)',

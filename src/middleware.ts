@@ -58,7 +58,43 @@ function detectFromCountry(country: string | null): Locale | null {
   return map[country.toUpperCase()] ?? null;
 }
 
+// Empty webpack HMR manifest — tells the browser "no modules changed".
+// Used in development to prevent 404 → full-reload loops when a hot-update
+// file for a stale compilation hash is no longer on disk.
+const EMPTY_HMR_MANIFEST = JSON.stringify({ c: {}, r: [], m: [] });
+
 export function middleware(request: NextRequest) {
+  // ── Webpack static files: pass through or HMR fallback ─────────────────
+  if (request.nextUrl.pathname.startsWith("/_next/static/webpack/")) {
+    // In development, Next.js compiles on demand.  If the browser holds a
+    // stale webpack runtime hash (e.g. from an immutable-cached old chunk),
+    // the server generates hot-update files for a DIFFERENT hash transition
+    // and tells the browser to fetch its hash's manifest, which 404s.
+    // The 404 causes Fast Refresh to do a full reload — repeating forever.
+    //
+    // Returning an empty "no modules changed" manifest for ANY hot-update
+    // JSON request (whether the file exists or not) makes HMR advance its
+    // internal hash without crashing, breaking the loop.  The trade-off is
+    // that HMR stops applying code diffs in this dev environment, but since
+    // it was already broken by the infinite-loop, this is strictly better.
+    if (
+      process.env.NODE_ENV === "development" &&
+      (request.nextUrl.pathname.includes(".webpack.hot-update.json") ||
+        request.nextUrl.pathname.includes("._.hot-update.json"))
+    ) {
+      return new NextResponse(EMPTY_HMR_MANIFEST, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    // All other webpack static files (chunks, HMR JS modules, etc.) —
+    // let them pass through to the static file handler unchanged.
+    return NextResponse.next();
+  }
+
   // ── Determine which locale to use ───────────────────────────────────────
   const existingCookie = request.cookies.get("NEXT_LOCALE")?.value as Locale | undefined;
   const hasValidCookie = existingCookie && (LOCALES as readonly string[]).includes(existingCookie);
@@ -106,6 +142,10 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Standard page routes (excludes _next/static, _next/image, api, assets)
     "/((?!_next/static|_next/image|api|favicon.ico|icons|images|.*\\..*).*)",
+    // Dev-only: intercept webpack HMR hot-update manifests so stale hashes
+    // don't cause 404 → infinite full-reload loops.
+    "/_next/static/webpack/(.*)",
   ],
 };
