@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { getRedisValue, setRedisValue } from "@/lib/server/redis";
 
 export const config = { maxDuration: 12 };
 
@@ -11,13 +12,30 @@ export type IcpHealthResponse = {
 };
 
 const MIIT_AUTH_URL = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/auth";
+const CACHE_KEY = "icp:health:status";
+const CACHE_TTL = 300; // 5 minutes — MIIT health rarely flips
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<IcpHealthResponse>,
 ) {
-  const checkedAt = new Date().toISOString();
   res.setHeader("Cache-Control", "no-store");
+  const refresh = req.query.refresh === "1";
+
+  // ── L2 Redis cache ────────────────────────────────────────────────────────
+  if (!refresh) {
+    try {
+      const cached = await getRedisValue(CACHE_KEY);
+      if (cached) {
+        res.setHeader("X-Cache", "HIT");
+        return res.status(200).json(JSON.parse(cached));
+      }
+    } catch {
+      // Redis unavailable → fall through to live check
+    }
+  }
+
+  const checkedAt = new Date().toISOString();
 
   // ── Check MIIT direct access (primary source) ────────────────────────────
   const t0 = Date.now();
@@ -47,15 +65,19 @@ export default async function handler(
     const miitOnline = data?.success === true || data?.code === 200;
 
     if (miitOnline) {
-      return res.status(200).json({ online: true, latencyMs, checkedAt, source: "miit" });
+      const payload: IcpHealthResponse = { online: true, latencyMs, checkedAt, source: "miit" };
+      void cacheResult(payload);
+      return res.status(200).json(payload);
     }
 
     // code 500 = MIIT server error (service down); fall through to legacy check
     if (data?.code !== 500 && data?.code !== undefined) {
-      return res.status(200).json({
+      const payload: IcpHealthResponse = {
         online: false, latencyMs, checkedAt, source: "miit",
         error: `MIIT: ${String(data?.msg || data?.code || "异常")}`,
-      });
+      };
+      void cacheResult(payload);
+      return res.status(200).json(payload);
     }
 
     // code 500 means MIIT backend down → check legacy fallback
@@ -86,26 +108,40 @@ export default async function handler(
     const legacyLatency = Date.now() - t1;
 
     if (legacyOnline) {
-      return res.status(200).json({ online: true, latencyMs: legacyLatency, checkedAt, source: "legacy" });
+      const payload: IcpHealthResponse = { online: true, latencyMs: legacyLatency, checkedAt, source: "legacy" };
+      void cacheResult(payload);
+      return res.status(200).json(payload);
     }
 
-    return res.status(200).json({
+    const payload: IcpHealthResponse = {
       online: false,
       latencyMs: miitLatency,
       checkedAt,
       source: "miit",
       error: `MIIT 服务异常（code 500），备用服务: ${legacyErr}`,
-    });
+    };
+    void cacheResult(payload);
+    return res.status(200).json(payload);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "unknown";
     const latencyMs = Date.now() - t0;
     const isTimeout = msg.includes("abort") || msg.includes("timeout");
-    return res.status(200).json({
+    const payload: IcpHealthResponse = {
       online: false,
       latencyMs: isTimeout ? null : latencyMs,
       checkedAt,
       source: "miit",
       error: isTimeout ? "MIIT 连接超时" : msg.slice(0, 80),
-    });
+    };
+    // Don't cache error/timeout results — let next request retry
+    return res.status(200).json(payload);
+  }
+}
+
+async function cacheResult(payload: IcpHealthResponse) {
+  try {
+    await setRedisValue(CACHE_KEY, JSON.stringify(payload), CACHE_TTL);
+  } catch {
+    // ignore
   }
 }

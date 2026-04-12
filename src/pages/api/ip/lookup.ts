@@ -1,10 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { getRedisValue, setRedisValue } from "@/lib/server/redis";
 
 export const config = { maxDuration: 20 };
 
-const RL_LIMIT  = 30;
-const RL_WINDOW = 60_000;
+const RL_LIMIT   = 30;
+const RL_WINDOW  = 60_000;
+const CACHE_TTL  = 600; // 10 minutes — IP geolocation is stable
 
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+:[0-9a-fA-F:]+$/;
@@ -170,13 +172,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   res.setHeader("Cache-Control", "no-store");
 
+  const cacheKey = `ip:lookup:${query.toLowerCase()}`;
+  const refresh = req.query.refresh === "1";
+
+  // ── L2 Redis cache ─────────────────────────────────────────────────────
+  if (!refresh) {
+    try {
+      const cached = await getRedisValue(cacheKey);
+      if (cached) {
+        res.setHeader("X-Cache", "HIT");
+        return res.status(200).json(JSON.parse(cached));
+      }
+    } catch {
+      // Redis unavailable → fall through to live lookup
+    }
+  }
+
   const asnMatch = query.match(ASN_RE);
   if (asnMatch) {
     const asn = parseInt(asnMatch[1]);
     try {
       const rdap = await fetchRdapAsn(asn);
       const info = extractRdapInfo(rdap);
-      return res.json({ type: "asn", asn, rdap: info, raw: rdap });
+      const payload = { type: "asn", asn, rdap: info, raw: rdap };
+      void saveToCache(cacheKey, payload);
+      return res.json(payload);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
@@ -209,7 +229,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? geo.countryCode.toUpperCase().split("").map((c: string) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
       : null;
 
-    return res.json({
+    const payload = {
       type: IPV6_RE.test(ip) ? "ipv6" : "ipv4",
       query: ip,
       resolvedFrom,
@@ -234,8 +254,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       proxy: geo?.proxy ?? null,
       hosting: geo?.hosting ?? null,
       rdap: rdapInfo,
-    });
+    };
+    void saveToCache(cacheKey, payload);
+    return res.json(payload);
   } catch (e: any) {
     return res.status(500).json({ error: e.message || "Lookup failed" });
+  }
+}
+
+async function saveToCache(key: string, payload: unknown) {
+  try {
+    await setRedisValue(key, JSON.stringify(payload), CACHE_TTL);
+  } catch {
+    // ignore
   }
 }

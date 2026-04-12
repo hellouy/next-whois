@@ -393,6 +393,8 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_activation_codes_used    ON activation_codes (used)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_user_id       ON balance_transactions (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_balance_tx_created       ON balance_transactions (created_at DESC)`,
+  // idx_changelog_date is an earlier duplicate of idx_changelog_entry_date
+  `DROP INDEX IF EXISTS idx_changelog_date`,
   `CREATE INDEX IF NOT EXISTS idx_changelog_entry_date     ON changelog_entries (entry_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_changelog_created        ON changelog_entries (created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS tld_registry_info (
