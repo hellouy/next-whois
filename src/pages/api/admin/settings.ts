@@ -84,8 +84,7 @@ async function isAdmin(req: NextApiRequest, res: NextApiResponse): Promise<boole
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
     try {
-      const admin = await isAdmin(req, res);
-      const rows = await getCachedRows();
+      const [admin, rows] = await Promise.all([isAdmin(req, res), getCachedRows()]);
       const settings: Record<string, string> = {};
       for (const row of rows) {
         if (ALLOWED_KEYS.has(row.key)) {
