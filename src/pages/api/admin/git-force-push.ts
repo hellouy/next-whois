@@ -80,7 +80,7 @@ const IGNORE_DIRS = new Set([
   "attached_assets", "__pycache__", ".cache",
 ]);
 const IGNORE_EXTS = new Set([".lock", ".log"]);
-const ALLOWED_DOTFILES = new Set([".gitignore", ".env.example", ".npmrc", ".replit"]);
+const ALLOWED_DOTFILES = new Set([".gitignore", ".env.example", ".npmrc"]);
 
 function collectFiles(dir: string, root: string, out: string[] = []): string[] {
   let entries: fs.Dirent[];

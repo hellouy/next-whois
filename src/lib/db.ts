@@ -599,13 +599,11 @@ function makePool(connectionString: string): Pool {
   } catch {
     sslConfig = { rejectUnauthorized: false };
   }
-  // On Vercel/Lambda each function instance is short-lived and isolated.
-  // On Replit the server is long-running but shares the same Supabase session-mode
-  // pool_size limit — keep the pool small to avoid "max clients reached" errors.
-  // On traditional self-hosted servers a larger pool is fine.
+  // On Vercel/Lambda each function instance is short-lived and isolated — keep
+  // the pool very small to avoid exhausting Supabase connection limits.
+  // On long-running servers a slightly larger pool improves throughput.
   const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  const isReplit = !!(process.env.REPLIT_DEV_DOMAIN || process.env.REPL_ID);
-  const maxConns = isServerless ? 2 : isReplit ? 3 : 8;
+  const maxConns = isServerless ? 2 : parseInt(process.env.PG_MAX_CONNECTIONS || "5");
   const p = new Pool({
     connectionString: cleanUrl,
     ssl: sslConfig,
@@ -615,7 +613,7 @@ function makePool(connectionString: string): Pool {
     connectionTimeoutMillis: 8_000,
     idleTimeoutMillis: 10_000,
     allowExitOnIdle: true,
-    keepAlive: !(isServerless || isReplit),
+    keepAlive: !isServerless,
     keepAliveInitialDelayMillis: 20_000,
     query_timeout: 25_000,
     statement_timeout: 25_000,

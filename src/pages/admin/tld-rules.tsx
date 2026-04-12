@@ -453,7 +453,7 @@ function LifecycleTabInline() {
     for (const ov of overrides) map[ov.tld] = ov;
     const seen = new Set<string>();
     const result: TldRow[] = [];
-    for (const entry of LIFECYCLE_TABLE as { tld: string; grace: number; redemption: number; pendingDelete: number; registry?: string }[]) {
+    for (const entry of (Object.entries(LIFECYCLE_TABLE).map(([tld, lc]) => ({ tld, ...lc })) as { tld: string; grace: number; redemption: number; pendingDelete: number; registry?: string }[])) {
       seen.add(entry.tld);
       const ov = map[entry.tld];
       result.push({
@@ -534,7 +534,7 @@ function LifecycleTabInline() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-muted-foreground">点击编辑任意 TLD，保存后立即同步到数据库生效</p>
-        <Button size="sm" variant="outline" onClick={loadOverrides} disabled={loading} className="h-8 rounded-xl">
+        <Button size="sm" variant="outline" onClick={() => loadOverrides()} disabled={loading} className="h-8 rounded-xl">
           <RiRefreshLine className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} />刷新
         </Button>
       </div>
@@ -950,7 +950,7 @@ function FailuresTabInline() {
           <Button onClick={() => { setAddTld(""); setAddServer(""); setAddOpen(true); }} variant="outline" size="sm" className="h-8 text-xs rounded-xl">
             <RiAddLine className="w-3.5 h-3.5 mr-1" />添加服务器
           </Button>
-          <Button onClick={load} variant="outline" size="sm" className="h-8 text-xs rounded-xl" disabled={loading}>
+          <Button onClick={() => load()} variant="outline" size="sm" className="h-8 text-xs rounded-xl" disabled={loading}>
             {loading ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}
           </Button>
         </div>
@@ -2240,7 +2240,7 @@ export default function AdminTldRulesPage() {
               <RiErrorWarningLine className="w-3.5 h-3.5" />仅显示默认值
             </button>
             <span className="text-xs text-muted-foreground whitespace-nowrap">{filtered.length} 条</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={load}>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => load()}>
               <RiRefreshLine className="w-3.5 h-3.5" />
             </Button>
           </div>
