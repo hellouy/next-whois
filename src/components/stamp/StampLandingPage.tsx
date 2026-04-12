@@ -97,8 +97,8 @@ export function StampLandingPage() {
         <meta name="description" content={sl("page_desc_main")} />
       </Head>
       <div className="max-w-lg mx-auto px-4 py-8 pb-10 space-y-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <RiArrowLeftLine className="w-3.5 h-3.5" />{sl("back_dashboard")}
+        <Link href={authStatus === "authenticated" ? "/dashboard" : "/"} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <RiArrowLeftLine className="w-3.5 h-3.5" />{authStatus === "authenticated" ? sl("back_dashboard") : t("back")}
         </Link>
 
         {/* Hero */}

@@ -11,6 +11,8 @@ import {
   RiWifiLine,
   RiArrowRightLine,
   RiCompassLine,
+  RiShieldCheckLine,
+  RiCalendarLine,
 } from "@remixicon/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
@@ -71,6 +73,24 @@ const BUILTIN_TOOLS: BuiltinTool[] = [
     descKey: "http.page_subtitle",
     colorClass: "text-sky-600 dark:text-sky-400",
     bgClass: "bg-sky-500/10 dark:bg-sky-500/15",
+  },
+  {
+    href: "/stamp",
+    icon: <RiShieldCheckLine className="w-6 h-6" />,
+    labelKey: "stamp.title",
+    descKey: "stamp.subtitle",
+    colorClass: "text-violet-600 dark:text-violet-400",
+    bgClass: "bg-violet-500/10 dark:bg-violet-500/15",
+    settingKey: "enable_stamps",
+  },
+  {
+    href: "/remind",
+    icon: <RiCalendarLine className="w-6 h-6" />,
+    labelKey: "remind.page_title_main",
+    descKey: "remind.page_desc_main",
+    colorClass: "text-rose-600 dark:text-rose-400",
+    bgClass: "bg-rose-500/10 dark:bg-rose-500/15",
+    settingKey: "enable_remind",
   },
 ];
 

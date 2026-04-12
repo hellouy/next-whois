@@ -4,7 +4,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
   return {
     redirect: {
       destination: "/tlds",
-      permanent: true,
+      permanent: false,
     },
   };
 };

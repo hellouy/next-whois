@@ -9,9 +9,36 @@ function genId() {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
+    const { visible_only } = req.query;
+
+    // Public endpoint: only visible sponsors, no auth required
+    if (visible_only === "1") {
+      try {
+        const rows = await many<{
+          id: string;
+          name: string;
+          avatar_url: string | null;
+          amount: string | null;
+          currency: string;
+          message: string | null;
+          sponsor_date: string | null;
+          is_anonymous: boolean;
+          is_visible: boolean;
+          platform: string | null;
+          created_at: string;
+        }>(`SELECT * FROM sponsors WHERE is_visible = true ORDER BY sponsor_date DESC NULLS LAST, created_at DESC`);
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+        return res.json({ sponsors: rows });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
+    // Admin-only: full list including hidden entries
+    const session = await requireAdmin(req, res);
+    if (!session) return;
+
     try {
-      const { visible_only } = req.query;
-      const where = visible_only === "1" ? "WHERE is_visible = true" : "";
       const rows = await many<{
         id: string;
         name: string;
@@ -24,12 +51,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         is_visible: boolean;
         platform: string | null;
         created_at: string;
-      }>(`SELECT * FROM sponsors ${where} ORDER BY sponsor_date DESC NULLS LAST, created_at DESC`);
-      if (visible_only === "1") {
-        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
-      } else {
-        res.setHeader("Cache-Control", "private, no-store");
-      }
+      }>(`SELECT * FROM sponsors ORDER BY sponsor_date DESC NULLS LAST, created_at DESC`);
+      res.setHeader("Cache-Control", "private, no-store");
       return res.json({ sponsors: rows });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });

@@ -802,8 +802,8 @@ export default function RemindPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         {/* Back */}
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <RiArrowLeftLine className="w-3.5 h-3.5" />{t("remind.back_dashboard")}
+        <Link href={status === "authenticated" ? "/dashboard" : "/"} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <RiArrowLeftLine className="w-3.5 h-3.5" />{status === "authenticated" ? t("remind.back_dashboard") : t("back")}
         </Link>
 
         {/* Hero */}
