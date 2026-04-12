@@ -2,7 +2,6 @@ import { cn, toSearchURI, isSearchRoute, cleanDomain, isValidDomainTld } from "@
 import { prefetchLookup } from "@/lib/lookup-prefetch";
 import React, { useEffect, useCallback, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { QueryLoadingSkeleton } from "@/components/query/query-loading-skeleton";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/lib/i18n";
 import Head from "next/head";
@@ -138,11 +137,10 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
   useSearchHotkeys({});
 
   const [isSearching, setIsSearching] = useState(false);
-  const [searchTarget, setSearchTarget] = useState<string>("");
 
   // Reset loading state when navigation finishes or errors (e.g. user presses back)
   useEffect(() => {
-    const reset = () => { setIsSearching(false); setSearchTarget(""); };
+    const reset = () => { setIsSearching(false); };
     router.events.on("routeChangeComplete", reset);
     router.events.on("routeChangeError", reset);
     return () => {
@@ -160,7 +158,6 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         (cleaned.includes(".") || /^AS\d+$/i.test(cleaned) || /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}/.test(cleaned)) &&
         isValidDomainTld(cleaned);
       if (queryLooksValid) prefetchLookup(cleaned);
-      setSearchTarget(cleaned || query.trim());
       setIsSearching(true);
       router.push(toSearchURI(query));
     },
@@ -229,11 +226,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
-          {isSearching ? (
-            <div key="skeleton" className="mt-4">
-              <QueryLoadingSkeleton isChinese={isChinese} domain={searchTarget} />
-            </div>
-          ) : (
+          {!isSearching && (
             <div key="home">
               {seo.showStats && stats && (
                 <div className="flex justify-center gap-6 mt-3 mb-1">
@@ -268,11 +261,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
-          {isSearching ? (
-            <div key="skeleton" className="flex-1 overflow-auto">
-              <QueryLoadingSkeleton isChinese={isChinese} domain={searchTarget} />
-            </div>
-          ) : (
+          {!isSearching && (
             <React.Fragment key="home">
               {/* Brand: fills remaining space in the middle */}
               <div className="flex flex-1 items-center justify-center">
