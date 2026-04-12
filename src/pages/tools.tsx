@@ -13,6 +13,7 @@ import {
   RiCompassLine,
   RiShieldCheckLine,
   RiCalendarLine,
+  RiSearchLine,
 } from "@remixicon/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
@@ -91,6 +92,14 @@ const BUILTIN_TOOLS: BuiltinTool[] = [
     colorClass: "text-rose-600 dark:text-rose-400",
     bgClass: "bg-rose-500/10 dark:bg-rose-500/15",
     settingKey: "enable_remind",
+  },
+  {
+    href: "/batch-check",
+    icon: <RiSearchLine className="w-6 h-6" />,
+    labelKey: "batch_check.nav_label",
+    descKey: "batch_check.nav_desc",
+    colorClass: "text-teal-600 dark:text-teal-400",
+    bgClass: "bg-teal-500/10 dark:bg-teal-500/15",
   },
 ];
 

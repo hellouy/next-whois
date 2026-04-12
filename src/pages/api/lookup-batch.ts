@@ -11,13 +11,21 @@ export const config = {
   maxDuration: 60,
 };
 
-const MAX_BATCH_SIZE    = 20;
+// Concurrency limit per batch to avoid hammering upstream WHOIS servers
+const CONCURRENCY = 5;
+
+// Rate limits apply only to external (non-same-origin) callers
 const RATE_LIMIT_ANON   = 5;
 const RATE_LIMIT_AUTHED = 15;
 const RATE_LIMIT_SUB    = 40;
 const RATE_WINDOW_MS    = 60_000;
 
-type BatchItem = {
+// Max batch sizes: logged-in users are unlimited within a single request
+// (capped at ANON_MAX for anonymous), authenticated users get higher caps.
+const MAX_ANON_SIZE    = 10;
+const MAX_AUTHED_SIZE  = 500;  // effectively unlimited for UI use
+
+export type BatchItem = {
   domain: string;
   status: boolean;
   time: number;
@@ -34,6 +42,28 @@ type Data =
   | { items: BatchItem[]; elapsed: number }
   | { error: string };
 
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let idx = 0;
+
+  async function worker() {
+    while (idx < tasks.length) {
+      const i = idx++;
+      try {
+        results[i] = { status: "fulfilled", value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  return results;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<Data>,
@@ -43,21 +73,23 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // ── Session + rate limiting ──────────────────────────────────────────────
+  // ── Session ──────────────────────────────────────────────────────────────
   const session = await getServerSession(req, res, authOptions).catch(() => null);
   const userEmail    = session?.user?.email ?? null;
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
   const sameOrigin   = isSameOriginRequest(req);
+  const isLoggedIn   = !!userEmail;
 
+  // ── Rate limiting (external callers only) ────────────────────────────────
   const ip        = getClientIp(req);
-  const tierLimit = sameOrigin ? RATE_LIMIT_SUB
-                  : isSubscribed ? RATE_LIMIT_SUB
-                  : userEmail    ? RATE_LIMIT_AUTHED
-                  :                RATE_LIMIT_ANON;
-  const tierKey   = sameOrigin ? `${ip}:origin:batch`
-                  : isSubscribed ? `${ip}:sub:batch`
-                  : userEmail    ? `${ip}:auth:batch`
-                  :                `${ip}:anon:batch`;
+  const tierLimit = sameOrigin    ? RATE_LIMIT_SUB
+                  : isSubscribed  ? RATE_LIMIT_SUB
+                  : isLoggedIn    ? RATE_LIMIT_AUTHED
+                  :                 RATE_LIMIT_ANON;
+  const tierKey   = sameOrigin    ? `${ip}:origin:batch`
+                  : isSubscribed  ? `${ip}:sub:batch`
+                  : isLoggedIn    ? `${ip}:auth:batch`
+                  :                 `${ip}:anon:batch`;
 
   if (!sameOrigin) {
     const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
@@ -86,8 +118,9 @@ export default async function handler(
     return res.status(400).json({ error: "Request body must include a non-empty \"domains\" array" });
   }
 
-  if ((domains as unknown[]).length > MAX_BATCH_SIZE) {
-    return res.status(400).json({ error: `Batch size exceeds maximum of ${MAX_BATCH_SIZE}` });
+  const maxBatch = isLoggedIn ? MAX_AUTHED_SIZE : MAX_ANON_SIZE;
+  if ((domains as unknown[]).length > maxBatch) {
+    return res.status(400).json({ error: `Batch size exceeds maximum of ${maxBatch}` });
   }
 
   const queryList = (domains as unknown[])
@@ -98,11 +131,12 @@ export default async function handler(
     return res.status(400).json({ error: "No valid domain strings in \"domains\" array" });
   }
 
-  // ── Execute all lookups in parallel ─────────────────────────────────────
+  // ── Execute lookups with controlled concurrency ───────────────────────────
+  // This avoids hammering upstream WHOIS servers while still being fast.
+  // Cache hits are returned instantly, so effective throughput is much higher.
   const batchStart = Date.now();
-  const settled = await Promise.allSettled(
-    queryList.map(domain => lookupWhoisWithCache(domain)),
-  );
+  const tasks = queryList.map(domain => () => lookupWhoisWithCache(domain));
+  const settled = await runWithConcurrency(tasks, CONCURRENCY);
 
   const items: BatchItem[] = settled.map((result, i) => {
     const domain = queryList[i];
