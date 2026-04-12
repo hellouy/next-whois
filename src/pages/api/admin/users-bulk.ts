@@ -3,14 +3,11 @@ import { many, run } from "@/lib/db-query";
 import { requireAdmin, getAdminEmail } from "@/lib/admin";
 import { randomBytes } from "crypto";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
+import { getSiteUrl } from "@/lib/server/site-settings-server";
 
 type Action = "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete" | "send_reset_email";
 
 const RESET_EXPIRES_MINUTES = 60;
-const SITE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  process.env.NEXTAUTH_URL ||
-  "https://example.com";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -88,7 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
             [tokenId, row.id, rawToken, expiresAt]
           );
-          const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
+          const siteUrl = await getSiteUrl();
+          const resetUrl = `${siteUrl}/reset-password?token=${rawToken}`;
           await sendEmail({
             to: row.email,
             subject: `重置你的 ${siteName} 密码（管理员触发）`,

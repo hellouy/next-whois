@@ -10,7 +10,31 @@ const PRIMARY    = "#7c3aed";   // violet-600
 const PRIMARY_LT = "#8b5cf6";   // violet-500
 const DARK       = "#0f172a";   // slate-900
 const FONT       = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-const BASE_URL   = () => process.env.NEXT_PUBLIC_BASE_URL || "https://example.com";
+// ── Server-side base URL (cached, reads og_url from DB) ──────────────────────
+// BASE_URL() is called synchronously inside template functions; this cache is
+// warmed asynchronously before every send so subsequent renders use the DB value.
+let _urlCache: string | null = null;
+let _urlCacheAt = 0;
+const URL_TTL = 60_000;
+
+export async function getSiteBaseUrl(): Promise<string> {
+  if (_urlCache && Date.now() - _urlCacheAt < URL_TTL) return _urlCache;
+  try {
+    const row = await one<{ value: string }>(
+      "SELECT value FROM site_settings WHERE key = 'og_url'"
+    );
+    const dbUrl = row?.value?.trim();
+    _urlCache = (dbUrl && dbUrl.startsWith("http"))
+      ? dbUrl.replace(/\/$/, "")
+      : (process.env.NEXT_PUBLIC_BASE_URL || "https://example.com");
+  } catch {
+    _urlCache = process.env.NEXT_PUBLIC_BASE_URL || "https://example.com";
+  }
+  _urlCacheAt = Date.now();
+  return _urlCache!;
+}
+
+const BASE_URL = () => _urlCache || process.env.NEXT_PUBLIC_BASE_URL || "https://example.com";
 
 // ── Server-side site label (cached, reads from DB) ───────────────────────────
 let _labelCache: string | null = null;
@@ -1125,15 +1149,23 @@ export async function sendEmailDirect(to: string, subject: string, html: string)
  * On any send failure the email is written to email_queue for later retry.
  * The queue processor (api/admin/process-email-queue) will retry with
  * exponential back-off (2, 4, 8, 16 min) up to max_attempts (default 5).
+ *
+ * Also accepts `htmlFn(baseUrl)` instead of `html` — the function is called
+ * AFTER the site URL is resolved from the DB, so all template links use the
+ * admin-configured `og_url` rather than the NEXT_PUBLIC_BASE_URL env var.
  */
 export async function sendEmail({
-  to, subject, html,
-}: { to: string; subject: string; html: string }) {
+  to, subject, html, htmlFn,
+}: { to: string; subject: string; html?: string; htmlFn?: (baseUrl: string) => string }) {
+  // Resolve base URL from DB (og_url setting) so email template links are correct.
+  // This also warms the _urlCache for the synchronous BASE_URL() used by other templates.
+  const baseUrl = await getSiteBaseUrl();
+  const renderedHtml = htmlFn ? htmlFn(baseUrl) : (html ?? "");
   try {
-    await sendEmailDirect(to, subject, html);
+    await sendEmailDirect(to, subject, renderedHtml);
   } catch (err: any) {
     console.error(`[sendEmail] Failed — queuing for retry → ${to}: ${err.message}`);
     const { enqueueEmail } = await import("@/lib/email-queue");
-    await enqueueEmail(to, subject, html);
+    await enqueueEmail(to, subject, renderedHtml);
   }
 }

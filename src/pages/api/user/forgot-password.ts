@@ -4,12 +4,9 @@ import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { localeFromCookieHeader, getEmailStrings } from "@/lib/email-strings";
+import { getSiteUrl } from "@/lib/server/site-settings-server";
 
 const RESET_EXPIRES_MINUTES = 60;
-const SITE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  process.env.NEXTAUTH_URL ||
-  "https://example.com";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -56,7 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Operation failed, please try again later" });
   }
 
-  const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
+  const siteUrl = await getSiteUrl();
+  const resetUrl = `${siteUrl}/reset-password?token=${rawToken}`;
   const siteName = await getSiteLabel().catch(() => "WHOIS");
   const s = getEmailStrings(locale);
   try {

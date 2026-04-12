@@ -83,6 +83,22 @@ export async function isEnabled(key: string): Promise<boolean> {
 }
 
 /**
+ * Returns the canonical site URL for generating links in emails, webhooks, etc.
+ * Priority: DB `og_url` → NEXT_PUBLIC_BASE_URL env → NEXTAUTH_URL env → empty string.
+ * Always prefer the admin-configured value so no environment variable is required.
+ */
+export async function getSiteUrl(): Promise<string> {
+  const dbUrl = await getSetting("og_url");
+  if (dbUrl && dbUrl.startsWith("http")) return dbUrl.replace(/\/$/, "");
+  return (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXTAUTH_URL ||
+    ""
+  );
+}
+
+/**
  * Fetch multiple settings in a single round-trip where possible.
  * L1 hits are served instantly; uncached keys are batched into one DB query.
  */

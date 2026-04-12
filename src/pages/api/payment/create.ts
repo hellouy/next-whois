@@ -89,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (provider === "xunhupay") {
       const appId = await getSetting("payment_xunhupay_appid");
-      const appSecret = process.env.XUNHUPAY_APP_SECRET ?? "";
+      const appSecret = (await getSetting("payment_xunhupay_secret")) || process.env.XUNHUPAY_APP_SECRET || "";
       if (!appId || !appSecret) return res.status(500).json({ error: "Xunhupay is not configured" });
 
       const { xunhupaySign } = await import("@/lib/payment");

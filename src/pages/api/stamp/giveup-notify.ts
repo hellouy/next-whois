@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { one, isDbReady } from "@/lib/db-query";
 import { sendEmail, stampVerifyTimeoutHtml, getSiteLabel } from "@/lib/email";
 import { getEmailStrings } from "@/lib/email-strings";
+import { getSiteUrl } from "@/lib/server/site-settings-server";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -23,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const fileContent = `next-whois-verify=${verify_token}`;
   const appBase = (appUrl && String(appUrl).startsWith("http"))
     ? appUrl
-    : (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://example.com");
+    : await getSiteUrl();
   const verifyUrl = `${appBase}/stamp?domain=${encodeURIComponent(domain)}`;
 
   const siteName = await getSiteLabel().catch(() => "WHOIS");

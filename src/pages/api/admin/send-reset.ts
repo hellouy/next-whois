@@ -4,13 +4,9 @@ import { requireAdmin } from "@/lib/admin";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { isAdminEmail } from "@/lib/admin-server";
+import { getSiteUrl } from "@/lib/server/site-settings-server";
 
 const RESET_EXPIRES_MINUTES = 60;
-const SITE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.NEXTAUTH_URL ||
-  "";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -65,7 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "生成重置令牌失败" });
   }
 
-  const resetUrl = `${SITE_URL}/reset-password?token=${rawToken}`;
+  const siteUrl = await getSiteUrl();
+  const resetUrl = `${siteUrl}/reset-password?token=${rawToken}`;
   const siteName = await getSiteLabel().catch(() => "WHOIS");
 
   try {

@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes } from "crypto";
 import {
   sendEmail, reminderHtml, phaseEventHtml,
-  dropApproachingHtml, domainDroppedHtml, getSiteLabel,
+  dropApproachingHtml, domainDroppedHtml, getSiteLabel, getSiteBaseUrl,
 } from "@/lib/email";
 import {
   computeLifecycle,
@@ -128,6 +128,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!(await isDbReady())) return res.status(500).json({ error: "Database unavailable" });
 
+  // Warm URL cache from DB (og_url) so BASE_URL() in all email templates returns the correct value
+  await getSiteBaseUrl().catch(() => {});
   const siteName = await getSiteLabel().catch(() => "WHOIS");
 
   try {
