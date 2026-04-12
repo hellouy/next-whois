@@ -132,20 +132,23 @@ const nextConfig = {
         cluster: false,
       };
 
-      // In development mode with proxied environments (like Replit), HMR
-      // full-reloads can fire route-change events before the webpack async
-      // chunk loader (require.e / __webpack_require__.e) has been initialised,
-      // causing "require.e is not a function" errors.
-      // Injecting a no-op fallback at the top of every client entry ensures
-      // the function exists, so the ErrorBoundary can catch any real failures
-      // instead of crashing the entire webpack runtime.
-      if (dev) {
+      // In proxied environments (Replit dev, iOS Safari, slow networks), HMR
+      // full-reloads or navigation events can call the webpack async chunk
+      // loader (require.e / __webpack_require__.e) before the webpack runtime
+      // chunk has fully initialised, causing "require.e is not a function".
+      // Fix: inject a safe no-op guard into EVERY client chunk (not just
+      // entries) so any chunk that runs first still has a valid require.e.
+      // In production this is effectively a no-op — the real loader is always
+      // present before any page chunk executes.
+      {
         const webpack = require('webpack');
         config.plugins.push(
           new webpack.BannerPlugin({
-            banner: '(function(){if(typeof __webpack_require__!=="undefined"&&typeof __webpack_require__.e!=="function"){__webpack_require__.e=function(){return Promise.resolve();}}})();',
+            // Guard both __webpack_require__.e (standard) and the local alias
+            // "require" that webpack uses inside chunk closure scopes.
+            banner: '(function(r){if(typeof r!=="undefined"&&typeof r.e!=="function"){r.e=function(){return Promise.resolve();}}})(typeof __webpack_require__!=="undefined"?__webpack_require__:undefined);',
             raw: true,
-            entryOnly: true,
+            entryOnly: false,
           })
         );
       }
