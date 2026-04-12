@@ -132,26 +132,6 @@ const nextConfig = {
         cluster: false,
       };
 
-      // In proxied environments (Replit dev, iOS Safari, slow networks), HMR
-      // full-reloads or navigation events can call the webpack async chunk
-      // loader (require.e / __webpack_require__.e) before the webpack runtime
-      // chunk has fully initialised, causing "require.e is not a function".
-      // Fix: inject a safe no-op guard into EVERY client chunk (not just
-      // entries) so any chunk that runs first still has a valid require.e.
-      // In production this is effectively a no-op — the real loader is always
-      // present before any page chunk executes.
-      {
-        const webpack = require('webpack');
-        config.plugins.push(
-          new webpack.BannerPlugin({
-            // Guard both __webpack_require__.e (standard) and the local alias
-            // "require" that webpack uses inside chunk closure scopes.
-            banner: '(function(r){if(typeof r!=="undefined"&&typeof r.e!=="function"){r.e=function(){return Promise.resolve();}}})(typeof __webpack_require__!=="undefined"?__webpack_require__:undefined);',
-            raw: true,
-            entryOnly: false,
-          })
-        );
-      }
     }
     return config;
   },
