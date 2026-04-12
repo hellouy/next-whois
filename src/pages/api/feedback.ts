@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { sendEmail, feedbackHtml, getSiteLabel } from "@/lib/email";
+import { sendEmail, sendEmailDirect, feedbackHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { run, isDbReady } from "@/lib/db-query";
@@ -80,20 +80,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const ts               = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
 
   const siteName = await getSiteLabel().catch(() => "WHOIS");
-  await sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `[反馈] ${cleanQuery} — ${issueLabels}`,
-    html: feedbackHtml({
-      query: cleanQuery,
-      queryType: String(queryType || "general"),
-      issueLabels,
-      description: cleanDescription || undefined,
-      email: cleanEmail || undefined,
-      ip,
-      ts,
-      siteName,
-    }),
-  });
+
+  let adminEmailSent = false;
+  if (ADMIN_EMAIL) {
+    try {
+      await sendEmailDirect(
+        ADMIN_EMAIL,
+        `[反馈] ${cleanQuery} — ${issueLabels}`,
+        feedbackHtml({
+          query: cleanQuery,
+          queryType: String(queryType || "general"),
+          issueLabels,
+          description: cleanDescription || undefined,
+          email: cleanEmail || undefined,
+          ip,
+          ts,
+          siteName,
+        }),
+      );
+      adminEmailSent = true;
+    } catch (err: unknown) {
+      console.error("[feedback] admin email failed:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Send confirmation email to submitter if they provided their address
+  if (cleanEmail) {
+    const isZh = /[\u4e00-\u9fa5]/.test(cleanDescription) ||
+      (req.headers["accept-language"] || "").toLowerCase().startsWith("zh");
+    const confirmHtml = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f8fafc;margin:0;padding:24px">
+<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:28px 32px;border:1px solid #e2e8f0">
+<h2 style="font-size:16px;font-weight:700;margin:0 0 8px;color:#0f172a">${isZh ? "我们已收到您的反馈" : "We received your feedback"}</h2>
+<p style="font-size:13px;color:#64748b;margin:0 0 16px;line-height:1.6">${isZh ? `感谢您对 <strong>${siteName}</strong> 的反馈！我们会尽快处理您的建议。` : `Thank you for your feedback on <strong>${siteName}</strong>! We'll review it as soon as possible.`}</p>
+<div style="background:#f1f5f9;border-radius:8px;padding:14px 16px;font-size:12px;color:#475569;margin-bottom:16px">
+  <p style="margin:0 0 4px"><strong>${isZh ? "查询目标" : "Subject"}：</strong>${cleanQuery}</p>
+  <p style="margin:0 0 4px"><strong>${isZh ? "问题类型" : "Issue"}：</strong>${issueLabels}</p>
+  ${cleanDescription ? `<p style="margin:0"><strong>${isZh ? "补充说明" : "Details"}：</strong>${cleanDescription}</p>` : ""}
+</div>
+<p style="font-size:11px;color:#94a3b8;margin:0">${ts} · ${siteName}</p>
+</div></body></html>`;
+    await sendEmail({
+      to: cleanEmail,
+      subject: isZh ? `[${siteName}] 感谢您的反馈` : `[${siteName}] Thank you for your feedback`,
+      html: confirmHtml,
+    }).catch((err: unknown) => {
+      console.error("[feedback] user confirmation email failed:", err instanceof Error ? err.message : err);
+    });
+  }
 
   if (await isDbReady()) {
     const id = randomBytes(8).toString("hex");
@@ -111,5 +144,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ).catch(() => {});
   }
 
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({ ok: true, emailSent: adminEmailSent });
 }

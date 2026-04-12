@@ -117,6 +117,7 @@ export default function FeedbackPage() {
   const [email, setEmail] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [done, setDone] = React.useState(false);
+  const [emailSent, setEmailSent] = React.useState(true);
   const openedAt = React.useRef(Date.now());
   const [hp, setHp] = React.useState("");
 
@@ -163,6 +164,7 @@ export default function FeedbackPage() {
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data?.error || t("feedback.err_failed")); return; }
+      setEmailSent(data?.emailSent !== false);
       setDone(true);
     } catch {
       toast.error(t("feedback.err_network"));
@@ -233,6 +235,18 @@ export default function FeedbackPage() {
                     {t("feedback.thanks_body")}
                   </p>
                 </div>
+                {!emailSent && (
+                  <div className="max-w-xs mx-auto rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 text-left">
+                    <p className="font-semibold mb-0.5">
+                      {router.locale === "zh" ? "反馈已保存，但邮件通知未发送" : "Feedback saved, email notification not sent"}
+                    </p>
+                    <p className="text-amber-600/80 dark:text-amber-400/80">
+                      {router.locale === "zh"
+                        ? "邮件服务尚未配置，请管理员在后台设置 SMTP 或 Resend，配置后将正常发送通知。"
+                        : "Email service is not configured. Please set up SMTP or Resend in admin settings."}
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-center gap-3 pt-2">
                   <Button variant="outline" onClick={() => { setDone(false); setSelected(new Set()); setDescription(""); setQuery(""); }} className="rounded-xl gap-2">
                     <RiFlagLine className="w-4 h-4" />{t("feedback.resubmit")}

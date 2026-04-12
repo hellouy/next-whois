@@ -88,6 +88,7 @@ export function DomainReminderDialog({
   const [submitting, setSubmitting] = React.useState(false);
   const [done, setDone] = React.useState(false);
   const [alreadySubscribed, setAlreadySubscribed] = React.useState(false);
+  const [checkingStatus, setCheckingStatus] = React.useState(false);
   const [selectedThresholds, setSelectedThresholds] = React.useState<number[]>(DEFAULT_REMINDER_THRESHOLDS);
 
   const [lcFeedbackOpen, setLcFeedbackOpen] = React.useState(false);
@@ -107,8 +108,19 @@ export function DomainReminderDialog({
       setDone(false);
       setAlreadySubscribed(false);
       setSelectedThresholds(DEFAULT_REMINDER_THRESHOLDS);
+
+      if (userEmail) {
+        setCheckingStatus(true);
+        fetch(`/api/remind/status?domain=${encodeURIComponent(domain)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data?.subscribed) setAlreadySubscribed(true);
+          })
+          .catch(() => {})
+          .finally(() => setCheckingStatus(false));
+      }
     }
-  }, [open, userEmail]);
+  }, [open, userEmail, domain]);
 
   const isRestricted = regStatusType === "prohibited" || regStatusType === "reserved";
 
@@ -286,8 +298,21 @@ export function DomainReminderDialog({
 
           <AnimatePresence mode="wait" initial={false}>
 
-            {/* ── Already subscribed ── */}
-            {alreadySubscribed ? (
+            {/* ── Checking subscription status ── */}
+            {checkingStatus ? (
+              <motion.div
+                key="checking"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="py-12 flex flex-col items-center justify-center gap-3"
+              >
+                <RiLoader4Line className="w-6 h-6 text-muted-foreground animate-spin" />
+                <p className="text-xs text-muted-foreground">{isZh ? "检查订阅状态…" : "Checking status…"}</p>
+              </motion.div>
+
+            ) : alreadySubscribed ? (
               <motion.div
                 key="already"
                 initial={{ opacity: 0, scale: 0.96 }}
