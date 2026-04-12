@@ -25,7 +25,7 @@ import {
   isASNumber,
   toAsciiDomain,
 } from "@/lib/whois/whois-patterns";
-import { ScraperRequiredError } from "@/lib/whois/custom-servers";
+import { ScraperRequiredError, queryManualServerRacing } from "@/lib/whois/custom-servers";
 import { lookupIpOrAsn, tryGenericWhoisForDomain, mergeResults, pickStr } from "@/lib/whois/whois-generic";
 import { initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { recordTldLookupFailure, getTldApiSource, clearTldFailureStats } from "@/lib/db";
@@ -688,6 +688,52 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     };
   }
 
+  // ── Admin-configured manual WHOIS server: direct query, skip RDAP ────────
+  // When the admin has explicitly added a custom server (source='manual') for
+  // this TLD, query it immediately and return — RDAP + whoiser cascade are not
+  // started, saving 2-8 s per call on ccTLDs where RDAP is unavailable.
+  // queryManualServerRacing (isUserServer=false) returns null on failure so we
+  // fall through gracefully to the standard RDAP+WHOIS flow when it doesn't work.
+  {
+    const manualEarly = await queryManualServerRacing(domainToQuery, tld, tldSuffix, innerTimeout);
+    if (manualEarly !== null) {
+      const raw = manualEarly.raw ?? "";
+      if (raw.trim().length > 0 && !isIanaFallback(raw)) {
+        if (isWhoisRateLimited(raw)) {
+          recordFailure("rate_limited");
+          setWhoisRateLimit(tldSuffix).catch(() => {});
+          return failWithDns("WHOIS server temporarily rate-limited this query — please try again in a moment");
+        }
+        try {
+          const parsed = await analyzeWhois(raw);
+          const hasRegistryStatus = parsed.status?.some(s =>
+            ["registry-reserved", "registry-premium", "prohibited", "registrationProhibited", "blocked"].includes(s.status ?? ""),
+          );
+          const detectedError = hasRegistryStatus ? null : detectWhoisError(raw);
+          if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
+            return {
+              time: elapsed(), status: false, cached: false, error: detectedError,
+              dnsProbe: {
+                domain, registrationStatus: "unregistered", confidence: "high",
+                signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
+              },
+            };
+          }
+          if (!detectedError && !isEmptyResult(parsed)) {
+            if (manualEarly.server) parsed.whoisServer = pickStr(parsed.whoisServer, manualEarly.server);
+            parsed.rawWhoisContent = raw;
+            clearTldFailureStats(tldSuffix).catch(() => {});
+            const dnsProbe = isDomainQuery && unconditionalDnsProbe
+              ? await Promise.race([unconditionalDnsProbe, new Promise<undefined>(r => setTimeout(r, 500))])
+              : undefined;
+            return { time: elapsed(), status: true, cached: false, source: "whois", result: parsed, dnsProbe };
+          }
+        } catch { /* parse failed → fall through to RDAP+WHOIS */ }
+      }
+      // Manual server returned empty/unparseable → fall through to RDAP+WHOIS
+    }
+  }
+
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
   // Reduced from 1200 → 900 ms: 900 ms is enough for most WHOIS servers to
   // respond while showing the final merged result ~300 ms sooner.
@@ -841,6 +887,8 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       if (whoisData?.server) result.whoisServer = pickStr(result.whoisServer, whoisData.server);
       result.rawRdapContent = rdapRaw!;
       const dnsProbe = await getProbeForSuccess();
+      // RDAP success → auto-remove any lingering failure record for this TLD
+      clearTldFailureStats(tldSuffix).catch(() => {});
       return { time: elapsed(), status: true, cached: false, source: "rdap", result, dnsProbe };
     } catch {}
   }
