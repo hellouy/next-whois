@@ -96,7 +96,7 @@ const nextConfig = {
     ];
   },
   ...(process.env.NEXT_BUILD_DIR ? { distDir: process.env.NEXT_BUILD_DIR } : {}),
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     if (isServer) {
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : []),
@@ -132,6 +132,24 @@ const nextConfig = {
         dgram: false,
         cluster: false,
       };
+
+      // In development mode with proxied environments (like Replit), HMR
+      // full-reloads can fire route-change events before the webpack async
+      // chunk loader (require.e / __webpack_require__.e) has been initialised,
+      // causing "require.e is not a function" errors.
+      // Injecting a no-op fallback at the top of every client entry ensures
+      // the function exists, so the ErrorBoundary can catch any real failures
+      // instead of crashing the entire webpack runtime.
+      if (dev) {
+        const webpack = require('webpack');
+        config.plugins.push(
+          new webpack.BannerPlugin({
+            banner: '(function(){if(typeof __webpack_require__!=="undefined"&&typeof __webpack_require__.e!=="function"){__webpack_require__.e=function(){return Promise.resolve();}}})();',
+            raw: true,
+            entryOnly: true,
+          })
+        );
+      }
     }
     return config;
   },

@@ -10,29 +10,70 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  autoRetrying: boolean;
+}
+
+// Webpack chunk-loading errors (require.e / __webpack_require__.e) are
+// transient: they occur when the HMR runtime reloads the page before the
+// webpack runtime has fully initialised.  A hard reload always fixes them.
+function isWebpackChunkError(error: Error | null): boolean {
+  if (!error) return false;
+  const msg = error.message || "";
+  return (
+    msg.includes("require.e is not a function") ||
+    msg.includes("__webpack_require__.e") ||
+    msg.includes("ChunkLoadError") ||
+    msg.includes("Loading chunk") ||
+    msg.includes("chunkId")
+  );
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, autoRetrying: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { hasError: true, error, autoRetrying: isWebpackChunkError(error) };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+
+    // Webpack chunk load failures are transient — silently reload the page.
+    if (isWebpackChunkError(error)) {
+      this.reloadTimer = setTimeout(() => {
+        if (typeof window !== "undefined") window.location.reload();
+      }, 1200);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.reloadTimer) clearTimeout(this.reloadTimer);
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, autoRetrying: false });
   };
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
+
+      // Webpack chunk errors: show a minimal "reloading" message instead of
+      // the scary error card, since a hard reload will fix them automatically.
+      if (this.state.autoRetrying) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[40vh] px-4 text-center gap-3">
+            <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">正在重新加载…</p>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col items-center justify-center min-h-[40vh] px-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center mb-5">
