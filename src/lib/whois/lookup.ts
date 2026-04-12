@@ -735,9 +735,18 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   }
 
   // Grace period (ms) WHOIS gets to complete after RDAP already succeeded.
-  // Reduced from 1200 → 900 ms: 900 ms is enough for most WHOIS servers to
-  // respond while showing the final merged result ~300 ms sooner.
-  const RDAP_WIN_WHOIS_GRACE_MS = 900;
+  // Reduced 1200 → 900 → 400 ms: WHOIS for most TLDs responds within 300 ms
+  // of RDAP, so 400 ms still captures the enrichment while returning the final
+  // result ~500 ms sooner than the old 900 ms cap.
+  const RDAP_WIN_WHOIS_GRACE_MS = 400;
+
+  // Grace period (ms) RDAP gets to complete after WHOIS already succeeded.
+  // Previously we called Promise.allSettled which waited up to RDAP_OUTER_TIMEOUT_MS
+  // (12 s) even when WHOIS was already done.  With an 800 ms cap:
+  //   • If RDAP finishes within 800 ms of WHOIS → we still get the structured JSON
+  //   • If RDAP is slow / unreachable → we return WHOIS-only 800 ms after WHOIS
+  //     instead of waiting potentially seconds longer.
+  const WHOIS_WIN_RDAP_GRACE_MS = 800;
 
   // T006: Skip WHOIS entirely when this TLD's server is known to be rate-limiting.
   // The flag is set on first detection and expires (via Redis TTL) after 60 s,
@@ -813,10 +822,31 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       void r; // already settled, just for symmetry
     }
   } else {
-    // WHOIS finished first — unconditionalDnsProbe is already running in parallel.
-    const [r, w] = await Promise.allSettled([rdapPromise, whoisPromise]);
-    rdapSettled  = r;
-    whoisSettled = w;
+    // WHOIS finished first — read its result, then decide how long to wait for RDAP.
+    const whoisResult = await whoisPromise.catch(() => null);
+    whoisSettled = { status: "fulfilled", value: whoisResult };
+
+    const whoisHasData = !!(whoisResult?.raw?.trim());
+    if (whoisHasData) {
+      // WHOIS returned real data → cap RDAP wait at WHOIS_WIN_RDAP_GRACE_MS.
+      // Previously Promise.allSettled waited up to RDAP_OUTER_TIMEOUT_MS (12 s)
+      // even when WHOIS already had everything we needed.
+      const rdapGraceResult = await Promise.race([
+        rdapPromise
+          .then(v  => ({ status: "fulfilled" as const, value: v }))
+          .catch(e  => ({ status: "rejected"  as const, reason: e })),
+        new Promise<{ status: "rejected"; reason: Error }>(res =>
+          setTimeout(() => res({ status: "rejected", reason: new Error("rdap-grace-timeout") }), WHOIS_WIN_RDAP_GRACE_MS)
+        ),
+      ]);
+      rdapSettled = rdapGraceResult;
+    } else {
+      // WHOIS returned null/empty (rate-limited, no-server, etc.) — RDAP is our
+      // only hope; wait for it fully up to RDAP_OUTER_TIMEOUT_MS via withTimeout.
+      rdapSettled = await rdapPromise
+        .then(v => ({ status: "fulfilled" as const, value: v }))
+        .catch(e => ({ status: "rejected"  as const, reason: e }));
+    }
   }
 
   const rdapSettledResult = rdapSettled.status === "fulfilled" ? rdapSettled.value : null;
