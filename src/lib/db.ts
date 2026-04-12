@@ -676,6 +676,14 @@ export async function getDbReady(): Promise<Pool | null> {
   if (!db) return null;
   if (getMigrated()) return db;
 
+  // SKIP_AUTO_MIGRATE=1 lets production instances (where all tables already exist)
+  // skip the 3-batch DDL migration queries on every cold start, saving ~200-400ms.
+  // Safe to set on Vercel once the Supabase schema is fully provisioned.
+  if (process.env.SKIP_AUTO_MIGRATE === "1" || process.env.SKIP_AUTO_MIGRATE === "true") {
+    setMigrated(true);
+    return db;
+  }
+
   if (global.__pgMigrating) {
     try {
       await global.__pgMigrating;
