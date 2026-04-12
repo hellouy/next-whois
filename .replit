@@ -79,6 +79,7 @@ SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5aHl1ZnhhY2Nqdm1rYnlpdnh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjAyNDIsImV4cCI6MjA4OTU5NjI0Mn0.RyyaowoKCDn5m3WFeLj7itRNpRaK1mfeK_11NNnBMJ0"
 NEXT_PUBLIC_SUPABASE_URL = "https://zyhyufxaccjvmkbyivxz.supabase.co"
 VERCEL_TEAM_ID = "team_jwt3T9B3Dg8JLPoGEjauWPRr"
+ADMIN_EMAIL = "9208522@qq.com"
 
 [userenv.development]
 NEXTAUTH_URL = "https://88581982-1823-4790-b07c-abca09faa164-00-2ojcwl8lrvf7g.riker.replit.dev"
