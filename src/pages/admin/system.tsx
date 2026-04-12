@@ -73,7 +73,7 @@ function GitUnlockPanel() {
             : "bg-red-100/60 dark:bg-red-900/20 text-red-700 dark:text-red-400"
         )}>
           {result.deleted > 0
-            ? `✓ 已删除 ${result.deleted} 个锁文件，请刷新 Replit Git 面板`
+            ? `✓ 已删除 ${result.deleted} 个锁文件，请刷新 Git 状态`
             : result.notFound === Object.keys(result.results).length
               ? "✓ 锁文件不存在，Git 面板应恢复正常"
               : "✗ 自动解锁受限，请在电脑 Shell 执行以下命令："}
@@ -212,7 +212,7 @@ export default function AdminSystemPage() {
       const r = await fetch("/api/admin/git-force-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "push", message: "chore: sync from Replit admin" }),
+        body: JSON.stringify({ action: "push", message: "chore: sync from admin panel" }),
       });
       const d = await r.json();
       if (d.error) {
