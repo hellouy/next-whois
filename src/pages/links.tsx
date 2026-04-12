@@ -193,21 +193,19 @@ export default function LinksPage() {
             )}
           </AnimatePresence>
 
-          {settings.about_contact_email && (
-            <div className="mt-10 pt-6 border-t border-border/40 text-center space-y-2">
-              <p className="text-[11px] text-muted-foreground/50">
-                {isChinese
-                  ? "如需申请友链，请联系管理员"
-                  : "Contact admin to apply for a friendly link"}
-              </p>
-              <a
-                href={`mailto:${settings.about_contact_email}`}
-                className="text-[11px] text-primary hover:underline flex items-center gap-1 justify-center"
-              >
-                {settings.about_contact_email}
-              </a>
-            </div>
-          )}
+          <div className="mt-10 pt-6 border-t border-border/40 text-center space-y-2">
+            <p className="text-[11px] text-muted-foreground/50">
+              {isChinese
+                ? "如需申请友链，请通过反馈表单联系管理员"
+                : "To apply for a friendly link, contact admin via feedback form"}
+            </p>
+            <Link
+              href="/feedback"
+              className="text-[11px] text-primary hover:underline flex items-center gap-1 justify-center"
+            >
+              {isChinese ? "前往反馈表单" : "Go to Feedback Form"}
+            </Link>
+          </div>
         </main>
       </ScrollArea>
     </>

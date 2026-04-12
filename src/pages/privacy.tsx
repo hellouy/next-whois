@@ -59,8 +59,6 @@ export default function PrivacyPage() {
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || settings.site_title || "WHOIS";
   const pageTitle = t("nav_privacy");
-  const contactEmail = settings.about_contact_email || settings.admin_email || "";
-
   const sections: Section[] = [
     {
       icon: RiDatabase2Line,
@@ -373,18 +371,16 @@ export default function PrivacyPage() {
                   </p>
                   <p className="text-[12px] text-muted-foreground">
                     {isChinese
-                      ? "如有隐私相关问题或数据请求，请发送邮件联系我们。"
-                      : "For privacy-related questions or data requests, please contact us by email."}
+                      ? "如有隐私相关问题或数据请求，请通过反馈表单联系我们。"
+                      : "For privacy-related questions or data requests, please contact us via our feedback form."}
                   </p>
-                  {contactEmail && (
-                    <a
-                      href={`mailto:${contactEmail}`}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium mt-2 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <RiMailLine className="w-3 h-3" />
-                      {contactEmail}
-                    </a>
-                  )}
+                  <Link
+                    href="/feedback"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium mt-2 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <RiMailLine className="w-3 h-3" />
+                    {isChinese ? "前往反馈表单" : "Go to Feedback Form"}
+                  </Link>
                 </div>
               </div>
             </motion.div>

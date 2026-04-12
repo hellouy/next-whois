@@ -50,8 +50,6 @@ export default function TermsPage() {
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || settings.site_title || "WHOIS";
   const pageTitle = t("nav_terms");
-  const contactEmail = settings.about_contact_email || settings.admin_email || "";
-
   type Section = {
     icon: React.ElementType;
     color: string;
@@ -377,37 +375,35 @@ export default function TermsPage() {
               </motion.div>
             ))}
 
-            {contactEmail && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: (sections.length + 1) * 0.06, duration: 0.3 }}
-                className="glass-panel border border-border rounded-xl p-5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-1.5 rounded-lg bg-muted/60 text-muted-foreground shrink-0">
-                    <RiMailLine className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold leading-none mb-1">
-                      {isChinese ? "联系我们" : "Contact Us"}
-                    </p>
-                    <p className="text-[12px] text-muted-foreground">
-                      {isChinese
-                        ? "如对本服务条款有任何疑问，欢迎通过邮件与我们联系。"
-                        : "If you have any questions about these Terms of Service, feel free to reach out by email."}
-                    </p>
-                    <a
-                      href={`mailto:${contactEmail}`}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium mt-2 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <RiMailLine className="w-3 h-3" />
-                      {contactEmail}
-                    </a>
-                  </div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: (sections.length + 1) * 0.06, duration: 0.3 }}
+              className="glass-panel border border-border rounded-xl p-5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 rounded-lg bg-muted/60 text-muted-foreground shrink-0">
+                  <RiMailLine className="w-4 h-4" />
                 </div>
-              </motion.div>
-            )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-none mb-1">
+                    {isChinese ? "联系我们" : "Contact Us"}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground">
+                    {isChinese
+                      ? "如对本服务条款有任何疑问，欢迎通过反馈表单与我们联系。"
+                      : "If you have any questions about these Terms of Service, feel free to reach out via our feedback form."}
+                  </p>
+                  <Link
+                    href="/feedback"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium mt-2 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <RiMailLine className="w-3 h-3" />
+                    {isChinese ? "前往反馈表单" : "Go to Feedback Form"}
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </main>
       </ScrollArea>

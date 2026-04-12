@@ -211,8 +211,6 @@ export default function AboutPage() {
   const githubUrl = settings.about_github_url || "https://github.com/zmh-program/next-whois";
   const authorName = settings.about_author_name || "zmh-program";
   const authorUrl = settings.about_author_url || "https://zmh.me";
-  const contactEmail = settings.about_contact_email;
-
   let thanksItems = DEFAULT_THANKS;
   if (settings.about_thanks?.trim()) {
     try {
@@ -284,15 +282,13 @@ export default function AboutPage() {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {isChinese ? introZh : introEn}
                 </p>
-                {contactEmail && (
-                  <a
-                    href={`mailto:${contactEmail}`}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-medium mt-3 px-3 py-1.5 rounded-lg bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
-                  >
-                    <RiMailLine className="w-3.5 h-3.5" />
-                    {contactEmail}
-                  </a>
-                )}
+                <Link
+                  href="/feedback"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium mt-3 px-3 py-1.5 rounded-lg bg-muted/60 hover:bg-muted border border-border transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <RiMailLine className="w-3.5 h-3.5" />
+                  {isChinese ? "联系 / 反馈" : "Contact / Feedback"}
+                </Link>
               </div>
             </motion.div>
 
