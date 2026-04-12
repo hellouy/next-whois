@@ -140,13 +140,13 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchingDomain, setSearchingDomain] = useState("");
 
-  // Reset loading state when navigation finishes or errors (e.g. user presses back)
+  // Only reset on navigation ERROR — on success the index page unmounts
+  // (Next.js replaces the Component), so resetting on routeChangeComplete
+  // would cause a 1-frame flicker: skeleton → home → result page.
   useEffect(() => {
     const reset = () => { setIsSearching(false); setSearchingDomain(""); };
-    router.events.on("routeChangeComplete", reset);
     router.events.on("routeChangeError", reset);
     return () => {
-      router.events.off("routeChangeComplete", reset);
       router.events.off("routeChangeError", reset);
     };
   }, [router]);
