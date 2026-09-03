@@ -53,6 +53,10 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
 
   let explicitUnicodeDomain = "";
   let explicitAsciiDomain = "";
+  // JPRS English format wraps multi-line values: "[Postal Address]" followed by
+  // indented continuation lines without a key or colon. Only "postal address"
+  // opts in — keeps the continuation logic narrowly scoped to JPRS layouts.
+  let multilineAddressTarget = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -64,13 +68,33 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
     if (bracketMatch) {
       key = bracketMatch[1].trim().toLowerCase();
       value = cleanFieldValue(bracketMatch[2].trim());
+      multilineAddressTarget = key === "postal address" && result.registrantAddress === "Unknown";
     } else {
+      // Continuation of a JPRS "[Postal Address]" block. Lines are pre-trimmed,
+      // so indentation is gone — a continuation is any line with no bracket
+      // header and no "key: value" colon separator directly following the block.
+      if (
+        multilineAddressTarget &&
+        !line.startsWith("[") &&
+        !line.includes(":")
+      ) {
+        const cont = cleanFieldValue(line);
+        if (cont) {
+          result.registrantAddress += ", " + cont;
+          continue;
+        }
+      }
+      multilineAddressTarget = false;
       let segments = line.split(":");
       if (segments.length < 2) continue;
       if (segments.length >= 3 && segments[0].toLowerCase() === "network") {
         segments = segments.slice(1);
       }
       key = segments[0].trim().toLowerCase();
+      // Nordic registries (.fi Traficom, .no NORID) pad keys with dots for
+      // column alignment: "domain.............: nic.fi". Strip the trailing
+      // dot run so the key matches the regular case labels.
+      key = key.replace(/\.+$/, "");
       value = cleanFieldValue(segments.slice(1).join(":").trim());
     }
 
@@ -88,14 +112,21 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "domain":
       case "nom de domaine":
       case "domaine":
+      case "dominio":
+      case "domainname":
+      // .lu (DNS-LU) uses "domainname"
+        if (isDomainLike(value)) result.domain = result.domain || value;
+        break;
+      // ── Japanese labels (.jp JPRS emits [English] and [日本語] rows) ─────
+      case "ドメイン名":
+      case "ドメイン情報":
         if (isDomainLike(value)) result.domain = result.domain || value;
         break;
       case "registrar":
       case "authorized agency":
       case "sponsoring registrar":
       case "registrar name":
-      case "registrant registrar":
-      case "registration service provider":
+      case "registrar-name":
       case "enregistreur":
       case "bureau d'enregistrement":
         result.registrar = result.registrar === "Unknown" ? value : result.registrar;
@@ -131,6 +162,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "date de mise à jour":
       case "dernière modification":
       case "derniere modification":
+      case "最終更新":
       case "zuletzt geaendert am":
       case "updated (utc)":
       case "last-update":
@@ -173,6 +205,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registration time":
       case "date de creation":
       case "date de création":
+      case "登録年月日":
       case "registriert am":
       case "datum registracije":
       case "created (utc)":
@@ -221,11 +254,13 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "expire date":
       case "expire":
       case "expires":
+      case "exp date":
       case "expiry date":
       case "expiry":
       case "registry expiration date":
       case "date expiration":
       case "date d'expiration":
+      case "有効期限":
       case "ablaufdatum":
       case "expires (utc)":
       case "expiration date (utc)":
@@ -272,6 +307,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "status":
       case "registration status":
       case "statut":
+      case "estado":
+      case "状態":
+      case "ロック状態":
         result.status.push(analyzeDomainStatus(value));
         break;
       case "domain status":
@@ -282,6 +320,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "host name":
       case "hostname":
       case "nameserver":
+      case "ネームサーバ":
+      case "serveur de noms":
+      case "servidor de nombres":
       case "ns":
       case "ns1":
       case "ns2":
@@ -301,6 +342,10 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "name servers":
       case "nserver":
       case "serveur de noms":
+      case "servidor de nombres":
+      // .kz (KazNIC) lists nameservers as Primary/Secondary server
+      case "primary server":
+      case "secondary server":
       case "p":
       // Split on commas (e.g. "ns1.foo.com, ns2.foo.com") then strip IPs
         for (const nsEntry of value.split(",")) {
@@ -321,6 +366,14 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant contact name":
       case "holder":
       case "owner":
+      // French/Spanish/German/Japanese ccTLD contact blocks
+      case "nom":
+      case "nombre":
+      case "personname":
+      case "登録者名":
+      case "名前":
+      // JPRS English contact section: "[Name]" (only JPRS uses bare "name")
+      case "name":
         if (!isRedactedValue(value) && result.registrantName === "Unknown")
           result.registrantName = value;
         break;
@@ -329,6 +382,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant organization":
       case "registrant organisation":
       case "registrant org":
+      case "domain holder organization":
         if (!isRedactedValue(value)) result.registrantOrganization = value;
         break;
       case "organization":
@@ -362,6 +416,8 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant locality":
       case "city":
       case "locality":
+      case "ville":
+      case "ciudad":
         if (!isRedactedValue(value) && result.registrantCity === "Unknown")
           result.registrantCity = value;
         break;
@@ -375,6 +431,13 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "street":
       case "address":
       case "addr":
+      case "adresse":
+      case "direccion":
+      case "street address":
+      case "domain holder street":
+      // JPRS English contact section: "[Postal Address]" (only JPRS uses this)
+      case "postal address":
+      case "住所":
         if (!isRedactedValue(value) && result.registrantAddress === "Unknown")
           result.registrantAddress = value;
         break;
@@ -384,6 +447,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant zip":
       case "registrant zip code":
       case "postal code":
+      case "code postal":
       case "zip code":
       case "zip":
       case "postcode":
@@ -401,6 +465,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         break;
       case "country":
       case "country-code":
+      case "pays":
+      case "pais":
+      case "domain holder country":
         if (!isRedactedValue(value) && result.registrantCountry === "Unknown")
           result.registrantCountry = value;
         break;
@@ -411,6 +478,8 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant telephone":
       case "phone":
       case "telephone":
+      case "téléphone":
+      case "telefono":
         if (!isRedactedValue(value) && result.registrantPhone === "Unknown")
           result.registrantPhone = value.replace(/^tel:/i, "").trim();
         break;
@@ -533,6 +602,10 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         result.dnssec = value;
         break;
       case "email":
+        if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
+          result.registrantEmail = value;
+        break;
+      case "courriel":
         if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
           result.registrantEmail = value;
         break;

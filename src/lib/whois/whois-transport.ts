@@ -22,13 +22,22 @@ export async function queryWhoisTcp(
     const net = require("node:net") as typeof import("net");
     let data = "";
     const socket = net.connect({ host: resolvedHost, port }, () => {
+      // Do NOT half-close the socket with socket.end() after writing. Some
+      // WHOIS servers (e.g. the JWhoisServer deployment behind whois.nic.tg)
+      // discard the pending query when the FIN arrives and return zero bytes.
+      // The standard WHOIS flow is: client sends the query, server responds
+      // and closes the connection — matching whoiser's behaviour here.
       socket.write(query + "\r\n");
-      socket.end();
     });
     socket.setTimeout(timeoutMs);
     socket.on("data", (chunk: Buffer) => (data += chunk.toString()));
     socket.on("close", () => resolve(data));
-    socket.on("timeout", () => socket.destroy(new Error("TCP WHOIS timeout")));
+    // A server that responds but never closes should still yield its data
+    // once the timeout fires, rather than failing the whole query.
+    socket.on("timeout", () => {
+      if (data.trim().length > 0) resolve(data);
+      socket.destroy(new Error("TCP WHOIS timeout"));
+    });
     socket.on("error", reject);
   });
 }

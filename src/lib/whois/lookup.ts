@@ -718,6 +718,15 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // RDAP_TIMEOUT (4 s), so per-TLD inner timeouts in rdap_client.ts (e.g. .rw=6s,
   // .ar=10s) fire BEFORE the outer wrapper cancels the promise.
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
+  // Attach a no-op rejection handler immediately. Between this creation and the
+  // race section below, queryManualServerRacing may await a DB/TCP round-trip
+  // (100 ms–8 s). With a warm node-rdap bootstrap cache, lookupRdap can reject
+  // in ~50 ms (e.g. "No RDAP server found for <tld>") — before the race attaches
+  // its own handlers — which Node flags as unhandledRejection and can crash the
+  // process. Early-return paths (manual server success) also abandon this
+  // promise; this catch keeps every abandonment path silent. Later .then/.catch
+  // consumers still observe the rejection normally.
+  rdapPromise.catch(() => {});
 
   // ── Admin-configured manual WHOIS server: direct query, skip RDAP ────────
   // When the admin has explicitly added a custom server (source='manual') for

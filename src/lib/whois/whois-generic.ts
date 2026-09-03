@@ -187,8 +187,8 @@ export async function tryGenericWhoisForDomain(
             pending--;
             if (pending === 0) resolve(null);
           }
-          staticP.then(handleResult);
-          whoiserP.then(handleResult);
+          staticP.then(handleResult).catch(() => handleResult(null));
+          whoiserP.then(handleResult).catch(() => handleResult(null));
         });
       } else {
         // No static server — whoiser only.
