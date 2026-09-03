@@ -134,6 +134,8 @@ export function isRedactedValue(value: string): boolean {
   if (dotRatio > 0.5 && value.length > 5) return true;
   if (/^[.\s]+$/.test(value)) return true;
   if (/REDACTED|WITHHELD|PRIVACY|NOT DISCLOSED/i.test(value)) return true;
+  // .tg (NICTogo JWhoisServer) redacts every contact field with "[PRIVEE]".
+  if (/^\[?PRIVEE\]?$/i.test(value)) return true;
   return false;
 }
 

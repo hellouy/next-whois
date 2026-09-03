@@ -137,6 +137,29 @@ export function detectWhoisError(raw: string): string | null {
   return scan(lines) ?? scan(commentLines);
 }
 
+/**
+ * True when every non-empty line is a policy banner (RFC 3912 %/# comments or
+ * well-known terms-of-use openers). Some registries — DNS-LU is the known
+ * example — accept the TCP connection from datacenter egress but answer with
+ * the usage banner only, withholding all domain data. Such responses parse to
+ * an empty result without matching any error pattern, which would otherwise
+ * surface as a confusing "Empty WHOIS response".
+ */
+export function isPolicyBannerOnly(raw: string): boolean {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  // A truly empty response is not a banner — detectWhoisError covers that.
+  if (lines.length === 0) return false;
+  return lines.every(
+    (l) =>
+      l.startsWith("%") ||
+      l.startsWith("#") ||
+      /^(?:NOTICE|TERMS OF USE|Terms of Use|By submitting|This service|Access to|You agree)\b/.test(l),
+  );
+}
+
 export function isEmptyResult(result: {
   domain: string;
   registrar: string;

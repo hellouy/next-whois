@@ -21,6 +21,7 @@ import {
   isIanaFallback,
   detectWhoisError,
   isEmptyResult,
+  isPolicyBannerOnly,
   isIPAddress,
   isASNumber,
   toAsciiDomain,
@@ -988,6 +989,18 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
               signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
             },
           };
+        }
+        // DNS-LU style restriction: the server accepted our connection but sent
+        // only its usage banner — every data line withheld. This happens when
+        // registries rate-limit or IP-restrict datacenter egress (Vercel IPs).
+        // Explain the cause and link the registry's web WHOIS for manual lookup.
+        if (!detectedError && isPolicyBannerOnly(whoisRawStr)) {
+          const registryWebUrl: Record<string, string> = {
+            lu: "https://dns.lu/en/domaines/whois-web",
+          };
+          const msg = `WHOIS server${whoisData?.server ? ` (${whoisData.server})` : ""} returned only its usage banner without domain data — the registry likely rate-limits or restricts queries from cloud networks`;
+          recordFailure("parse_error", msg);
+          return failWithDns(msg, registryWebUrl[tldSuffix]);
         }
         recordFailure("parse_error", detectedError || "Empty WHOIS response");
         return failWithDns(detectedError || "Empty WHOIS response");
