@@ -363,7 +363,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         hasWhois = true;
         whoisServer = serverEntry;
       } else if (serverEntry && typeof serverEntry === "object") {
-        const h = (serverEntry as any).host || (serverEntry as any).url || (serverEntry as any).scraper;
+        const h = (serverEntry as any).host || (serverEntry as any).url || (serverEntry as any).name || (serverEntry as any).registryUrl;
         if (h) { hasWhois = true; whoisServer = String(h); }
       }
 

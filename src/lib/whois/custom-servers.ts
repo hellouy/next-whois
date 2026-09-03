@@ -6,6 +6,7 @@ import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
 import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupNicPh } from "@/lib/whois/http-scrapers/nic-ph";
+import { lookupNicGw } from "@/lib/whois/http-scrapers/nic-gw";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
 export type TcpServerEntry = {
@@ -79,7 +80,7 @@ export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.
 
 const BUILTIN_SERVERS: CustomServerMap = {
   bn: "whois.bnnic.bn",
-  gw: { type: "http", url: "https://registar.nic.gw/en/whois/{{domain}}/", method: "GET" },
+  gw: { type: "scraper", name: "nic-gw", registryUrl: "https://registar.nic.gw/en/whois/" },
   ba:      { type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "com.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "org.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
@@ -504,6 +505,20 @@ async function executeServerEntry(
           : `nic.ba scraper error: ${nicBaFail.reason}`,
         registryUrl,
         nicBaFail.blocked,
+      );
+    }
+    if (scraperName === "nic-gw") {
+      const nicGwResult = await lookupNicGw(domainToQuery);
+      if (nicGwResult.success) {
+        return { raw: nicGwResult.rawWhoisContent, structured: {}, server: "registar.nic.gw", registryUrl };
+      }
+      const nicGwFail = nicGwResult as { success: false; blocked: boolean; reason: string };
+      throw new ScraperRequiredError(
+        nicGwFail.blocked
+          ? "registar.nic.gw is rate-limiting automated lookups — please check the registry directly"
+          : `nic.gw scraper error: ${nicGwFail.reason}`,
+        registryUrl,
+        nicGwFail.blocked,
       );
     }
     if (scraperName === "nic-ph") {
