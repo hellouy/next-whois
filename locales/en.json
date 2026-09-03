@@ -134,8 +134,8 @@
   "history_unknown": "Unknown",
   "nav_api_docs": "API Docs",
   "nav_api_docs_desc": "API documentation and usage examples",
-  "nav_tlds": "TLDs / Servers",
-  "nav_tlds_desc": "IANA TLD list and WHOIS server configs",
+  "nav_tlds": "TLD Support",
+  "nav_tlds_desc": "IANA suffixes split into queryable / not queryable",
   "nav_domain_lookup": "Domain Lookup",
   "nav_domain_lookup_desc": "Look up domain, IP, ASN and more",
   "nav_dns": "DNS Lookup",
@@ -1692,6 +1692,7 @@
     "nav_settings": "Site Settings",
     "nav_server_test": "Server Test",
     "nav_tld_failures": "TLD Failures",
+    "nav_whois_servers": "WHOIS Server Overrides",
     "nav_notify_service": "Push Channels",
     "nav_expired_domains": "Expired Domain Leads",
     "nav_domain_access": "Domain Access"

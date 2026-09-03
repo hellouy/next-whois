@@ -1,12 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getAllCustomServers } from "@/lib/whois/custom-servers";
+import {
+  getAllCustomServers,
+  getStaticWhoisServer,
+} from "@/lib/whois/custom-servers";
+import { GTLD_RDAP_BOOTSTRAP } from "@/lib/whois/rdap_gtld_bootstrap";
+import { getCctldRdapOverrides } from "@/lib/whois/rdap_client";
 import {
   isRedisAvailable,
   getJsonRedisValue,
   setJsonRedisValue,
 } from "@/lib/server/redis";
 
-const REDIS_IANA_KEY = "iana_tlds:v2";
+const REDIS_IANA_KEY = "iana_tlds:v3";
 const REDIS_IANA_TTL = 43_200; // 12 hours — shared across all Vercel instances
 
 export type TldInfo = {
@@ -25,6 +30,10 @@ export type IanaTldsResponse = {
   total: number;
   ccTldCount: number;
   gTldCount: number;
+  /** Suffixes with a known WHOIS and/or RDAP query path. */
+  supportedCount: number;
+  /** Suffixes with no known WHOIS or RDAP server. */
+  unsupportedCount: number;
 };
 
 const CC_NAMES: Record<string, { zh: string; en: string }> = {
@@ -341,6 +350,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const serverMap = serversData as Record<string, unknown>;
+    const rdapOverrides = getCctldRdapOverrides();
 
     const tlds: TldInfo[] = ianaTlds.map((tld) => {
       const isCc = tld.length === 2 && /^[a-z]{2}$/.test(tld);
@@ -348,6 +358,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let hasWhois = false;
       let whoisServer: string | undefined;
 
+      // 1) Runtime sources: tld_registry_info DB + built-in scrapers + user overrides
       if (typeof serverEntry === "string" && serverEntry) {
         hasWhois = true;
         whoisServer = serverEntry;
@@ -356,7 +367,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (h) { hasWhois = true; whoisServer = String(h); }
       }
 
-      const rdapServer = rdapMap[tld];
+      // 2) Static sources: whois-servers.json + gTLD WHOIS bootstrap.
+      //    Merge even when the DB is populated — getStaticWhoisServer reads the
+      //    file + bootstrap directly and always represents a usable TCP path.
+      if (!hasWhois) {
+        const staticWhois = getStaticWhoisServer(tld);
+        if (staticWhois) { hasWhois = true; whoisServer = staticWhois; }
+      }
+
+      // RDAP path = hand-verified ccTLD overrides ∪ bundled bootstrap ∪ live IANA.
+      // The bundled maps keep hasRdap accurate even when the live fetch fails,
+      // and the live map catches TLDs added after the last bundle generation.
+      const rdapServer =
+        rdapOverrides[tld] ?? GTLD_RDAP_BOOTSTRAP[tld] ?? rdapMap[tld];
       const hasRdap = Boolean(rdapServer);
 
       const names = isCc ? CC_NAMES[tld] : undefined;
@@ -374,8 +397,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const ccTldCount = tlds.filter((t) => t.type === "cctld").length;
     const gTldCount = tlds.filter((t) => t.type === "gtld").length;
+    const supportedCount = tlds.filter((t) => t.hasWhois || t.hasRdap).length;
 
-    const result: IanaTldsResponse = { tlds, total: tlds.length, ccTldCount, gTldCount };
+    const result: IanaTldsResponse = {
+      tlds,
+      total: tlds.length,
+      ccTldCount,
+      gTldCount,
+      supportedCount,
+      unsupportedCount: tlds.length - supportedCount,
+    };
     cache = { data: result, at: Date.now() };
 
     // Write to Redis so other Vercel instances skip the IANA fetch

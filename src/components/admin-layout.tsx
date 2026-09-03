@@ -71,6 +71,7 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
       { href: "/admin/tld-rules",      labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
       { href: "/admin/tld-failures",   labelKey: "admin.nav_tld_failures",   icon: RiBarChartLine,   activeIcon: RiBarChartLine },
+      { href: "/admin/whois-servers",  labelKey: "admin.nav_whois_servers",  icon: RiGlobalLine,     activeIcon: RiGlobalLine },
       { href: "/admin/api",            labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
     ],
   },
