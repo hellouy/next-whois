@@ -75,10 +75,11 @@ export function getStaticWhoisServer(tld: string): string | null {
 }
 
 /** Exported so admin pages can identify which TLDs are handled by built-in logic. */
-export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba","ph","com.ph","net.ph","org.ph","edu.ph","gov.ph","mil.ph"]);
+export const BUILTIN_SERVER_TLDS: ReadonlySet<string> = new Set(["bn","ba","com.ba","org.ba","net.ba","gov.ba","edu.ba","mil.ba","ph","com.ph","net.ph","org.ph","edu.ph","gov.ph","mil.ph","gw"]);
 
 const BUILTIN_SERVERS: CustomServerMap = {
   bn: "whois.bnnic.bn",
+  gw: { type: "http", url: "https://registar.nic.gw/en/whois/{{domain}}/", method: "GET" },
   ba:      { type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "com.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },
   "org.ba":{ type: "scraper", name: "nic-ba", registryUrl: "https://www.nic.ba/?culture=en&handler=DomainSearch" },

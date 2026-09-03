@@ -220,7 +220,7 @@ export default function AdminWhoisServersPage() {
   const [showAdd, setShowAdd] = React.useState(false);
   const [editingTld, setEditingTld] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState<string | null>(null);
-  const BUILTIN_TLDS = new Set(["bn"]);
+  const BUILTIN_TLDS = new Set(["bn", "gw"]);
 
   const fetchServers = React.useCallback(async () => {
     setLoading(true);
