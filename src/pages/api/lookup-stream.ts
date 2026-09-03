@@ -3,7 +3,7 @@ import { lookupWhoisCacheStreaming } from "@/lib/whois/lookup";
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
-import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
+import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
@@ -34,10 +34,10 @@ const MAX_QUERY_LENGTH  = 300;
  * For cache hits or WHOIS-only TLDs, a single line is sent and the
  * connection closes immediately (behaves identically to /api/lookup).
  *
- * Latency optimization: the WHOIS/RDAP lookup is started immediately after
- * input validation — before awaiting the session/settings check.  The
- * session check runs in parallel with the first RDAP round-trip, saving
- * 50-300 ms on every request.  If auth fails, the lookup is abandoned.
+ * SECURITY: the WHOIS/RDAP lookup starts only after the API-key check,
+ * session check, rate limit and require-login gate have all passed.  Auth
+ * gates must never run in parallel with upstream lookups — that would let
+ * unauthenticated or throttled requests consume registry queries for free.
  *
  * CN reserved SLDs are detected synchronously before the lookup starts so
  * no network request is wasted.  Rate limiting is applied after auth so the
@@ -66,7 +66,6 @@ export default async function handler(
 
   const nocache = req.query.nocache === "1";
   const ip = getClientIp(req);
-  const sameOrigin = isSameOriginRequest(req);
 
   // ── CN reserved SLD check — synchronous, zero network cost ───────────────
   // Province, functional, and system-reserved .cn SLDs never need a WHOIS
@@ -74,24 +73,14 @@ export default async function handler(
   // a network request and keeps latency near-zero for these queries.
   const cnReserved = getCnReservedSldInfo(trimmed);
 
-  // ── Earliest possible lookup start ───────────────────────────────────────
-  // Begin the WHOIS/RDAP lookup immediately after input validation — before
-  // the API-key check and session check — so those auth round-trips run in
-  // parallel with the first RDAP/WHOIS network requests.
-  // Skip for CN reserved domains (synthetic result, no lookup needed).
-  let _lookupAborted = false;
-  let _bufferedPartial: WhoisResult | null = null;
-  let _onPartial: (p: WhoisResult) => void = (p) => { _bufferedPartial = p; };
-
-  const lookupPromise = cnReserved ? null : lookupWhoisCacheStreaming(
-    trimmed,
-    { nocache },
-    (partial) => { if (!_lookupAborted) _onPartial(partial); },
-  );
-
-  // ── API-key check + auth check (runs in parallel with the lookup above) ──
+  // ── Auth & rate limiting BEFORE any upstream lookup ──────────────────────
+  // SECURITY: the real WHOIS/RDAP lookup must not start until the request has
+  // passed the API-key check, the rate limit and the require-login gate.
+  // Starting it earlier (the old "parallel with auth" optimisation) let
+  // unauthenticated or throttled requests consume upstream registry queries
+  // for free — a query amplification vector against WHOIS/RDAP servers.
   const keyOk = await enforceApiKey(req, res, "api");
-  if (!keyOk) { _lookupAborted = true; return; }
+  if (!keyOk) return;
 
   const [session, requireLogin] = await Promise.all([
     getServerSession(req, res, authOptions).catch(() => null),
@@ -102,31 +91,27 @@ export default async function handler(
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
 
   // ── Tiered rate limiting — applied after auth so the correct quota applies ─
-  // Same-origin (the site itself) is always exempt.
-  const tierLimit = sameOrigin    ? RATE_LIMIT_SUB
-                  : isSubscribed  ? RATE_LIMIT_SUB
+  // SECURITY: same-origin is no longer exempt — Origin/Referer/Host headers
+  // are client-controlled and trivially spoofed, so an unlimited
+  // same-origin tier acted as a rate-limit bypass.
+  const tierLimit = isSubscribed  ? RATE_LIMIT_SUB
                   : userEmail     ? RATE_LIMIT_AUTHED
                   :                 RATE_LIMIT_ANON;
-  const tierKey   = sameOrigin    ? `${ip}:origin`
-                  : isSubscribed  ? `${ip}:sub`
+  const tierKey   = isSubscribed  ? `${ip}:sub`
                   : userEmail     ? `${ip}:auth`
                   :                 `${ip}:anon`;
 
-  const { allowed, remaining, resetMs } = sameOrigin
-    ? { allowed: true, remaining: tierLimit, resetMs: 0 }
-    : rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+  const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
 
   res.setHeader("X-RateLimit-Limit", String(tierLimit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
   res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
 
   if (!allowed) {
-    _lookupAborted = true;
     return res.status(429).json({ error: "Too many requests — please slow down" });
   }
 
   if (requireLogin === "1" && !userEmail) {
-    _lookupAborted = true;
     return res.status(401).json({ error: "Please log in to perform queries" });
   }
 
@@ -169,30 +154,26 @@ export default async function handler(
     }
   }
 
-  // Upgrade the partial callback so future partial results write directly.
-  _onPartial = (p) => {
-    if (!partialSent && !finalSent) {
-      partialSent = true;
-      writeChunk({ ...p, result: p.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
-    }
-  };
-
-  // If a partial result arrived during the session check, send it now.
-  // TypeScript 5.9's narrowing is too aggressive here: after _onPartial is
-  // reassigned (above) it concludes _bufferedPartial can never be non-null,
-  // even though the original closure ran before the reassignment.  The double
-  // cast bypasses that over-eager narrowing while keeping the runtime guard.
-  const bufferedPartial = _bufferedPartial as unknown as WhoisResult | null;
-  if (bufferedPartial !== null && !partialSent && !finalSent) {
-    partialSent = true;
-    writeChunk({ ...bufferedPartial, result: bufferedPartial.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
-  }
+  // Partial results (typically the fast RDAP answer arriving before the full
+  // WHOIS fallback completes) stream out as soon as they land. cnReserved was
+  // already handled above, so a real lookup always starts here — AFTER all
+  // auth gates have passed.
+  const lookupPromise = lookupWhoisCacheStreaming(
+    trimmed,
+    { nocache },
+    (p) => {
+      if (!partialSent && !finalSent) {
+        partialSent = true;
+        writeChunk({ ...p, result: p.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
+      }
+    },
+  );
 
   const tldParts = trimmed.toLowerCase().split(".");
   const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
 
   try {
-    const finalResult = await lookupPromise!;
+    const finalResult = await lookupPromise;
 
     finalSent = true;
 

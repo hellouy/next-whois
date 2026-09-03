@@ -99,17 +99,12 @@ export const authOptions: NextAuthOptions = {
 
         const email = credentials.email.toLowerCase().trim();
 
-        // Resolve admin email early — used for bypass decisions below
-        const isAdm = await isAdminEmail(email);
-
-        // Admin: proactively clear any stale brute-force lock so prior
-        // test-login failures can never block the admin account.
-        const emailKey = `login:email:${email}`;
-        if (isAdm) await clearFailedAttempts(emailKey);
-
-        // If disable_login is enabled, block all logins except the admin account
+        // Note: admin status is only trusted AFTER password verification below.
+        // The submitted email string alone must never bypass any protection,
+        // otherwise anyone knowing the admin email could brute-force it.
         const disableLogin = await getSetting("disable_login");
-        if (disableLogin === "1" && !isAdm) return null;
+        const isAdmEmail = disableLogin === "1" ? await isAdminEmail(email) : false;
+        if (disableLogin === "1" && !isAdmEmail) return null;
 
         const ip = String(
           (req as any)?.headers?.["x-forwarded-for"] ||
@@ -117,17 +112,17 @@ export const authOptions: NextAuthOptions = {
           "unknown"
         ).split(",")[0].trim();
 
-        // ── Rate-limit by IP (global) — admin is exempt ─────────────────────
-        if (!isAdm) {
-          const ipRl = await checkRateLimit(`login:ip:${ip}`, 20, 10 * 60 * 1000);
-          if (!ipRl.ok) return null;
-        }
+        const emailKey = `login:email:${email}`;
 
-        // ── Rate-limit by email (per-account brute-force) — admin is exempt ──
-        if (!isAdm && (await isLockedOut(emailKey))) return null;
+        // ── Rate-limit by IP (global) — applies to ALL accounts, including admin ──
+        const ipRl = await checkRateLimit(`login:ip:${ip}`, 20, 10 * 60 * 1000);
+        if (!ipRl.ok) return null;
 
-        // ── Captcha verification — admin is exempt to prevent lockout ─────────
-        if (!isAdm) {
+        // ── Rate-limit by email (per-account brute-force) — no exemptions ──
+        if (await isLockedOut(emailKey)) return null;
+
+        // ── Captcha verification — applies to ALL accounts ─────────
+        {
           const { getCaptchaConfig, verifyCaptchaToken } = await import("@/lib/server/captcha");
           const captchaConfig = await getCaptchaConfig("login");
           if (captchaConfig.provider && captchaConfig.secretKey) {
@@ -152,16 +147,15 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user) {
-          // Admin missing from DB is a config error — don't lock out
-          if (!isAdm) await recordFailedAttempt(emailKey);
+          await recordFailedAttempt(emailKey);
           return null;
         }
         if (user.disabled) return null;
 
         const valid = await compare(credentials.password, user.password_hash);
         if (!valid) {
-          // Wrong password — record for non-admin only
-          if (!isAdm) await recordFailedAttempt(emailKey);
+          // Wrong password — always record, admin included
+          await recordFailedAttempt(emailKey);
           return null;
         }
 
@@ -207,8 +201,11 @@ export const authOptions: NextAuthOptions = {
         // Allow updating display name from client
         if (session?.name !== undefined) token.name = session.name;
 
-        // Allow updating email after a verified email change
-        if (session?.email !== undefined) token.email = session.email;
+        // SECURITY: email is never accepted from the client in an update.
+        // Changing email requires the verified flow in /api/user/profile
+        // (emailChangeCode) followed by re-authentication. Accepting a raw
+        // client email here would allow session.user.email forgery and
+        // privilege escalation via admin-email comparison.
 
         // SECURITY: Never trust client-provided subscriptionAccess.
         // Use the `refreshSubscription` signal to re-read from DB.

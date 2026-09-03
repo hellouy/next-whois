@@ -4,7 +4,7 @@ import { WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types
 import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
-import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
+import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
@@ -73,22 +73,20 @@ export default async function handler(
   const userEmail = session?.user?.email                    ?? null;
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
 
-  // Tiered rate limiting — same-origin (the site itself) is always exempt.
+  // Tiered rate limiting. SECURITY: same-origin is no longer exempt — the
+  // Origin/Referer/Host headers are all client-controlled and trivially
+  // spoofed, so an unlimited same-origin tier acted as a rate-limit bypass.
+  // The site's own browser traffic still gets generous tiers below.
   // Tier key includes auth state so each tier has its own independent bucket.
   const ip         = getClientIp(req);
-  const sameOrigin = isSameOriginRequest(req);
-  const tierLimit  = sameOrigin  ? RATE_LIMIT_SUB
-                   : isSubscribed ? RATE_LIMIT_SUB
-                   : userEmail    ? RATE_LIMIT_AUTHED
-                   :                RATE_LIMIT_ANON;
-  const tierKey    = sameOrigin  ? `${ip}:origin`
-                   : isSubscribed ? `${ip}:sub`
-                   : userEmail    ? `${ip}:auth`
-                   :                `${ip}:anon`;
+  const tierLimit  = isSubscribed ? RATE_LIMIT_SUB
+                    : userEmail    ? RATE_LIMIT_AUTHED
+                    :                RATE_LIMIT_ANON;
+  const tierKey    = isSubscribed ? `${ip}:sub`
+                    : userEmail    ? `${ip}:auth`
+                    :                `${ip}:anon`;
 
-  const { allowed, remaining, resetMs } = sameOrigin
-    ? { allowed: true, remaining: tierLimit, resetMs: 0 }
-    : rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+  const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
 
   res.setHeader("X-RateLimit-Limit", String(tierLimit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));

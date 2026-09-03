@@ -10,7 +10,7 @@ async function verifyPaypalWebhook(
   req: NextApiRequest,
   body: any
 ): Promise<boolean> {
-  if (!webhookId) return true;
+  if (!webhookId) return false;
   try {
     const token = await paypalGetToken();
     const verifyRes = await fetch("https://api-m.paypal.com/v1/notifications/verify-webhook-signature", {
@@ -40,12 +40,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const webhookId = (await getSetting("payment_paypal_webhook_id")) || process.env.PAYPAL_WEBHOOK_ID || "";
   const body = req.body;
 
-  if (webhookId) {
-    const valid = await verifyPaypalWebhook(webhookId, req, body);
-    if (!valid) {
-      console.warn("[paypal webhook] Invalid signature");
-      return res.status(400).json({ error: "Invalid signature" });
-    }
+  // SECURITY: without a configured webhook id we cannot verify the signature,
+  // so payment events must be rejected instead of trusted.
+  if (!webhookId) {
+    console.error("[paypal webhook] Rejected: PAYPAL_WEBHOOK_ID not configured");
+    return res.status(503).json({ error: "Webhook not configured" });
+  }
+
+  const valid = await verifyPaypalWebhook(webhookId, req, body);
+  if (!valid) {
+    console.warn("[paypal webhook] Invalid signature");
+    return res.status(400).json({ error: "Invalid signature" });
   }
 
   const eventType = body?.event_type as string | undefined;
@@ -59,19 +64,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let orderId: string | null = null;
 
+    // SECURITY: only match by the exact provider order id carried in the
+    // verified event. No fuzzy fallback — a forged callback must never be
+    // able to mark an unrelated pending order as paid.
     if (paypalOrderId) {
       const row = await one<{ id: string }>(
         `SELECT id FROM payment_orders WHERE provider_order_id = $1 AND status != 'paid'`,
         [paypalOrderId]
-      );
-      orderId = row?.id ?? null;
-    }
-
-    if (!orderId && captureId) {
-      const row = await one<{ id: string }>(
-        `SELECT id FROM payment_orders
-         WHERE metadata->>'paypal_order_id' IS NOT NULL AND status != 'paid'
-         ORDER BY created_at DESC LIMIT 1`
       );
       orderId = row?.id ?? null;
     }

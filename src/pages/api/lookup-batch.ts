@@ -3,9 +3,10 @@ import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
 import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
-import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
+import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import { getSetting } from "@/lib/server/site-settings-server";
 
 export const config = {
   maxDuration: 60,
@@ -14,11 +15,15 @@ export const config = {
 // Concurrency limit per batch to avoid hammering upstream WHOIS servers
 const CONCURRENCY = 5;
 
-// Rate limits apply only to external (non-same-origin) callers
+// Rate limits — SECURITY: same-origin is no longer exempt (Origin/Referer/
+// Host headers are client-controlled and trivially spoofed).
 const RATE_LIMIT_ANON   = 5;
 const RATE_LIMIT_AUTHED = 15;
 const RATE_LIMIT_SUB    = 40;
 const RATE_WINDOW_MS    = 60_000;
+
+// Per-item input validation (parity with /api/lookup)
+const MAX_QUERY_LENGTH  = 300;
 
 // Max batch sizes: logged-in users are unlimited within a single request
 // (capped at ANON_MAX for anonymous), authenticated users get higher caps.
@@ -77,21 +82,18 @@ export default async function handler(
   const session = await getServerSession(req, res, authOptions).catch(() => null);
   const userEmail    = session?.user?.email ?? null;
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
-  const sameOrigin   = isSameOriginRequest(req);
   const isLoggedIn   = !!userEmail;
 
-  // ── Rate limiting (external callers only) ────────────────────────────────
+  // ── Rate limiting (all callers — no spoofable same-origin exemption) ─────
   const ip        = getClientIp(req);
-  const tierLimit = sameOrigin    ? RATE_LIMIT_SUB
-                  : isSubscribed  ? RATE_LIMIT_SUB
+  const tierLimit = isSubscribed  ? RATE_LIMIT_SUB
                   : isLoggedIn    ? RATE_LIMIT_AUTHED
                   :                 RATE_LIMIT_ANON;
-  const tierKey   = sameOrigin    ? `${ip}:origin:batch`
-                  : isSubscribed  ? `${ip}:sub:batch`
+  const tierKey   = isSubscribed  ? `${ip}:sub:batch`
                   : isLoggedIn    ? `${ip}:auth:batch`
                   :                 `${ip}:anon:batch`;
 
-  if (!sameOrigin) {
+  {
     const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
     res.setHeader("X-RateLimit-Limit", String(tierLimit));
     res.setHeader("X-RateLimit-Remaining", String(remaining));
@@ -104,6 +106,12 @@ export default async function handler(
   // ── API key enforcement ──────────────────────────────────────────────────
   const keyOk = await enforceApiKey(req, res, "api");
   if (!keyOk) return;
+
+  // ── require_login gate (parity with /api/lookup and /api/lookup-stream) ──
+  const requireLogin = await getSetting("require_login");
+  if (requireLogin === "1" && !userEmail) {
+    return res.status(401).json({ error: "Please log in to perform queries" });
+  }
 
   // ── Validate request body ────────────────────────────────────────────────
   let domains: unknown;
@@ -123,9 +131,15 @@ export default async function handler(
     return res.status(400).json({ error: `Batch size exceeds maximum of ${maxBatch}` });
   }
 
-  const queryList = (domains as unknown[])
-    .map(d => (typeof d === "string" ? d.trim().toLowerCase() : ""))
-    .filter(Boolean);
+  const rawList = domains as unknown[];
+  const queryList: string[] = [];
+  for (const d of rawList) {
+    if (typeof d !== "string") continue;
+    const t = d.trim().toLowerCase();
+    if (t.length === 0 || t.length > MAX_QUERY_LENGTH) continue;
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(t)) continue; // control chars incl. \n
+    queryList.push(t);
+  }
 
   if (queryList.length === 0) {
     return res.status(400).json({ error: "No valid domain strings in \"domains\" array" });
