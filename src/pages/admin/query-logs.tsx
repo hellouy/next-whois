@@ -3,8 +3,8 @@ import { AdminLayout } from "@/components/admin-layout";
 import { cn } from "@/lib/utils";
 import {
   RiLoader4Line, RiRefreshLine, RiCheckLine, RiErrorWarningLine,
-  RiTimeLine, RiFilterLine, RiDatabase2Line, RiSignalWifiLine,
-  RiDeleteBin2Line,
+  RiFilterLine, RiDatabase2Line, RiSignalWifiLine,
+  RiDeleteBin2Line, RiUserLine, RiGhostLine,
 } from "@remixicon/react";
 import type { QueryLogRow, QueryLogResponse, QueryLogStats } from "@/pages/api/admin/query-logs";
 
@@ -12,6 +12,11 @@ const STATUS_OPTIONS = [
   { value: "all",  label: "全部" },
   { value: "ok",   label: "成功" },
   { value: "fail", label: "失败" },
+];
+const USER_TYPE_OPTIONS = [
+  { value: "all",    label: "全部用户" },
+  { value: "anon",   label: "匿名用户" },
+  { value: "logged", label: "登录用户" },
 ];
 const HOURS_OPTIONS = [
   { value: "1",   label: "过去 1 小时" },
@@ -65,6 +70,7 @@ export default function QueryLogsPage() {
   const [autoRefresh, setAuto]  = React.useState(false);
   const [tldFilter, setTld]     = React.useState("");
   const [statusFilter, setStatus] = React.useState("all");
+  const [userTypeFilter, setUserType] = React.useState("all");
   const [hoursFilter, setHours] = React.useState("24");
   const [page, setPage]         = React.useState(1);
   const timerRef                = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,6 +81,7 @@ export default function QueryLogsPage() {
       const params = new URLSearchParams({
         tld: tldFilter.trim(),
         status: statusFilter,
+        user_type: userTypeFilter,
         hours: hoursFilter,
         page: String(pg),
         limit: "100",
@@ -90,9 +97,9 @@ export default function QueryLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tldFilter, statusFilter, hoursFilter, page]);
+  }, [tldFilter, statusFilter, userTypeFilter, hoursFilter, page]);
 
-  React.useEffect(() => { load(1); setPage(1); }, [tldFilter, statusFilter, hoursFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { load(1); setPage(1); }, [tldFilter, statusFilter, userTypeFilter, hoursFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { load(page); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
@@ -109,8 +116,20 @@ export default function QueryLogsPage() {
 
         {/* Stats bar */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="总查询数" value={stats.total.toLocaleString()} />
+            <StatCard
+              label="登录用户查询"
+              value={stats.logged.toLocaleString()}
+              sub={stats.total > 0 ? `占比 ${Math.round(stats.logged / stats.total * 100)}%` : undefined}
+              accent="text-primary"
+            />
+            <StatCard
+              label="匿名用户查询"
+              value={stats.anonymous.toLocaleString()}
+              sub={stats.total > 0 ? `占比 ${Math.round(stats.anonymous / stats.total * 100)}%` : undefined}
+              accent="text-muted-foreground"
+            />
             <StatCard
               label="失败次数"
               value={stats.errors.toLocaleString()}
@@ -160,6 +179,17 @@ export default function QueryLogsPage() {
           </div>
 
           <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-muted-foreground">用户类型</label>
+            <select
+              value={userTypeFilter}
+              onChange={e => setUserType(e.target.value)}
+              className="h-8 px-2 text-xs rounded-lg border border-border/60 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+            >
+              {USER_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
             <label className="text-[10px] text-muted-foreground">时间范围</label>
             <select
               value={hoursFilter}
@@ -201,6 +231,7 @@ export default function QueryLogsPage() {
                 <tr className="border-b border-border/40 bg-muted/30">
                   <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium w-8">#</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium">域名</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium">查询者</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium">TLD</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium">状态</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-muted-foreground font-medium">耗时</th>
@@ -212,14 +243,14 @@ export default function QueryLogsPage() {
               <tbody>
                 {loading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-12 text-muted-foreground">
                       <RiLoader4Line className="w-5 h-5 animate-spin mx-auto mb-2" />
                       <p className="text-xs">加载中…</p>
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-12 text-muted-foreground">
                       <RiDatabase2Line className="w-5 h-5 mx-auto mb-2 opacity-40" />
                       <p className="text-xs">暂无查询日志</p>
                       <p className="text-[10px] mt-1 opacity-60">进行一次域名查询后数据将显示在这里</p>
@@ -239,6 +270,19 @@ export default function QueryLogsPage() {
                       </td>
                       <td className="px-4 py-2 font-mono text-foreground/80 max-w-[180px] truncate" title={row.domain}>
                         {row.domain}
+                      </td>
+                      <td className="px-4 py-2 max-w-[180px] truncate">
+                        {row.user_email ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-foreground/80" title={row.user_email}>
+                            <RiUserLine className="w-3 h-3 shrink-0 text-primary/70" />
+                            <span className="truncate">{row.user_email}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title={row.ip ? `IP ${row.ip}` : undefined}>
+                            <RiGhostLine className="w-3 h-3 shrink-0" />
+                            匿名{row.ip ? ` · ${row.ip.slice(0, 40)}` : ""}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2">
                         <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted/60 text-muted-foreground">
@@ -318,7 +362,7 @@ export default function QueryLogsPage() {
         {/* Footer note */}
         <p className="text-[11px] text-muted-foreground/50 text-center">
           <RiDeleteBin2Line className="w-3 h-3 inline mr-1" />
-          日志自动保留最近 30 天，每次写入时清理过期记录。<RiTimeLine className="w-3 h-3 inline mx-1" />仅记录通过 API 查询的请求，缓存命中与后端直接响应均包含在内。
+          日志自动保留最近 30 天（写入时抽样清理过期记录）。记录在响应返回前落库，单查、流式与批量接口的匿名及登录查询均包含在内；历史遗留行无查询者信息，归入匿名统计。
         </p>
 
       </div>

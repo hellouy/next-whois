@@ -125,8 +125,14 @@ export default async function handler(
       status: [{ status: "registry-reserved", url: "" }],
       rawWhoisContent: `[CN Reserved] ${cnReserved.descZh}`,
     };
-    saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail).catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
-    logQuery({ domain: trimmed, tld, success: true, cached: false, durationMs: 0, errorCode: null, source: "whois" }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
+    // AWAITED before responding so the lambda cannot freeze and drop the write.
+    await logQuery({
+      domain: trimmed, tld, success: true, cached: false,
+      durationMs: 0, errorCode: null, source: "whois",
+      userId, userEmail, ip,
+    }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
+    await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
+      .catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
     res.setHeader("Content-Type", "application/x-ndjson");
     res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
     res.write(JSON.stringify({
@@ -187,17 +193,20 @@ export default async function handler(
       partial: false,
     });
 
-    logQuery({
+    // Record writes are AWAITED before res.end() (in the finally below) so the
+    // lambda cannot freeze and drop them — accurate admin stats depend on this.
+    await logQuery({
       domain: trimmed, tld,
       success: finalResult.status,
       cached: finalResult.cached ?? false,
       durationMs: (finalResult.time ?? 0) * 1000,
       errorCode: finalResult.status ? null : (finalResult.error?.slice(0, 60) ?? null),
       source: finalResult.source ?? null,
+      userId, userEmail, ip,
     }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
 
     if (finalResult.status) {
-      saveSearchRecord(
+      await saveSearchRecord(
         trimmed,
         finalResult.result ?? { ...initialWhoisAnalyzeResult },
         finalResult.dnsProbe,
@@ -216,9 +225,10 @@ export default async function handler(
         partial: false,
         result: { ...initialWhoisAnalyzeResult },
       });
-      logQuery({
+      await logQuery({
         domain: trimmed, tld, success: false, cached: false,
         durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
+        userId, userEmail, ip,
       }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
     }
   } finally {

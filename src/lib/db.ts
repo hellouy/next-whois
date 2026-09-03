@@ -327,6 +327,9 @@ const ALTER_COLUMNS = [
   `ALTER TABLE invite_codes  ADD COLUMN IF NOT EXISTS expires_at          TIMESTAMPTZ`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS thresholds_json     TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS whois_synced_at     TIMESTAMPTZ`,
+  `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS user_id            TEXT`,
+  `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS user_email         TEXT`,
+  `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS ip                 TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS whois_expiry_date   TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS registrar           TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS creation_date       TEXT`,
@@ -477,11 +480,15 @@ const CREATE_INDEXES = [
     duration_ms INTEGER      NOT NULL DEFAULT 0,
     error_code  TEXT,
     source      TEXT,
+    user_id     TEXT,
+    user_email  TEXT,
+    ip          TEXT,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
   `CREATE INDEX IF NOT EXISTS idx_query_logs_created ON query_logs (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_query_logs_tld     ON query_logs (tld)`,
   `CREATE INDEX IF NOT EXISTS idx_query_logs_success ON query_logs (success)`,
+  `CREATE INDEX IF NOT EXISTS idx_query_logs_user    ON query_logs (user_id)`,
   `CREATE TABLE IF NOT EXISTS expired_domain_leads (
     id            SERIAL       PRIMARY KEY,
     domain        TEXT         NOT NULL UNIQUE,
@@ -717,8 +724,10 @@ export async function getDbReady(): Promise<Pool | null> {
 
 /**
  * Log an individual query event (success or failure) for the admin observability dashboard.
- * Fire-and-forget — never throws, never blocks the main query path.
- * Automatically prunes records older than 30 days to cap table growth.
+ * Identity columns (user_id/user_email/ip) let the dashboard split anonymous vs
+ * logged-in traffic. Never throws — callers may await it before responding
+ * (required on Vercel: fire-and-forget writes are dropped when the lambda freezes).
+ * Prunes records older than 30 days on ~1% of calls to cap table growth.
  */
 export async function logQuery(entry: {
   domain: string;
@@ -728,6 +737,9 @@ export async function logQuery(entry: {
   durationMs: number;
   errorCode?: string | null;
   source?: string | null;
+  userId?: string | null;
+  userEmail?: string | null;
+  ip?: string | null;
 }): Promise<void> {
   const db = await getDbReady().catch(() => null);
   if (!db) return;
@@ -735,8 +747,8 @@ export async function logQuery(entry: {
   if (!client) return;
   try {
     await client.query(
-      `INSERT INTO query_logs (domain, tld, success, cached, duration_ms, error_code, source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO query_logs (domain, tld, success, cached, duration_ms, error_code, source, user_id, user_email, ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         entry.domain.slice(0, 253),
         entry.tld.slice(0, 63),
@@ -745,12 +757,19 @@ export async function logQuery(entry: {
         Math.round(entry.durationMs),
         entry.errorCode ?? null,
         entry.source ?? null,
+        entry.userId ?? null,
+        entry.userEmail ? entry.userEmail.slice(0, 255) : null,
+        entry.ip ?? null,
       ],
     );
-    // Prune old records: keep only the last 30 days (runs occasionally, non-blocking)
-    await client.query(
-      `DELETE FROM query_logs WHERE created_at < NOW() - INTERVAL '30 days'`,
-    );
+    // Prune old records: keep only the last 30 days. Runs on ~1% of inserts
+    // (a full-table DELETE on every write is wasteful and adds latency now
+    // that logQuery is awaited in the response path).
+    if (Math.random() < 0.01) {
+      await client
+        .query(`DELETE FROM query_logs WHERE created_at < NOW() - INTERVAL '30 days'`)
+        .catch(() => {});
+    }
   } catch {
     // Silently ignore — never disrupt the query path
   } finally {

@@ -116,7 +116,17 @@ export default async function handler(
       status: [{ status: "registry-reserved", url: "" }],
       rawWhoisContent: `[CN Reserved] ${cnReserved.descZh}`,
     };
-    saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail).catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
+    const cnTld = trimmed.toLowerCase().split(".").pop() ?? "";
+    // AWAITED before responding: Vercel drops un-awaited background writes
+    // when the lambda freezes right after the response — this was why admin
+    // stats undercounted anonymous and logged-in queries.
+    await logQuery({
+      domain: trimmed, tld: cnTld, success: true, cached: false,
+      durationMs: 0, errorCode: null, source: "whois",
+      userId, userEmail, ip,
+    }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+    await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
+      .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
     res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
     return res.status(200).json({
       time: 0,
@@ -137,13 +147,24 @@ export default async function handler(
   const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
 
   if (!status) {
-    logQuery({ domain: trimmed, tld, success: false, cached: false, durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+    await logQuery({
+      domain: trimmed, tld, success: false, cached: false,
+      durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null,
+      userId, userEmail, ip,
+    }).catch(e => console.error("[lookup] logQuery failed:", e.message));
     return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
   }
 
   // Record every successful lookup — logged-in or anonymous, cached or fresh.
-  saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail).catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
-  logQuery({ domain: trimmed, tld, success: true, cached: cached ?? false, durationMs: time * 1000, errorCode: null, source: source ?? null }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+  // Both writes are AWAITED before responding so the lambda cannot freeze and
+  // drop them (accurate admin stats depend on this).
+  await saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail)
+    .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
+  await logQuery({
+    domain: trimmed, tld, success: true, cached: cached ?? false,
+    durationMs: time * 1000, errorCode: null, source: source ?? null,
+    userId, userEmail, ip,
+  }).catch(e => console.error("[lookup] logQuery failed:", e.message));
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
   // CDN edge cache also honours the same expiry windows as Redis.

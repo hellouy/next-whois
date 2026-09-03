@@ -12,11 +12,16 @@ export type QueryLogRow = {
   duration_ms: number;
   error_code: string | null;
   source: string | null;
+  user_id: string | null;
+  user_email: string | null;
+  ip: string | null;
   created_at: string;
 };
 
 export type QueryLogStats = {
   total: number;
+  anonymous: number;
+  logged: number;
   errors: number;
   cached: number;
   avg_duration_ms: number;
@@ -45,6 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const {
     tld = "",
     status = "all",
+    user_type = "all",
     hours = "24",
     page = "1",
     limit = "100",
@@ -64,6 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (status === "ok")   conditions.push("success = true");
   if (status === "fail") conditions.push("success = false");
+  // user_type splits traffic by caller identity (anonymous vs logged-in)
+  if (user_type === "anon")   conditions.push("user_id IS NULL");
+  if (user_type === "logged") conditions.push("user_id IS NOT NULL");
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -73,18 +82,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const [rowsResult, statsResult, countResult] = await Promise.all([
       client.query<QueryLogRow>(
-        `SELECT id, domain, tld, success, cached, duration_ms, error_code, source, created_at
+        `SELECT id, domain, tld, success, cached, duration_ms, error_code, source, user_id, user_email, ip, created_at
          FROM query_logs ${where}
          ORDER BY created_at DESC
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, limitNum, offset],
       ),
-      client.query<{ total: string; errors: string; cached: string; avg_ms: string }>(
+      client.query<{ total: string; anon: string; logged: string; errors: string; cached: string; avg_ms: string }>(
         `SELECT
-           COUNT(*)                              AS total,
-           COUNT(*) FILTER (WHERE NOT success)   AS errors,
-           COUNT(*) FILTER (WHERE cached)        AS cached,
-           COALESCE(AVG(duration_ms), 0)::int    AS avg_ms
+           COUNT(*)                                    AS total,
+           COUNT(*) FILTER (WHERE user_id IS NULL)     AS anon,
+           COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS logged,
+           COUNT(*) FILTER (WHERE NOT success)         AS errors,
+           COUNT(*) FILTER (WHERE cached)              AS cached,
+           COALESCE(AVG(duration_ms), 0)::int          AS avg_ms
          FROM query_logs ${where}`,
         params,
       ),
@@ -96,12 +107,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const s = statsResult.rows[0];
     const total      = parseInt(s?.total ?? "0", 10);
+    const anon       = parseInt(s?.anon ?? "0", 10);
+    const logged     = parseInt(s?.logged ?? "0", 10);
     const errors     = parseInt(s?.errors ?? "0", 10);
     const cached_cnt = parseInt(s?.cached ?? "0", 10);
     const avg_ms     = parseInt(s?.avg_ms ?? "0", 10);
 
     const stats: QueryLogStats = {
       total,
+      anonymous: anon,
+      logged,
       errors,
       cached: cached_cnt,
       avg_duration_ms: avg_ms,

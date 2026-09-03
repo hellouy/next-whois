@@ -7,6 +7,8 @@ import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { logQuery } from "@/lib/db";
+import { saveSearchRecord } from "@/lib/server/save-search-record";
 
 export const config = {
   maxDuration: 60,
@@ -80,6 +82,7 @@ export default async function handler(
 
   // ── Session ──────────────────────────────────────────────────────────────
   const session = await getServerSession(req, res, authOptions).catch(() => null);
+  const userId       = ((session?.user as any)?.id as string | undefined) ?? null;
   const userEmail    = session?.user?.email ?? null;
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
   const isLoggedIn   = !!userEmail;
@@ -167,6 +170,34 @@ export default async function handler(
   });
 
   const elapsed = (Date.now() - batchStart) / 1000;
+
+  // ── Record every batch item (query_logs + search_history) ────────────────
+  // SECURITY-STATS: batch lookups used to be entirely invisible to admin
+  // stats. Every item is now logged with the caller's identity, and the
+  // writes are AWAITED before responding so the lambda cannot drop them.
+  await Promise.all(items.map((item) => {
+    const tld = item.domain.split(".").pop() ?? "";
+    const tasks: Promise<unknown>[] = [
+      logQuery({
+        domain: item.domain,
+        tld,
+        success: item.status,
+        cached: item.cached ?? false,
+        durationMs: Math.round(item.time * 1000),
+        errorCode: item.status ? null : (item.error?.slice(0, 60) ?? null),
+        source: item.source ?? null,
+        userId, userEmail, ip,
+      }).catch(e => console.error("[lookup-batch] logQuery failed:", e.message)),
+    ];
+    if (item.status && item.result) {
+      tasks.push(
+        saveSearchRecord(item.domain, item.result, item.dnsProbe, userId, userEmail)
+          .catch(e => console.error("[lookup-batch] saveSearchRecord failed:", e.message)),
+      );
+    }
+    return Promise.all(tasks);
+  }));
+
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json({ items, elapsed });
 }
