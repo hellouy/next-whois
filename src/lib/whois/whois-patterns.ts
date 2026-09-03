@@ -93,33 +93,48 @@ export function isIanaFallback(raw: string): boolean {
 }
 
 export function detectWhoisError(raw: string): string | null {
-  const lines = raw
+  const allLines = raw
     .split("\n")
     .map((l) => l.trim())
-    .filter(
-      (l) =>
-        l.length > 0 &&
-        !l.startsWith("%") &&
-        !l.startsWith("#") &&
-        !l.startsWith(">>>") &&
-        !l.startsWith("NOTICE") &&
-        !l.startsWith("TERMS OF USE") &&
-        !l.startsWith("Terms of Use") &&
-        !l.startsWith("By submitting") &&
-        !l.startsWith("This service") &&
-        !l.startsWith("Access to") &&
-        !l.startsWith("You agree"),
-    );
-  if (lines.length === 0) return "Empty WHOIS response";
-  const filtered = lines.slice(0, 30).join("\n");
-  for (const pattern of WHOIS_ERROR_PATTERNS) {
-    const match = filtered.match(pattern);
-    if (match) {
-      const matchLine = lines.find((l) => pattern.test(l));
-      return matchLine?.trim() || match[0];
+    .filter((l) => l.length > 0 && !l.startsWith(">>>"));
+
+  // RFC 3912 comment lines (% / #). Some registries ONLY report the empty /
+  // not-registered state inside comments — e.g. whois.nic.sn answers with
+  // "%% NOT FOUND" — so comment lines must participate in the pattern scan
+  // instead of being discarded outright.
+  const commentLines = allLines.filter(
+    (l) => l.startsWith("%") || l.startsWith("#"),
+  );
+  const lines = allLines.filter(
+    (l) =>
+      !l.startsWith("%") &&
+      !l.startsWith("#") &&
+      !l.startsWith("NOTICE") &&
+      !l.startsWith("TERMS OF USE") &&
+      !l.startsWith("Terms of Use") &&
+      !l.startsWith("By submitting") &&
+      !l.startsWith("This service") &&
+      !l.startsWith("Access to") &&
+      !l.startsWith("You agree"),
+  );
+  if (lines.length === 0 && commentLines.length === 0) return "Empty WHOIS response";
+
+  const scan = (candidates: string[]): string | null => {
+    const filtered = candidates.slice(0, 30).join("\n");
+    for (const pattern of WHOIS_ERROR_PATTERNS) {
+      const match = filtered.match(pattern);
+      if (match) {
+        const matchLine = candidates.find((l) => pattern.test(l));
+        return matchLine?.trim() || match[0];
+      }
     }
-  }
-  return null;
+    return null;
+  };
+
+  // Content lines take precedence; fall back to comment lines so responses
+  // whose payload is comments-only (or whose not-found marker is a comment,
+  // as with .sn) are still classified correctly.
+  return scan(lines) ?? scan(commentLines);
 }
 
 export function isEmptyResult(result: {

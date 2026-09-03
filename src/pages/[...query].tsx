@@ -816,13 +816,25 @@ export default function LookupPage({
   // fetches new data without a full page reload.
   const [target, setTarget] = React.useState(propTarget);
   const [displayTarget, setDisplayTarget] = React.useState(propDisplayTarget);
+  // First sync-effect run corresponds to the initial mount; later runs mean
+  // an actual route change happened (e.g. a shallow push from handleSearch).
+  const firstSyncRun = React.useRef(true);
 
   useEffect(() => {
     const newTarget = targetFromRouterQuery(router.query);
     if (newTarget && newTarget !== target) {
       setTarget(newTarget);
       setDisplayTarget(newTarget); // domainToUnicode not available client-side
+    } else if (newTarget && newTarget === target && !firstSyncRun.current) {
+      // Route changed to a variant URL (different case / protocol / www
+      // prefix) that normalizes to the SAME target. The [target, refreshKey]
+      // fetch effect will not re-fire, so nothing would clear the loading
+      // skeleton set by routeChangeStart — clear it here to avoid an
+      // infinite spinner.
+      setLoading(false);
+      setRefreshing(false);
     }
+    firstSyncRun.current = false;
   // router.query.query is the catch-all segment array; re-run when it changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.query]);
@@ -1170,9 +1182,17 @@ export default function LookupPage({
   }, [router.query.subscribe, sessionStatus]);
 
   const handleSearch = (query: string) => {
-    const url = toSearchURI(query);
-    if (url === router.asPath) return;
     const cleaned = cleanDomain(query.replace(/\s+/g, ""));
+    const url = toSearchURI(query);
+    // Same domain searched again (raw input may differ in case / protocol /
+    // www prefix but normalizes to the current target). A shallow push would
+    // set the loading skeleton via routeChangeStart while the [target]
+    // fetch effect never re-fires — an infinite spinner. Re-query instead.
+    if (cleaned && cleaned === target) {
+      setRefreshKey((k) => k + 1);
+      return;
+    }
+    if (url === router.asPath) return;
     if (cleaned && looksLikeDomainQuery(cleaned) && isValidDomainTld(cleaned)) {
       prefetchLookup(cleaned);
     }

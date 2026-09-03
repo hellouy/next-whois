@@ -129,6 +129,8 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "modified on":
       case "date de mise a jour":
       case "date de mise à jour":
+      case "dernière modification":
+      case "derniere modification":
       case "zuletzt geaendert am":
       case "updated (utc)":
       case "last-update":
@@ -269,6 +271,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       }
       case "status":
       case "registration status":
+      case "statut":
         result.status.push(analyzeDomainStatus(value));
         break;
       case "domain status":
@@ -297,6 +300,7 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "nameservers":
       case "name servers":
       case "nserver":
+      case "serveur de noms":
       case "p":
       // Split on commas (e.g. "ns1.foo.com, ns2.foo.com") then strip IPs
         for (const nsEntry of value.split(",")) {
