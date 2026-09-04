@@ -39,3 +39,18 @@ export function captureException(err: unknown, context?: Record<string, unknown>
     // Never let telemetry break the request path.
   }
 }
+
+/** Report an error-level log line that has no Error object attached. */
+export function captureMessage(msg: string, context?: Record<string, unknown>) {
+  if (!ensureInit()) return;
+  try {
+    Sentry.withScope(scope => {
+      if (context) {
+        for (const [k, v] of Object.entries(context)) scope.setExtra(k, v);
+      }
+      Sentry.captureMessage(msg, "error");
+    });
+  } catch {
+    // Never let telemetry break the request path.
+  }
+}

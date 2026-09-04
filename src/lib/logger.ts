@@ -72,13 +72,15 @@ function emit(level: LogLevel, ctx: string, msg: string, args: unknown[]) {
 
     if (level === "error" && process.env.SENTRY_DSN) {
       const errArg = args.find(a => a instanceof Error);
-      if (errArg) {
-        // Fire-and-forget: server-only chunk; the client bundle never
-        // downloads it because non-NEXT_PUBLIC env vars compile away.
-        void import("./monitoring-server")
-          .then(m => m.captureException(errArg, { ctx, msg }))
-          .catch(() => {});
-      }
+      // Fire-and-forget: server-only chunk; the client bundle never
+      // downloads it because non-NEXT_PUBLIC env vars compile away.
+      void import("./monitoring-server")
+        .then(m =>
+          errArg
+            ? m.captureException(errArg, { ctx, msg })
+            : m.captureMessage(msg, { ctx, args: args.map(serializeArg) }),
+        )
+        .catch(() => {});
     }
   } else {
     if (level === "debug" && !IS_DEV) return;
