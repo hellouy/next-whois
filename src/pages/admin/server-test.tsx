@@ -228,7 +228,7 @@ export default function ServerTestPage() {
 
             {/* TCP fields */}
             {serverType === "tcp" && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="col-span-2 space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">主机名 / IP</label>
                   <Input

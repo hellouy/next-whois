@@ -129,7 +129,11 @@ function PlanForm({ initial, onSave, onCancel, saving }: {
       </div>
 
       <div className="flex gap-2 pt-1">
-        <Button size="sm" onClick={() => onSave(form)} disabled={saving} className="h-8 text-xs">
+        <Button size="sm" onClick={() => {
+          if (!form.name.trim()) { toast.error("请填写套餐名称"); return; }
+          if (!form.price || Number.isNaN(Number(form.price))) { toast.error("请填写有效价格"); return; }
+          onSave(form);
+        }} disabled={saving} className="h-8 text-xs">
           {saving ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiCheckLine className="w-3.5 h-3.5 mr-1" />}
           保存
         </Button>
@@ -172,6 +176,7 @@ export default function PaymentPlansAdmin() {
       ]);
       const pd = await pr.json();
       const sd = await sr.json();
+      if (pd.error) { toast.error(pd.error); return; }
       setPlans(pd.plans ?? []);
       setPaySettings(sd.settings ?? null);
     } catch { toast.error("加载失败"); }

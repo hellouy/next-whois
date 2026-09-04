@@ -28,6 +28,7 @@ export default function DbExportPage() {
     try {
       const r = await fetch("/api/admin/db-export");
       const d = await r.json();
+      if (d.error) { toast.error(d.error); return; }
       setStats(d.tables ?? []);
     } catch {
       toast.error("加载统计失败");

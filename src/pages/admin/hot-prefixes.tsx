@@ -343,7 +343,6 @@ export default function AdminHotPrefixesPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "保存失败");
-      await invalidateCacheClient();
       toast.success(`已导入 ${d.imported ?? toImport.length} 个前缀`);
       setShowAiDiscover(false);
       fetchPrefixes();
@@ -352,11 +351,6 @@ export default function AdminHotPrefixesPage() {
     } finally {
       setAiImporting(false);
     }
-  }
-
-  async function invalidateCacheClient() {
-    // fire-and-forget cache bust
-    try { await fetch("/api/admin/hot-prefixes?action=seed", { method: "HEAD" }); } catch {}
   }
 
   return (
@@ -627,7 +621,7 @@ export default function AdminHotPrefixesPage() {
               <p className="text-sm mt-1">点击「导入内置列表」快速添加 100+ 个预设前缀</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
+            <div className="rounded-xl border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">

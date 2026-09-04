@@ -195,8 +195,8 @@ export default function AdminNotifyServicePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(s),
       });
-      const d = await res.json();
-      if (d.ok !== false) toast.success("通知服务配置已保存");
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.ok !== false) toast.success("通知服务配置已保存");
       else toast.error(d.error || "保存失败");
     } catch {
       toast.error("保存失败");

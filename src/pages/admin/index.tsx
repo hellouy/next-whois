@@ -295,12 +295,13 @@ export default function AdminIndexPage() {
               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <RiSearchLine className="w-3 h-3 text-blue-500" />
                 <span className="font-semibold text-foreground">{stats.todaySearches}</span> 次查询
-                {stats.todayLoggedSearches > 0 && (
-                  <span className="text-primary/70">（登录 {stats.todayLoggedSearches}</span>
-                )}
-                {stats.todayAnonSearches > 0 && (
-                  <span className="text-muted-foreground/70">匿名 {stats.todayAnonSearches}）</span>
-                )}
+                {stats.todayLoggedSearches > 0 && stats.todayAnonSearches > 0 ? (
+                  <span className="text-muted-foreground/70">（登录 {stats.todayLoggedSearches} / 匿名 {stats.todayAnonSearches}）</span>
+                ) : stats.todayLoggedSearches > 0 ? (
+                  <span className="text-primary/70">（登录 {stats.todayLoggedSearches}）</span>
+                ) : stats.todayAnonSearches > 0 ? (
+                  <span className="text-muted-foreground/70">（匿名 {stats.todayAnonSearches}）</span>
+                ) : null}
               </span>
             )}
             {(stats.todayFailedSearches ?? 0) > 0 && (

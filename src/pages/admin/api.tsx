@@ -77,6 +77,10 @@ export default function AdminApiPage() {
 
   // AI key input state per provider
   const [aiKeyInputs, setAiKeyInputs] = useState<Record<string, string>>({});
+  // Providers whose key input is explicitly expanded via the "更换" button —
+  // previously this used a single-space sentinel value in aiKeyInputs, which
+  // fought with value={inputVal.trim()} in the controlled input.
+  const [aiEditing, setAiEditing] = useState<Set<string>>(new Set());
   const [aiShowKey, setAiShowKey] = useState<Record<string, boolean>>({});
   const [aiSaving, setAiSaving] = useState<string | null>(null);
   const [aiDeleting, setAiDeleting] = useState<string | null>(null);
@@ -90,7 +94,11 @@ export default function AdminApiPage() {
     fetch("/api/admin/api-keys")
       .then((r) => r.json())
       .then((d) => {
-        setState(d);
+        if (d && typeof d === "object" && !d.error) {
+          setState(d);
+        } else {
+          toast.error((d as { error?: string }).error || "加载配置失败");
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -204,6 +212,7 @@ export default function AdminApiPage() {
         },
       }));
       setAiKeyInputs(prev => ({ ...prev, [providerId]: "" }));
+      setAiEditing(prev => { const n = new Set(prev); n.delete(providerId); return n; });
       toast.success(`${AI_PROVIDERS.find(p => p.id === providerId)?.name} Key 已保存，即时生效`);
     } catch (e: any) {
       toast.error(e.message || "保存失败");
@@ -285,7 +294,7 @@ export default function AdminApiPage() {
               {AI_PROVIDERS.sort((a, b) => a.priority - b.priority).map((provider) => {
                 const status = state.ai_providers[provider.id];
                 const inputVal = aiKeyInputs[provider.id] ?? "";
-                const showInput = inputVal !== "" || !status?.configured;
+                const showInput = aiEditing.has(provider.id) || inputVal !== "" || !status?.configured;
                 const isLoading = aiSaving === provider.id || aiDeleting === provider.id || testing === `ai_${provider.id}`;
 
                 return (
@@ -345,7 +354,7 @@ export default function AdminApiPage() {
                               variant="ghost"
                               size="sm"
                               className="h-8 text-xs"
-                              onClick={() => setAiKeyInputs(p => ({ ...p, [provider.id]: " " }))}
+                              onClick={() => setAiEditing(prev => new Set(prev).add(provider.id))}
                             >
                               更换
                             </Button>
@@ -372,7 +381,7 @@ export default function AdminApiPage() {
                               <Input
                                 type={aiShowKey[provider.id] ? "text" : "password"}
                                 placeholder={`粘贴 ${provider.name} API Key`}
-                                value={inputVal.trim()}
+                                value={inputVal}
                                 onChange={(e) => setAiKeyInputs(p => ({ ...p, [provider.id]: e.target.value }))}
                                 className="pr-10 font-mono text-sm"
                                 autoComplete="off"
@@ -405,7 +414,7 @@ export default function AdminApiPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setAiKeyInputs(p => ({ ...p, [provider.id]: "" }))}
+                              onClick={() => setAiEditing(prev => { const n = new Set(prev); n.delete(provider.id); return n; })}
                               >
                                 取消
                               </Button>

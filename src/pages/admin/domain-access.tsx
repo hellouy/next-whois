@@ -47,7 +47,7 @@ function StatCard({
     <div className="glass-panel border border-border rounded-2xl p-4 flex items-start gap-3">
       {Icon && (
         <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", color || "bg-muted/60")}>
-          <Icon className="w-4.5 h-4.5" />
+          <Icon className="w-4 h-4" />
         </div>
       )}
       <div>
@@ -167,7 +167,7 @@ export default function AdminDomainAccessPage() {
             {/* Warning: domains without TLD rules */}
             {stats.noTldRules > 0 && (
               <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-4 py-3">
-                <RiAlertLine className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+                <RiAlertLine className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
                     {stats.noTldRules} 个域名缺少 TLD 解析规则
@@ -257,7 +257,7 @@ export default function AdminDomainAccessPage() {
                     onClick={() => router.push(href)}
                     className="flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-border hover:bg-muted/40 transition-colors group"
                   >
-                    <Icon className="w-4.5 h-4.5 text-muted-foreground shrink-0" />
+                    <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{label}</p>
                       <p className="text-xs text-muted-foreground truncate">{desc}</p>

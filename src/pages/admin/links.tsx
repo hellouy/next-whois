@@ -25,7 +25,7 @@ type FriendlyLink = {
   created_at: string;
 };
 
-const EMPTY_FORM = { name: "", url: "", description: "", category: "", sort_order: "0", logo_url: "" };
+const EMPTY_FORM = { name: "", url: "", description: "", category: "", sort_order: "0", logo_url: "", active: true };
 
 export default function AdminLinksPage() {
   const [links, setLinks] = React.useState<FriendlyLink[]>([]);
@@ -70,6 +70,7 @@ export default function AdminLinksPage() {
       category: link.category || "",
       sort_order: String(link.sort_order),
       logo_url: link.logo_url || "",
+      active: link.active,
     });
   }
 
@@ -95,7 +96,10 @@ export default function AdminLinksPage() {
         category: form.category.trim() || null,
         sort_order: Number(form.sort_order) || 0,
         logo_url: form.logo_url.trim() || null,
-        active: true,
+        // Editing an existing link must preserve its current visibility — the
+        // API treats any body without active:false as active:true, so forcing
+        // true here would silently re-publish a hidden link on every edit.
+        active: editId ? (form.active ?? true) : true,
       };
       const res = await fetch("/api/admin/links", {
         method: editId ? "PUT" : "POST",
@@ -115,14 +119,19 @@ export default function AdminLinksPage() {
 
   async function toggleActive(link: FriendlyLink) {
     try {
-      await fetch("/api/admin/links", {
+      const res = await fetch("/api/admin/links", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: link.id, active: !link.active }),
       });
-      setLinks(ls => ls.map(l => l.id === link.id ? { ...l, active: !l.active } : l));
+      if (res.ok) {
+        setLinks(ls => ls.map(l => l.id === link.id ? { ...l, active: !l.active } : l));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || "操作失败");
+      }
     } catch {
-      toast.error("操作失败");
+      toast.error("网络错误");
     }
   }
 

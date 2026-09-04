@@ -38,7 +38,7 @@ export default function StampStylesPage() {
           onClick={closePreview}>
           <div
             className="rounded-[22px] overflow-hidden shadow-2xl"
-            style={{width:340}}
+            style={{width: "min(340px, 90vw)"}}
             onClick={e => e.stopPropagation()}>
             <StampPreviewCard themeKey={previewKey} />
           </div>

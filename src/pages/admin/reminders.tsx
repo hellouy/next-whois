@@ -323,15 +323,15 @@ export default function AdminRemindersPage() {
               <div className="glass-panel border border-border rounded-2xl overflow-hidden">
                 <div className="grid grid-cols-[1fr_1fr_auto_auto] text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2 border-b border-border bg-muted/30 gap-3">
                   <span>域名</span>
-                  <span>用户</span>
+                  <span className="hidden sm:block">用户</span>
                   <span>提前天数</span>
                   <span>发送时间</span>
                 </div>
                 <div className="divide-y divide-border">
                   {logs.map(log => (
-                    <div key={log.id} className="grid grid-cols-[1fr_1fr_auto_auto] px-4 py-2.5 gap-3 text-[11px] items-center hover:bg-muted/20 transition-colors">
+                    <div key={log.id} className="grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_1fr_auto_auto] px-4 py-2.5 gap-3 text-[11px] items-center hover:bg-muted/20 transition-colors">
                       <span className="font-mono font-semibold truncate">{log.domain}</span>
-                      <span className="text-muted-foreground truncate">{log.user_email}</span>
+                      <span className="text-muted-foreground truncate hidden sm:block">{log.user_email}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-semibold shrink-0 text-center">
                         {log.days_before === 0 || log.days_before <= -100000
                           ? "手动"
@@ -352,7 +352,7 @@ export default function AdminRemindersPage() {
 
         {/* Filter tabs — only show for reminders list */}
         {pageTab === "reminders" && (
-        <div className="flex items-center gap-1.5 p-1 glass-panel border border-border rounded-xl w-fit">
+        <div className="flex items-center gap-1.5 p-1 glass-panel border border-border rounded-xl flex-wrap">
           <RiFilterLine className="w-3.5 h-3.5 text-muted-foreground ml-1" />
           {FILTERS.map(f => (
             <button
@@ -412,7 +412,7 @@ export default function AdminRemindersPage() {
                         ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold">活跃</span>
                         : <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">已停用</span>
                       }
-                      {reminder.days_before && (
+                      {reminder.days_before != null && reminder.days_before > 0 && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400">
                           提前 {reminder.days_before} 天
                         </span>
@@ -493,7 +493,7 @@ export default function AdminRemindersPage() {
                     })()}
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity mt-0.5">
                     <button
                       onClick={() => editingId === reminder.id ? cancelEdit() : openEdit(reminder)}
                       className={cn(

@@ -868,7 +868,7 @@ export default function AdminUsersPage() {
                 </div>
 
                 {user.email !== currentUserEmail && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                     {/* Edit */}
                     <button
                       onClick={() => setEditUser(user)}

@@ -166,17 +166,17 @@ export default function OgStylesPage({ initialEnabledStyles, initialBrandName, i
   }, [enabled, savedEnabled]);
 
   function toggle(id: number) {
+    // Validation must run OUTSIDE the state updater: reactStrictMode invokes
+    // updaters twice in dev, so a toast inside the updater fires twice — and
+    // updaters are required to be pure.
+    if (enabled.has(id) && enabled.size <= 1) {
+      toast.error("至少需要保留一种样式");
+      return;
+    }
     setEnabled((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        if (next.size <= 1) {
-          toast.error("至少需要保留一种样式");
-          return prev;
-        }
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }

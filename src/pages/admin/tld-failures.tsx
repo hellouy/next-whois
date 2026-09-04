@@ -218,6 +218,8 @@ export default function TldFailuresPage() {
       const d = await r.json();
       if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`); load(1); setPage(1); }
       else toast.error("操作失败");
+    } catch (e: any) {
+      toast.error(`操作失败: ${e?.message || "网络错误"}`);
     } finally { setClearingAll(false); }
   }
 
@@ -234,6 +236,8 @@ export default function TldFailuresPage() {
       const d = await r.json();
       if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条`); load(page); }
       else toast.error("操作失败");
+    } catch (e: any) {
+      toast.error(`操作失败: ${e?.message || "网络错误"}`);
     } finally { setBulkDeleting(false); }
   }
 
@@ -445,15 +449,16 @@ export default function TldFailuresPage() {
     setLookingUp(tld);
     try {
       const domain = `example.${tld}`;
-      const r = await fetch(`/api/whois?domain=${encodeURIComponent(domain)}&nocache=1`);
+      const r = await fetch(`/api/lookup?query=${encodeURIComponent(domain)}&nocache=1`);
       const d = await r.json();
       if (d.status === true || d.status === "true") {
         toast.success(`.${tld} 查询成功，已自动从失败列表中移除`);
-        await fetch("/api/admin/tld-failures", {
+        const dr = await fetch("/api/admin/tld-failures", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tld }),
         });
+        if (!dr.ok) toast.error("移除失败列表条目失败，请重试");
         load(page);
       } else {
         toast.error(`.${tld} 查询仍然失败: ${d.error || "无法获取结果"}`);

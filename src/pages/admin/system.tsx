@@ -180,7 +180,9 @@ export default function AdminSystemPage() {
       const d = await r.json();
       setGitStatus(d);
       if (!d.hasToken) setShowGitConfig(true);
-    } catch { /* ignore */ }
+    } catch {
+      toast.error("加载 Git 状态失败，推送功能暂不可用");
+    }
     finally { setGitStatusLoading(false); }
   }
 
@@ -414,7 +416,7 @@ export default function AdminSystemPage() {
                 </div>
                 <h3 className="text-sm font-bold">活动统计</h3>
               </div>
-              <div className="grid grid-cols-4 divide-x divide-border">
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
                 <StatItem label="查询记录" value={data.stats.searches.total} sub={`今日 ${data.stats.searches.today}`} />
                 <StatItem label="监控提醒" value={data.stats.reminders.active} sub={`共 ${data.stats.reminders.total}`} />
                 <StatItem label="用户反馈" value={data.stats.feedback.total} sub={`近7天 ${data.stats.feedback.recent}`} />

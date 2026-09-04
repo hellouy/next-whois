@@ -1,4 +1,5 @@
 import React from "react";
+import { toast } from "sonner";
 import { AdminLayout } from "@/components/admin-layout";
 import { cn } from "@/lib/utils";
 import {
@@ -92,14 +93,23 @@ export default function QueryLogsPage() {
       setRows(data.rows);
       setStats(data.stats);
       setTotal(data.total_count);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      toast.error(e?.message?.slice(0, 80) || "加载查询日志失败");
     } finally {
       setLoading(false);
     }
   }, [tldFilter, statusFilter, userTypeFilter, hoursFilter, page]);
 
-  React.useEffect(() => { load(1); setPage(1); }, [tldFilter, statusFilter, userTypeFilter, hoursFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Single-request pattern: mount and page changes go through the [page] effect;
+  // filter changes either load directly (already on page 1) or reset to page 1,
+  // which triggers that same effect. The firstRender guard prevents the mount
+  // from firing a duplicate request in both effects.
+  const firstRender = React.useRef(true);
+  React.useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (page === 1) load(1);
+    else setPage(1);
+  }, [tldFilter, statusFilter, userTypeFilter, hoursFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { load(page); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {

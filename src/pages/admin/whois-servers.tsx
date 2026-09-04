@@ -227,7 +227,10 @@ export default function AdminWhoisServersPage() {
     try {
       const res = await fetch("/api/whois-servers");
       const d = await res.json();
-      if (!d.success) return;
+      if (!d.success) {
+        toast.error(d.message || d.error || "加载 WHOIS 服务器列表失败");
+        return;
+      }
       const userKeys = new Set<string>(Object.keys(d.userServers ?? {}));
       setUserTlds(userKeys);
       const list: ServerRow[] = Object.entries(
@@ -243,6 +246,8 @@ export default function AdminWhoisServersPage() {
         return a.tld.localeCompare(b.tld);
       });
       setRows(list);
+    } catch {
+      toast.error("加载 WHOIS 服务器列表失败，请检查网络后重试");
     } finally {
       setLoading(false);
     }
@@ -257,19 +262,23 @@ export default function AdminWhoisServersPage() {
   );
 
   const handleSave = async (tld: string, entry: CustomServerEntry) => {
-    const res = await fetch("/api/whois-servers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tld, entry }),
-    });
-    const d = await res.json();
-    if (d.success) {
-      toast.success(d.message || `已保存 .${tld}`);
-      setShowAdd(false);
-      setEditingTld(null);
-      await fetchServers();
-    } else {
-      toast.error(d.message || "保存失败");
+    try {
+      const res = await fetch("/api/whois-servers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tld, entry }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(d.message || `已保存 .${tld}`);
+        setShowAdd(false);
+        setEditingTld(null);
+        await fetchServers();
+      } else {
+        toast.error(d.message || "保存失败");
+      }
+    } catch {
+      toast.error("保存失败：网络错误");
     }
   };
 
@@ -280,6 +289,8 @@ export default function AdminWhoisServersPage() {
       const d = await res.json();
       if (d.success) { toast.success(d.message || `已删除 .${tld}`); await fetchServers(); }
       else toast.error(d.message || "删除失败");
+    } catch {
+      toast.error("删除失败：网络错误");
     } finally {
       setDeleting(null);
     }
@@ -377,7 +388,7 @@ export default function AdminWhoisServersPage() {
                         {getDisplayHost(row.entry)}
                       </span>
                       {row.source === "user" && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                           <Button size="icon-sm" variant="ghost" className="h-6 w-6 touch-manipulation"
                             onClick={() => setEditingTld(row.tld)} title="编辑">
                             <RiEditLine className="w-3 h-3" />

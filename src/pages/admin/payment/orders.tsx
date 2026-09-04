@@ -85,13 +85,14 @@ export default function PaymentOrdersAdmin() {
   const pendingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const PAGE_SIZE = 50;
 
-  async function load(append = false, offsetOverride?: number) {
+  async function load(append = false, offsetOverride?: number, searchOverride?: string) {
     const currentOffset = append ? (offsetOverride ?? orders.length) : 0;
     if (append) setLoadingMore(true); else setLoading(true);
     try {
-      const params = new URLSearchParams({ status, search, limit: String(PAGE_SIZE), offset: String(currentOffset) });
+      const params = new URLSearchParams({ status, search: searchOverride ?? search, limit: String(PAGE_SIZE), offset: String(currentOffset) });
       const r = await fetch(`/api/admin/payment/orders?${params}`);
       const d = await r.json();
+      if (d.error) { toast.error(d.error); return; }
       if (append) {
         setOrders(prev => [...prev, ...(d.orders ?? [])]);
       } else {
@@ -215,7 +216,7 @@ export default function PaymentOrdersAdmin() {
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === "Escape" && (setSearch(""), setTimeout(() => load(), 0))}
+                onKeyDown={e => e.key === "Escape" && (setSearch(""), load(false, 0, ""))}
                 placeholder="邮箱 / 订单号 / 套餐名"
                 className="pl-8 h-8 text-sm"
               />

@@ -114,6 +114,8 @@ function KeysTab() {
       const d = await r.json();
       if (d.keys) setKeys(d.keys);
       setRequireApiKey(!!d.require_api_key);
+    } catch {
+      toast.error("加载 API Key 列表失败，请检查网络后重试");
     } finally { setLoading(false); }
   }
   React.useEffect(() => { load(); }, []);
@@ -122,10 +124,13 @@ function KeysTab() {
     setTogglingRequire(true);
     try {
       const next = !requireApiKey;
-      await fetch("/api/admin/access-keys", { method: "POST", headers: { "Content-Type": "application/json" },
+      const r = await fetch("/api/admin/access-keys", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle_require", enabled: next }) });
+      if (!r.ok) { toast.error("操作失败，状态未变更"); return; }
       setRequireApiKey(next);
       toast.success(next ? "已开启 API Key 验证" : "已关闭 API Key 验证");
+    } catch {
+      toast.error("操作失败：网络错误");
     } finally { setTogglingRequire(false); }
   }
 
@@ -148,22 +153,34 @@ function KeysTab() {
   }
 
   async function toggleActive(k: AccessKey) {
-    await fetch("/api/admin/access-keys", { method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: k.id, is_active: !k.is_active }) });
-    setKeys(ks => ks.map(x => x.id === k.id ? { ...x, is_active: !x.is_active } : x));
-    toast.success(k.is_active ? "已停用" : "已启用");
+    try {
+      const r = await fetch("/api/admin/access-keys", { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: k.id, is_active: !k.is_active }) });
+      if (!r.ok) { toast.error("操作失败"); return; }
+      setKeys(ks => ks.map(x => x.id === k.id ? { ...x, is_active: !x.is_active } : x));
+      toast.success(k.is_active ? "已停用" : "已启用");
+    } catch {
+      toast.error("操作失败：网络错误");
+    }
   }
 
   async function deleteKey(k: AccessKey) {
     if (!confirm(`确认删除 Key "${k.label || k.key.slice(0, 12) + "…"}"？`)) return;
-    await fetch("/api/admin/access-keys", { method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: k.id }) });
-    setKeys(ks => ks.filter(x => x.id !== k.id));
-    toast.success("已删除");
+    try {
+      const r = await fetch("/api/admin/access-keys", { method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: k.id }) });
+      if (!r.ok) { toast.error("删除失败"); return; }
+      setKeys(ks => ks.filter(x => x.id !== k.id));
+      toast.success("已删除");
+    } catch {
+      toast.error("删除失败：网络错误");
+    }
   }
 
   function copy(text: string) {
-    navigator.clipboard.writeText(text).then(() => { setCopied(text); setTimeout(() => setCopied(null), 2000); });
+    navigator.clipboard.writeText(text)
+      .then(() => { setCopied(text); setTimeout(() => setCopied(null), 2000); })
+      .catch(() => toast.error("复制失败，请手动复制"));
   }
 
   const filtered = keys.filter(k =>
@@ -202,10 +219,14 @@ function KeysTab() {
               onClick={async () => {
                 if (!confirm(`删除全部 ${expiredCount} 个已过期 Key？`)) return;
                 const expired = keys.filter(isKeyExpired);
-                await Promise.all(expired.map(k => fetch("/api/admin/access-keys", { method: "DELETE",
-                  headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: k.id }) })));
-                setKeys(ks => ks.filter(k => !isKeyExpired(k)));
-                toast.success(`已清除 ${expiredCount} 个过期 Key`);
+                try {
+                  await Promise.all(expired.map(k => fetch("/api/admin/access-keys", { method: "DELETE",
+                    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: k.id }) })));
+                  setKeys(ks => ks.filter(k => !isKeyExpired(k)));
+                  toast.success(`已清除 ${expiredCount} 个过期 Key`);
+                } catch {
+                  toast.error("清理失败：网络错误");
+                }
               }}>
               <RiDeleteBinLine className="w-3.5 h-3.5" />清理过期 ({expiredCount})
             </Button>
@@ -418,6 +439,8 @@ function InviteTab() {
       const r = await fetch("/api/admin/invite-codes");
       const d = await r.json();
       if (d.codes) setCodes(d.codes);
+    } catch {
+      toast.error("加载邀请码列表失败，请检查网络后重试");
     } finally { setLoading(false); }
   }
   React.useEffect(() => { load(); }, []);
@@ -433,27 +456,43 @@ function InviteTab() {
         toast.success(`已生成 ${d.created.length} 个邀请码`);
         setShowCreate(false); setDescription(""); setCount("1"); setMaxUses("1"); setExpiresIn("permanent");
         load();
+      } else {
+        toast.error(d.error || "生成失败");
       }
+    } catch {
+      toast.error("生成失败：网络错误");
     } finally { setCreating(false); }
   }
 
   async function toggleActive(code: InviteCode) {
-    await fetch("/api/admin/invite-codes", { method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: code.id, is_active: !code.is_active }) });
-    setCodes(cs => cs.map(c => c.id === code.id ? { ...c, is_active: !c.is_active } : c));
-    toast.success(code.is_active ? "已停用" : "已启用");
+    try {
+      const r = await fetch("/api/admin/invite-codes", { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: code.id, is_active: !code.is_active }) });
+      if (!r.ok) { toast.error("操作失败"); return; }
+      setCodes(cs => cs.map(c => c.id === code.id ? { ...c, is_active: !c.is_active } : c));
+      toast.success(code.is_active ? "已停用" : "已启用");
+    } catch {
+      toast.error("操作失败：网络错误");
+    }
   }
 
   async function deleteCode(code: InviteCode) {
     if (!confirm(`确认删除邀请码 ${code.code}？`)) return;
-    await fetch("/api/admin/invite-codes", { method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: code.id }) });
-    setCodes(cs => cs.filter(c => c.id !== code.id));
-    toast.success("已删除");
+    try {
+      const r = await fetch("/api/admin/invite-codes", { method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: code.id }) });
+      if (!r.ok) { toast.error("删除失败"); return; }
+      setCodes(cs => cs.filter(c => c.id !== code.id));
+      toast.success("已删除");
+    } catch {
+      toast.error("删除失败：网络错误");
+    }
   }
 
   function copy(code: string) {
-    navigator.clipboard.writeText(code).then(() => { setCopied(code); setTimeout(() => setCopied(null), 2000); });
+    navigator.clipboard.writeText(code)
+      .then(() => { setCopied(code); setTimeout(() => setCopied(null), 2000); })
+      .catch(() => toast.error("复制失败，请手动复制"));
   }
 
   const expiredCount = codes.filter(isCodeExpired).length;
@@ -478,10 +517,14 @@ function InviteTab() {
               onClick={async () => {
                 const targets = codes.filter(c => isCodeExhausted(c) || isCodeExpired(c));
                 if (!confirm(`删除全部 ${targets.length} 个已耗尽/已过期邀请码？`)) return;
-                await Promise.all(targets.map(c => fetch("/api/admin/invite-codes", { method: "DELETE",
-                  headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) })));
-                setCodes(cs => cs.filter(c => !isCodeExhausted(c) && !isCodeExpired(c)));
-                toast.success(`已清除 ${targets.length} 个邀请码`);
+                try {
+                  await Promise.all(targets.map(c => fetch("/api/admin/invite-codes", { method: "DELETE",
+                    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) })));
+                  setCodes(cs => cs.filter(c => !isCodeExhausted(c) && !isCodeExpired(c)));
+                  toast.success(`已清除 ${targets.length} 个邀请码`);
+                } catch {
+                  toast.error("清理失败：网络错误");
+                }
               }}>
               <RiDeleteBinLine className="w-3.5 h-3.5" />清理无效 ({canPurge})
             </Button>
@@ -493,7 +536,7 @@ function InviteTab() {
       </div>
 
       {codes.length > 0 && (
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {[
             { label: "全部",   value: codes.length,   color: "text-foreground" },
             { label: "可用",   value: activeCount,    color: "text-emerald-500" },

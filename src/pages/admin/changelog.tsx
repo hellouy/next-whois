@@ -298,7 +298,7 @@ export default function AdminChangelogPage() {
                                 <p className="text-xs text-foreground/80 leading-snug">{entry.zh}</p>
                                 {entry.en && <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{entry.en}</p>}
                               </div>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                                 {entry.version && (
                                   <span className="text-[9px] font-mono text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                                     v{entry.version}

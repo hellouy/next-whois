@@ -50,6 +50,10 @@ function ImageUploadField({
       } catch { toast.error("上传失败"); }
       finally { setUploading(false); }
     };
+    reader.onerror = () => {
+      setUploading(false);
+      toast.error("读取文件失败，请重试");
+    };
     reader.readAsDataURL(file);
   }
 
@@ -94,7 +98,7 @@ function ImageUploadField({
             <button
               type="button"
               onClick={() => { onChange(""); setPreview(null); }}
-              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               title="清除图片"
             >
               <span className="text-[10px] font-bold">×</span>
@@ -150,7 +154,7 @@ function SponsorForm({
 
   return (
     <form onSubmit={submit} className="space-y-4 p-4 bg-muted/30 rounded-xl border border-border">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label className="text-xs mb-1 block">赞助者名称 *</Label>
           <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="姓名 / 昵称" className="h-8 text-sm" />
@@ -391,25 +395,33 @@ export default function AdminSponsorsPage() {
   React.useEffect(() => { load(); }, []);
 
   async function handleAdd(data: typeof EMPTY_FORM) {
-    const r = await fetch("/api/admin/sponsors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    const d = await r.json();
-    if (d.ok) { toast.success("赞助记录已添加"); setShowForm(false); load(); }
-    else toast.error(d.error || "添加失败");
+    try {
+      const r = await fetch("/api/admin/sponsors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const d = await r.json();
+      if (d.ok) { toast.success("赞助记录已添加"); setShowForm(false); load(); }
+      else toast.error(d.error || "添加失败");
+    } catch {
+      toast.error("添加失败：网络错误");
+    }
   }
 
   async function handleEdit(data: typeof EMPTY_FORM & { id?: string }) {
-    const r = await fetch("/api/admin/sponsors", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editing?.id, ...data }),
-    });
-    const d = await r.json();
-    if (d.ok) { toast.success("已更新"); setEditing(null); load(); }
-    else toast.error(d.error || "更新失败");
+    try {
+      const r = await fetch("/api/admin/sponsors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editing?.id, ...data }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast.success("已更新"); setEditing(null); load(); }
+      else toast.error(d.error || "更新失败");
+    } catch {
+      toast.error("更新失败：网络错误");
+    }
   }
 
   async function handleDelete(id: string, name: string) {
@@ -424,18 +436,24 @@ export default function AdminSponsorsPage() {
       const d = await r.json();
       if (d.ok) { toast.success("已删除"); load(); }
       else toast.error(d.error || "删除失败");
+    } catch {
+      toast.error("删除失败：网络错误");
     } finally { setDeleting(null); }
   }
 
   async function toggleVisible(s: Sponsor) {
-    const r = await fetch("/api/admin/sponsors", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...s, is_visible: !s.is_visible }),
-    });
-    const d = await r.json();
-    if (d.ok) { toast.success(s.is_visible ? "已隐藏" : "已显示"); load(); }
-    else toast.error(d.error || "操作失败");
+    try {
+      const r = await fetch("/api/admin/sponsors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...s, is_visible: !s.is_visible }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast.success(s.is_visible ? "已隐藏" : "已显示"); load(); }
+      else toast.error(d.error || "操作失败");
+    } catch {
+      toast.error("操作失败：网络错误");
+    }
   }
 
   const totalAmount = sponsors.reduce((s, sp) => s + (sp.amount ? parseFloat(sp.amount) : 0), 0);

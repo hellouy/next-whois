@@ -69,13 +69,23 @@ export default function TldSpeedPage() {
     const id = ++fetchRef.current;
     fetch(`/api/admin/tld-speed-stats?hours=${hours}&sort=${sort}&min_queries=${minQry}&limit=200`)
       .then(r => r.json())
-      .then((d: TldSpeedStats) => {
+      .then((d: TldSpeedStats & { error?: string }) => {
         if (fetchRef.current !== id) return;
+        if (d.error || !d.rows) {
+          toast.error(d.error || "加载 TLD 测速统计失败");
+          setLoading(false);
+          return;
+        }
         setCached(key, d);
         setData(d);
         setLoading(false);
       })
-      .catch(() => { if (fetchRef.current === id) setLoading(false); });
+      .catch(() => {
+        if (fetchRef.current === id) {
+          toast.error("加载 TLD 测速统计失败");
+          setLoading(false);
+        }
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hours, sort, minQry]);
 

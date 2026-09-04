@@ -265,7 +265,7 @@ export default function AdminSearchRecordsPage() {
 
         {/* Stats summary cards */}
         {data && (
-          <div className="grid grid-cols-4 sm:grid-cols-9 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-9 gap-2">
             {[
               { label: "独立域名", value: data.stats.all,         color: "text-foreground",        title: "不同域名数量（去重）" },
               { label: "今日新增", value: data.stats.today,       color: "text-blue-500",           title: "今日搜索过的独立域名数" },
@@ -621,7 +621,7 @@ export default function AdminSearchRecordsPage() {
                       <button
                         onClick={() => deleteRecordByQuery(r.query)}
                         disabled={deletingRow === r.query}
-                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 ml-1"
+                        className="p-1.5 rounded-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 ml-1"
                         title="删除此域名的所有查询记录"
                       >
                         {deletingRow === r.query

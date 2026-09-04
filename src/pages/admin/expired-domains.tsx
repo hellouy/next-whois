@@ -623,7 +623,7 @@ export default function ExpiredDomainsPage() {
 
                   <Button
                     size="sm"
-                    onClick={() => { handleSaveSettings(); handleCrawlAllPrefixes(); }}
+                    onClick={async () => { await handleSaveSettings(); handleCrawlAllPrefixes(); }}
                     disabled={crawling || !prefixList.length}
                     className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
