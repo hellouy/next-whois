@@ -521,7 +521,12 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
     if (!dsn) return;
     void import("@sentry/nextjs").then(Sentry => {
-      Sentry.init({ dsn, environment: process.env.NODE_ENV, tracesSampleRate: 0 });
+      Sentry.init({
+        dsn,
+        environment: process.env.NODE_ENV,
+        tracesSampleRate: 0,
+        attachStacktrace: true,
+      });
     }).catch(() => {});
   }, []);
 

@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 const setupPWA = require('next-pwa');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 const SECURITY_HEADERS = [
   { key: 'X-Frame-Options',              value: 'SAMEORIGIN' },
@@ -158,4 +159,22 @@ const withPWA = setupPWA({
   ],
 });
 
-module.exports = withPWA(nextConfig);
+// ── Sentry source-map upload (build-time only) ─────────────────────────────
+// Runtime init stays lazy (src/lib/monitoring-server.ts + _app useEffect), so
+// this wrapper ONLY handles source-map generation/upload during `next build`.
+// When SENTRY_AUTH_TOKEN is unset (local dev, contributors) the plugin is
+// fully disabled and the build behaves exactly as before.
+const sentryWebpackPluginOptions = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Tag uploads with the commit SHA on Vercel so runtime events (which read
+  // VERCEL_GIT_COMMIT_SHA) associate with the same release; locally the
+  // plugin falls back to auto-detection (Next.js build ID).
+  release: process.env.VERCEL_GIT_COMMIT_SHA || undefined,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN, deleteSourcemapsAfterUpload: true },
+  telemetry: false,
+  silent: true,
+};
+
+module.exports = withSentryConfig(withPWA(nextConfig), sentryWebpackPluginOptions);

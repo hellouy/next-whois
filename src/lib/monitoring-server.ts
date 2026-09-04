@@ -21,7 +21,9 @@ function ensureInit(): boolean {
     Sentry.init({
       dsn,
       environment: process.env.NODE_ENV,
+      release: process.env.VERCEL_GIT_COMMIT_SHA || undefined,
       tracesSampleRate: 0, // error reporting only, no tracing
+      attachStacktrace: true, // captureMessage events carry a stacktrace
       spotlight: false,
     });
   } catch {
