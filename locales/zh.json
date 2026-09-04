@@ -223,7 +223,9 @@
     "placeholder_domain": "输入域名，如 google.com",
     "placeholder_dns": "输入域名，如 example.com",
     "placeholder_ssl": "输入域名或 IP，如 github.com",
-    "placeholder_ip": "输入 IP 或 ASN，如 8.8.8.8"
+    "placeholder_ip": "输入 IP 或 ASN，如 8.8.8.8",
+    "email_not_sent_title": "反馈已保存，但邮件通知未发送",
+    "email_not_sent_body": "邮件服务尚未配置，请管理员在后台设置 SMTP 或 Resend，配置后将正常发送通知。"
   },
   "relative_time": {
     "today": "今天",
@@ -773,7 +775,8 @@
     "search_btn": "查询",
     "back_home": "返回首页",
     "log_title": "查询日志",
-    "tip": "404 是很正常的 HTTP 状态码，不像 NXDOMAIN 那么罕见。"
+    "tip": "404 是很正常的 HTTP 状态码，不像 NXDOMAIN 那么罕见。",
+    "signal": "幽灵信号"
   },
   "sponsor": {
     "page_title_default": "赞助支持",
@@ -879,7 +882,8 @@
     "page_of": "第 {{current}} / {{total}} 页",
     "back": "返回",
     "copy": "复制",
-    "results_count": "{{count}} 条记录"
+    "results_count": "{{count}} 条记录",
+    "check_failed": "检测失败"
   },
   "guide": {
     "page_title": "使用指南 · 域名到期提醒",

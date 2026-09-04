@@ -223,7 +223,9 @@
     "placeholder_domain": "Domain eingeben, z.B. google.com",
     "placeholder_dns": "Domain eingeben, z.B. example.com",
     "placeholder_ssl": "Domain oder IP eingeben, z.B. github.com",
-    "placeholder_ip": "IP oder ASN eingeben, z.B. 8.8.8.8"
+    "placeholder_ip": "IP oder ASN eingeben, z.B. 8.8.8.8",
+    "email_not_sent_title": "Feedback gespeichert, E-Mail-Benachrichtigung wurde nicht gesendet",
+    "email_not_sent_body": "Der E-Mail-Dienst ist nicht konfiguriert. Bitte richten Sie SMTP oder Resend in den Admin-Einstellungen ein."
   },
   "relative_time": {
     "today": "heute",
@@ -773,7 +775,8 @@
     "search_btn": "Suchen",
     "back_home": "Zurück zur Startseite",
     "log_title": "Abfrageprotokoll",
-    "tip": "404 ist ein völlig normaler HTTP-Statuscode. Anders als NXDOMAIN passiert er ständig."
+    "tip": "404 ist ein völlig normaler HTTP-Statuscode. Anders als NXDOMAIN passiert er ständig.",
+    "signal": "Geister-Signal"
   },
   "sponsor": {
     "page_title_default": "Unterstützen",
@@ -879,7 +882,8 @@
     "page_of": "Seite {{current}} / {{total}}",
     "back": "Zurück",
     "copy": "Kopieren",
-    "results_count": "{{count}} Ergebnis(se)"
+    "results_count": "{{count}} Ergebnis(se)",
+    "check_failed": "Gesundheitsprüfung fehlgeschlagen"
   },
   "guide": {
     "page_title": "Benutzerhandbuch · Domainablauf-Erinnerungen",
@@ -1694,7 +1698,8 @@
     "nav_expired_domains": "Ablaufende Domains",
     "nav_domain_access": "Domain-Zugang",
     "nav_db_export": "DB-Export",
-    "nav_server_test": "Server-Test"
+    "nav_server_test": "Server-Test",
+    "nav_whois_servers": "WHOIS-Server-Verwaltung"
   },
   "common": {
     "retry": "Wiederholen",
@@ -1756,5 +1761,51 @@
   "home": {
     "stats_total": "Gesamtsuchen",
     "stats_today": "Suchen heute"
+  },
+  "batch_check": {
+    "page_title": "Präfix-Verfügbarkeitsprüfung",
+    "page_subtitle": "Präfix eingeben und TLD-Gruppen wählen, um massenhaft zu prüfen, welche Domains registrierbar sind",
+    "nav_label": "Präfix-Massencheck",
+    "nav_desc": "Ein Präfix auf gTLD, ccTLD oder eigene Endungen massenhaft prüfen",
+    "input_label": "Domain-Präfix",
+    "input_placeholder": "z. B. meinshop, hallo, cool-brand",
+    "tld_group_label": "TLD-Gruppe",
+    "tld_preset_popular": "Beliebt",
+    "tld_preset_gtld": "gTLD (alle)",
+    "tld_preset_cctld": "ccTLD (alle)",
+    "tld_preset_all": "Alle IANA",
+    "tld_preset_custom": "Benutzerdefiniert",
+    "custom_tld_placeholder": "TLDs mit Leerzeichen oder Kommas trennen, z. B. com net org io",
+    "btn_check": "Jetzt prüfen",
+    "btn_stop": "Stoppen",
+    "btn_clear": "Leeren",
+    "btn_export_csv": "CSV exportieren",
+    "btn_copy_available": "Verfügbare kopieren",
+    "status_checking": "Prüfe...",
+    "status_done": "Fertig",
+    "status_stopped": "Gestoppt",
+    "col_domain": "Domain",
+    "col_status": "Status",
+    "col_registrar": "Registrar",
+    "col_expiry": "Läuft ab",
+    "col_cached": "Cache",
+    "tag_available": "Verfügbar",
+    "tag_registered": "Registriert",
+    "tag_reserved": "Reserviert",
+    "tag_error": "Fehler",
+    "tag_premium": "Premium",
+    "summary_total": "{{total}} geprüft",
+    "summary_available": "{{count}} verfügbar",
+    "summary_registered": "{{count}} registriert",
+    "filter_all": "Alle",
+    "filter_available": "Verfügbar",
+    "filter_registered": "Registriert",
+    "err_no_prefix": "Bitte ein Domain-Präfix eingeben",
+    "err_no_tlds": "Bitte mindestens eine TLD-Gruppe wählen oder eigene TLDs eingeben",
+    "err_login_required": "Bitte zuerst anmelden, um die Massenprüfung zu nutzen",
+    "info_login_for_more": "Nach der Anmeldung mehr TLDs gleichzeitig prüfen",
+    "warn_large_batch": "{{count}} TLDs werden geprüft — das kann dauern. Ergebnisse erscheinen laufend.",
+    "warn_anon_limit": "Anonyme Nutzer können maximal {{max}} TLDs gleichzeitig prüfen. Anmeldung hebt das Limit auf.",
+    "popular_tlds_note": "Übliche kommerzielle TLDs"
   }
 }

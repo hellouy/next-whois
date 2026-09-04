@@ -238,12 +238,10 @@ export default function FeedbackPage() {
                 {!emailSent && (
                   <div className="max-w-xs mx-auto rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 text-left">
                     <p className="font-semibold mb-0.5">
-                      {router.locale === "zh" ? "反馈已保存，但邮件通知未发送" : "Feedback saved, email notification not sent"}
+                      {t("feedback.email_not_sent_title")}
                     </p>
                     <p className="text-amber-600/80 dark:text-amber-400/80">
-                      {router.locale === "zh"
-                        ? "邮件服务尚未配置，请管理员在后台设置 SMTP 或 Resend，配置后将正常发送通知。"
-                        : "Email service is not configured. Please set up SMTP or Resend in admin settings."}
+                      {t("feedback.email_not_sent_body")}
                     </p>
                   </div>
                 )}

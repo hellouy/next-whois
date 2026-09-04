@@ -223,7 +223,9 @@
     "placeholder_domain": "Entrez un domaine, ex. google.com",
     "placeholder_dns": "Entrez un domaine, ex. example.com",
     "placeholder_ssl": "Entrez un domaine ou IP, ex. github.com",
-    "placeholder_ip": "Entrez une IP ou ASN, ex. 8.8.8.8"
+    "placeholder_ip": "Entrez une IP ou ASN, ex. 8.8.8.8",
+    "email_not_sent_title": "Retour enregistré, notification par e-mail non envoyée",
+    "email_not_sent_body": "Le service e-mail n'est pas configuré. Veuillez configurer SMTP ou Resend dans les paramètres d'administration."
   },
   "relative_time": {
     "today": "aujourd'hui",
@@ -773,7 +775,8 @@
     "search_btn": "Chercher",
     "back_home": "Retour à l'accueil",
     "log_title": "Journal de requête",
-    "tip": "404 est un code HTTP tout à fait normal. Contrairement à NXDOMAIN, ça arrive tout le temps."
+    "tip": "404 est un code HTTP tout à fait normal. Contrairement à NXDOMAIN, ça arrive tout le temps.",
+    "signal": "Signal fantôme"
   },
   "sponsor": {
     "page_title_default": "Soutenir",
@@ -879,7 +882,8 @@
     "page_of": "Page {{current}} / {{total}}",
     "back": "Retour",
     "copy": "Copier",
-    "results_count": "{{count}} résultat(s)"
+    "results_count": "{{count}} résultat(s)",
+    "check_failed": "Échec du contrôle de santé"
   },
   "guide": {
     "page_title": "Guide d'utilisation · Rappels d'expiration de domaine",
@@ -1694,7 +1698,8 @@
     "nav_expired_domains": "Domaines expirés",
     "nav_domain_access": "Accès Domaine",
     "nav_db_export": "Export DB",
-    "nav_server_test": "Test serveur"
+    "nav_server_test": "Test serveur",
+    "nav_whois_servers": "Gestion des serveurs WHOIS"
   },
   "common": {
     "retry": "Réessayer",
@@ -1756,5 +1761,51 @@
   "home": {
     "stats_total": "recherches totales",
     "stats_today": "recherches aujourd'hui"
+  },
+  "batch_check": {
+    "page_title": "Vérification de disponibilité de préfixe",
+    "page_subtitle": "Saisissez un préfixe et choisissez des groupes de TLD pour vérifier en masse les domaines enregistrables",
+    "nav_label": "Vérif. de préfixe en masse",
+    "nav_desc": "Vérifiez un préfixe sur les gTLD, ccTLD ou suffixes personnalisés en un clic",
+    "input_label": "Préfixe de domaine",
+    "input_placeholder": "ex. maboutique, bonjour, cool-brand",
+    "tld_group_label": "Groupe de TLD",
+    "tld_preset_popular": "Populaires",
+    "tld_preset_gtld": "gTLD (tous)",
+    "tld_preset_cctld": "ccTLD (tous)",
+    "tld_preset_all": "IANA (tous)",
+    "tld_preset_custom": "Personnalisé",
+    "custom_tld_placeholder": "TLD séparés par des espaces ou virgules, ex. com net org io",
+    "btn_check": "Vérifier",
+    "btn_stop": "Arrêter",
+    "btn_clear": "Effacer",
+    "btn_export_csv": "Exporter CSV",
+    "btn_copy_available": "Copier disponibles",
+    "status_checking": "Vérification...",
+    "status_done": "Terminé",
+    "status_stopped": "Arrêté",
+    "col_domain": "Domaine",
+    "col_status": "Statut",
+    "col_registrar": "Registrar",
+    "col_expiry": "Expiration",
+    "col_cached": "Cache",
+    "tag_available": "Disponible",
+    "tag_registered": "Enregistré",
+    "tag_reserved": "Réservé",
+    "tag_error": "Erreur",
+    "tag_premium": "Premium",
+    "summary_total": "{{total}} vérifiés",
+    "summary_available": "{{count}} disponibles",
+    "summary_registered": "{{count}} enregistrés",
+    "filter_all": "Tous",
+    "filter_available": "Disponibles",
+    "filter_registered": "Enregistrés",
+    "err_no_prefix": "Veuillez saisir un préfixe de domaine",
+    "err_no_tlds": "Choisissez au moins un groupe de TLD ou saisissez des TLD personnalisés",
+    "err_login_required": "Connectez-vous pour utiliser la vérification en masse",
+    "info_login_for_more": "Connectez-vous pour vérifier plus de TLD à la fois",
+    "warn_large_batch": "Vérification de {{count}} TLD — cela peut prendre du temps. Les résultats s'affichent au fur et à mesure.",
+    "warn_anon_limit": "Les utilisateurs anonymes peuvent vérifier jusqu'à {{max}} TLD à la fois. Connectez-vous pour supprimer la limite.",
+    "popular_tlds_note": "TLD commerciaux courants"
   }
 }

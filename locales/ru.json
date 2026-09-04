@@ -222,7 +222,9 @@
     "placeholder_domain": "Введите домен, напр. google.com",
     "placeholder_dns": "Введите домен, напр. example.com",
     "placeholder_ssl": "Введите домен или IP, напр. github.com",
-    "placeholder_ip": "Введите IP или ASN, напр. 8.8.8.8"
+    "placeholder_ip": "Введите IP или ASN, напр. 8.8.8.8",
+    "email_not_sent_title": "Отзыв сохранён, но уведомление по электронной почте не отправлено",
+    "email_not_sent_body": "Почтовый сервис не настроен. Администратору нужно настроить SMTP или Resend в панели управления."
   },
   "relative_time": {
     "today": "сегодня",
@@ -772,7 +774,8 @@
     "search_btn": "Искать",
     "back_home": "На главную",
     "log_title": "Журнал запросов",
-    "tip": "404 — вполне нормальный HTTP-код. В отличие от NXDOMAIN, он встречается постоянно."
+    "tip": "404 — вполне нормальный HTTP-код. В отличие от NXDOMAIN, он встречается постоянно.",
+    "signal": "Сигнал призрака"
   },
   "sponsor": {
     "page_title_default": "Поддержать",
@@ -878,7 +881,8 @@
     "page_of": "Стр. {{current}} / {{total}}",
     "back": "Назад",
     "copy": "Копировать",
-    "results_count": "{{count}} записей"
+    "results_count": "{{count}} записей",
+    "check_failed": "Проверка состояния не удалась"
   },
   "guide": {
     "page_title": "Руководство · Напоминания об истечении домена",
@@ -1693,7 +1697,8 @@
     "nav_expired_domains": "Истёкшие домены",
     "nav_domain_access": "Доступ к домену",
     "nav_db_export": "Экспорт БД",
-    "nav_server_test": "Тест сервера"
+    "nav_server_test": "Тест сервера",
+    "nav_whois_servers": "Управление WHOIS-серверами"
   },
   "common": {
     "retry": "Повторить",
@@ -1756,5 +1761,51 @@
     "stats_total": "всего запросов",
     "stats_today": "запросов сегодня"
   },
-  "back_to_top": "Наверх"
+  "back_to_top": "Наверх",
+  "batch_check": {
+    "page_title": "Проверка доступности префикса",
+    "page_subtitle": "Введите префикс и выберите группы TLD, чтобы массово проверить, какие домены свободны",
+    "nav_label": "Массовая проверка префикса",
+    "nav_desc": "Проверить префикс по gTLD, ccTLD или своим суффиксам одним кликом",
+    "input_label": "Префикс домена",
+    "input_placeholder": "например myshop, hello, cool-brand",
+    "tld_group_label": "Группа TLD",
+    "tld_preset_popular": "Популярные",
+    "tld_preset_gtld": "gTLD (все)",
+    "tld_preset_cctld": "ccTLD (все)",
+    "tld_preset_all": "Все IANA",
+    "tld_preset_custom": "Свои",
+    "custom_tld_placeholder": "TLD через пробел или запятую, напр. com net org io",
+    "btn_check": "Проверить",
+    "btn_stop": "Остановить",
+    "btn_clear": "Очистить",
+    "btn_export_csv": "Экспорт CSV",
+    "btn_copy_available": "Копировать свободные",
+    "status_checking": "Проверка...",
+    "status_done": "Готово",
+    "status_stopped": "Остановлено",
+    "col_domain": "Домен",
+    "col_status": "Статус",
+    "col_registrar": "Регистратор",
+    "col_expiry": "Истекает",
+    "col_cached": "Кэш",
+    "tag_available": "Свободен",
+    "tag_registered": "Занят",
+    "tag_reserved": "Зарезервирован",
+    "tag_error": "Ошибка",
+    "tag_premium": "Премиум",
+    "summary_total": "Проверено: {{total}}",
+    "summary_available": "{{count}} свободно",
+    "summary_registered": "{{count}} занято",
+    "filter_all": "Все",
+    "filter_available": "Свободные",
+    "filter_registered": "Занятые",
+    "err_no_prefix": "Введите префикс домена",
+    "err_no_tlds": "Выберите хотя бы одну группу TLD или введите свои TLD",
+    "err_login_required": "Войдите, чтобы использовать массовую проверку",
+    "info_login_for_more": "Войдите, чтобы проверять больше TLD за раз",
+    "warn_large_batch": "Проверяется {{count}} TLD — это может занять время. Результаты появляются по мере готовности.",
+    "warn_anon_limit": "Анонимные пользователи: максимум {{max}} TLD за раз. Войдите, чтобы снять лимит.",
+    "popular_tlds_note": "Популярные коммерческие TLD"
+  }
 }

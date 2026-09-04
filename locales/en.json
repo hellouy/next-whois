@@ -223,7 +223,9 @@
     "placeholder_domain": "Enter domain, e.g. google.com",
     "placeholder_dns": "Enter domain, e.g. example.com",
     "placeholder_ssl": "Enter domain or IP, e.g. github.com",
-    "placeholder_ip": "Enter IP or ASN, e.g. 8.8.8.8"
+    "placeholder_ip": "Enter IP or ASN, e.g. 8.8.8.8",
+    "email_not_sent_title": "Feedback saved, email notification not sent",
+    "email_not_sent_body": "Email service is not configured. Please set up SMTP or Resend in admin settings."
   },
   "relative_time": {
     "today": "today",
@@ -773,7 +775,8 @@
     "search_btn": "Search",
     "back_home": "Back to Home",
     "log_title": "Query Log",
-    "tip": "404 is a perfectly normal HTTP status code. Unlike NXDOMAIN, it happens all the time."
+    "tip": "404 is a perfectly normal HTTP status code. Unlike NXDOMAIN, it happens all the time.",
+    "signal": "Ghost signal"
   },
   "sponsor": {
     "page_title_default": "Sponsor",
@@ -879,7 +882,8 @@
     "page_of": "Page {{current}} / {{total}}",
     "back": "Back",
     "copy": "Copy",
-    "results_count": "{{count}} result(s)"
+    "results_count": "{{count}} result(s)",
+    "check_failed": "Health check failed"
   },
   "guide": {
     "page_title": "User Guide · Domain Expiry Reminders",

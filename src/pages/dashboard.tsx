@@ -182,7 +182,7 @@ export default function DashboardPage() {
               onClick={() => router.push("/")}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:opacity-70 touch-manipulation">
               <RiSearchLine className="w-3.5 h-3.5" />
-              <span>返回首页</span>
+              <span>{t("not_found.back_home")}</span>
             </button>
             {isAdminUser && (
               <Link href="/admin"

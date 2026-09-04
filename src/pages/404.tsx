@@ -52,41 +52,150 @@ function looksLikeDomainQuery(path: string): boolean {
   return isValidDomainTld(path);
 }
 
-const FUN_FACTS_ZH = [
-  "世界上第一个 404 错误发生在 1992 年的欧洲核子研究中心（CERN），来自 Room 404 这个房间。",
-  "NXDOMAIN 全称 Non-Existent Domain，即「不存在的域名」，是 DNS 世界里的鬼城。",
-  "全球注册域名数量超过 3.5 亿个，但你访问的这个并不在其中。",
-  "最古老的活跃域名 symbolics.com 注册于 1985 年 3 月 15 日，至今已运行 40 年。",
-  ".com 自 1985 年起就是最受欢迎的顶级域，王者地位从未动摇。",
-  "一次 DNS 查询通常在 50ms 内完成，这个 404 用的时间更短 —— 因为什么都没找到。",
-  "ICANN 管理着 1,500 多个顶级域名（TLD），不过你要找的这个还没被注册。",
-  "DNS 根服务器逻辑上只有 13 个，但实际分布在全球 1,500 多个物理节点上。",
-  "TTL（Time To Live）是 DNS 记录的缓存时间。这个 404 页面的 TTL：0 秒。",
-  "全球每天有超过 10 万个新域名被注册 —— 你找的这个可能明天就会出现！",
-  "域名不区分大小写，google.com 和 GOOGLE.COM 会解析到同一个地方。",
-  "IPv4 地址总共约 43 亿个，而 IPv6 地址数量比地球上的沙粒还多。",
-  "世界上最贵的域名交易：voice.com 以 3,000 万美元成交（2019 年）。",
-  ".tk（托克劳群岛）曾经是全球注册数量最多的 ccTLD，因为它免费开放注册。",
-];
+const FUN_FACTS: Record<string, string[]> = {
+  zh: [
+    "世界上第一个 404 错误发生在 1992 年的欧洲核子研究中心（CERN），来自 Room 404 这个房间。",
+    "NXDOMAIN 全称 Non-Existent Domain，即「不存在的域名」，是 DNS 世界里的鬼城。",
+    "全球注册域名数量超过 3.5 亿个，但你访问的这个并不在其中。",
+    "最古老的活跃域名 symbolics.com 注册于 1985 年 3 月 15 日，至今已运行 40 年。",
+    ".com 自 1985 年起就是最受欢迎的顶级域，王者地位从未动摇。",
+    "一次 DNS 查询通常在 50ms 内完成，这个 404 用的时间更短 —— 因为什么都没找到。",
+    "ICANN 管理着 1,500 多个顶级域名（TLD），不过你要找的这个还没被注册。",
+    "DNS 根服务器逻辑上只有 13 个，但实际分布在全球 1,500 多个物理节点上。",
+    "TTL（Time To Live）是 DNS 记录的缓存时间。这个 404 页面的 TTL：0 秒。",
+    "全球每天有超过 10 万个新域名被注册 —— 你找的这个可能明天就会出现！",
+    "域名不区分大小写，google.com 和 GOOGLE.COM 会解析到同一个地方。",
+    "IPv4 地址总共约 43 亿个，而 IPv6 地址数量比地球上的沙粒还多。",
+    "世界上最贵的域名交易：voice.com 以 3,000 万美元成交（2019 年）。",
+    ".tk（托克劳群岛）曾经是全球注册数量最多的 ccTLD，因为它免费开放注册。",
+  ],
+  "zh-tw": [
+    "世界上第一個 404 錯誤發生在 1992 年的歐洲核子研究中心（CERN），來自 Room 404 這個房間。",
+    "NXDOMAIN 全名 Non-Existent Domain，即「不存在的網域」，是 DNS 世界裡的鬼城。",
+    "全球註冊網域數量超過 3.5 億個，但你造訪的這個並不在其中。",
+    "最古老的活躍網域 symbolics.com 註冊於 1985 年 3 月 15 日，至今已運作 40 年。",
+    ".com 自 1985 年起就是最受歡迎的頂級域，王者地位從未動搖。",
+    "一次 DNS 查詢通常在 50ms 內完成，這個 404 用的時間更短 —— 因為什麼都沒找到。",
+    "ICANN 管理著 1,500 多個頂級網域（TLD），不過你要找的這個還沒被註冊。",
+    "DNS 根伺服器邏輯上只有 13 個，但實際分布在全球 1,500 多個實體節點上。",
+    "TTL（Time To Live）是 DNS 紀錄的快取時間。這個 404 頁面的 TTL：0 秒。",
+    "全球每天有超過 10 萬個新網域被註冊 —— 你找的這個可能明天就會出現！",
+    "網域不區分大小寫，google.com 和 GOOGLE.COM 會解析到同一個地方。",
+    "IPv4 位址總共約 43 億個，而 IPv6 位址數量比地球上的沙粒還多。",
+    "世界上最貴的網域交易：voice.com 以 3,000 萬美元成交（2019 年）。",
+    ".tk（托克勞群島）曾經是全球註冊數量最多的 ccTLD，因為它免費開放註冊。",
+  ],
+  en: [
+    "The first 404 error was served at CERN in 1992 — from Room 404.",
+    "NXDOMAIN stands for Non-Existent Domain — the ghost town of the DNS world.",
+    "Over 350 million domains are registered worldwide, but this one isn't among them.",
+    "The oldest active domain, symbolics.com, was registered on March 15, 1985.",
+    ".com has been the most popular TLD since 1985 — and still holds the crown.",
+    "A DNS lookup typically completes in under 50ms. This 404 took even less.",
+    "ICANN manages over 1,500 top-level domains — but yours hasn't been registered yet.",
+    "There are only 13 logical DNS root servers, but 1,500+ physical nodes worldwide.",
+    "TTL stands for Time To Live — the cache lifetime of a DNS record. This page: 0 sec.",
+    "Over 100,000 new domains are registered every single day worldwide.",
+    "Domain names are case-insensitive — google.com and GOOGLE.COM go to the same place.",
+    "IPv4 has ~4.3 billion addresses. IPv6 has more addresses than grains of sand on Earth.",
+    "The most expensive domain sale: voice.com sold for $30 million in 2019.",
+    ".tk (Tokelau) was once the most-registered ccTLD in the world — because it was free.",
+  ],
+  ja: [
+    "最初の 404 エラーは 1992 年、CERN の「Room 404」という部屋から生まれました。",
+    "NXDOMAIN は Non-Existent Domain（存在しないドメイン）の略 — DNS 世界のゴーストタウンです。",
+    "世界中に 3.5 億以上のドメインが登録されていますが、このページはその中にありません。",
+    "最古のアクティブなドメイン symbolics.com は 1985 年 3 月 15 日に登録されました。",
+    ".com は 1985 年から最も人気のある TLD であり、今も王座を守り続けています。",
+    "DNS ルックアップは通常 50ms 以内に完了します。この 404 はさらに速かった — 何も見つからなかったので。",
+    "ICANN は 1,500 以上の TLD を管理していますが、あなたの探しているものはまだ登録されていません。",
+    "DNS ルートサーバーは論理的に 13 台ですが、世界中に 1,500 以上の物理ノードがあります。",
+    "TTL は Time To Live — DNS レコードのキャッシュ有効期間です。このページの TTL：0 秒。",
+    "世界中で毎日 10 万以上の新しいドメインが登録されています — あなたの探しているものも明日には現れるかも！",
+    "ドメイン名は大文字小文字を区別しません — google.com と GOOGLE.COM は同じ場所に行きます。",
+    "IPv4 は約 43 億個のアドレスがありますが、IPv6 のアドレス数は地球上の砂粒よりも多いのです。",
+    "史上最高額のドメイン取引：voice.com が 3,000 万ドルで売却されました（2019 年）。",
+    ".tk（トケラウ）はかつて世界で最も登録数の多い ccTLD でした — 無料で登録できたからです。",
+  ],
+  ko: [
+    "첫 번째 404 에러는 1992년 CERN의 'Room 404'라는 방에서 발생했습니다.",
+    "NXDOMAIN은 Non-Existent Domain(존재하지 않는 도메인)의 약자 — DNS 세계의 유령 도시입니다.",
+    "전 세계에 3억 5천만 개 이상의 도메인이 등록되어 있지만, 이 페이지는 그중에 없습니다.",
+    "가장 오래된 활성 도메인 symbolics.com은 1985년 3월 15일에 등록되었습니다.",
+    ".com은 1985년부터 가장 인기 있는 TLD이며, 지금도 왕좌를 지키고 있습니다.",
+    "DNS 조회는 보통 50ms 이내에 완료됩니다. 이 404는 그보다 더 빨랐습니다 — 아무것도 찾지 못했으니까요.",
+    "ICANN은 1,500개 이상의 TLD를 관리하지만, 당신이 찾는 것은 아직 등록되지 않았습니다.",
+    "DNS 루트 서버는 논리적으로 13개뿐이지만, 전 세계에 1,500개 이상의 물리적 노드가 있습니다.",
+    "TTL은 Time To Live — DNS 레코드의 캐시 수명입니다. 이 페이지의 TTL: 0초.",
+    "전 세계적으로 매일 10만 개 이상의 새 도메인이 등록됩니다 — 당신이 찾는 것도 내일 나타날지 모릅니다!",
+    "도메인 이름은 대소문자를 구분하지 않습니다 — google.com과 GOOGLE.COM은 같은 곳으로 갑니다.",
+    "IPv4는 약 43억 개의 주소가 있지만, IPv6 주소 수는 지구의 모래알보다 많습니다.",
+    "역대 최고가 도메인 거래: voice.com이 3,000만 달러에 팔렸습니다(2019년).",
+    ".tk(토켈라우)는 한때 세계에서 가장 많이 등록된 ccTLD였습니다 — 무료였거든요.",
+  ],
+  de: [
+    "Der erste 404-Fehler stammt aus dem Jahr 1992 — aus dem Raum 404 am CERN.",
+    "NXDOMAIN steht für Non-Existent Domain — die Geisterstadt der DNS-Welt.",
+    "Weltweit sind über 350 Millionen Domains registriert — diese hier gehört nicht dazu.",
+    "Die älteste aktive Domain, symbolics.com, wurde am 15. März 1985 registriert.",
+    ".com ist seit 1985 die beliebteste TLD — und verteidigt die Krone bis heute.",
+    "Eine DNS-Abfrage dauert meist unter 50 ms. Dieser 404 war noch schneller — es gab ja nichts zu finden.",
+    "ICANN verwaltet über 1.500 Top-Level-Domains — Ihre ist (noch) nicht dabei.",
+    "Es gibt nur 13 logische DNS-Root-Server, aber über 1.500 physische Knoten weltweit.",
+    "TTL steht für Time To Live — die Cache-Lebensdauer eines DNS-Eintrags. Diese Seite: 0 Sek.",
+    "Weltweit werden täglich über 100.000 neue Domains registriert — Ihre könnte morgen dabei sein!",
+    "Domainnamen sind case-insensitive — google.com und GOOGLE.COM führen zum selben Ziel.",
+    "IPv4 bietet ~4,3 Milliarden Adressen. IPv6 hat mehr Adressen als Sandkörner auf der Erde.",
+    "Der teuerste Domain-Verkauf: voice.com wechselte 2019 für 30 Millionen Dollar den Besitzer.",
+    ".tk (Tokelau) war einmal die meistregistrierte ccTLD der Welt — weil sie kostenlos war.",
+  ],
+  fr: [
+    "La première erreur 404 est née en 1992 au CERN — dans la salle Room 404.",
+    "NXDOMAIN signifie Non-Existent Domain — la ville fantôme du monde DNS.",
+    "Plus de 350 millions de domaines sont enregistrés dans le monde — celui-ci n'en fait pas partie.",
+    "Le plus ancien domaine actif, symbolics.com, a été enregistré le 15 mars 1985.",
+    ".com est la TLD la plus populaire depuis 1985 — et elle garde toujours sa couronne.",
+    "Une requête DNS s'effectue généralement en moins de 50 ms. Ce 404 a été encore plus rapide — il n'y avait rien à trouver.",
+    "L'ICANN gère plus de 1 500 extensions — la vôtre n'est pas encore enregistrée.",
+    "Il n'existe que 13 serveurs racine DNS logiques, mais plus de 1 500 nœuds physiques dans le monde.",
+    "TTL signifie Time To Live — la durée de vie en cache d'un enregistrement DNS. Cette page : 0 sec.",
+    "Plus de 100 000 nouveaux domaines sont enregistrés chaque jour — le vôtre pourrait apparaître demain !",
+    "Les noms de domaine sont insensibles à la casse — google.com et GOOGLE.COM mènent au même endroit.",
+    "L'IPv4 offre ~4,3 milliards d'adresses. L'IPv6 en a plus que de grains de sable sur Terre.",
+    "La vente de domaine la plus chère : voice.com vendu 30 millions de dollars en 2019.",
+    ".tk (Tokelau) fut un temps le ccTLD le plus enregistré au monde — parce qu'il était gratuit.",
+  ],
+  ru: [
+    "Первая ошибка 404 случилась в 1992 году в CERN — в комнате Room 404.",
+    "NXDOMAIN означает Non-Existent Domain — город-призрак мира DNS.",
+    "В мире зарегистрировано более 350 миллионов доменов — но этого среди них нет.",
+    "Старейший активный домен symbolics.com был зарегистрирован 15 марта 1985 года.",
+    ".com — самая популярная TLD с 1985 года, и корону она так и не отдала.",
+    "DNS-запрос обычно выполняется за 50 мс. Этот 404 был ещё быстрее — искать было нечего.",
+    "ICANN управляет более чем 1 500 доменными зонами — но вашей среди них пока нет.",
+    "Логических корневых DNS-серверов всего 13, но физических узлов по миру — более 1 500.",
+    "TTL — Time To Live, время жизни DNS-записи в кэше. У этой страницы TTL: 0 секунд.",
+    "Ежедневно в мире регистрируется более 100 000 новых доменов — ваш может появиться завтра!",
+    "Домены нечувствительны к регистру — google.com и GOOGLE.COM ведут в одно место.",
+    "В IPv4 около 4,3 миллиарда адресов. В IPv6 их больше, чем песчинок на Земле.",
+    "Самая дорогая сделка с доменом: voice.com продан за 30 миллионов долларов в 2019 году.",
+    ".tk (Токелау) когда-то был самой регистрируемой ccTLD в мире — потому что был бесплатным.",
+  ],
+};
 
-const FUN_FACTS_EN = [
-  "The first 404 error was served at CERN in 1992 — from Room 404.",
-  "NXDOMAIN stands for Non-Existent Domain — the ghost town of the DNS world.",
-  "Over 350 million domains are registered worldwide, but this one isn't among them.",
-  "The oldest active domain, symbolics.com, was registered on March 15, 1985.",
-  ".com has been the most popular TLD since 1985 — and still holds the crown.",
-  "A DNS lookup typically completes in under 50ms. This 404 took even less.",
-  "ICANN manages over 1,500 top-level domains — but yours hasn't been registered yet.",
-  "There are only 13 logical DNS root servers, but 1,500+ physical nodes worldwide.",
-  "TTL stands for Time To Live — the cache lifetime of a DNS record. This page: 0 sec.",
-  "Over 100,000 new domains are registered every single day worldwide.",
-  "Domain names are case-insensitive — google.com and GOOGLE.COM go to the same place.",
-  "IPv4 has ~4.3 billion addresses. IPv6 has more addresses than grains of sand on Earth.",
-  "The most expensive domain sale: voice.com sold for $30 million in 2019.",
-  ".tk (Tokelau) was once the most-registered ccTLD in the world — because it was free.",
-];
+function factsForLocale(locale: string): string[] {
+  return FUN_FACTS[locale] ?? FUN_FACTS.en;
+}
 
-function RadarAnimation() {
+function RadarAnimation({
+  pinged,
+  signalLabel,
+  onGhostClick,
+}: {
+  pinged: boolean;
+  signalLabel?: string;
+  onGhostClick?: () => void;
+}) {
   return (
     <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
       {[1, 2, 3].map((i) => (
@@ -117,18 +226,76 @@ function RadarAnimation() {
           }}
         />
       </motion.div>
-      <motion.div
-        animate={{ scale: [1, 1.12, 1], opacity: [0.6, 1, 0.6] }}
-        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      <motion.button
+        type="button"
+        aria-label={signalLabel}
+        onClick={onGhostClick}
+        whileHover={{ scale: 1.18 }}
+        whileTap={{ scale: 0.88, rotate: -10 }}
+        animate={
+          pinged
+            ? { y: [0, -8, 0], rotate: [0, 8, -8, 0] }
+            : { scale: [1, 1.12, 1], opacity: [0.6, 1, 0.6] }
+        }
+        transition={
+          pinged
+            ? { duration: 0.65, ease: "easeOut" }
+            : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
+        }
+        className="relative z-10 cursor-pointer bg-transparent border-0 p-0"
       >
-        <RiGhostSmileLine className="w-9 h-9 text-muted-foreground/50" />
-      </motion.div>
+        <RiGhostSmileLine
+          className={
+            pinged
+              ? "w-9 h-9 text-emerald-500/80"
+              : "w-9 h-9 text-muted-foreground/50"
+          }
+        />
+      </motion.button>
+      {pinged && signalLabel && (
+        <motion.span
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-mono text-emerald-500/80 whitespace-nowrap"
+        >
+          {signalLabel}
+        </motion.span>
+      )}
     </div>
   );
 }
 
-function GlitchNumber() {
+const SCRAMBLE_CHARS = "0123456789#%&$@!?";
+
+function GlitchNumber({ scrambleSignal = 0 }: { scrambleSignal?: number }) {
   const controls = useAnimationControls();
+  const [display, setDisplay] = useState("404");
+
+  useEffect(() => {
+    let frame = 0;
+    const totalFrames = 14;
+    const interval = setInterval(() => {
+      frame += 1;
+      if (frame >= totalFrames) {
+        setDisplay("404");
+        clearInterval(interval);
+        return;
+      }
+      setDisplay(
+        "404"
+          .split("")
+          .map((c) =>
+            Math.random() > 0.3
+              ? c
+              : SCRAMBLE_CHARS[
+                  Math.floor(Math.random() * SCRAMBLE_CHARS.length)
+                ],
+          )
+          .join(""),
+      );
+    }, 55);
+    return () => clearInterval(interval);
+  }, [scrambleSignal]);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +327,7 @@ function GlitchNumber() {
         className="text-[5.5rem] sm:text-[7rem] font-black tracking-tighter text-muted-foreground/[0.12] leading-none"
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
-        404
+        {display}
       </motion.div>
       <motion.div
         animate={controls}
@@ -172,7 +339,7 @@ function GlitchNumber() {
           mixBlendMode: "screen",
         }}
       >
-        404
+        {display}
       </motion.div>
     </div>
   );
@@ -228,16 +395,17 @@ export default function NotFoundPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [rawPath, setRawPath] = useState("");
+  const [ghostPinged, setGhostPinged] = useState(false);
+  const [scrambleSignal, setScrambleSignal] = useState(0);
   // whenDate must start as a fixed empty string so SSR and client first-render
   // produce identical HTML.  We fill it in via useEffect (client-only).
   const [whenDate, setWhenDate] = useState("");
   // randomFact likewise: start with a fixed entry so SSR matches client.
   // Use locale-appropriate fact list to avoid Chinese/English mixing.
-  const [randomFact, setRandomFact] = useState(FUN_FACTS_EN[0]);
+  const [randomFact, setRandomFact] = useState(() => factsForLocale(locale)[0]);
 
   useEffect(() => {
-    const isChinese = locale === "zh" || locale === "zh-tw";
-    const facts = isChinese ? FUN_FACTS_ZH : FUN_FACTS_EN;
+    const facts = factsForLocale(locale);
     setRawPath(window.location.pathname.replace(/^\//, "") || "");
     setWhenDate(new Date().toUTCString());
     setRandomFact(facts[Math.floor(Math.random() * facts.length)]);
@@ -302,6 +470,13 @@ export default function NotFoundPage() {
     if (query.trim()) router.push(toSearchURI(query.trim()));
   };
 
+  const handleGhostPing = () => {
+    setGhostPinged(true);
+    setScrambleSignal((s) => s + 1);
+    const facts = factsForLocale(locale);
+    setRandomFact(facts[Math.floor(Math.random() * facts.length)]);
+  };
+
   const displayPath = rawPath.length > 40 ? rawPath.slice(0, 40) + "…" : rawPath;
 
   return (
@@ -328,7 +503,11 @@ export default function NotFoundPage() {
 
           <div className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-              <RadarAnimation />
+              <RadarAnimation
+                pinged={ghostPinged}
+                signalLabel={t("not_found.signal")}
+                onGhostClick={handleGhostPing}
+              />
 
               <div className="flex-1 text-center sm:text-left">
                 <motion.div
@@ -336,7 +515,7 @@ export default function NotFoundPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.15 }}
                 >
-                  <GlitchNumber />
+                  <GlitchNumber scrambleSignal={scrambleSignal} />
                   <h1 className="text-xl font-semibold text-foreground mb-1 mt-2">
                     {t("not_found.title")}
                   </h1>
@@ -484,7 +663,7 @@ export default function NotFoundPage() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {terminalDone && (
+          {(terminalDone || ghostPinged) && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}

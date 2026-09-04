@@ -183,6 +183,7 @@ function Pagination({ pageNum, pages, total, pageSize, hasNextPage, hasPreviousP
 type HealthStatus = "checking" | "online" | "offline";
 
 function useApiHealth() {
+  const { t } = useTranslation();
   const [status, setStatus] = React.useState<HealthStatus>("checking");
   const [latency, setLatency] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | undefined>();
@@ -199,11 +200,11 @@ function useApiHealth() {
     } catch {
       setStatus("offline");
       setLatency(null);
-      setError("检测失败");
+      setError(t("icp.check_failed"));
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [t]);
 
   React.useEffect(() => { check(); }, [check]);
   return { status, latency, error, checking, check };

@@ -223,7 +223,9 @@
     "placeholder_domain": "輸入網域，如 google.com",
     "placeholder_dns": "輸入網域，如 example.com",
     "placeholder_ssl": "輸入網域或 IP，如 github.com",
-    "placeholder_ip": "輸入 IP 或 ASN，如 8.8.8.8"
+    "placeholder_ip": "輸入 IP 或 ASN，如 8.8.8.8",
+    "email_not_sent_title": "回饋已儲存，但郵件通知未發送",
+    "email_not_sent_body": "郵件服務尚未設定，請管理員在後台設定 SMTP 或 Resend，設定後將正常發送通知。"
   },
   "relative_time": {
     "today": "今天",
@@ -773,7 +775,8 @@
     "search_btn": "查詢",
     "back_home": "返回首頁",
     "log_title": "查詢日誌",
-    "tip": "404 是很正常的 HTTP 狀態碼，不像 NXDOMAIN 那麼罕見。"
+    "tip": "404 是很正常的 HTTP 狀態碼，不像 NXDOMAIN 那麼罕見。",
+    "signal": "幽靈訊號"
   },
   "sponsor": {
     "page_title_default": "贊助支持",
@@ -879,7 +882,8 @@
     "page_of": "第 {{current}} / {{total}} 頁",
     "back": "返回",
     "copy": "複製",
-    "results_count": "{{count}} 條記錄"
+    "results_count": "{{count}} 條記錄",
+    "check_failed": "檢測失敗"
   },
   "guide": {
     "page_title": "使用指南 · 域名到期提醒",
@@ -1757,5 +1761,51 @@
   "home": {
     "stats_total": "次總查詢",
     "stats_today": "次今日查詢"
+  },
+  "batch_check": {
+    "page_title": "前綴可用性檢測",
+    "page_subtitle": "輸入前綴，選擇後綴分組，批次查詢哪些域名可註冊",
+    "nav_label": "前綴批次查域",
+    "nav_desc": "輸入前綴，一鍵批次檢測 gTLD、ccTLD 或自訂後綴可用性",
+    "input_label": "網域前綴",
+    "input_placeholder": "如 myshop、hello、cool-brand",
+    "tld_group_label": "後綴分組",
+    "tld_preset_popular": "常用後綴",
+    "tld_preset_gtld": "gTLD（全部）",
+    "tld_preset_cctld": "ccTLD（全部）",
+    "tld_preset_all": "IANA 全部",
+    "tld_preset_custom": "自訂",
+    "custom_tld_placeholder": "用空格或逗號分隔，如 com net org io",
+    "btn_check": "開始查詢",
+    "btn_stop": "停止",
+    "btn_clear": "清除",
+    "btn_export_csv": "匯出 CSV",
+    "btn_copy_available": "複製可註冊",
+    "status_checking": "查詢中...",
+    "status_done": "已完成",
+    "status_stopped": "已停止",
+    "col_domain": "網域",
+    "col_status": "狀態",
+    "col_registrar": "註冊商",
+    "col_expiry": "到期時間",
+    "col_cached": "快取",
+    "tag_available": "可註冊",
+    "tag_registered": "已註冊",
+    "tag_reserved": "已保留",
+    "tag_error": "查詢失敗",
+    "tag_premium": "溢價域名",
+    "summary_total": "共查詢 {{total}} 個",
+    "summary_available": "{{count}} 個可註冊",
+    "summary_registered": "{{count}} 個已註冊",
+    "filter_all": "全部",
+    "filter_available": "可註冊",
+    "filter_registered": "已註冊",
+    "err_no_prefix": "請輸入網域前綴",
+    "err_no_tlds": "請至少選擇一個後綴分組或輸入自訂後綴",
+    "err_login_required": "請先登入後使用批次查詢",
+    "info_login_for_more": "登入後可批次檢測更多後綴",
+    "warn_large_batch": "將查詢 {{count}} 個後綴，結果會逐步顯示，請稍候。",
+    "warn_anon_limit": "未登入使用者每次最多查詢 {{max}} 個後綴，登入後不受限制。",
+    "popular_tlds_note": "常見商業後綴"
   }
 }

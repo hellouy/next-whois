@@ -223,7 +223,9 @@
     "placeholder_domain": "도메인 입력, 예: google.com",
     "placeholder_dns": "도메인 입력, 예: example.com",
     "placeholder_ssl": "도메인 또는 IP 입력, 예: github.com",
-    "placeholder_ip": "IP 또는 ASN 입력, 예: 8.8.8.8"
+    "placeholder_ip": "IP 또는 ASN 입력, 예: 8.8.8.8",
+    "email_not_sent_title": "피드백이 저장되었지만 이메일 알림이 전송되지 않았습니다",
+    "email_not_sent_body": "이메일 서비스가 구성되지 않았습니다. 관리자가 관리 화면에서 SMTP 또는 Resend를 설정하면 정상적으로 알림이 전송됩니다."
   },
   "relative_time": {
     "today": "오늘",
@@ -773,7 +775,8 @@
     "search_btn": "검색",
     "back_home": "홈으로 돌아가기",
     "log_title": "쿼리 로그",
-    "tip": "404는 완전히 정상적인 HTTP 상태 코드입니다. NXDOMAIN과 달리 매우 흔합니다."
+    "tip": "404는 완전히 정상적인 HTTP 상태 코드입니다. NXDOMAIN과 달리 매우 흔합니다.",
+    "signal": "고스트 신호"
   },
   "sponsor": {
     "page_title_default": "후원",
@@ -879,7 +882,8 @@
     "page_of": "{{current}} / {{total}} 페이지",
     "back": "뒤로",
     "copy": "복사",
-    "results_count": "{{count}} 건"
+    "results_count": "{{count}} 건",
+    "check_failed": "상태 확인 실패"
   },
   "guide": {
     "page_title": "사용 가이드 · 도메인 만료 알림",
@@ -1694,7 +1698,8 @@
     "nav_expired_domains": "만료 도메인 발굴",
     "nav_domain_access": "도메인 접속",
     "nav_db_export": "DB 내보내기",
-    "nav_server_test": "서버 테스트"
+    "nav_server_test": "서버 테스트",
+    "nav_whois_servers": "WHOIS 서버 관리"
   },
   "common": {
     "retry": "재시도",
@@ -1756,5 +1761,51 @@
   "home": {
     "stats_total": "총 검색 수",
     "stats_today": "오늘 검색 수"
+  },
+  "batch_check": {
+    "page_title": "접두사 가용성 확인",
+    "page_subtitle": "접두사를 입력하고 TLD 그룹을 선택해 등록 가능한 도메인을 일괄 확인하세요",
+    "nav_label": "접두사 일괄 확인",
+    "nav_desc": "접두사로 gTLD, ccTLD 또는 사용자 지정 접미사의 가용성을 한 번에 확인",
+    "input_label": "도메인 접두사",
+    "input_placeholder": "예: myshop, hello, cool-brand",
+    "tld_group_label": "TLD 그룹",
+    "tld_preset_popular": "인기",
+    "tld_preset_gtld": "gTLD (전체)",
+    "tld_preset_cctld": "ccTLD (전체)",
+    "tld_preset_all": "IANA 전체",
+    "tld_preset_custom": "사용자 지정",
+    "custom_tld_placeholder": "공백 또는 쉼표로 구분하여 입력 (예: com net org io)",
+    "btn_check": "확인 시작",
+    "btn_stop": "중지",
+    "btn_clear": "지우기",
+    "btn_export_csv": "CSV 내보내기",
+    "btn_copy_available": "등록 가능 복사",
+    "status_checking": "확인 중...",
+    "status_done": "완료",
+    "status_stopped": "중지됨",
+    "col_domain": "도메인",
+    "col_status": "상태",
+    "col_registrar": "등록기관",
+    "col_expiry": "만료일",
+    "col_cached": "캐시",
+    "tag_available": "등록 가능",
+    "tag_registered": "등록됨",
+    "tag_reserved": "예약됨",
+    "tag_error": "오류",
+    "tag_premium": "프리미엄",
+    "summary_total": "{{total}}개 확인",
+    "summary_available": "{{count}}개 등록 가능",
+    "summary_registered": "{{count}}개 등록됨",
+    "filter_all": "전체",
+    "filter_available": "등록 가능",
+    "filter_registered": "등록됨",
+    "err_no_prefix": "도메인 접두사를 입력하세요",
+    "err_no_tlds": "TLD 그룹을 하나 이상 선택하거나 사용자 지정 TLD를 입력하세요",
+    "err_login_required": "일괄 확인을 사용하려면 먼저 로그인하세요",
+    "info_login_for_more": "로그인하면 더 많은 TLD를 한 번에 확인할 수 있습니다",
+    "warn_large_batch": "{{count}}개 TLD를 확인합니다. 시간이 걸릴 수 있으며 결과는 완료되는 대로 표시됩니다.",
+    "warn_anon_limit": "비로그인 사용자는 한 번에 최대 {{max}}개 TLD까지 확인할 수 있습니다. 로그인하면 제한이 해제됩니다.",
+    "popular_tlds_note": "일반적인 상업용 TLD"
   }
 }

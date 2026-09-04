@@ -222,7 +222,9 @@
     "placeholder_domain": "ドメインを入力、例: google.com",
     "placeholder_dns": "ドメインを入力、例: example.com",
     "placeholder_ssl": "ドメインまたはIPを入力、例: github.com",
-    "placeholder_ip": "IPまたはASNを入力、例: 8.8.8.8"
+    "placeholder_ip": "IPまたはASNを入力、例: 8.8.8.8",
+    "email_not_sent_title": "フィードバックは保存されましたが、メール通知は送信されませんでした",
+    "email_not_sent_body": "メールサービスが未設定です。管理者が管理画面で SMTP または Resend を設定すると通知が送信されるようになります。"
   },
   "relative_time": {
     "today": "今日",
@@ -772,7 +774,8 @@
     "search_btn": "検索",
     "back_home": "ホームに戻る",
     "log_title": "クエリログ",
-    "tip": "404 は普通の HTTP ステータスコードです。NXDOMAIN と違って、よくあることです。"
+    "tip": "404 は普通の HTTP ステータスコードです。NXDOMAIN と違って、よくあることです。",
+    "signal": "ゴースト信号"
   },
   "sponsor": {
     "page_title_default": "スポンサー",
@@ -878,7 +881,8 @@
     "page_of": "{{current}} / {{total}} ページ",
     "back": "戻る",
     "copy": "コピー",
-    "results_count": "{{count}} 件"
+    "results_count": "{{count}} 件",
+    "check_failed": "ヘルスチェックに失敗しました"
   },
   "guide": {
     "page_title": "ユーザーガイド · ドメイン有効期限リマインダー",
@@ -1693,7 +1697,8 @@
     "nav_expired_domains": "失効ドメイン発掘",
     "nav_domain_access": "ドメインアクセス",
     "nav_db_export": "DBエクスポート",
-    "nav_server_test": "サーバーテスト"
+    "nav_server_test": "サーバーテスト",
+    "nav_whois_servers": "WHOISサーバー管理"
   },
   "common": {
     "retry": "再試行",
@@ -1756,5 +1761,51 @@
     "stats_total": "総検索数",
     "stats_today": "本日の検索数"
   },
-  "back_to_top": "トップに戻る"
+  "back_to_top": "トップに戻る",
+  "batch_check": {
+    "page_title": "プレフィックス利用可否チェック",
+    "page_subtitle": "プレフィックスを入力し TLD グループを選択して、登録可能なドメインを一括チェック",
+    "nav_label": "プレフィックス一括チェック",
+    "nav_desc": "プレフィックスから gTLD・ccTLD・カスタム後缀の利用可否を一括チェック",
+    "input_label": "ドメインプレフィックス",
+    "input_placeholder": "例: myshop、hello、cool-brand",
+    "tld_group_label": "TLD グループ",
+    "tld_preset_popular": "人気",
+    "tld_preset_gtld": "gTLD（すべて）",
+    "tld_preset_cctld": "ccTLD（すべて）",
+    "tld_preset_all": "IANA すべて",
+    "tld_preset_custom": "カスタム",
+    "custom_tld_placeholder": "スペースまたはカンマ区切りで入力（例: com net org io）",
+    "btn_check": "チェック開始",
+    "btn_stop": "停止",
+    "btn_clear": "クリア",
+    "btn_export_csv": "CSV エクスポート",
+    "btn_copy_available": "登録可能をコピー",
+    "status_checking": "チェック中...",
+    "status_done": "完了",
+    "status_stopped": "停止しました",
+    "col_domain": "ドメイン",
+    "col_status": "ステータス",
+    "col_registrar": "レジストラ",
+    "col_expiry": "有効期限",
+    "col_cached": "キャッシュ",
+    "tag_available": "登録可能",
+    "tag_registered": "登録済み",
+    "tag_reserved": "予約済み",
+    "tag_error": "エラー",
+    "tag_premium": "プレミアム",
+    "summary_total": "{{total}} 件をチェック",
+    "summary_available": "{{count}} 件登録可能",
+    "summary_registered": "{{count}} 件登録済み",
+    "filter_all": "すべて",
+    "filter_available": "登録可能",
+    "filter_registered": "登録済み",
+    "err_no_prefix": "ドメインプレフィックスを入力してください",
+    "err_no_tlds": "TLD グループを1つ以上選択するか、カスタム TLD を入力してください",
+    "err_login_required": "一括チェックを使用するには先にログインしてください",
+    "info_login_for_more": "ログインするとより多くの TLD を一括チェックできます",
+    "warn_large_batch": "{{count}} 個の TLD をチェック中です。完了順に結果が表示されます。",
+    "warn_anon_limit": "未ログインユーザーは一度に最大 {{max}} 個の TLD までです。ログインで制限解除。",
+    "popular_tlds_note": "一般的な商用 TLD"
+  }
 }
