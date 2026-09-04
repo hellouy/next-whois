@@ -1,72 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import tls from "tls";
-import dns from "dns";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { isBlockedHost } from "@/lib/ssrf-guard";
 
 export const config = { maxDuration: 20 };
 
 const RL_LIMIT  = 20;
 const RL_WINDOW = 60_000;
-
-function isPrivateHost(host: string): boolean {
-  if (/^(localhost|127\.|0\.0\.0\.0|::1|0:0:0:0:0:0:0:1)$/i.test(host)) return true;
-  if (/^10\.\d+\.\d+\.\d+$/.test(host)) return true;
-  if (/^192\.168\.\d+\.\d+$/.test(host)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(host)) return true;
-  if (/^169\.254\.\d+\.\d+$/.test(host)) return true;
-  if (/^fe80:/i.test(host)) return true;
-  if (host === "169.254.169.254") return true;
-  if (/\.local$/i.test(host)) return true;
-  return false;
-}
-
-/**
- * Normalize any IPv4 notation (dotted, decimal, hex, octal, mixed) to a
- * dotted-quad string, or null when input is not an IPv4 literal. Closes the
- * integer/hex bypass (e.g. 2130706433 == 127.0.0.1).
- */
-function normalizeIPv4(host: string): string | null {
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host;
-  if (/^(0x[0-9a-f]+|\d+)$/i.test(host)) {
-    const n = /^0x/i.test(host) ? parseInt(host, 16) : host.startsWith("0") && host.length > 1 ? parseInt(host, 8) : parseInt(host, 10);
-    if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) return null;
-    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
-  }
-  if (/^(\d+|0x[0-9a-f]+)(\.(\d+|0x[0-9a-f]+)){0,3}$/i.test(host)) {
-    const parts = host.split(".").map(p => (/^0x/i.test(p) ? parseInt(p, 16) : p.startsWith("0") && p.length > 1 ? parseInt(p, 8) : parseInt(p, 10)));
-    if (parts.some(p => !Number.isInteger(p) || p < 0 || p > 255)) return null;
-    while (parts.length < 4) parts.push(0);
-    return parts.join(".");
-  }
-  return null;
-}
-
-/**
- * Full private/internal-address guard: literal check plus DNS resolution so
- * hostnames resolving into private space are rejected before any TLS
- * connection is opened (SSRF protection for the cert checker).
- */
-async function isBlockedHost(host: string): Promise<boolean> {
-  if (isPrivateHost(host)) return true;
-  const ipv4 = normalizeIPv4(host);
-  if (ipv4) {
-    if (isPrivateHost(ipv4)) return true;
-    const m = ipv4.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-    if (m) {
-      const a = Number(m[1]), b = Number(m[2]);
-      if (a === 0 || (a === 100 && b >= 64 && b <= 127)) return true;
-      if (a >= 224) return true;
-    }
-    return false;
-  }
-  try {
-    const addrs: { address: string }[] = await dns.promises.lookup(host.replace(/^\[|\]$/g, ""), { all: true });
-    if (!addrs || addrs.length === 0) return false;
-    return addrs.some(a => isPrivateHost(a.address));
-  } catch {
-    return false;
-  }
-}
 
 type SanEntry = { type: string; value: string };
 type CertChainEntry = {
