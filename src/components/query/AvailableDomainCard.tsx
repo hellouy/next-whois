@@ -5,6 +5,7 @@ import {
   RiCheckLine,
   RiFileCopyLine,
   RiSearchLine,
+  RiNotification3Line,
   RiShoppingCartLine,
   RiLoopLeftLine,
   RiVipCrownLine,
@@ -65,6 +66,9 @@ interface AvailableDomainCardProps {
   domain: string;
   locale: string;
   isPremiumByWhois?: boolean;
+  /** Optional callback opening the domain-reminder dialog — when provided,
+   *  an "alert me when registered" entry point is rendered. */
+  onSubscribe?: () => void;
 }
 
 const cardVariants = {
@@ -80,7 +84,7 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }: AvailableDomainCardProps) {
+export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, onSubscribe }: AvailableDomainCardProps) {
   const [rawPrices, setRawPrices] = React.useState<DomainPricing[]>([]);
   const [registrars, setRegistrars] = React.useState<DomainPricing[]>([]);
   const [renewRegistrars, setRenewRegistrars] = React.useState<DomainPricing[]>([]);
@@ -418,6 +422,19 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false }
               </span>
             </motion.a>
           ) : null}
+          {onSubscribe && (
+            <motion.button
+              onClick={onSubscribe}
+              className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/8 hover:bg-amber-500/14 transition-all duration-150 active:scale-[0.97] w-full"
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            >
+              <RiNotification3Line className="w-4 h-4 shrink-0" />
+              <span>
+                {isZh ? "订阅注册提醒 · 被他人抢注时通知我" : "Get notified if someone registers it"}
+              </span>
+            </motion.button>
+          )}
           <div className="flex gap-2">
             <motion.button
               onClick={handleCopy}

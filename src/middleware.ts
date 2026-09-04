@@ -134,8 +134,17 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  // Prevent stale redirect caches from old locale-prefixed URLs.
-  res.headers.set("Cache-Control", "no-store, must-revalidate");
+  // Cache policy:
+  // - Page handlers own their Cache-Control (e.g. the query page's gSSP sets
+  //   public, s-maxage, stale-while-revalidate; content pages set their own).
+  //   Overriding it here with a global no-store would silently disable edge
+  //   caching for every route (verified: gSSP s-maxage never reached clients).
+  // - The one case that MUST NOT be cached is a response that changes the
+  //   NEXT_LOCALE cookie: a cached "set locale X" response would pin every
+  //   subsequent visitor's language. Scope no-store to exactly that case.
+  if (!hasValidCookie && detected) {
+    res.headers.set("Cache-Control", "no-store, must-revalidate");
+  }
 
   return res;
 }

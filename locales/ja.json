@@ -1278,7 +1278,11 @@
     "result_title_result": "支払い結果",
     "result_order_id_label": "注文番号",
     "result_timeout_hint": "支払い確認に予想以上の時間がかかっています。数分お待ちいただいてから、手動でリフレッシュしてください。",
-    "result_refresh_status": "ステータスを更新"
+    "result_refresh_status": "ステータスを更新",
+    "result_login_required": "支払い状況を確認するにはログインしてください",
+    "result_login_btn": "ログイン",
+    "checkout_load_failed": "プランの読み込みに失敗しました。再試行してください。",
+    "checkout_retry": "再試行"
   },
   "dashboard": {
     "phase_active": "有効",

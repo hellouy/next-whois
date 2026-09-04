@@ -1279,7 +1279,11 @@
     "result_title_result": "Payment Result",
     "result_order_id_label": "Order ID",
     "result_timeout_hint": "Payment is taking longer than expected. Please wait a few minutes, then refresh manually.",
-    "result_refresh_status": "Refresh Status"
+    "result_refresh_status": "Refresh Status",
+    "result_login_required": "Please sign in to view your payment status",
+    "result_login_btn": "Sign in",
+    "checkout_load_failed": "Failed to load plans. Please retry.",
+    "checkout_retry": "Retry"
   },
   "dashboard": {
     "phase_active": "Active",

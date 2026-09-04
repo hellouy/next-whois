@@ -206,6 +206,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Unsupported payment method" });
   } catch (err: any) {
     console.error("[payment/create]", err);
-    return res.status(500).json({ error: err.message || "Failed to create order" });
+    console.error("[payment/create]", err);
+    return res.status(500).json({ error: "Failed to create order" });
   }
 }

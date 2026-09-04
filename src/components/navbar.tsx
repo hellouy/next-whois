@@ -719,11 +719,18 @@ function UserButton() {
       if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
       setOpen(false);
     }
+    // Close on scroll/resize: the dropdown is fixed-positioned from the
+    // button's rect at open time, so scrolling would detach it visually.
+    function handleReposition() { setOpen(false); }
     document.addEventListener("mousedown", handleOutside);
     document.addEventListener("touchstart", handleOutside, { passive: true });
+    window.addEventListener("scroll", handleReposition, { passive: true, capture: true });
+    window.addEventListener("resize", handleReposition, { passive: true });
     return () => {
       document.removeEventListener("mousedown", handleOutside);
       document.removeEventListener("touchstart", handleOutside);
+      window.removeEventListener("scroll", handleReposition, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", handleReposition);
     };
   }, [open]);
 

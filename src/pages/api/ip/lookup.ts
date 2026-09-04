@@ -198,7 +198,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       void saveToCache(cacheKey, payload);
       return res.json(payload);
     } catch (e: any) {
-      return res.status(500).json({ error: e.message });
+      console.error("[ip/lookup]", e);
+      return res.status(500).json({ error: "Lookup failed" });
     }
   }
 
@@ -258,7 +259,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     void saveToCache(cacheKey, payload);
     return res.json(payload);
   } catch (e: any) {
-    return res.status(500).json({ error: e.message || "Lookup failed" });
+    console.error("[ip/lookup]", e);
+    return res.status(500).json({ error: "Lookup failed" });
   }
 }
 

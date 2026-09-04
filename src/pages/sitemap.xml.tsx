@@ -20,8 +20,6 @@ const STATIC_PAGES = [
   { path: "/sponsor",     changefreq: "monthly",  priority: "0.5" },
   { path: "/links",       changefreq: "monthly",  priority: "0.6" },
   { path: "/changelog",   changefreq: "weekly",   priority: "0.6" },
-  { path: "/login",       changefreq: "monthly",  priority: "0.4" },
-  { path: "/register",    changefreq: "monthly",  priority: "0.4" },
 ];
 
 function escXml(str: string) {

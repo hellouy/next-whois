@@ -156,15 +156,19 @@ export default async function handler(
   }
 
   // Record every successful lookup — logged-in or anonymous, cached or fresh.
-  // Both writes are AWAITED before responding so the lambda cannot freeze and
-  // drop them (accurate admin stats depend on this).
-  await saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail)
-    .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
-  await logQuery({
-    domain: trimmed, tld, success: true, cached: cached ?? false,
-    durationMs: time * 1000, errorCode: null, source: source ?? null,
-    userId, userEmail, ip,
-  }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+  // Both writes run in PARALLEL so a cache hit still pays only one round-trip
+  // latency; each has its own .catch so one failure cannot break the other.
+  // awaitAllSettled keeps the lambda alive until both settle (accurate admin
+  // stats depend on these writes not being frozen out).
+  await Promise.allSettled([
+    saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail)
+      .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message)),
+    logQuery({
+      domain: trimmed, tld, success: true, cached: cached ?? false,
+      durationMs: time * 1000, errorCode: null, source: source ?? null,
+      userId, userEmail, ip,
+    }).catch(e => console.error("[lookup] logQuery failed:", e.message)),
+  ]);
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
   // CDN edge cache also honours the same expiry windows as Redis.

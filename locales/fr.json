@@ -1279,7 +1279,11 @@
     "result_title_result": "Résultat du paiement",
     "result_order_id_label": "Numéro de commande",
     "result_timeout_hint": "La confirmation du paiement prend plus de temps que prévu. Veuillez patienter quelques minutes, puis actualiser manuellement.",
-    "result_refresh_status": "Actualiser le statut"
+    "result_refresh_status": "Actualiser le statut",
+    "result_login_required": "Veuillez vous connecter pour voir votre statut de paiement",
+    "result_login_btn": "Se connecter",
+    "checkout_load_failed": "Échec du chargement des offres. Veuillez réessayer.",
+    "checkout_retry": "Réessayer"
   },
   "dashboard": {
     "phase_active": "Actif",

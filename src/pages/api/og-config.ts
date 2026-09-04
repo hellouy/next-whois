@@ -88,7 +88,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       invalidateOgConfigCache();
       return res.json({ ok: true });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message });
+      console.error("[og-config]", err);
+      return res.status(500).json({ error: "Failed to load config" });
     }
   }
 

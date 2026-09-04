@@ -725,7 +725,7 @@ export default function RemindPage() {
     e.preventDefault();
     const q = searchQuery.trim();
     if (!q) return;
-    router.push(`/${q}?subscribe=1`);
+    router.push(`/${encodeURIComponent(q)}?subscribe=1`);
   }
 
   // Delegate to DirectSubscribeForm when ?domain= is present — after all hooks

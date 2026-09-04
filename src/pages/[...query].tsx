@@ -855,7 +855,6 @@ export default function LookupPage({
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => { setMounted(true); }, []);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
-  const suppressNextLoad = React.useRef(false);
   // Track if the first client-side fetch has completed to avoid flicker:
   // On first load, if SSR already provided data, do a silent background refresh
   // (keep showing SSR data while fresh data loads) instead of flashing a skeleton.
@@ -864,10 +863,6 @@ export default function LookupPage({
 
   useEffect(() => {
     const handleStart = (url: string) => {
-      if (suppressNextLoad.current) {
-        suppressNextLoad.current = false;
-        return;
-      }
       if (isSearchRoute(url)) { setLoading(true); setRefreshing(false); }
     };
     // routeChangeComplete is intentionally NOT handled here: the
@@ -1146,6 +1141,23 @@ export default function LookupPage({
   const { status, result, error, time, dnsProbe, registryUrl, cached, cachedAt, cacheTtl } = data as typeof data & { registryUrl?: string };
 
   const { data: session, status: sessionStatus } = useSession();
+
+  // Shared permission gate for opening the reminder dialog from any entry
+  // point (registered-domain buttons and the available-domain card alike).
+  const openReminderWithGate = React.useCallback(() => {
+    if (!session) {
+      toast.info(isChinese ? "请先登录再订阅域名提醒" : "Please log in to subscribe for reminders");
+      router.push(`/login?callbackUrl=${encodeURIComponent(`/${target}?subscribe=1`)}`);
+      return;
+    }
+    if (!(session?.user as any)?.subscriptionAccess) {
+      toast.info(isChinese ? "需要开通会员才能使用域名订阅提醒" : "Subscription required to use domain reminders.", {
+        action: { label: isChinese ? "去开通" : "Upgrade", onClick: () => router.push("/payment/checkout") },
+      });
+      return;
+    }
+    setReminderDialogOpen(true);
+  }, [session, isChinese, router, target]);
 
   // Auto-open the reminder dialog when navigated here with ?subscribe=1
   const autoOpenedRef = React.useRef(false);
@@ -1619,7 +1631,12 @@ export default function LookupPage({
                     </div>
                   </>
                 ) : dnsProbe?.registrationStatus === "unregistered" ? (
-                  <AvailableDomainCard domain={target} locale={locale} isPremiumByWhois={result ? getDomainRegistrationStatus(result, locale).isPremiumReserved : false} />
+                  <AvailableDomainCard
+                    domain={target}
+                    locale={locale}
+                    isPremiumByWhois={result ? getDomainRegistrationStatus(result, locale).isPremiumReserved : false}
+                    onSubscribe={enableRemind ? openReminderWithGate : undefined}
+                  />
                 ) : (
                   <>
                     <div className="glass-panel border border-red-200/50 dark:border-red-900/40 rounded-xl overflow-hidden">
@@ -2326,39 +2343,6 @@ export default function LookupPage({
                       document.body
                     )}
 
-                    {mounted && enableFeedback && (
-                    <FeedbackDrawer
-                      open={feedbackOpen}
-                      onOpenChange={setFeedbackOpen}
-                      query={result.domain || target}
-                      queryType={queryType}
-                    />
-                    )}
-
-                    {mounted && enableRemind && (
-                    <DomainReminderDialog
-                      domain={result.domain || target}
-                      expirationDate={result.expirationDate}
-                      remainingDays={result.remainingDays}
-                      open={reminderDialogOpen}
-                      onOpenChange={setReminderDialogOpen}
-                      isZh={isChinese}
-                      userEmail={session?.user?.email ?? ""}
-                      registerPriceFmt={
-                        result.registerPrice && result.registerPrice.new !== -1 && result.registerPrice.currency !== "Unknown"
-                          ? formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)
-                          : undefined
-                      }
-                      renewPriceFmt={
-                        result.renewPrice && result.renewPrice.renew !== -1 && result.renewPrice.currency !== "Unknown"
-                          ? formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)
-                          : undefined
-                      }
-                      isPremium={result.registerPrice?.isPremium ?? false}
-                      eppStatuses={result.status?.map((s) => s.status) ?? []}
-                      regStatusType={getDomainRegistrationStatus(result, locale).type}
-                    />
-                    )}
 
                     {result.remainingDays === null &&
                       (() => {
@@ -2746,6 +2730,39 @@ export default function LookupPage({
           )}
 
           {/* Text ad — shown after successful result, desktop only (mobile version is inline) */}
+                    {mounted && enableFeedback && (
+                    <FeedbackDrawer
+                      open={feedbackOpen}
+                      onOpenChange={setFeedbackOpen}
+                      query={result?.domain || target}
+                      queryType={queryType}
+                    />
+                    )}
+
+                    {mounted && enableRemind && (
+                    <DomainReminderDialog
+                      domain={result?.domain || target}
+                      expirationDate={result?.expirationDate}
+                      remainingDays={result?.remainingDays ?? null}
+                      open={reminderDialogOpen}
+                      onOpenChange={setReminderDialogOpen}
+                      isZh={isChinese}
+                      userEmail={session?.user?.email ?? ""}
+                      registerPriceFmt={
+                        result?.registerPrice && result.registerPrice.new !== -1 && result.registerPrice.currency !== "Unknown"
+                          ? formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)
+                          : undefined
+                      }
+                      renewPriceFmt={
+                        result?.renewPrice && result.renewPrice.renew !== -1 && result.renewPrice.currency !== "Unknown"
+                          ? formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)
+                          : undefined
+                      }
+                      isPremium={result?.registerPrice?.isPremium ?? false}
+                      eppStatuses={result?.status?.map((s) => s.status) ?? []}
+                      regStatusType={result ? getDomainRegistrationStatus(result, locale).type : undefined}
+                    />
+                    )}
           <ResultTextAd loading={loading} />
 
             </motion.div>

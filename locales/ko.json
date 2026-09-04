@@ -1279,7 +1279,11 @@
     "result_title_result": "결제 결과",
     "result_order_id_label": "주문 번호",
     "result_timeout_hint": "결제 확인이 예상보다 오래 걸리고 있습니다. 몇 분 기다린 후 수동으로 새로고침해 주세요.",
-    "result_refresh_status": "상태 새로고침"
+    "result_refresh_status": "상태 새로고침",
+    "result_login_required": "결제 상태를 확인하려면 로그인해 주세요",
+    "result_login_btn": "로그인",
+    "checkout_load_failed": "플랜을 불러오지 못했습니다. 다시 시도해 주세요.",
+    "checkout_retry": "다시 시도"
   },
   "dashboard": {
     "phase_active": "활성",

@@ -39,6 +39,7 @@ export default function PaymentCheckout() {
   const planFromUrl = typeof router.query.plan === "string" ? router.query.plan : null;
 
   const [plans, setPlans] = React.useState<Plan[]>([]);
+  const [loadFailed, setLoadFailed] = React.useState(false);
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(planFromUrl);
   const [selectedProvider, setSelectedProvider] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -56,12 +57,15 @@ export default function PaymentCheckout() {
     return p;
   }, [settings]);
 
-  React.useEffect(() => {
+  const loadPlans = React.useCallback(() => {
+    setLoading(true);
+    setLoadFailed(false);
     fetch("/api/payment/plans")
       .then(r => r.json())
       .then(d => { setPlans(d.plans ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoadFailed(true); setLoading(false); });
   }, []);
+  React.useEffect(() => { loadPlans(); }, [loadPlans]);
 
   React.useEffect(() => {
     if (enabledProviders.length === 1) setSelectedProvider(enabledProviders[0]);
@@ -79,7 +83,11 @@ export default function PaymentCheckout() {
       return;
     }
     if (authStatus !== "authenticated") {
-      router.push(`/login?callbackUrl=${encodeURIComponent("/payment/checkout")}`);
+      // Preserve the chosen plan across the login round-trip.
+      const cb = selectedPlan
+        ? `/payment/checkout?plan=${encodeURIComponent(selectedPlan)}`
+        : "/payment/checkout";
+      router.push(`/login?callbackUrl=${encodeURIComponent(cb)}`);
       return;
     }
     setPaying(true);
@@ -125,8 +133,12 @@ export default function PaymentCheckout() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
         <RiPriceTag3Line className="w-10 h-10 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">{t("payment.checkout_no_plans")}</p>
-        <Link href="/dashboard" className="text-xs text-primary hover:underline">{t("payment.checkout_back_dashboard")}</Link>
+        <p className="text-sm text-muted-foreground">{loadFailed ? t("payment.checkout_load_failed") : t("payment.checkout_no_plans")}</p>
+        {loadFailed ? (
+          <Button onClick={loadPlans} className="rounded-xl h-9">{t("payment.checkout_retry")}</Button>
+        ) : (
+          <Link href="/dashboard" className="text-xs text-primary hover:underline">{t("payment.checkout_back_dashboard")}</Link>
+        )}
       </div>
     );
   }

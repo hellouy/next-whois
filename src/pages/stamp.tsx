@@ -430,6 +430,9 @@ export default function StampPage() {
       initVercelVerify();
     }
     if (verifyTab !== "vercel") stopVercelPolling();
+    // Stop polling when the component unmounts too — leaving the page with
+    // the vercel tab active must not leak requests for up to 18.5 minutes.
+    return () => { stopVercelPolling(); };
   }, [verifyTab, submitResult?.id]);
 
   // No domain — show landing page

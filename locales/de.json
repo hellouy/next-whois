@@ -1279,7 +1279,11 @@
     "result_title_result": "Zahlungsergebnis",
     "result_order_id_label": "Bestellnummer",
     "result_timeout_hint": "Die Zahlungsbestätigung dauert länger als erwartet. Bitte warten Sie einige Minuten und aktualisieren Sie dann manuell.",
-    "result_refresh_status": "Status aktualisieren"
+    "result_refresh_status": "Status aktualisieren",
+    "result_login_required": "Bitte melden Sie sich an, um Ihren Zahlungsstatus zu sehen",
+    "result_login_btn": "Anmelden",
+    "checkout_load_failed": "Pläne konnten nicht geladen werden. Bitte erneut versuchen.",
+    "checkout_retry": "Erneut versuchen"
   },
   "dashboard": {
     "phase_active": "Aktiv",

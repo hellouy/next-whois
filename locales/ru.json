@@ -1278,7 +1278,11 @@
     "result_title_result": "Результат оплаты",
     "result_order_id_label": "Номер заказа",
     "result_timeout_hint": "Подтверждение платежа занимает больше времени, чем ожидалось. Подождите несколько минут, затем обновите вручную.",
-    "result_refresh_status": "Обновить статус"
+    "result_refresh_status": "Обновить статус",
+    "result_login_required": "Войдите, чтобы увидеть статус платежа",
+    "result_login_btn": "Войти",
+    "checkout_load_failed": "Не удалось загрузить тарифы. Повторите попытку.",
+    "checkout_retry": "Повторить"
   },
   "dashboard": {
     "phase_active": "Активный",

@@ -9,7 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { CURRENCY_SYMBOL } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
-  RiLoader4Line, RiCheckLine, RiCloseLine, RiArrowRightLine,
+  RiLoader4Line, RiCheckLine, RiCloseLine, RiArrowRightLine, RiLockLine,
   RiShieldCheckLine, RiRefreshLine,
 } from "@remixicon/react";
 
@@ -86,6 +86,7 @@ export default function PaymentResult() {
 
   const isPaid = order?.status === "paid";
   const isCancelled = urlStatus === "cancel";
+  const needsLogin = authStatus === "unauthenticated" && !isPaid;
   const sym = order ? (CURRENCY_SYMBOL[order.currency] ?? order.currency) : "¥";
 
   const pageTitle = isPaid
@@ -153,6 +154,20 @@ export default function PaymentResult() {
                   {t("payment.result_encrypted")}
                 </div>
               </div>
+            </>
+          ) : needsLogin ? (
+            <>
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+                <RiLockLine className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black">{t("payment.result_login_required")}</h1>
+              </div>
+              <Link href={`/login?callbackUrl=${encodeURIComponent(`/payment/result?order=${orderId ?? ""}`)}`}>
+                <Button className="w-full rounded-xl h-10">
+                  {t("payment.result_login_btn")}
+                </Button>
+              </Link>
             </>
           ) : isCancelled ? (
             <>

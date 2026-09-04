@@ -108,6 +108,9 @@ export function DomainReminderDialog({
       setDone(false);
       setAlreadySubscribed(false);
       setSelectedThresholds(DEFAULT_REMINDER_THRESHOLDS);
+      // Reset phase toggles like the thresholds above — re-opening the
+      // dialog must not keep the previous session's chip selection.
+      setPhaseAlerts({ grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true });
 
       if (userEmail) {
         setCheckingStatus(true);

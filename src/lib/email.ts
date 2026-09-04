@@ -1166,6 +1166,15 @@ export async function sendEmail({
   } catch (err: any) {
     console.error(`[sendEmail] Failed — queuing for retry → ${to}: ${err.message}`);
     const { enqueueEmail } = await import("@/lib/email-queue");
-    await enqueueEmail(to, subject, renderedHtml);
+    await enqueueEmail(to, subject, renderedHtml).catch((qErr: any) => {
+      // Both direct send AND queue fallback failed — surface loudly so the
+      // email is never silently lost.
+      console.error(
+        `[sendEmail] CRITICAL: direct send and queue enqueue both failed → ${to} "${subject}":`,
+        `send=${err.message}`,
+        `enqueue=${qErr?.message ?? qErr}`,
+      );
+      throw new Error(`Email delivery failed permanently: ${err.message}`);
+    });
   }
 }

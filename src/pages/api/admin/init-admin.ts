@@ -149,6 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`[init-admin] Admin account created for ${adminEmail} from IP ${ip}`);
     return res.json({ ok: true, action: "created", email: adminEmail });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error("[init-admin]", err);
+    return res.status(500).json({ error: "Initialization failed" });
   }
 }

@@ -42,6 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Regular URL — redirect
     return res.redirect(302, value);
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    console.error("[image]", e);
+    return res.status(500).json({ error: "Image generation failed" });
   }
 }
