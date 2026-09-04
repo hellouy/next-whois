@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import dns from "dns";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 export const config = { maxDuration: 15 };
@@ -16,6 +17,54 @@ function isPrivateHost(host: string): boolean {
   if (host === "169.254.169.254") return true;
   if (/\.local$/i.test(host)) return true;
   return false;
+}
+
+/**
+ * Normalize any IPv4 notation (dotted, decimal, hex, octal, mixed) to a
+ * dotted-quad string, or null when input is not an IPv4 literal. Closes the
+ * integer/hex bypass (e.g. 2130706433 == 127.0.0.1).
+ */
+function normalizeIPv4(host: string): string | null {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host;
+  if (/^(0x[0-9a-f]+|\d+)$/i.test(host)) {
+    const n = /^0x/i.test(host) ? parseInt(host, 16) : host.startsWith("0") && host.length > 1 ? parseInt(host, 8) : parseInt(host, 10);
+    if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) return null;
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+  }
+  if (/^(\d+|0x[0-9a-f]+)(\.(\d+|0x[0-9a-f]+)){0,3}$/i.test(host)) {
+    const parts = host.split(".").map(p => (/^0x/i.test(p) ? parseInt(p, 16) : p.startsWith("0") && p.length > 1 ? parseInt(p, 8) : parseInt(p, 10)));
+    if (parts.some(p => !Number.isInteger(p) || p < 0 || p > 255)) return null;
+    while (parts.length < 4) parts.push(0);
+    return parts.join(".");
+  }
+  return null;
+}
+
+/**
+ * SSRF guard: literal checks plus DNS resolution so hostnames resolving into
+ * private space are rejected before any fetch. Called on the initial URL and
+ * again on every redirect hop.
+ */
+async function isBlockedHost(host: string): Promise<boolean> {
+  if (isPrivateHost(host)) return true;
+  const ipv4 = normalizeIPv4(host);
+  if (ipv4) {
+    if (isPrivateHost(ipv4)) return true;
+    const m = ipv4.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (m) {
+      const a = Number(m[1]), b = Number(m[2]);
+      if (a === 0 || (a === 100 && b >= 64 && b <= 127)) return true;
+      if (a >= 224) return true;
+    }
+    return false;
+  }
+  try {
+    const addrs: { address: string }[] = await dns.promises.lookup(host.replace(/^\[|\]$/g, ""), { all: true });
+    if (!addrs || addrs.length === 0) return false;
+    return addrs.some(a => isPrivateHost(a.address));
+  } catch {
+    return false;
+  }
 }
 
 export type SecurityHeader = {
@@ -188,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   try {
     const parsed = new URL(rawUrl);
-    if (isPrivateHost(parsed.hostname)) {
+    if (await isBlockedHost(parsed.hostname)) {
       return res.status(400).json({
         ok: false, url: rawUrl, finalUrl: rawUrl, statusCode: null, statusText: null,
         latencyMs: null, server: null, contentType: null, contentLength: null,
@@ -239,6 +288,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         redirectChain.push({ url: currentUrl, status: r.status });
         if (!location) break;
         try { currentUrl = new URL(location, currentUrl).href; } catch { break; }
+        // Re-check every redirect hop: a public URL redirecting into private
+        // space must be blocked, not followed.
+        let nextHost: string;
+        try { nextHost = new URL(currentUrl).hostname; } catch { break; }
+        if (await isBlockedHost(nextHost)) {
+          return res.status(400).json({
+            ok: false, url: rawUrl, finalUrl: currentUrl, statusCode: null, statusText: null,
+            latencyMs: null, server: null, contentType: null, contentLength: null,
+            xPoweredBy: null, cacheControl: null, via: null,
+            redirectChain, hsts: null, csp: null, xFrameOptions: null,
+            xContentTypeOptions: null, referrerPolicy: null, permissionsPolicy: null,
+            xXssProtection: null, securityScore: 0, securityHeaders: [],
+            error: "Redirect to private or internal address blocked",
+          });
+        }
         continue;
       }
       break;

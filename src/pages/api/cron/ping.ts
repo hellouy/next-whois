@@ -6,12 +6,18 @@ import { isRedisAvailable, getRedisValue } from "@/lib/server/redis";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
 
+  // Auth is fail-closed: when CRON_SECRET is not configured, only an admin
+  // session may trigger the endpoint (never anonymous access).
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const authHeader = req.headers.authorization;
     if (authHeader !== `Bearer ${secret}`) {
       return res.status(401).json({ error: "unauthorized" });
     }
+  } else {
+    const { requireAdmin } = await import("@/lib/admin");
+    const session = await requireAdmin(req, res);
+    if (!session) return;
   }
 
   const dbReady = await isDbReady();

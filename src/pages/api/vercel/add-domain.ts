@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { one, run, isDbReady } from "@/lib/db-query";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const config = { maxDuration: 15 };
 
@@ -28,9 +29,20 @@ async function getDomainInfo(domain: string) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
+  // Tight IP rate limit: the endpoint drives the token-guarded Vercel API,
+  // so anonymous abuse must not be able to spam the project domain list.
+  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+  const rl = await checkRateLimit(`vercel-add-domain:${ip}`, 3, 60 * 60 * 1000);
+  if (!rl.ok) return res.status(429).json({ error: "Too many requests" });
+
   const { domain, stampId } = req.body;
   if (!domain || !stampId)
     return res.status(400).json({ error: "Missing domain or stampId" });
+
+  // Domain must look like a registrable name before we touch the Vercel API.
+  const d = String(domain).toLowerCase().trim();
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d) || d.length > 253)
+    return res.status(400).json({ error: "Invalid domain" });
 
   if (!process.env.VERCEL_API_TOKEN || !process.env.VERCEL_PROJECT_ID)
     return res.status(503).json({ error: "Vercel integration not configured" });

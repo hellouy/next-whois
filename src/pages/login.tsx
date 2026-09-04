@@ -82,8 +82,11 @@ export default function LoginPage() {
         resetCaptcha();
       } else {
         toast.success(t("auth.login_success"));
-        const callbackUrl = (router.query.callbackUrl as string) || "/dashboard";
-        router.replace(callbackUrl);
+        const raw = (router.query.callbackUrl as string) || "/dashboard";
+        // Only allow same-site paths: must start with "/" and not "//" or a
+        // scheme-relative/absolute URL (open-redirect guard).
+        const safe = raw.startsWith("/") && !raw.startsWith("//") && !/^\/[a-z]+:/i.test(raw) ? raw : "/dashboard";
+        router.replace(safe);
       }
     } catch {
       setError(t("auth.login_err_network"));

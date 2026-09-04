@@ -357,7 +357,13 @@ export async function paypalCreateOrder(params: {
   return { id: data.id, approveUrl: approveLink.href };
 }
 
-export async function paypalCaptureOrder(paypalOrderId: string): Promise<{ status: string; captureId: string }> {
+export async function paypalCaptureOrder(paypalOrderId: string): Promise<{
+  status: string;
+  captureId: string;
+  amount?: string;
+  currency?: string;
+  payerEmail?: string;
+}> {
   const token = await paypalGetToken();
   const PAYPAL_BASE = await getPaypalBase();
   const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${paypalOrderId}/capture`, {
@@ -366,8 +372,15 @@ export async function paypalCaptureOrder(paypalOrderId: string): Promise<{ statu
   });
   const data = await res.json() as any;
   const captureStatus = data.status;
-  const captureId = data.purchase_units?.[0]?.payments?.captures?.[0]?.id ?? data.id;
-  return { status: captureStatus, captureId };
+  const capture = data.purchase_units?.[0]?.payments?.captures?.[0];
+  const captureId = capture?.id ?? data.id;
+  return {
+    status: captureStatus,
+    captureId,
+    amount: capture?.amount?.value,
+    currency: capture?.amount?.currency_code,
+    payerEmail: data.payer?.email_address,
+  };
 }
 
 export function verifyAlipaySign(

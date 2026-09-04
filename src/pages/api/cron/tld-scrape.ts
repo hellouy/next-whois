@@ -167,6 +167,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (provided !== cronSecret) {
       return res.status(401).json({ error: "unauthorized" });
     }
+  } else {
+    // Fail-closed: without CRON_SECRET only an admin session may run the
+    // AI scrape pipeline (it consumes AI quota and writes tld_rules).
+    const { requireAdmin } = await import("@/lib/admin");
+    const session = await requireAdmin(req, res);
+    if (!session) return;
   }
 
   const batch = await getNextBatch();
