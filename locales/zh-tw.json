@@ -1039,20 +1039,22 @@
     "login_remember_me": "記住我（30天免重新登入）"
   },
   "tlds": {
-    "form_tld_label": "TLD / 網域後綴",
-    "form_protocol_label": "協議類型",
-    "form_host_label": "WHOIS 伺服器主機名稱",
-    "form_port_label": "連接埠（預設 43）",
-    "form_url_label": "URL 範本（用 {{domain}} 代表網域名稱）",
-    "form_method_label": "HTTP 方法",
-    "form_saving": "儲存中...",
-    "form_save": "儲存",
-    "form_cancel": "取消",
-    "toast_saved": "已儲存",
-    "toast_save_failed": "儲存失敗",
-    "toast_deleted": "已刪除",
-    "toast_delete_failed": "刪除失敗",
-    "not_supported": "暫不支援查詢"
+    "no_support": "不支援",
+    "supported": "支援查詢後綴",
+    "unsupported": "不支援查詢後綴",
+    "page_subtitle": "IANA 全量後綴，按是否具備可查詢的 WHOIS/RDAP 通道區分",
+    "stats_total": "共 {{total}} 個 IANA 後綴 · 至少一種協定可查的後綴可在此頁列出",
+    "showing_supported": "顯示 {{shown}} 個可查詢後綴（共 {{total}} 個）",
+    "showing_unsupported": "顯示 {{shown}} 個（共 {{total}} 個）",
+    "footer_supported": "標註 WHOIS/RDAP 表示該後綴存在可用的查詢通道 · 資料來源 IANA",
+    "footer_unsupported": "這些後綴在 IANA 註冊，但公開管道無可用 WHOIS/RDAP 伺服器，暫無法查詢",
+    "cctld": "國別網域",
+    "gtld": "通用頂級",
+    "search_placeholder": "搜尋後綴、國家名稱，如 com / 台灣 / china ...",
+    "search_placeholder_alt": "搜尋後綴或國家名稱...",
+    "loading": "正在載入 IANA 後綴列表...",
+    "no_match": "未找到符合的後綴",
+    "no_unsupported": "沒有不可查詢的後綴"
   },
   "ip": {
     "title": "IP / ASN 查詢",
@@ -1760,7 +1762,11 @@
   "close_announcement": "關閉公告",
   "home": {
     "stats_total": "次總查詢",
-    "stats_today": "次今日查詢"
+    "stats_today": "次今日查詢",
+    "quick_dns": "DNS 查詢",
+    "quick_ip": "IP 查詢",
+    "quick_ssl": "SSL 憑證",
+    "quick_icp": "ICP 備案"
   },
   "batch_check": {
     "page_title": "前綴可用性檢測",
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "將查詢 {{count}} 個後綴，結果會逐步顯示，請稍候。",
     "warn_anon_limit": "未登入使用者每次最多查詢 {{max}} 個後綴，登入後不受限制。",
     "popular_tlds_note": "常見商業後綴"
+  },
+  "links": {
+    "page_title": "友情連結",
+    "default_category": "推薦",
+    "default_content": "站長精選推薦 · 朋友們的網站",
+    "count": "{{count}} 個連結",
+    "loading": "載入中…",
+    "load_failed": "載入失敗，請稍後重試",
+    "empty": "暫無連結",
+    "empty_hint": "管理員尚未新增任何友情連結",
+    "apply_hint": "如需申請友鏈，請透過回饋表單聯絡管理員",
+    "go_feedback": "前往回饋表單"
+  },
+  "query": {
+    "loading_with_domain": "正在查詢 {{domain}}…",
+    "loading": "正在查詢…",
+    "step_connect": "連線 RDAP 伺服器…",
+    "step_whois": "查詢 WHOIS 資料庫…",
+    "step_parse": "解析註冊資訊…"
   }
 }

@@ -1039,20 +1039,22 @@
     "login_remember_me": "로그인 상태 유지 (30일)"
   },
   "tlds": {
-    "form_tld_label": "TLD / 도메인 확장자",
-    "form_protocol_label": "프로토콜 유형",
-    "form_host_label": "WHOIS 서버 호스트명",
-    "form_port_label": "포트 (기본값 43)",
-    "form_url_label": "URL 템플릿 ({{domain}}으로 도메인 이름 표시)",
-    "form_method_label": "HTTP 메서드",
-    "form_saving": "저장 중...",
-    "form_save": "저장",
-    "form_cancel": "취소",
-    "toast_saved": "저장됨",
-    "toast_save_failed": "저장 실패",
-    "toast_deleted": "삭제됨",
-    "toast_delete_failed": "삭제 실패",
-    "not_supported": "지원되지 않음"
+    "no_support": "미지원",
+    "supported": "조회 가능한 접미사",
+    "unsupported": "조회 불가 접미사",
+    "page_subtitle": "IANA 전체 접미사 목록, WHOIS/RDAP 조회 가능 여부로 분류",
+    "stats_total": "IANA 접미사 총 {{total}}개 · 최소 1개 프로토콜로 조회 가능한 항목이 여기 표시됩니다",
+    "showing_supported": "조회 가능한 접미사 {{total}}개 중 {{shown}}개 표시",
+    "showing_unsupported": "{{total}}개 중 {{shown}}개 표시",
+    "footer_supported": "WHOIS/RDAP 배지는 사용 가능한 조회 경로가 있음을 의미합니다 · 출처: IANA",
+    "footer_unsupported": "IANA에 등록되어 있지만 공개된 WHOIS/RDAP 서버가 없어 현재 조회할 수 없습니다",
+    "cctld": "국가 도메인",
+    "gtld": "일반 TLD",
+    "search_placeholder": "접미사·국가명 검색 (예: com / korea ...)",
+    "search_placeholder_alt": "접미사 또는 국가명 검색...",
+    "loading": "IANA 접미사 목록 로딩 중...",
+    "no_match": "일치하는 접미사가 없습니다",
+    "no_unsupported": "조회 불가 접미사가 없습니다"
   },
   "ip": {
     "title": "IP / ASN 조회",
@@ -1760,7 +1762,11 @@
   "close_announcement": "공지 닫기",
   "home": {
     "stats_total": "총 검색 수",
-    "stats_today": "오늘 검색 수"
+    "stats_today": "오늘 검색 수",
+    "quick_dns": "DNS 조회",
+    "quick_ip": "IP 조회",
+    "quick_ssl": "SSL 확인",
+    "quick_icp": "ICP 조회"
   },
   "batch_check": {
     "page_title": "접두사 가용성 확인",
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "{{count}}개 TLD를 확인합니다. 시간이 걸릴 수 있으며 결과는 완료되는 대로 표시됩니다.",
     "warn_anon_limit": "비로그인 사용자는 한 번에 최대 {{max}}개 TLD까지 확인할 수 있습니다. 로그인하면 제한이 해제됩니다.",
     "popular_tlds_note": "일반적인 상업용 TLD"
+  },
+  "links": {
+    "page_title": "링크 모음",
+    "default_category": "추천",
+    "default_content": "선별된 추천 · 친구들의 웹사이트",
+    "count": "링크 {{count}}개",
+    "loading": "불러오는 중…",
+    "load_failed": "불러오기에 실패했습니다. 잠시 후 다시 시도해 주세요",
+    "empty": "아직 링크가 없습니다",
+    "empty_hint": "아직 추가된 링크가 없습니다",
+    "apply_hint": "링크 신청은 피드백 양식을 통해 관리자에게 연락해 주세요",
+    "go_feedback": "피드백 양식으로 이동"
+  },
+  "query": {
+    "loading_with_domain": "{{domain}} 조회 중…",
+    "loading": "조회 중…",
+    "step_connect": "RDAP 서버 연결 중…",
+    "step_whois": "WHOIS 데이터베이스 조회 중…",
+    "step_parse": "등록 정보 파싱 중…"
   }
 }

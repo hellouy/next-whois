@@ -34,11 +34,10 @@ const card = {
 };
 
 export default function LinksPage() {
-  const { locale } = useTranslation();
+  const { t } = useTranslation();
   const settings = useSiteSettings();
-  const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || "WHOIS";
-  const pageTitle = settings.links_title || (isChinese ? "友情链接" : "Friendly Links");
+  const pageTitle = settings.links_title || t("links.page_title");
 
   const [links, setLinks] = React.useState<FriendlyLink[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -54,12 +53,12 @@ export default function LinksPage() {
   const grouped = React.useMemo(() => {
     const map = new Map<string, FriendlyLink[]>();
     links.forEach(link => {
-      const key = link.category || (isChinese ? "推荐" : "Recommended");
+      const key = link.category || t("links.default_category");
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(link);
     });
     return Array.from(map.entries());
-  }, [links, isChinese]);
+  }, [links, t]);
 
   return (
     <>
@@ -82,13 +81,13 @@ export default function LinksPage() {
               <div>
                 <h1 className="text-lg font-bold leading-none">{pageTitle}</h1>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {settings.links_content || (isChinese ? "站长精选推荐 · 朋友们的网站" : "Curated recommendations · friends' websites")}
+                  {settings.links_content || t("links.default_content")}
                 </p>
               </div>
             </div>
             {!loading && !error && (
               <span className="ml-auto text-[10px] text-muted-foreground hidden sm:block">
-                {links.length} {isChinese ? "个链接" : "links"}
+                {t("links.count", { count: links.length })}
               </span>
             )}
           </div>
@@ -103,7 +102,7 @@ export default function LinksPage() {
                 className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground"
               >
                 <RiLoader4Line className="w-7 h-7 animate-spin" />
-                <p className="text-sm">{isChinese ? "加载中…" : "Loading…"}</p>
+                <p className="text-sm">{t("links.loading")}</p>
               </motion.div>
             ) : error ? (
               <motion.div
@@ -112,7 +111,7 @@ export default function LinksPage() {
                 animate={{ opacity: 1 }}
                 className="py-24 text-center"
               >
-                <p className="text-sm text-muted-foreground">{isChinese ? "加载失败，请稍后重试" : "Failed to load, please try again"}</p>
+                <p className="text-sm text-muted-foreground">{t("links.load_failed")}</p>
               </motion.div>
             ) : links.length === 0 ? (
               <motion.div
@@ -123,10 +122,10 @@ export default function LinksPage() {
               >
                 <RiLinksLine className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
                 <p className="text-sm text-muted-foreground font-medium">
-                  {isChinese ? "暂无链接" : "No links yet"}
+                  {t("links.empty")}
                 </p>
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  {isChinese ? "管理员尚未添加任何友情链接" : "No friendly links have been added yet"}
+                  {t("links.empty_hint")}
                 </p>
               </motion.div>
             ) : (
@@ -195,15 +194,13 @@ export default function LinksPage() {
 
           <div className="mt-10 pt-6 border-t border-border/40 text-center space-y-2">
             <p className="text-[11px] text-muted-foreground/50">
-              {isChinese
-                ? "如需申请友链，请通过反馈表单联系管理员"
-                : "To apply for a friendly link, contact admin via feedback form"}
+              {t("links.apply_hint")}
             </p>
             <Link
               href="/feedback"
               className="text-[11px] text-primary hover:underline flex items-center gap-1 justify-center"
             >
-              {isChinese ? "前往反馈表单" : "Go to Feedback Form"}
+              {t("links.go_feedback")}
             </Link>
           </div>
         </main>

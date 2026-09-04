@@ -1039,20 +1039,22 @@
     "login_remember_me": "Angemeldet bleiben (30 Tage)"
   },
   "tlds": {
-    "form_tld_label": "TLD / Domain-Endung",
-    "form_protocol_label": "Protokolltyp",
-    "form_host_label": "WHOIS-Serverhostname",
-    "form_port_label": "Port (Standard 43)",
-    "form_url_label": "URL-Vorlage ({{domain}} für Domain verwenden)",
-    "form_method_label": "HTTP-Methode",
-    "form_saving": "Speichern...",
-    "form_save": "Speichern",
-    "form_cancel": "Abbrechen",
-    "toast_saved": "Gespeichert",
-    "toast_save_failed": "Speichern fehlgeschlagen",
-    "toast_deleted": "Gelöscht",
-    "toast_delete_failed": "Löschen fehlgeschlagen",
-    "not_supported": "Nicht unterstützt"
+    "no_support": "Nicht unterstützt",
+    "supported": "Abfragbare Suffixe",
+    "unsupported": "Nicht abfragbare Suffixe",
+    "page_subtitle": "Vollständige IANA-Suffixliste, sortiert nach WHOIS/RDAP-Verfügbarkeit",
+    "stats_total": "{{total}} IANA-Suffixe insgesamt · hier gelistet, wenn über mindestens ein Protokoll abfragbar",
+    "showing_supported": "{{shown}} von {{total}} abfragbaren Suffixen",
+    "showing_unsupported": "{{shown}} von {{total}}",
+    "footer_supported": "WHOIS/RDAP-Badges bedeuten: ein nutzbarer Abfrageweg existiert · Datenquelle: IANA",
+    "footer_unsupported": "Bei IANA registriert, aber ohne öffentlichen WHOIS/RDAP-Server — derzeit nicht abfragbar",
+    "cctld": "Länderdomain",
+    "gtld": "Generische TLD",
+    "search_placeholder": "Suffix oder Land suchen, z. B. com / germany ...",
+    "search_placeholder_alt": "Suffix oder Land suchen...",
+    "loading": "IANA-Suffixliste wird geladen...",
+    "no_match": "Keine passenden Suffixe gefunden",
+    "no_unsupported": "Keine nicht abfragbaren Suffixe"
   },
   "ip": {
     "title": "IP / ASN Suche",
@@ -1760,7 +1762,11 @@
   "close_announcement": "Ankündigung schließen",
   "home": {
     "stats_total": "Gesamtsuchen",
-    "stats_today": "Suchen heute"
+    "stats_today": "Suchen heute",
+    "quick_dns": "DNS-Lookup",
+    "quick_ip": "IP-Lookup",
+    "quick_ssl": "SSL-Check",
+    "quick_icp": "ICP-Abfrage"
   },
   "batch_check": {
     "page_title": "Präfix-Verfügbarkeitsprüfung",
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "{{count}} TLDs werden geprüft — das kann dauern. Ergebnisse erscheinen laufend.",
     "warn_anon_limit": "Anonyme Nutzer können maximal {{max}} TLDs gleichzeitig prüfen. Anmeldung hebt das Limit auf.",
     "popular_tlds_note": "Übliche kommerzielle TLDs"
+  },
+  "links": {
+    "page_title": "Empfehlungslinks",
+    "default_category": "Empfohlen",
+    "default_content": "Kuratierte Empfehlungen · Websites von Freunden",
+    "count": "{{count}} Links",
+    "loading": "Wird geladen…",
+    "load_failed": "Laden fehlgeschlagen, bitte später erneut versuchen",
+    "empty": "Noch keine Links",
+    "empty_hint": "Es wurden noch keine Empfehlungslinks hinzugefügt",
+    "apply_hint": "Um einen Link zu beantragen, kontaktieren Sie den Administrator über das Feedback-Formular",
+    "go_feedback": "Zum Feedback-Formular"
+  },
+  "query": {
+    "loading_with_domain": "{{domain}} wird abgefragt…",
+    "loading": "Wird abgefragt…",
+    "step_connect": "Verbindung zum RDAP-Server…",
+    "step_whois": "WHOIS-Datenbank wird abgefragt…",
+    "step_parse": "Registrierungsdaten werden analysiert…"
   }
 }

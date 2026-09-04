@@ -1038,20 +1038,22 @@
     "login_remember_me": "Запомнить меня (30 дней)"
   },
   "tlds": {
-    "form_tld_label": "TLD / Расширение домена",
-    "form_protocol_label": "Тип протокола",
-    "form_host_label": "Имя хоста WHOIS-сервера",
-    "form_port_label": "Порт (по умолчанию 43)",
-    "form_url_label": "Шаблон URL (используйте {{domain}} для имени домена)",
-    "form_method_label": "HTTP-метод",
-    "form_saving": "Сохранение...",
-    "form_save": "Сохранить",
-    "form_cancel": "Отмена",
-    "toast_saved": "Сохранено",
-    "toast_save_failed": "Сохранение не удалось",
-    "toast_deleted": "Удалено",
-    "toast_delete_failed": "Удаление не удалось",
-    "not_supported": "Не поддерживается"
+    "no_support": "Не поддерживается",
+    "supported": "Доступные суффиксы",
+    "unsupported": "Недоступные суффиксы",
+    "page_subtitle": "Полный список суффиксов IANA, сгруппированный по доступности WHOIS/RDAP",
+    "stats_total": "Всего суффиксов IANA: {{total}} · здесь показаны доступные хотя бы по одному протоколу",
+    "showing_supported": "Показано {{shown}} из {{total}} доступных суффиксов",
+    "showing_unsupported": "Показано {{shown}} из {{total}}",
+    "footer_supported": "Значки WHOIS/RDAP означают наличие рабочего канала запроса · Источник: IANA",
+    "footer_unsupported": "Зарегистрированы в IANA, но без публичного WHOIS/RDAP-сервера — запрос пока невозможен",
+    "cctld": "Национальный домен",
+    "gtld": "Общий TLD",
+    "search_placeholder": "Поиск по суффиксу или стране, напр. com / russia ...",
+    "search_placeholder_alt": "Поиск по суффиксу или стране...",
+    "loading": "Загрузка списка суффиксов IANA...",
+    "no_match": "Подходящих суффиксов не найдено",
+    "no_unsupported": "Недоступных суффиксов нет"
   },
   "ip": {
     "title": "Поиск IP / ASN",
@@ -1759,7 +1761,11 @@
   "close_announcement": "Закрыть объявление",
   "home": {
     "stats_total": "всего запросов",
-    "stats_today": "запросов сегодня"
+    "stats_today": "запросов сегодня",
+    "quick_dns": "DNS-запрос",
+    "quick_ip": "IP-запрос",
+    "quick_ssl": "SSL-проверка",
+    "quick_icp": "ICP-проверка"
   },
   "back_to_top": "Наверх",
   "batch_check": {
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "Проверяется {{count}} TLD — это может занять время. Результаты появляются по мере готовности.",
     "warn_anon_limit": "Анонимные пользователи: максимум {{max}} TLD за раз. Войдите, чтобы снять лимит.",
     "popular_tlds_note": "Популярные коммерческие TLD"
+  },
+  "links": {
+    "page_title": "Дружественные ссылки",
+    "default_category": "Рекомендуем",
+    "default_content": "Подборка администратора · сайты друзей",
+    "count": "{{count}} ссылок",
+    "loading": "Загрузка…",
+    "load_failed": "Не удалось загрузить, попробуйте позже",
+    "empty": "Ссылок пока нет",
+    "empty_hint": "Дружественные ссылки ещё не добавлены",
+    "apply_hint": "Чтобы добавить свою ссылку, свяжитесь с администратором через форму обратной связи",
+    "go_feedback": "Перейти к форме обратной связи"
+  },
+  "query": {
+    "loading_with_domain": "Запрос {{domain}}…",
+    "loading": "Запрос…",
+    "step_connect": "Подключение к серверу RDAP…",
+    "step_whois": "Запрос к базе WHOIS…",
+    "step_parse": "Разбор данных регистрации…"
   }
 }

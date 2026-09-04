@@ -100,6 +100,59 @@ const DEFAULT_KEYWORDS    = "whois查询, rdap, 域名查询, 域名注册信息
 const DEFAULT_LOGO        = "WHOIS";
 const DEFAULT_TAGLINE     = "专业的 WHOIS / RDAP 查询工具";
 
+// Locale-aware fallbacks applied client-side when the ISR-rendered SEO props
+// still carry the (Chinese) defaults, i.e. no custom settings were configured.
+const SEO_FALLBACKS: Record<string, { title: string; description: string; keywords: string; tagline: string }> = {
+  en: {
+    title: "RDAP+WHOIS Lookup · Free Online Domain Info Tool",
+    description: "Free online WHOIS / RDAP lookup tool. Query domain registration info, registrar, creation and expiry dates, DNS, status and more. Supports international domains and IP addresses.",
+    keywords: "whois, rdap, domain lookup, domain registration info, domain expiry, whois tool, domain info, ip lookup, domain status",
+    tagline: "Professional WHOIS / RDAP lookup tool",
+  },
+  zh: {
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESC,
+    keywords: DEFAULT_KEYWORDS,
+    tagline: DEFAULT_TAGLINE,
+  },
+  "zh-tw": {
+    title: "RDAP+WHOIS 網域查詢 · 免費線上網域資訊查詢工具",
+    description: "免費線上 WHOIS / RDAP 網域查詢工具，支援查詢網域註冊資訊、註冊商、註冊日期、到期時間、DNS、狀態等，支援國際網域和 IP 位址查詢。",
+    keywords: "whois查詢, rdap, 網域查詢, 網域註冊資訊, 網域到期, whois工具, 網域資訊, ip查詢, 網域狀態",
+    tagline: "專業的 WHOIS / RDAP 查詢工具",
+  },
+  ja: {
+    title: "RDAP+WHOIS ドメイン検索 · 無料オンラインドメイン情報ツール",
+    description: "無料のオンライン WHOIS / RDAP 検索ツール。ドメインの登録情報、レジストラ、登録日・有効期限、DNS、ステータスなどを照会できます。国際ドメインと IP アドレスに対応。",
+    keywords: "whois検索, rdap, ドメイン検索, ドメイン登録情報, ドメイン有効期限, whoisツール, ドメイン情報, ip検索, ドメインステータス",
+    tagline: "プロフェッショナルな WHOIS / RDAP 検索ツール",
+  },
+  ko: {
+    title: "RDAP+WHOIS 도메인 조회 · 무료 온라인 도메인 정보 도구",
+    description: "무료 온라인 WHOIS / RDAP 조회 도구. 도메인 등록 정보, 등록기관, 등록일, 만료일, DNS, 상태 등을 조회할 수 있으며 국제 도메인과 IP 주소를 지원합니다.",
+    keywords: "whois조회, rdap, 도메인조회, 도메인등록정보, 도메인만료, whois도구, 도메인정보, ip조회, 도메인상태",
+    tagline: "전문 WHOIS / RDAP 조회 도구",
+  },
+  de: {
+    title: "RDAP+WHOIS Lookup · Kostenloses Online-Domain-Info-Tool",
+    description: "Kostenloses Online-Tool für WHOIS / RDAP-Abfragen. Registrierungsdaten, Registrar, Registrierungs- und Ablaufdatum, DNS, Status und mehr — für internationale Domains und IP-Adressen.",
+    keywords: "whois abfrage, rdap, domain lookup, domain registrierungsinfo, domain ablauf, whois tool, domain info, ip lookup, domain status",
+    tagline: "Professionelles WHOIS / RDAP-Lookup-Tool",
+  },
+  fr: {
+    title: "RDAP+WHOIS Recherche · Outil gratuit d'informations sur les domaines",
+    description: "Outil gratuit en ligne WHOIS / RDAP. Consultez les informations d'enregistrement des domaines, le registrar, les dates de création et d'expiration, le DNS, le statut et plus. Domaines internationaux et adresses IP.",
+    keywords: "whois, rdap, recherche domaine, infos enregistrement domaine, expiration domaine, outil whois, infos domaine, lookup ip, statut domaine",
+    tagline: "Outil professionnel de recherche WHOIS / RDAP",
+  },
+  ru: {
+    title: "RDAP+WHOIS проверка · бесплатный онлайн-инструмент о доменах",
+    description: "Бесплатный онлайн-инструмент WHOIS / RDAP. Данные регистрации домена, регистратор, даты создания и истечения, DNS, статус и другое. Поддержка международных доменов и IP-адресов.",
+    keywords: "whois проверка, rdap, проверка домена, данные регистрации домена, срок домена, whois инструмент, информация о домене, проверка ip, статус домена",
+    tagline: "Профессиональный инструмент WHOIS / RDAP",
+  },
+};
+
 const DEFAULT_SEO: HomeSeo = {
   title:             DEFAULT_TITLE,
   description:       DEFAULT_DESC,
@@ -120,10 +173,20 @@ const DEFAULT_SEO: HomeSeo = {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
-  const seo = seoProp ?? DEFAULT_SEO;
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const isChinese = locale === "zh";
+  const fb = SEO_FALLBACKS[locale] ?? SEO_FALLBACKS.en;
+  const seo = React.useMemo<HomeSeo>(() => {
+    const base = seoProp ?? DEFAULT_SEO;
+    return {
+      ...base,
+      title: base.title === DEFAULT_TITLE ? fb.title : base.title,
+      description: base.description === DEFAULT_DESC ? fb.description : base.description,
+      keywords: base.keywords === DEFAULT_KEYWORDS ? fb.keywords : base.keywords,
+      ogTitle: base.ogTitle === DEFAULT_TITLE ? fb.title : base.ogTitle,
+      tagline: base.tagline === DEFAULT_TAGLINE ? fb.tagline : base.tagline,
+    };
+  }, [seoProp, fb]);
   const settings = useSiteSettings();
   const stats = usePublicStats(seo.showStats);
 
@@ -237,7 +300,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               transition={{ duration: 0.18, ease: "easeOut" }}
               className="mt-3"
             >
-              <QueryLoadingSkeleton isChinese={isChinese} domain={searchingDomain} />
+              <QueryLoadingSkeleton domain={searchingDomain} />
             </motion.div>
           ) : (
             <div key="home">
@@ -282,7 +345,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               transition={{ duration: 0.18, ease: "easeOut" }}
               className="flex-1 overflow-y-auto"
             >
-              <QueryLoadingSkeleton isChinese={isChinese} domain={searchingDomain} />
+              <QueryLoadingSkeleton domain={searchingDomain} />
             </motion.div>
           ) : (
             <React.Fragment key="home">
@@ -308,20 +371,12 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
 
               {/* Quick-access tool links — pinned at bottom, above footer copyright */}
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                {(isChinese
-                  ? [
-                      { href: "/dns", label: "DNS 查询" },
-                      { href: "/ip",  label: "IP 查询" },
-                      { href: "/ssl", label: "SSL 证书" },
-                      { href: "/icp", label: "ICP 备案" },
-                    ]
-                  : [
-                      { href: "/dns", label: "DNS Lookup" },
-                      { href: "/ip",  label: "IP Lookup" },
-                      { href: "/ssl", label: "SSL Check" },
-                      { href: "/icp", label: "ICP Query" },
-                    ]
-                ).map(({ href, label }) => (
+                {[
+                  { href: "/dns", label: t("home.quick_dns") },
+                  { href: "/ip",  label: t("home.quick_ip") },
+                  { href: "/ssl", label: t("home.quick_ssl") },
+                  { href: "/icp", label: t("home.quick_icp") },
+                ].map(({ href, label }) => (
                   <Link
                     key={href}
                     href={href}

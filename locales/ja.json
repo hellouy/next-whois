@@ -1038,20 +1038,22 @@
     "login_remember_me": "ログイン状態を保持（30日間）"
   },
   "tlds": {
-    "form_tld_label": "TLD / ドメイン拡張子",
-    "form_protocol_label": "プロトコルタイプ",
-    "form_host_label": "WHOISサーバーホスト名",
-    "form_port_label": "ポート（デフォルト43）",
-    "form_url_label": "URLテンプレート（{{domain}}でドメイン名を表す）",
-    "form_method_label": "HTTPメソッド",
-    "form_saving": "保存中...",
-    "form_save": "保存",
-    "form_cancel": "キャンセル",
-    "toast_saved": "保存しました",
-    "toast_save_failed": "保存に失敗しました",
-    "toast_deleted": "削除しました",
-    "toast_delete_failed": "削除に失敗しました",
-    "not_supported": "未対応"
+    "no_support": "非対応",
+    "supported": "クエリ可能なサフィックス",
+    "unsupported": "クエリ不可のサフィックス",
+    "page_subtitle": "IANA の全サフィックス一覧。WHOIS/RDAP クエリの可否で分類",
+    "stats_total": "IANA サフィックス全 {{total}} 件 · 少なくとも 1 つのプロトコルでクエリ可能なものがここに表示されます",
+    "showing_supported": "クエリ可能なサフィックス {{total}} 件中 {{shown}} 件を表示",
+    "showing_unsupported": "{{total}} 件中 {{shown}} 件を表示",
+    "footer_supported": "WHOIS/RDAP バッジは利用可能なクエリ経路が存在することを示します · データソース: IANA",
+    "footer_unsupported": "IANA に登録されていますが、公開された WHOIS/RDAP サーバーがなく、現在クエリできません",
+    "cctld": "国別ドメイン",
+    "gtld": "汎用 TLD",
+    "search_placeholder": "サフィックス・国名で検索（例: com / japan ...）",
+    "search_placeholder_alt": "サフィックスまたは国名で検索...",
+    "loading": "IANA サフィックス一覧を読み込み中...",
+    "no_match": "一致するサフィックスが見つかりません",
+    "no_unsupported": "クエリ不可のサフィックスはありません"
   },
   "ip": {
     "title": "IP / ASN 検索",
@@ -1759,7 +1761,11 @@
   "close_announcement": "お知らせを閉じる",
   "home": {
     "stats_total": "総検索数",
-    "stats_today": "本日の検索数"
+    "stats_today": "本日の検索数",
+    "quick_dns": "DNS 検索",
+    "quick_ip": "IP 検索",
+    "quick_ssl": "SSL 証明書",
+    "quick_icp": "ICP 登録"
   },
   "back_to_top": "トップに戻る",
   "batch_check": {
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "{{count}} 個の TLD をチェック中です。完了順に結果が表示されます。",
     "warn_anon_limit": "未ログインユーザーは一度に最大 {{max}} 個の TLD までです。ログインで制限解除。",
     "popular_tlds_note": "一般的な商用 TLD"
+  },
+  "links": {
+    "page_title": "リンク集",
+    "default_category": "おすすめ",
+    "default_content": "管理者厳選の推薦 · 友達のサイト",
+    "count": "{{count}} 件のリンク",
+    "loading": "読み込み中…",
+    "load_failed": "読み込みに失敗しました。後でもう一度お試しください",
+    "empty": "リンクはまだありません",
+    "empty_hint": "まだ友情リンクが追加されていません",
+    "apply_hint": "リンクを申請するには、フィードバックフォームから管理者にご連絡ください",
+    "go_feedback": "フィードバックフォームへ"
+  },
+  "query": {
+    "loading_with_domain": "{{domain}} を検索中…",
+    "loading": "検索中…",
+    "step_connect": "RDAP サーバーに接続中…",
+    "step_whois": "WHOIS データベースを照会中…",
+    "step_parse": "登録情報を解析中…"
   }
 }

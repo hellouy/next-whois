@@ -1039,20 +1039,22 @@
     "login_remember_me": "Remember me (stay signed in for 30 days)"
   },
   "tlds": {
-    "form_tld_label": "TLD / Domain Extension",
-    "form_protocol_label": "Protocol Type",
-    "form_host_label": "WHOIS Server Hostname",
-    "form_port_label": "Port (default 43)",
-    "form_url_label": "URL Template (use {{domain}} for domain name)",
-    "form_method_label": "HTTP Method",
-    "form_saving": "Saving...",
-    "form_save": "Save",
-    "form_cancel": "Cancel",
-    "toast_saved": "Saved",
-    "toast_save_failed": "Save failed",
-    "toast_deleted": "Deleted",
-    "toast_delete_failed": "Delete failed",
-    "not_supported": "Not supported"
+    "no_support": "No support",
+    "supported": "Supported Suffixes",
+    "unsupported": "Unsupported Suffixes",
+    "page_subtitle": "Full IANA suffix list, split by WHOIS/RDAP query availability",
+    "stats_total": "{{total}} IANA suffixes total · listed here when queryable via at least one protocol",
+    "showing_supported": "Showing {{shown}} of {{total}} queryable suffixes",
+    "showing_unsupported": "Showing {{shown}} of {{total}}",
+    "footer_supported": "WHOIS/RDAP badges mean a usable query path exists · Data source: IANA",
+    "footer_unsupported": "Registered at IANA but expose no WHOIS/RDAP server — not queryable at present",
+    "cctld": "ccTLD",
+    "gtld": "gTLD",
+    "search_placeholder": "Search TLD or country, e.g. com / china ...",
+    "search_placeholder_alt": "Search suffix or country...",
+    "loading": "Loading IANA TLD list...",
+    "no_match": "No matching suffixes found",
+    "no_unsupported": "No unsupported suffixes"
   },
   "ip": {
     "title": "IP / ASN Lookup",
@@ -1760,7 +1762,11 @@
   "close_announcement": "Close announcement",
   "home": {
     "stats_total": "total searches",
-    "stats_today": "searches today"
+    "stats_today": "searches today",
+    "quick_dns": "DNS Lookup",
+    "quick_ip": "IP Lookup",
+    "quick_ssl": "SSL Check",
+    "quick_icp": "ICP Query"
   },
   "batch_check": {
     "page_title": "Prefix Availability Check",
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "Querying {{count}} TLDs — this may take a while. Results appear as they complete.",
     "warn_anon_limit": "Anonymous users can check up to {{max}} TLDs at once. Log in to remove the limit.",
     "popular_tlds_note": "Common commercial TLDs"
+  },
+  "links": {
+    "page_title": "Friendly Links",
+    "default_category": "Recommended",
+    "default_content": "Curated recommendations · friends' websites",
+    "count": "{{count}} links",
+    "loading": "Loading…",
+    "load_failed": "Failed to load, please try again",
+    "empty": "No links yet",
+    "empty_hint": "No friendly links have been added yet",
+    "apply_hint": "To apply for a friendly link, contact admin via feedback form",
+    "go_feedback": "Go to Feedback Form"
+  },
+  "query": {
+    "loading_with_domain": "Querying {{domain}}…",
+    "loading": "Querying…",
+    "step_connect": "Connecting to RDAP server…",
+    "step_whois": "Querying WHOIS database…",
+    "step_parse": "Parsing registration data…"
   }
 }

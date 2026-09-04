@@ -24,6 +24,7 @@ type TabType = "supported" | "unsupported";
 const isSupported = (e: TldInfo) => e.hasWhois || e.hasRdap;
 
 const TldCard = React.memo(function TldCard({ entry, isChinese }: { entry: TldInfo; isChinese: boolean }) {
+  const { t } = useTranslation();
   const isCc = entry.type === "cctld";
   const isIdn = entry.tld.startsWith("xn--");
   const countryLabel = isChinese ? entry.country : entry.countryEn;
@@ -58,7 +59,7 @@ const TldCard = React.memo(function TldCard({ entry, isChinese }: { entry: TldIn
         )}
         {!entry.hasWhois && !entry.hasRdap && (
           <span className="text-[9px] px-1.5 py-0 h-4 leading-4 rounded-sm bg-red-500/8 text-red-400/70 dark:text-red-500/60 border border-red-400/20 inline-flex items-center">
-            {isChinese ? "不支持" : "No support"}
+            {t("tlds.no_support")}
           </span>
         )}
       </div>
@@ -67,7 +68,7 @@ const TldCard = React.memo(function TldCard({ entry, isChinese }: { entry: TldIn
 });
 
 export default function TldsPage() {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const settings = useSiteSettings();
   const isChinese = locale === "zh" || locale === "zh-tw";
   const siteName = settings.site_logo_text || "WHOIS";
@@ -127,9 +128,7 @@ export default function TldsPage() {
   const handleFilterClick = (f: FilterType) => setTypeFilter((prev) => (prev === f ? "all" : f));
 
   const pageTitle =
-    tab === "supported"
-      ? (isChinese ? "支持查询后缀" : "Supported Suffixes")
-      : (isChinese ? "不支持查询后缀" : "Unsupported Suffixes");
+    tab === "supported" ? t("tlds.supported") : t("tlds.unsupported");
 
   return (
     <>
@@ -153,9 +152,7 @@ export default function TldsPage() {
               <div className="min-w-0">
                 <h1 className="text-lg font-bold leading-none">{pageTitle}</h1>
                 <p className="text-[11px] text-muted-foreground mt-0.5 break-words">
-                  {isChinese
-                    ? "IANA 全量后缀，按是否具备可查询的 WHOIS/RDAP 通道区分"
-                    : "Full IANA suffix list, split by WHOIS/RDAP query availability"}
+                  {t("tlds.page_subtitle")}
                 </p>
               </div>
             </div>
@@ -175,7 +172,7 @@ export default function TldsPage() {
               >
                 <RiCheckboxCircleLine className={["w-4 h-4 mx-auto mb-1 transition-colors", tab === "supported" ? "text-emerald-500" : "text-emerald-400/70"].join(" ")} />
                 <p className="text-lg font-bold tabular-nums">{data.supportedCount ?? supported.length}</p>
-                <p className="text-[10px] text-muted-foreground">{isChinese ? "支持查询后缀" : "Queryable"}</p>
+                <p className="text-[10px] text-muted-foreground">{t("tlds.supported")}</p>
               </button>
               <button
                 onClick={() => setTab("unsupported")}
@@ -188,7 +185,7 @@ export default function TldsPage() {
               >
                 <RiCloseCircleLine className={["w-4 h-4 mx-auto mb-1 transition-colors", tab === "unsupported" ? "text-red-500" : "text-red-400/70"].join(" ")} />
                 <p className="text-lg font-bold tabular-nums">{data.unsupportedCount ?? unsupported.length}</p>
-                <p className="text-[10px] text-muted-foreground">{isChinese ? "不支持查询后缀" : "Not queryable"}</p>
+                <p className="text-[10px] text-muted-foreground">{t("tlds.unsupported")}</p>
               </button>
             </div>
           )}
@@ -203,9 +200,7 @@ export default function TldsPage() {
                 RDAP {rdapCount}
               </span>
               <span className="text-[11px] text-muted-foreground ml-1">
-                {isChinese
-                  ? `共 ${data?.total ?? 0} 个 IANA 后缀 · 至少一种协议可查的后缀可在此页列出`
-                  : `${data?.total ?? 0} IANA suffixes total · listed here when queryable via at least one protocol`}
+                {t("tlds.stats_total", { total: data?.total ?? 0 })}
               </span>
             </div>
           )}
@@ -226,9 +221,7 @@ export default function TldsPage() {
                   ? <RiCheckboxCircleLine className="w-4 h-4 shrink-0" />
                   : <RiCloseCircleLine className="w-4 h-4 shrink-0" />}
                 <span className="truncate">
-                  {key === "supported"
-                    ? (isChinese ? "支持查询后缀" : "Queryable Suffixes")
-                    : (isChinese ? "不支持查询后缀" : "Unsupported Suffixes")}
+                  {key === "supported" ? t("tlds.supported") : t("tlds.unsupported")}
                 </span>
               </button>
             ))}
@@ -248,7 +241,7 @@ export default function TldsPage() {
                     ].join(" ")}
                   >
                     <RiFlagLine className="w-3.5 h-3.5" />
-                    {isChinese ? "国别域名" : "ccTLD"}
+                    {t("tlds.cctld")}
                     <span className="font-mono tabular-nums">{supported.filter((x) => x.type === "cctld").length}</span>
                   </button>
                   <button
@@ -261,7 +254,7 @@ export default function TldsPage() {
                     ].join(" ")}
                   >
                     <RiStarLine className="w-3.5 h-3.5" />
-                    {isChinese ? "通用顶级" : "gTLD"}
+                    {t("tlds.gtld")}
                     <span className="font-mono tabular-nums">{supported.filter((x) => x.type === "gtld").length}</span>
                   </button>
                 </div>
@@ -273,7 +266,7 @@ export default function TldsPage() {
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder={isChinese ? "搜索后缀、国家名称，如 com / 中国 / china ..." : "Search TLD or country, e.g. com / china ..."}
+                    placeholder={t("tlds.search_placeholder")}
                     className="pl-9 h-9 text-sm"
                   />
                 </div>
@@ -282,19 +275,17 @@ export default function TldsPage() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <RiLoader4Line className="w-6 h-6 text-muted-foreground animate-spin" />
-                  <p className="text-sm text-muted-foreground">{isChinese ? "正在加载 IANA 后缀列表..." : "Loading IANA TLD list..."}</p>
+                  <p className="text-sm text-muted-foreground">{t("tlds.loading")}</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-16">
                   <RiGlobalLine className="w-8 h-8 mx-auto text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">{isChinese ? "未找到匹配的后缀" : "No matching suffixes found"}</p>
+                  <p className="text-sm text-muted-foreground">{t("tlds.no_match")}</p>
                 </div>
               ) : (
                 <>
                   <p className="text-[11px] text-muted-foreground mb-3">
-                    {isChinese
-                      ? `显示 ${filtered.length} 个可查询后缀（共 ${supported.length} 个）`
-                      : `Showing ${filtered.length} of ${supported.length} queryable suffixes`}
+                    {t("tlds.showing_supported", { shown: filtered.length, total: supported.length })}
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {filtered.map((entry) => (
@@ -306,9 +297,7 @@ export default function TldsPage() {
 
               <div className="mt-10 pt-6 border-t border-border/40 text-center">
                 <p className="text-[11px] text-muted-foreground/50">
-                  {isChinese
-                    ? "标注 WHOIS/RDAP 表示该后缀存在可用的查询通道 · 数据来源 IANA"
-                    : "WHOIS/RDAP badges mean a usable query path exists · Data source: IANA"}
+                  {t("tlds.footer_supported")}
                 </p>
               </div>
             </div>
@@ -320,7 +309,7 @@ export default function TldsPage() {
                   <Input
                     value={uSearch}
                     onChange={(e) => setUSearch(e.target.value)}
-                    placeholder={isChinese ? "搜索后缀或国家名称..." : "Search suffix or country..."}
+                    placeholder={t("tlds.search_placeholder_alt")}
                     className="pl-9 h-9 text-sm"
                   />
                 </div>
@@ -329,21 +318,19 @@ export default function TldsPage() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <RiLoader4Line className="w-6 h-6 text-muted-foreground animate-spin" />
-                  <p className="text-sm text-muted-foreground">{isChinese ? "正在加载 IANA 后缀列表..." : "Loading IANA TLD list..."}</p>
+                  <p className="text-sm text-muted-foreground">{t("tlds.loading")}</p>
                 </div>
               ) : filteredUnsupported.length === 0 ? (
                 <div className="text-center py-16">
                   <RiCheckboxCircleLine className="w-8 h-8 mx-auto text-emerald-500/50 mb-3" />
                   <p className="text-sm text-muted-foreground">
-                    {isChinese ? "没有不可查询的后缀" : "No unsupported suffixes"}
+                    {t("tlds.no_unsupported")}
                   </p>
                 </div>
               ) : (
                 <>
                   <p className="text-[11px] text-muted-foreground mb-3">
-                    {isChinese
-                      ? `显示 ${filteredUnsupported.length} 个（共 ${unsupported.length} 个）`
-                      : `Showing ${filteredUnsupported.length} of ${unsupported.length}`}
+                    {t("tlds.showing_unsupported", { shown: filteredUnsupported.length, total: unsupported.length })}
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {filteredUnsupported.map((entry) => (
@@ -355,9 +342,7 @@ export default function TldsPage() {
 
               <div className="mt-10 pt-6 border-t border-border/40 text-center">
                 <p className="text-[11px] text-muted-foreground/50">
-                  {isChinese
-                    ? "这些后缀在 IANA 注册，但公开渠道无可用 WHOIS/RDAP 服务器，暂无法查询"
-                    : "Registered at IANA but expose no WHOIS/RDAP server — not queryable at present"}
+                  {t("tlds.footer_unsupported")}
                 </p>
               </div>
             </div>

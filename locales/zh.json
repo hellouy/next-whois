@@ -1039,20 +1039,22 @@
     "login_remember_me": "记住我（30天免重新登录）"
   },
   "tlds": {
-    "form_tld_label": "TLD / 域名后缀",
-    "form_protocol_label": "协议类型",
-    "form_host_label": "WHOIS 服务器主机名",
-    "form_port_label": "端口（默认 43）",
-    "form_url_label": "URL 模板（用 {{domain}} 代表域名）",
-    "form_method_label": "HTTP 方法",
-    "form_saving": "保存中...",
-    "form_save": "保存",
-    "form_cancel": "取消",
-    "toast_saved": "已保存",
-    "toast_save_failed": "保存失败",
-    "toast_deleted": "已删除",
-    "toast_delete_failed": "删除失败",
-    "not_supported": "暂不支持查询"
+    "no_support": "不支持",
+    "supported": "支持查询后缀",
+    "unsupported": "不支持查询后缀",
+    "page_subtitle": "IANA 全量后缀，按是否具备可查询的 WHOIS/RDAP 通道区分",
+    "stats_total": "共 {{total}} 个 IANA 后缀 · 至少一种协议可查的后缀可在此页列出",
+    "showing_supported": "显示 {{shown}} 个可查询后缀（共 {{total}} 个）",
+    "showing_unsupported": "显示 {{shown}} 个（共 {{total}} 个）",
+    "footer_supported": "标注 WHOIS/RDAP 表示该后缀存在可用的查询通道 · 数据来源 IANA",
+    "footer_unsupported": "这些后缀在 IANA 注册，但公开渠道无可用 WHOIS/RDAP 服务器，暂无法查询",
+    "cctld": "国别域名",
+    "gtld": "通用顶级",
+    "search_placeholder": "搜索后缀、国家名称，如 com / 中国 / china ...",
+    "search_placeholder_alt": "搜索后缀或国家名称...",
+    "loading": "正在加载 IANA 后缀列表...",
+    "no_match": "未找到匹配的后缀",
+    "no_unsupported": "没有不可查询的后缀"
   },
   "ip": {
     "title": "IP / ASN 查询",
@@ -1760,7 +1762,11 @@
   "close_announcement": "关闭公告",
   "home": {
     "stats_total": "次总查询",
-    "stats_today": "次今日查询"
+    "stats_today": "次今日查询",
+    "quick_dns": "DNS 查询",
+    "quick_ip": "IP 查询",
+    "quick_ssl": "SSL 证书",
+    "quick_icp": "ICP 备案"
   },
   "batch_check": {
     "page_title": "前缀可用性检测",
@@ -1807,5 +1813,24 @@
     "warn_large_batch": "将查询 {{count}} 个后缀，结果会逐步显示，请稍候。",
     "warn_anon_limit": "未登录用户每次最多查询 {{max}} 个后缀，登录后不受限制。",
     "popular_tlds_note": "常见商业后缀"
+  },
+  "links": {
+    "page_title": "友情链接",
+    "default_category": "推荐",
+    "default_content": "站长精选推荐 · 朋友们的网站",
+    "count": "{{count}} 个链接",
+    "loading": "加载中…",
+    "load_failed": "加载失败，请稍后重试",
+    "empty": "暂无链接",
+    "empty_hint": "管理员尚未添加任何友情链接",
+    "apply_hint": "如需申请友链，请通过反馈表单联系管理员",
+    "go_feedback": "前往反馈表单"
+  },
+  "query": {
+    "loading_with_domain": "正在查询 {{domain}}…",
+    "loading": "正在查询…",
+    "step_connect": "连接 RDAP 服务器…",
+    "step_whois": "查询 WHOIS 数据库…",
+    "step_parse": "解析注册信息…"
   }
 }

@@ -1494,7 +1494,7 @@ export default function LookupPage({
 
           <AnimatePresence initial={false}>
           {loading && !status && (
-            <QueryLoadingSkeleton isChinese={isChinese} domain={displayTarget} />
+            <QueryLoadingSkeleton domain={displayTarget} />
           )}
           </AnimatePresence>
 

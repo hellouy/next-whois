@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils";
 import { RiGlobalLine } from "@remixicon/react";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 interface QueryLoadingSkeletonProps {
-  isChinese: boolean;
   domain?: string;
 }
 
-export function QueryLoadingSkeleton({ isChinese, domain }: QueryLoadingSkeletonProps) {
+export function QueryLoadingSkeleton({ domain }: QueryLoadingSkeletonProps) {
+  const { t } = useTranslation();
   return (
     <motion.div
       key="skeleton"
@@ -52,8 +53,8 @@ export function QueryLoadingSkeleton({ isChinese, domain }: QueryLoadingSkeleton
           <div className="text-center space-y-2">
             <p className="text-sm font-semibold tracking-[0.06em] text-foreground/70 select-none">
               {domain
-                ? (isChinese ? `正在查询 ${domain}…` : `Querying ${domain}…`)
-                : (isChinese ? "正在查询…" : "Querying…")}
+                ? t("query.loading_with_domain", { domain })
+                : t("query.loading")}
             </p>
             <p className="text-[11px] text-muted-foreground/45 select-none tracking-wide">
               RDAP · WHOIS · DNS
@@ -62,10 +63,11 @@ export function QueryLoadingSkeleton({ isChinese, domain }: QueryLoadingSkeleton
 
           {/* Step list */}
           <div className="w-full max-w-[280px] space-y-2">
-            {(isChinese
-              ? ["连接 RDAP 服务器…", "查询 WHOIS 数据库…", "解析注册信息…"]
-              : ["Connecting to RDAP server…", "Querying WHOIS database…", "Parsing registration data…"]
-            ).map((step, i) => (
+            {[
+              t("query.step_connect"),
+              t("query.step_whois"),
+              t("query.step_parse"),
+            ].map((step, i) => (
               <div key={i} className="flex items-center gap-2.5"
                 style={{ animation: "sk-step 0.35s ease both", animationDelay: `${0.2 + i * 0.38}s` }}>
                 <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-primary/45 animate-pulse"
