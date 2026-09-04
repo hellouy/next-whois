@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, isDbReady } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/orders");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
@@ -22,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res.json({ orders });
   } catch (err: any) {
-    console.error("[user/orders]", err.message);
+    logger.error("[user/orders]", err.message);
     return res.status(500).json({ error: "Failed to retrieve orders" });
   }
 }

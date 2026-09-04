@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { run, isDbReady } from "@/lib/db-query";
 import { randomBytes } from "crypto";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/sponsors/submit");
 
 export const config = { maxDuration: 10 };
 
@@ -68,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res.json({ ok: true, id });
   } catch (err: any) {
-    console.error("[sponsors/submit] error:", err.message);
+    logger.error("[sponsors/submit] error:", err.message);
     return res.status(500).json({ error: "Submission failed, please try again later" });
   }
 }

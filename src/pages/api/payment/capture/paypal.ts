@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { paypalCaptureOrder, markOrderPaid } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/capture/paypal");
 
 export const config = { maxDuration: 15 };
 
@@ -38,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const captured = Number(amount);
       const orderCurrency = (order.currency === "CNY" ? "USD" : order.currency).toUpperCase();
       if (!Number.isFinite(captured) || captured + 0.001 < order.amount || captured > order.amount + 0.001 || (currency ?? "").toUpperCase() !== orderCurrency) {
-        console.error(
+        logger.error(
           `[paypal capture] Order ${orderId} amount mismatch — order=${order.amount} ${orderCurrency}, captured=${amount} ${currency}; NOT marking paid`
         );
         return res.redirect(`/payment/result?order=${orderId}&status=error`);
@@ -49,12 +52,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         providerOrderId: captureId || paypalOrderId,
         webhookRaw: JSON.stringify({ paypal_order_id: paypalOrderId, capture_id: captureId, amount, currency }),
       });
-      console.log(`[paypal capture] Order ${orderId} paid — capture=${captureId}`);
+      logger.info(`[paypal capture] Order ${orderId} paid — capture=${captureId}`);
     } else {
-      console.warn(`[paypal capture] Order ${orderId} — PayPal status=${status}`);
+      logger.warn(`[paypal capture] Order ${orderId} — PayPal status=${status}`);
     }
   } catch (err: any) {
-    console.error("[paypal capture]", err.message);
+    logger.error("[paypal capture]", err.message);
   }
 
   return res.redirect(`/payment/result?order=${orderId}`);

@@ -3,6 +3,9 @@ import { randomBytes } from "crypto";
 import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { invalidateStampCache } from "@/lib/stamp-cache";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/stamps");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -135,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (updated?.domain) invalidateStampCache(updated.domain);
       return res.json({ ok: true, stamp: updated });
     } catch (err: any) {
-      console.error("[admin/stamps] PATCH error:", err.message);
+      logger.error("[admin/stamps] PATCH error:", err.message);
       return res.status(500).json({ error: "更新失败，请稍后重试" });
     }
   }

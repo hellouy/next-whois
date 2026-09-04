@@ -3,6 +3,9 @@ import { hash } from "bcryptjs";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordChangedHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/reset-password");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -55,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err: any) {
     // Roll back the token claim so the user can retry
     await run("UPDATE password_reset_tokens SET used = false WHERE id = $1", [claimed.id]).catch(() => {});
-    console.error("[reset-password] update error:", err.message);
+    logger.error("[reset-password] update error:", err.message);
     return res.status(500).json({ error: "Reset failed, please try again" });
   }
 
@@ -69,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         to: userRow.email,
         subject: `Password Reset Successful — Security Notice | ${siteName}`,
         html: passwordChangedHtml({ name: userRow.name ?? null, email: userRow.email, siteName }),
-      }).catch(e => console.error("[reset-password] email error:", e))
+      }).catch(e => logger.error("[reset-password] email error:", e))
     );
   }
 

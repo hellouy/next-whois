@@ -4,6 +4,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/profile");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -88,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         params,
       );
     } catch (err: any) {
-      console.error("[profile] PATCH error:", err.message);
+      logger.error("[profile] PATCH error:", err.message);
       return res.status(500).json({ error: "Update failed, please try again" });
     }
 

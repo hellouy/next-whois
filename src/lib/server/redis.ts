@@ -18,6 +18,10 @@
 
 // ── Upstash HTTP client (Vercel-optimised) ───────────────────────────────────
 
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("server/redis");
+
 type UpstashClient = import("@upstash/redis").Redis;
 
 // ── Circuit breaker for Upstash ───────────────────────────────────────────────
@@ -39,7 +43,7 @@ function isUpstashCircuitOpen(): boolean {
 function tripUpstashCircuit() {
   if (isUpstashCircuitOpen()) return; // already tripped
   _cbg.__upstashDisabledUntil = Date.now() + CB_RETRY_MS;
-  console.warn("[Redis] Upstash limit reached — disabling Redis calls for 1 hour to save quota.");
+  logger.warn("[Redis] Upstash limit reached — disabling Redis calls for 1 hour to save quota.");
 }
 
 function handleUpstashError(err: any) {
@@ -71,10 +75,10 @@ function getUpstashClient(): UpstashClient | null {
   try {
     const { Redis } = require("@upstash/redis") as typeof import("@upstash/redis");
     _upstash = new Redis({ url: creds.url, token: creds.token });
-    console.log("[Redis] Using Upstash HTTP client →", creds.url);
+    logger.info("[Redis] Using Upstash HTTP client →", creds.url);
     return _upstash;
   } catch (err: any) {
-    console.error("[Redis] Failed to init Upstash client:", err.message);
+    logger.error("[Redis] Failed to init Upstash client:", err.message);
     _upstash = null;
     return null;
   }
@@ -141,13 +145,13 @@ function createIoredisConn(): import("ioredis").Redis | undefined {
       client = new Redis({ ...opts, host: REDIS_HOST, port: REDIS_PORT, password: REDIS_PASSWORD, db: REDIS_DB } as any);
     }
   } catch (err) {
-    console.error("[Redis] ioredis init failed:", err);
+    logger.error("[Redis] ioredis init failed:", err);
     return undefined;
   }
   if (!client) return undefined;
 
-  client.on("ready",        ()    => { _ioredisAvailable = true;  global.__redisAvailable = true;  console.log("[Redis] Connected and ready"); });
-  client.on("error",        (err) => { console.error("[Redis]", err.message); });
+  client.on("ready",        ()    => { _ioredisAvailable = true;  global.__redisAvailable = true;  logger.info("[Redis] Connected and ready"); });
+  client.on("error",        (err) => { logger.error("[Redis]", err.message); });
   client.on("close",        ()    => { _ioredisAvailable = false; global.__redisAvailable = false; });
   client.on("reconnecting", ()    => { _ioredisAvailable = false; global.__redisAvailable = false; });
   client.on("end",          ()    => { _ioredisAvailable = false; global.__redisAvailable = false; });
@@ -198,11 +202,11 @@ export async function getRedisValue(key: string): Promise<string | null> {
   const up = getUpstashClient();
   if (up) {
     try { return await up.get<string>(key) ?? null; }
-    catch (err: any) { handleUpstashError(err); console.error(`[Redis] GET ${key}:`, err.message); return null; }
+    catch (err: any) { handleUpstashError(err); logger.error(`[Redis] GET ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try { return await redis.get(key); }
-  catch (err: any) { console.error(`[Redis] GET ${key}:`, err.message); return null; }
+  catch (err: any) { logger.error(`[Redis] GET ${key}:`, err.message); return null; }
 }
 
 export async function setRedisValue(
@@ -216,25 +220,25 @@ export async function setRedisValue(
       if (ttl && ttl > 0) await up.set(key, value, { ex: ttl });
       else                 await up.set(key, value);
       return true;
-    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] SET ${key}:`, err.message); return false; }
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] SET ${key}:`, err.message); return false; }
   }
   if (!redis || !_ioredisAvailable) return false;
   try {
     if (ttl && ttl > 0) await redis.set(key, value, "EX", ttl);
     else                 await redis.set(key, value);
     return true;
-  } catch (err: any) { console.error(`[Redis] SET ${key}:`, err.message); return false; }
+  } catch (err: any) { logger.error(`[Redis] SET ${key}:`, err.message); return false; }
 }
 
 export async function deleteRedisValue(key: string): Promise<boolean> {
   const up = getUpstashClient();
   if (up) {
     try { await up.del(key); return true; }
-    catch (err: any) { handleUpstashError(err); console.error(`[Redis] DEL ${key}:`, err.message); return false; }
+    catch (err: any) { handleUpstashError(err); logger.error(`[Redis] DEL ${key}:`, err.message); return false; }
   }
   if (!redis || !_ioredisAvailable) return false;
   try { await redis.del(key); return true; }
-  catch (err: any) { console.error(`[Redis] DEL ${key}:`, err.message); return false; }
+  catch (err: any) { logger.error(`[Redis] DEL ${key}:`, err.message); return false; }
 }
 
 /**
@@ -259,7 +263,7 @@ export async function deleteRedisKeysByPattern(pattern: string): Promise<number>
       return deleted;
     } catch (err: any) {
       handleUpstashError(err);
-      console.error(`[Redis] SCAN/DEL ${pattern}:`, err.message);
+      logger.error(`[Redis] SCAN/DEL ${pattern}:`, err.message);
       return 0;
     }
   }
@@ -276,7 +280,7 @@ export async function deleteRedisKeysByPattern(pattern: string): Promise<number>
     await redis.del(...toDelete);
     return toDelete.length;
   } catch (err: any) {
-    console.error(`[Redis] SCAN/DEL ${pattern}:`, err.message);
+    logger.error(`[Redis] SCAN/DEL ${pattern}:`, err.message);
     return 0;
   }
 }
@@ -292,14 +296,14 @@ export async function incrRedisValue(key: string, ttlSeconds: number): Promise<n
       const count = await up.incr(key);
       if (count === 1) await up.expire(key, ttlSeconds);
       return count;
-    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] INCR ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] INCR ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, ttlSeconds);
     return count;
-  } catch (err: any) { console.error(`[Redis] INCR ${key}:`, err.message); return null; }
+  } catch (err: any) { logger.error(`[Redis] INCR ${key}:`, err.message); return null; }
 }
 
 /**
@@ -316,14 +320,14 @@ export async function incrRedisValueRolling(key: string, ttlSeconds: number): Pr
       const count = await up.incr(key);
       await up.expire(key, ttlSeconds);
       return count;
-    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
     const count = await redis.incr(key);
     await redis.expire(key, ttlSeconds);
     return count;
-  } catch (err: any) { console.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
+  } catch (err: any) { logger.error(`[Redis] INCR(rolling) ${key}:`, err.message); return null; }
 }
 
 export async function getRemainingTtl(key: string): Promise<number | null> {
@@ -350,7 +354,7 @@ export async function getJsonRedisValue<T>(key: string): Promise<T | null> {
       // Upstash may return already-parsed object when stored as JSON
       if (typeof raw === "object") return raw as unknown as T;
       return JSON.parse(raw) as T;
-    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] getJson ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] getJson ${key}:`, err.message); return null; }
   }
   const raw = await getRedisValue(key);
   if (!raw) return null;
@@ -378,7 +382,7 @@ export async function getJsonRedisValueWithTtl<T>(
       if (raw == null) return null;
       const value = typeof raw === "object" ? (raw as unknown as T) : JSON.parse(raw as string) as T;
       return { value, remainingTtl: ttl >= 0 ? ttl : null };
-    } catch (err: any) { handleUpstashError(err); console.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
@@ -386,7 +390,7 @@ export async function getJsonRedisValueWithTtl<T>(
     if (!raw) return null;
     const value = JSON.parse(raw) as T;
     return { value, remainingTtl: ttl >= 0 ? ttl : null };
-  } catch (err: any) { console.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
+  } catch (err: any) { logger.error(`[Redis] getJsonWithTtl ${key}:`, err.message); return null; }
 }
 
 // ── Site settings cache (Redis L2 for cross-instance sharing on Vercel) ──────

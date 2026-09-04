@@ -1,4 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("supabase");
 
 let _client: SupabaseClient | null = null;
 
@@ -21,7 +24,7 @@ export function getSupabase(): SupabaseClient | null {
     process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
-    console.error(
+    logger.error(
       "[supabase] Missing SUPABASE_URL or SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY. " +
         "Add them as secrets in your project settings.",
     );

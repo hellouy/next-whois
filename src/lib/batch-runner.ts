@@ -11,6 +11,10 @@
  *  c) The browser tab is closed / hard-refreshed (F5)
  */
 
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("batch-runner");
+
 export type BatchItem = {
   tld: string;
   status: "pending" | "ok" | "error" | "skipped";
@@ -124,7 +128,7 @@ export function start(
   _state = { status: "running", items, idx: firstPending, model };
   _notify();
 
-  _runLoop().catch(err => console.error("[BatchRunner] Loop error:", err));
+  _runLoop().catch(err => logger.error("[BatchRunner] Loop error:", err));
 }
 
 /** Stop the running batch. Progress up to this point is preserved. */
@@ -217,7 +221,7 @@ async function _runLoop() {
           status: "stopped",
         };
         _notify();
-        console.warn(`[BatchRunner] Auto-stopped: failure rate ${Math.round(errors / processed * 100)}% (${errors}/${processed})`);
+        logger.warn(`[BatchRunner] Auto-stopped: failure rate ${Math.round(errors / processed * 100)}% (${errors}/${processed})`);
         break;
       }
     }

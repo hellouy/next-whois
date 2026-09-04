@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/image");
 
 const ALLOWED_KEYS = new Set([
   "og_image",
@@ -42,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Regular URL — redirect
     return res.redirect(302, value);
   } catch (e: any) {
-    console.error("[image]", e);
+    logger.error("[image]", e);
     return res.status(500).json({ error: "Image generation failed" });
   }
 }

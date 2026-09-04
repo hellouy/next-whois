@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/redeem-code");
 
 type ClaimedCode = {
   id: number;
@@ -130,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       balanceCents: updated?.balance_cents ?? 0,
     });
   } catch (err: any) {
-    console.error("[user/redeem-code]", err.message);
+    logger.error("[user/redeem-code]", err.message);
     return res.status(500).json({ error: "Redemption failed, please try again" });
   }
 }

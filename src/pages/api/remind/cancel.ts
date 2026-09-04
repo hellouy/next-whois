@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { one, run, isDbReady } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/remind/cancel");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = String(req.query.token || "").trim();
@@ -24,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ ok: true, domain: existing.domain, email: existing.email });
   } catch (err: any) {
-    console.error("[remind/cancel] DB error:", err);
+    logger.error("[remind/cancel] DB error:", err);
     return res.status(500).json({ error: "Cancellation failed, please try again" });
   }
 }

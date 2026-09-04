@@ -4,6 +4,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, run, isDbReady } from "@/lib/db-query";
 import { computeLifecycle } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/subscriptions");
 
 const DEFAULT_THRESHOLDS = [60, 30, 10, 5, 1];
 
@@ -136,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json({ subscriptions });
     } catch (err) {
-      console.error("[subscriptions] GET error:", err instanceof Error ? err.message : String(err));
+      logger.error("[subscriptions] GET error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "Failed to retrieve data" });
     }
   }
@@ -166,7 +169,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         return res.status(200).json({ ok: true, whois_synced_at: new Date().toISOString(), expiration_date: dateStr });
       } catch (err) {
-        console.error("[subscriptions] PATCH whois_sync error:", err instanceof Error ? err.message : String(err));
+        logger.error("[subscriptions] PATCH whois_sync error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "WHOIS sync failed" });
       }
     }
@@ -181,7 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [parsed.toISOString().slice(0, 10), id as string, session.user.email],
         );
       } catch (err) {
-        console.error("[subscriptions] PATCH expiration_date error:", err instanceof Error ? err.message : String(err));
+        logger.error("[subscriptions] PATCH expiration_date error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "Failed to update expiration date" });
       }
     }
@@ -195,7 +198,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [db, id as string, session.user.email],
         );
       } catch (err) {
-        console.error("[subscriptions] PATCH days_before error:", err instanceof Error ? err.message : String(err));
+        logger.error("[subscriptions] PATCH days_before error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "Failed to update reminder settings" });
       }
     }
@@ -208,7 +211,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [activeVal, id as string, session.user.email],
         );
       } catch (err) {
-        console.error("[subscriptions] PATCH active error:", err instanceof Error ? err.message : String(err));
+        logger.error("[subscriptions] PATCH active error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "Failed to update status" });
       }
     }
@@ -228,7 +231,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [new Date().toISOString(), id as string, session.user.email],
       );
     } catch (err) {
-      console.error("[subscriptions] DELETE error:", err instanceof Error ? err.message : String(err));
+      logger.error("[subscriptions] DELETE error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "Cancellation failed, please try again" });
     }
     return res.status(200).json({ ok: true });

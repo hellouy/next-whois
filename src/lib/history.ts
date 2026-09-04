@@ -1,4 +1,7 @@
 import { HISTORY_LIMIT } from "@/lib/env";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("history");
 
 export type RegStatus = "registered" | "unregistered" | "reserved" | "error" | "unknown";
 
@@ -58,7 +61,7 @@ export function listHistory(): HistoryItem[] {
       }))
       .filter((item: HistoryItem) => item.query.length > 0);
   } catch (error) {
-    console.warn("Failed to read history from localStorage:", error);
+    logger.warn("Failed to read history from localStorage:", error);
     return [];
   }
 }
@@ -85,7 +88,7 @@ export function addHistory(query: string, regStatus?: RegStatus) {
     }
     localStorage.setItem("history", JSON.stringify(history));
   } catch (error) {
-    console.warn("Failed to save history to localStorage:", error);
+    logger.warn("Failed to save history to localStorage:", error);
   }
 }
 
@@ -99,7 +102,7 @@ export function removeHistory(query: string) {
     history = history.filter((item) => item.query !== domain);
     localStorage.setItem("history", JSON.stringify(history));
   } catch (error) {
-    console.warn("Failed to remove history from localStorage:", error);
+    logger.warn("Failed to remove history from localStorage:", error);
   }
 }
 

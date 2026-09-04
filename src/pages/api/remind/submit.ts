@@ -9,6 +9,9 @@ import { computeLifecycle, fmtDate } from "@/lib/lifecycle";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/remind/submit");
 
 type WhoisFetchResult = {
   date: string;
@@ -184,7 +187,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     }
   } catch (dbErr: any) {
-    console.error("[remind/submit] DB error:", dbErr);
+    logger.error("[remind/submit] DB error:", dbErr);
     return res.status(500).json({ error: "Database write failed, please try again" });
   }
 
@@ -220,7 +223,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          WHERE id = $6`,
         [whoisDate, whoisDate, whoisRegistrar, whoisCreationDate,
          whoisNameservers.length ? JSON.stringify(whoisNameservers) : null, reminderId],
-      ).catch((e: Error) => console.warn("[remind/submit] WHOIS date update failed:", e.message));
+      ).catch((e: Error) => logger.warn("[remind/submit] WHOIS date update failed:", e.message));
     }
   }
 

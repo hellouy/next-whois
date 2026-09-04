@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, isDbReady } from "@/lib/db-query";
 import { getStampCache, setStampCache, STAMP_CACHE_TTL } from "@/lib/stamp-cache";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/stamp/check");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
@@ -33,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ stamps });
   } catch (err: any) {
-    console.error("[stamp/check] error:", err);
+    logger.error("[stamp/check] error:", err);
     return res.status(500).json({ error: "Query failed, please try again", stamps: [] });
   }
 }

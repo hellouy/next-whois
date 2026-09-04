@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { isDbReady } from "@/lib/db-query";
 import { getDbReady } from "@/lib/db";
 import { isRedisAvailable, getRedisValue } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/cron/ping");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
@@ -32,10 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await db!.query("SELECT 1");
     dbLatencyMs = Date.now() - dbStart;
-    console.log(`[cron/ping] db alive (${dbLatencyMs}ms)`);
+    logger.info(`[cron/ping] db alive (${dbLatencyMs}ms)`);
   } catch (err: any) {
     dbError = err.message;
-    console.error("[cron/ping] db query failed:", err.message);
+    logger.error("[cron/ping] db query failed:", err.message);
   }
 
   let redisOk = false;
@@ -46,9 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await getRedisValue("ping:probe");
       redisLatencyMs = Date.now() - redisStart;
       redisOk = true;
-      console.log(`[cron/ping] redis alive (${redisLatencyMs}ms)`);
+      logger.info(`[cron/ping] redis alive (${redisLatencyMs}ms)`);
     } catch (err: any) {
-      console.error("[cron/ping] redis probe failed:", err.message);
+      logger.error("[cron/ping] redis probe failed:", err.message);
     }
   }
 

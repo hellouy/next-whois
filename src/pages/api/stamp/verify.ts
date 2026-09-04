@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { timingSafeEqual } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const RL_LIMIT  = 20;
 const RL_WINDOW = 60_000;
@@ -132,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).end();
 
   // Rate limiting: 20 requests per minute per IP (each verify triggers 4 DoH + 1 HTTP call)
-  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  const { ok: allowed } = await checkRateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
   if (!allowed) return res.status(429).json({ error: "Too many requests, please try again later" });
 
   const { id, domain } = req.body;

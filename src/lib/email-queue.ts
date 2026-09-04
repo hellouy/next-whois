@@ -14,6 +14,9 @@
  */
 
 import { run as dbQuery, many, one } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("email-queue");
 
 export interface QueuedEmail {
   id: number;
@@ -50,9 +53,9 @@ export async function enqueueEmail(
       `INSERT INTO email_queue (to_email, subject, html) VALUES ($1, $2, $3)`,
       [to, subject, html],
     );
-    console.log(`[email-queue] Queued → ${to} | "${subject}"`);
+    logger.info(`[email-queue] Queued → ${to} | "${subject}"`);
   } catch (err: any) {
-    console.error("[email-queue] Failed to enqueue:", err.message);
+    logger.error("[email-queue] Failed to enqueue:", err.message);
   }
 }
 
@@ -117,7 +120,7 @@ export async function processEmailQueue(
         [row.id],
       );
       result.sent++;
-      console.log(`[email-queue] Sent #${row.id} → ${row.to_email}`);
+      logger.info(`[email-queue] Sent #${row.id} → ${row.to_email}`);
     } catch (err: any) {
       const errMsg = err?.message || "unknown error";
       const nextAttempt = row.attempts + 1;
@@ -133,7 +136,7 @@ export async function processEmailQueue(
             [row.id, nextAttempt, errMsg.slice(0, 500)],
           );
           result.failed++;
-          console.error(`[email-queue] Permanently failed #${row.id} → ${row.to_email}: ${errMsg}`);
+          logger.error(`[email-queue] Permanently failed #${row.id} → ${row.to_email}: ${errMsg}`);
           result.errors.push(`#${row.id} failed: ${errMsg}`);
         } else {
           const delay = retryDelayMinutes(nextAttempt);
@@ -145,10 +148,10 @@ export async function processEmailQueue(
             [row.id, nextAttempt, errMsg.slice(0, 500), nextAt.toISOString()],
           );
           result.retried++;
-          console.warn(`[email-queue] Retry scheduled #${row.id} in ${delay}min → ${row.to_email}: ${errMsg}`);
+          logger.warn(`[email-queue] Retry scheduled #${row.id} in ${delay}min → ${row.to_email}: ${errMsg}`);
         }
       } catch (dbErr: any) {
-        console.error(`[email-queue] DB update failed for #${row.id}:`, dbErr.message);
+        logger.error(`[email-queue] DB update failed for #${row.id}:`, dbErr.message);
         result.errors.push(`#${row.id} db update failed: ${dbErr.message}`);
       }
     }
@@ -159,7 +162,7 @@ export async function processEmailQueue(
     await client.query("COMMIT");
     client.release();
   } catch (err: any) {
-    console.error("[email-queue] commit failed:", err.message);
+    logger.error("[email-queue] commit failed:", err.message);
     try { client.release(); } catch {}
   }
 

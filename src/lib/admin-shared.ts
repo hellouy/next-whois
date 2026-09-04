@@ -1,8 +1,12 @@
 // Warn once per process — not on every hot-reload or API call.
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-shared");
+
 let _warnedOnce = false;
 if (!process.env.ADMIN_EMAIL && !_warnedOnce) {
   _warnedOnce = true;
-  console.warn(
+  logger.warn(
     "[admin] ADMIN_EMAIL environment variable is not set. " +
     "Please configure it to secure the admin account."
   );

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { lookupWhoisCacheStreaming } from "@/lib/whois/lookup";
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
@@ -9,6 +9,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/lookup-stream");
 
 export const config = {
   maxDuration: 30,
@@ -101,7 +104,7 @@ export default async function handler(
                   : userEmail     ? `${ip}:auth`
                   :                 `${ip}:anon`;
 
-  const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+  const { ok: allowed, remaining, resetMs } = await checkRateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
 
   res.setHeader("X-RateLimit-Limit", String(tierLimit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
@@ -130,9 +133,9 @@ export default async function handler(
       domain: trimmed, tld, success: true, cached: false,
       durationMs: 0, errorCode: null, source: "whois",
       userId, userEmail, ip,
-    }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
+    }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
     await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
-      .catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
+      .catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message));
     res.setHeader("Content-Type", "application/x-ndjson");
     res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
     res.write(JSON.stringify({
@@ -203,7 +206,7 @@ export default async function handler(
       errorCode: finalResult.status ? null : (finalResult.error?.slice(0, 60) ?? null),
       source: finalResult.source ?? null,
       userId, userEmail, ip,
-    }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
+    }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
 
     if (finalResult.status) {
       await saveSearchRecord(
@@ -212,7 +215,7 @@ export default async function handler(
         finalResult.dnsProbe,
         userId,
         userEmail,
-      ).catch(e => console.error("[lookup-stream] saveSearchRecord failed:", e.message));
+      ).catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message));
     }
   } catch (err) {
     if (!finalSent) {
@@ -229,7 +232,7 @@ export default async function handler(
         domain: trimmed, tld, success: false, cached: false,
         durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
         userId, userEmail, ip,
-      }).catch(e => console.error("[lookup-stream] logQuery failed:", e.message));
+      }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
     }
   } finally {
     res.end();

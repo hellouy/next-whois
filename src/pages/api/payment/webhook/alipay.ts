@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, verifyAlipaySign } from "@/lib/payment";
 import { isDbReady } from "@/lib/db-query";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/webhook/alipay");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -11,13 +14,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const alipayPublicKey = (await getSetting("payment_alipay_public_key")) || process.env.ALIPAY_PUBLIC_KEY || "";
 
   if (!alipayPublicKey) {
-    console.warn("[alipay webhook] payment_alipay_public_key not configured");
+    logger.warn("[alipay webhook] payment_alipay_public_key not configured");
     return res.status(200).send("fail");
   }
 
   const isValid = verifyAlipaySign(body, alipayPublicKey);
   if (!isValid) {
-    console.warn("[alipay webhook] Signature verification failed");
+    logger.warn("[alipay webhook] Signature verification failed");
     return res.status(200).send("fail");
   }
 
@@ -35,9 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       providerOrderId: trade_no,
       webhookRaw: JSON.stringify(body).slice(0, 2000),
     });
-    console.log(`[alipay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
+    logger.info(`[alipay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
   } catch (err: any) {
-    console.error("[alipay webhook] markOrderPaid error:", err.message);
+    logger.error("[alipay webhook] markOrderPaid error:", err.message);
     return res.status(200).send("fail");
   }
 

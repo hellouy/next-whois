@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/og-config");
 
 const DEFAULT_BRAND_NAME = "RDAP+WHOIS";
 const DEFAULT_TAGLINE    = "WHOIS / RDAP · Domain Lookup Tool";
@@ -88,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       invalidateOgConfigCache();
       return res.json({ ok: true });
     } catch (err: any) {
-      console.error("[og-config]", err);
+      logger.error("[og-config]", err);
       return res.status(500).json({ error: "Failed to load config" });
     }
   }

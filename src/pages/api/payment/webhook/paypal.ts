@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, paypalGetToken } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/webhook/paypal");
 
 export const config = { api: { bodyParser: true } };
 
@@ -43,18 +46,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // SECURITY: without a configured webhook id we cannot verify the signature,
   // so payment events must be rejected instead of trusted.
   if (!webhookId) {
-    console.error("[paypal webhook] Rejected: PAYPAL_WEBHOOK_ID not configured");
+    logger.error("[paypal webhook] Rejected: PAYPAL_WEBHOOK_ID not configured");
     return res.status(503).json({ error: "Webhook not configured" });
   }
 
   const valid = await verifyPaypalWebhook(webhookId, req, body);
   if (!valid) {
-    console.warn("[paypal webhook] Invalid signature");
+    logger.warn("[paypal webhook] Invalid signature");
     return res.status(400).json({ error: "Invalid signature" });
   }
 
   const eventType = body?.event_type as string | undefined;
-  console.log(`[paypal webhook] event_type=${eventType}`);
+  logger.info(`[paypal webhook] event_type=${eventType}`);
 
   if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
     const capture = body?.resource;
@@ -82,9 +85,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           providerOrderId: captureId ?? paypalOrderId,
           webhookRaw: JSON.stringify(body).slice(0, 2000),
         });
-        console.log(`[paypal webhook] Order ${orderId} marked paid — sub=${result.grantsSubscription}`);
+        logger.info(`[paypal webhook] Order ${orderId} marked paid — sub=${result.grantsSubscription}`);
       } catch (err: any) {
-        console.error("[paypal webhook] markOrderPaid error:", err.message);
+        logger.error("[paypal webhook] markOrderPaid error:", err.message);
       }
     }
   }

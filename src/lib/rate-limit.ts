@@ -20,15 +20,15 @@ async function checkRedisRateLimit(
   ip: string,
   maxRequests: number,
   windowMs: number,
-): Promise<{ ok: boolean; remaining: number } | null> {
+): Promise<{ ok: boolean; remaining: number; resetMs: number } | null> {
   if (!isRedisAvailable()) return null;
   const windowKey = Math.floor(Date.now() / windowMs);
   const key = `rl:${ip}:${windowKey}`;
   const ttlSeconds = Math.ceil(windowMs / 1000);
   const count = await incrRedisValue(key, ttlSeconds);
   if (count === null) return null;
-  if (count > maxRequests) return { ok: false, remaining: 0 };
-  return { ok: true, remaining: Math.max(0, maxRequests - count) };
+  if (count > maxRequests) return { ok: false, remaining: 0, resetMs: (windowKey + 1) * windowMs - Date.now() };
+  return { ok: true, remaining: Math.max(0, maxRequests - count), resetMs: (windowKey + 1) * windowMs - Date.now() };
 }
 
 // ─── Supabase DB backend (fallback when Redis unavailable) ────────────────────
@@ -37,7 +37,7 @@ async function checkDbRateLimit(
   ip: string,
   maxRequests: number,
   windowMs: number,
-): Promise<{ ok: boolean; remaining: number } | null> {
+): Promise<{ ok: boolean; remaining: number; resetMs: number } | null> {
   if (!(await isDbReady())) return null;
   const resetAt = new Date(Date.now() + windowMs);
   try {
@@ -58,8 +58,8 @@ async function checkDbRateLimit(
     const count = row?.count ?? 1;
     const rowResetAt = row ? new Date(row.reset_at).getTime() : Date.now() + windowMs;
     localCache.set(ip, { count, resetAt: rowResetAt });
-    if (count > maxRequests) return { ok: false, remaining: 0 };
-    return { ok: true, remaining: Math.max(0, maxRequests - count) };
+    if (count > maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, rowResetAt - Date.now()) };
+    return { ok: true, remaining: Math.max(0, maxRequests - count), resetMs: Math.max(0, rowResetAt - Date.now()) };
   } catch {
     return null;
   }
@@ -67,19 +67,26 @@ async function checkDbRateLimit(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+export interface RateLimitResult {
+  ok: boolean;
+  remaining: number;
+  /** Milliseconds until the current window resets (0 when already expired). */
+  resetMs: number;
+}
+
 export async function checkRateLimit(
   ip: string,
   maxRequests = 5,
   windowMs = DEFAULT_WINDOW_MS,
-): Promise<{ ok: boolean; remaining: number }> {
+): Promise<RateLimitResult> {
   const now = Date.now();
 
   // L1: local in-memory (fastest — zero latency within same warm instance)
   const local = localCache.get(ip);
   if (local && now <= local.resetAt) {
-    if (local.count >= maxRequests) return { ok: false, remaining: 0 };
+    if (local.count >= maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, local.resetAt - now) };
     local.count += 1;
-    return { ok: true, remaining: maxRequests - local.count };
+    return { ok: true, remaining: maxRequests - local.count, resetMs: Math.max(0, local.resetAt - now) };
   }
 
   // L2: Redis
@@ -100,9 +107,21 @@ export async function checkRateLimit(
   const entry = localCache.get(ip);
   if (!entry || now > entry.resetAt) {
     localCache.set(ip, { count: 1, resetAt: now + windowMs });
-    return { ok: true, remaining: maxRequests - 1 };
+    return { ok: true, remaining: maxRequests - 1, resetMs: windowMs };
   }
-  if (entry.count >= maxRequests) return { ok: false, remaining: 0 };
+  if (entry.count >= maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, entry.resetAt - now) };
   entry.count += 1;
-  return { ok: true, remaining: maxRequests - entry.count };
+  return { ok: true, remaining: maxRequests - entry.count, resetMs: Math.max(0, entry.resetAt - now) };
+}
+
+/**
+ * Extract the best-guess IP address from a Next.js API request.
+ * Shared by every rate-limited endpoint.
+ */
+export function getClientIp(req: import("next").NextApiRequest): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
+  }
+  return (req.socket as any)?.remoteAddress ?? "unknown";
 }

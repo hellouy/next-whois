@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, verifyStripeWebhookSignature } from "@/lib/payment";
 import { isDbReady } from "@/lib/db-query";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/webhook/stripe");
 
 export const config = { api: { bodyParser: false } };
 
@@ -23,12 +26,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const webhookSecret = (await getSetting("payment_stripe_webhook_secret")) || process.env.STRIPE_WEBHOOK_SECRET || "";
 
   if (!webhookSecret) {
-    console.warn("[stripe webhook] payment_stripe_webhook_secret not configured");
+    logger.warn("[stripe webhook] payment_stripe_webhook_secret not configured");
     return res.status(500).json({ error: "Webhook secret not configured" });
   }
 
   if (!verifyStripeWebhookSignature(rawBody, sig ?? "", webhookSecret)) {
-    console.warn("[stripe webhook] Invalid signature");
+    logger.warn("[stripe webhook] Invalid signature");
     return res.status(400).json({ error: "Invalid signature" });
   }
 
@@ -51,9 +54,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         providerOrderId: sessionId,
         webhookRaw: rawBody.slice(0, 2000),
       });
-      console.log(`[stripe webhook] Order ${orderId} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
+      logger.info(`[stripe webhook] Order ${orderId} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
     } catch (err: any) {
-      console.error("[stripe webhook] markOrderPaid error:", err.message);
+      logger.error("[stripe webhook] markOrderPaid error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }

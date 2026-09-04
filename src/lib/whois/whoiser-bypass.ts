@@ -23,6 +23,9 @@ import {
   incrRedisValueRolling,
   deleteRedisKeysByPattern,
 } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("whois/whoiser-bypass");
 import { run, many, isDbReady } from "@/lib/db-query";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -152,7 +155,7 @@ export async function recordWhoiserFailure(tld: string): Promise<void> {
   }
 
   if (count >= BYPASS_FAIL_THRESHOLD) {
-    console.log(`[whoiser-bypass] Auto-bypassing .${t} after ${count} failures`);
+    logger.info(`[whoiser-bypass] Auto-bypassing .${t} after ${count} failures`);
     _bypassed.add(t);
     // Persist to Redis (cross-instance awareness)
     if (isRedisAvailable()) {

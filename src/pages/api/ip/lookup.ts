@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getRedisValue, setRedisValue } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/ip/lookup");
 
 export const config = { maxDuration: 20 };
 
@@ -164,7 +167,7 @@ function extractRdapInfo(rdap: any): Record<string, string> {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  const { ok: allowed } = await checkRateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
   if (!allowed) return res.status(429).json({ error: "Too many requests" });
 
   let query = (req.query.q as string | undefined)?.trim();
@@ -198,7 +201,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       void saveToCache(cacheKey, payload);
       return res.json(payload);
     } catch (e: any) {
-      console.error("[ip/lookup]", e);
+      logger.error("[ip/lookup]", e);
       return res.status(500).json({ error: "Lookup failed" });
     }
   }
@@ -259,7 +262,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     void saveToCache(cacheKey, payload);
     return res.json(payload);
   } catch (e: any) {
-    console.error("[ip/lookup]", e);
+    logger.error("[ip/lookup]", e);
     return res.status(500).json({ error: "Lookup failed" });
   }
 }

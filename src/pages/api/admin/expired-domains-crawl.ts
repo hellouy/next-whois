@@ -19,6 +19,9 @@ import { many, one, run, isDbReady } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { getSettings } from "@/lib/server/site-settings-server";
 import * as cheerio from "cheerio";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/expired-domains-crawl");
 
 export const config = { maxDuration: 60 };
 
@@ -360,7 +363,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       cookieStr = await loginToExpiredDomains(username, password);
     } catch (err: any) {
-      console.error("[expired-domains-crawl] login error:", err.message);
+      logger.error("[expired-domains-crawl] login error:", err.message);
       return res.status(500).json({ error: err.message });
     }
 
@@ -388,7 +391,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalUpdated  += r.updated;
           results.push({ prefix: pfx, inserted: r.inserted, updated: r.updated, count: r.leads.length });
         } catch (err: any) {
-          console.error(`[expired-domains-crawl] prefix "${pfx}" error:`, err.message);
+          logger.error(`[expired-domains-crawl] prefix "${pfx}" error:`, err.message);
           results.push({ prefix: pfx, inserted: 0, updated: 0, count: -1 });
         }
       }
@@ -404,7 +407,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = await crawlByLength(cookieStr, { minLen, maxLen, tldFilter, rows });
       return res.json({ ok: true, mode: "length", ...result });
     } catch (err: any) {
-      console.error("[expired-domains-crawl]", err.message);
+      logger.error("[expired-domains-crawl]", err.message);
       return res.status(500).json({ error: err.message });
     }
   }

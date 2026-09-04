@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { one, run, isDbReady } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/stamp/submit");
 
 /** Basic domain format validation (supports IDN punycode, rejects obvious garbage) */
 function isValidDomain(d: string): boolean {
@@ -141,7 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [id, cleanDomain, cleanTagName, cleanTagStyle, cleanCardTheme, cleanLink, cleanDesc, cleanNickname, cleanEmail, token],
     );
   } catch (err: any) {
-    console.error("[stamp/submit] Write error:", err.message);
+    logger.error("[stamp/submit] Write error:", err.message);
     return res.status(500).json({ error: "Database write failed, please try again later" });
   }
 

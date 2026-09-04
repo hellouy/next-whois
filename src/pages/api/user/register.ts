@@ -7,6 +7,9 @@ import { localeFromCookieHeader, localeFromAcceptHeader, getEmailStrings } from 
 import { getRedisValue, deleteRedisValue, isRedisAvailable } from "@/lib/server/redis";
 import { getCaptchaConfig, verifyCaptchaToken } from "@/lib/server/captcha";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/register");
 
 type CodeRow = { id: string; is_active: boolean; use_count: number; max_uses: number; expires_at: string | null };
 
@@ -135,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (err.code === "INVITE_EXHAUSTED") {
       return res.status(400).json({ error: err.message });
     }
-    console.error("[register] transaction error:", err.message);
+    logger.error("[register] transaction error:", err.message);
     return res.status(500).json({ error: "Registration failed, please try again" });
   }
 
@@ -154,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subject: s.subj_welcome(siteName),
       html: welcomeHtml({ name: cleanName, email: cleanEmail, siteName, locale }),
     });
-  }).catch((e) => console.error("[register] welcome email error:", e));
+  }).catch((e) => logger.error("[register] welcome email error:", e));
 
   return res.status(201).json({ ok: true });
 }

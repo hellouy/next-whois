@@ -4,6 +4,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { sendEmail, getSiteLabel } from "@/lib/email";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/contact");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -79,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     return res.status(200).json({ ok: true });
   } catch (err: any) {
-    console.error("[user/contact] send error:", err.message);
+    logger.error("[user/contact] send error:", err.message);
     return res.status(500).json({ error: "Failed to send message, please try again" });
   }
 }

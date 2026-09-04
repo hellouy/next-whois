@@ -1,6 +1,9 @@
 import { randomBytes, createHash, createHmac } from "crypto";
 import { run, one, many } from "@/lib/db-query";
 import { sendEmail, paymentConfirmHtml, getSiteLabel } from "@/lib/email";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("payment");
 
 export type PaymentProvider = "stripe" | "xunhupay" | "alipay" | "paypal" | "wechat";
 export type OrderStatus = "pending" | "paid" | "failed" | "expired" | "refunded";
@@ -209,7 +212,7 @@ export async function markOrderPaid(params: {
       "通过支付系统赞助",
       order.plan_id ?? "payment",
     ]
-  ).catch(e => console.warn("[markOrderPaid] sponsor insert error:", e));
+  ).catch(e => logger.warn("[markOrderPaid] sponsor insert error:", e));
 
   const siteName = await getSiteLabel();
   sendEmail({
@@ -224,7 +227,7 @@ export async function markOrderPaid(params: {
       orderId: params.orderId,
       siteName,
     }),
-  }).catch(e => console.error("[markOrderPaid] email error:", e));
+  }).catch(e => logger.error("[markOrderPaid] email error:", e));
 
   return { alreadyPaid: false, userEmail: order.user_email, grantsSubscription };
 }

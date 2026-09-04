@@ -1,4 +1,7 @@
 import { Pool } from "pg";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("db");
 
 declare global {
   // eslint-disable-next-line no-var
@@ -630,7 +633,7 @@ function makePool(connectionString: string): Pool {
     query_timeout: 25_000,
     statement_timeout: 25_000,
   } as any);
-  p.on("error", (err) => console.error("[db] pool error:", err.message));
+  p.on("error", (err) => logger.error("[db] pool error:", err.message));
   return p;
 }
 
@@ -639,10 +642,10 @@ export function getDb(): Pool | null {
   if (existing) return existing;
   const cs = getConnectionString();
   if (!cs) {
-    console.error("[db] No PostgreSQL connection URL found. Set POSTGRES_URL_NON_POOLING as a secret.");
+    logger.error("[db] No PostgreSQL connection URL found. Set POSTGRES_URL_NON_POOLING as a secret.");
     return null;
   }
-  console.log(`[db] Connecting via ${cs.source} → ${getConnectionHost()}`);
+  logger.info(`[db] Connecting via ${cs.source} → ${getConnectionHost()}`);
   const p = makePool(cs.url);
   setPool(p);
   setMigrated(false);
@@ -677,7 +680,7 @@ export async function runMigrations(db: Pool): Promise<void> {
       `\nEND $$`;
     await client.query(indexBlock);
 
-    console.log("[db] Schema ready");
+    logger.info("[db] Schema ready");
   } finally {
     client.release();
   }
@@ -708,7 +711,7 @@ export async function getDbReady(): Promise<Pool | null> {
   const migrationPromise = runMigrations(db)
     .then(() => { setMigrated(true); })
     .catch((err: unknown) => {
-      console.error("[db] Migration failed:", err instanceof Error ? err.message : String(err));
+      logger.error("[db] Migration failed:", err instanceof Error ? err.message : String(err));
     })
     .finally(() => { global.__pgMigrating = undefined; });
 

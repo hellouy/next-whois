@@ -1,4 +1,7 @@
 import { one } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("server/captcha");
 
 export async function getCaptchaConfig(
   scope?: "login" | "register",
@@ -59,7 +62,7 @@ export async function verifyCaptchaToken(token: string, provider: string, secret
     const data = await res.json();
     return data.success === true;
   } catch (err) {
-    console.error("[captcha] verify error:", err);
+    logger.error("[captcha] verify error:", err);
     return false;
   }
 }

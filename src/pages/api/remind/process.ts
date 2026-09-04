@@ -4,6 +4,9 @@ import {
   sendEmail, reminderHtml, phaseEventHtml,
   dropApproachingHtml, domainDroppedHtml, getSiteLabel, getSiteBaseUrl,
 } from "@/lib/email";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/remind/process");
 import {
   computeLifecycle,
   fmtDate,
@@ -92,9 +95,9 @@ async function refreshStaleWhoisDates(
         [dateStr, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id],
       );
       updated.set(r.id, { date: dateStr, eppStatus: epp, registrar, creationDate, nameservers });
-      console.log(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
+      logger.info(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
     } catch (err) {
-      console.warn(`[process] WHOIS refresh failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
+      logger.warn(`[process] WHOIS refresh failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
     }
   }));
   return updated;
@@ -159,7 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Refresh WHOIS data for near-expiry domains with stale sync dates (non-blocking batch)
     const whoisRefreshed = await refreshStaleWhoisDates(remindersRaw).catch((e) => {
-      console.warn("[process] WHOIS batch refresh error:", e?.message ?? e);
+      logger.warn("[process] WHOIS batch refresh error:", e?.message ?? e);
       return new Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>();
     });
 
@@ -400,14 +403,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
       } catch (reminderErr: any) {
-        console.error("[remind/process] Error processing reminder", reminder.id, reminderErr.message);
+        logger.error("[remind/process] Error processing reminder", reminder.id, reminderErr.message);
         results.skipped++;
       }
     }
 
     return res.status(200).json({ ok: true, processed: reminders.length, ...results });
   } catch (err: any) {
-    console.error("[remind/process] Fatal error:", err);
+    logger.error("[remind/process] Fatal error:", err);
     return res.status(500).json({ error: "Processing failed, please try again" });
   }
 }

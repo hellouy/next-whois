@@ -14,6 +14,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import { many, run, isDbReady } from "@/lib/db-query";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/subscription-sync");
 
 export const config = { maxDuration: 60 };
 
@@ -105,14 +108,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           refreshed++;
           domains.push(r.domain);
         } catch (err) {
-          console.warn(`[subscription-sync] failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
+          logger.warn(`[subscription-sync] failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
           failed++;
         }
       }));
     }
 
     const skipped = rows.length - candidates.length;
-    console.log(`[subscription-sync] tld=${tld ?? "all"} refreshed=${refreshed} skipped=${skipped} failed=${failed}`);
+    logger.info(`[subscription-sync] tld=${tld ?? "all"} refreshed=${refreshed} skipped=${skipped} failed=${failed}`);
 
     return res.status(200).json({
       ok: true,
@@ -125,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[subscription-sync] error:", msg);
+    logger.error("[subscription-sync] error:", msg);
     return res.status(500).json({ error: msg });
   }
 }

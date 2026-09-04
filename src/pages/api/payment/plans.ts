@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getActivePlans } from "@/lib/payment";
 import { isDbReady } from "@/lib/db-query";
 import { getRedisValue, setRedisValue } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/plans");
 
 const CACHE_KEY = "payment:active_plans";
 const CACHE_TTL = 5 * 60; // 5 minutes
@@ -32,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(payload);
   } catch (err: any) {
-    console.error("[payment/plans] error:", err.message);
+    logger.error("[payment/plans] error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve plans, please try again" });
   }
 }

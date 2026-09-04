@@ -4,6 +4,9 @@ import { requireAdmin, getAdminEmail } from "@/lib/admin";
 import { randomBytes } from "crypto";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { getSiteUrl } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/users-bulk");
 
 type Action = "disable" | "enable" | "grant_subscription" | "revoke_subscription" | "delete" | "send_reset_email";
 
@@ -99,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             sent++;
           } else {
             failedEmails.push(rows[i].email);
-            console.warn(`[users-bulk] send_reset_email failed for ${rows[i].email}:`, r.reason?.message ?? r.reason);
+            logger.warn(`[users-bulk] send_reset_email failed for ${rows[i].email}:`, r.reason?.message ?? r.reason);
           }
         });
         affected = sent;

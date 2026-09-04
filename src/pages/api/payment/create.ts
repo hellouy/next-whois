@@ -7,6 +7,9 @@ import { many } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSetting, getSiteUrl } from "@/lib/server/site-settings-server";
 import Stripe from "stripe";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/create");
 
 export const config = { maxDuration: 15 };
 
@@ -205,8 +208,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(400).json({ error: "Unsupported payment method" });
   } catch (err: any) {
-    console.error("[payment/create]", err);
-    console.error("[payment/create]", err);
+    logger.error("[payment/create]", err);
+    logger.error("[payment/create]", err);
     return res.status(500).json({ error: "Failed to create order" });
   }
 }

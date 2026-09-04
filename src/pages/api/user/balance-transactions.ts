@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, isDbReady } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/balance-transactions");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
@@ -39,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       balanceCents: balanceRow?.balance_cents ?? 0,
     });
   } catch (err: any) {
-    console.error("[user/balance-transactions]", err.message);
+    logger.error("[user/balance-transactions]", err.message);
     return res.status(500).json({ error: "Failed to retrieve balance records" });
   }
 }

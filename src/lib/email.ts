@@ -5,6 +5,9 @@
 
 import { one } from "@/lib/db-query";
 import { getEmailStrings, fmtEmailDate } from "@/lib/email-strings";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("email");
 
 const PRIMARY    = "#7c3aed";   // violet-600
 const PRIMARY_LT = "#8b5cf6";   // violet-500
@@ -1121,11 +1124,11 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
     if (resp.ok) return;
     const body = await resp.text().catch(() => "");
     if (resp.status === 403 && body.includes("not verified") && from !== RESEND_FALLBACK_FROM) {
-      console.warn(`[sendEmail] Domain not verified for "${from}", retrying with ${RESEND_FALLBACK_FROM}`);
+      logger.warn(`[sendEmail] Domain not verified for "${from}", retrying with ${RESEND_FALLBACK_FROM}`);
       continue;
     }
     lastErr = `Resend ${resp.status}: ${body.slice(0, 200)}`;
-    console.error("[sendEmail] Resend error:", resp.status, body);
+    logger.error("[sendEmail] Resend error:", resp.status, body);
     throw new Error(lastErr);
   }
   if (lastErr) throw new Error(lastErr);
@@ -1164,12 +1167,12 @@ export async function sendEmail({
   try {
     await sendEmailDirect(to, subject, renderedHtml);
   } catch (err: any) {
-    console.error(`[sendEmail] Failed — queuing for retry → ${to}: ${err.message}`);
+    logger.error(`[sendEmail] Failed — queuing for retry → ${to}: ${err.message}`);
     const { enqueueEmail } = await import("@/lib/email-queue");
     await enqueueEmail(to, subject, renderedHtml).catch((qErr: any) => {
       // Both direct send AND queue fallback failed — surface loudly so the
       // email is never silently lost.
-      console.error(
+      logger.error(
         `[sendEmail] CRITICAL: direct send and queue enqueue both failed → ${to} "${subject}":`,
         `send=${err.message}`,
         `enqueue=${qErr?.message ?? qErr}`,

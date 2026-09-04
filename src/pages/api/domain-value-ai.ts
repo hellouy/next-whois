@@ -12,6 +12,9 @@ import { authOptions } from "./auth/[...nextauth]";
 import { analyzeDomainWithAi } from "@/lib/server/domain-value-ai";
 import { scoreDomain } from "@/lib/domain-value";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/domain-value-ai");
 
 // Rate limit: 5 AI calls per IP per minute, backed by Redis so it survives
 // lambda cold starts and is consistent across multiple function instances.
@@ -66,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     return res.status(200).json(analysis);
   } catch (e) {
-    console.error("[api/domain-value-ai]", e);
+    logger.error("[api/domain-value-ai]", e);
     return res.status(500).json({ error: "AI analysis failed, please try again" });
   }
 }

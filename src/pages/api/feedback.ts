@@ -4,6 +4,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { run, isDbReady } from "@/lib/db-query";
 import { randomBytes } from "crypto";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/feedback");
 
 const ISSUE_LABELS: Record<string, string> = {
   // Domain / WHOIS
@@ -100,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       adminEmailSent = true;
     } catch (err: unknown) {
-      console.error("[feedback] admin email failed:", err instanceof Error ? err.message : err);
+      logger.error("[feedback] admin email failed:", err instanceof Error ? err.message : err);
     }
   }
 
@@ -124,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subject: isZh ? `[${siteName}] 感谢您的反馈` : `[${siteName}] Thank you for your feedback`,
       html: confirmHtml,
     }).catch((err: unknown) => {
-      console.error("[feedback] user confirmation email failed:", err instanceof Error ? err.message : err);
+      logger.error("[feedback] user confirmation email failed:", err instanceof Error ? err.message : err);
     });
   }
 

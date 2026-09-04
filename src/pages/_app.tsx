@@ -516,6 +516,15 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   const router = useRouter();
   const isAdminPage = router.pathname.startsWith("/admin");
 
+  // ── Client-side Sentry (lazy chunk, only when NEXT_PUBLIC_SENTRY_DSN set) ──
+  React.useEffect(() => {
+    const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    if (!dsn) return;
+    void import("@sentry/nextjs").then(Sentry => {
+      Sentry.init({ dsn, environment: process.env.NODE_ENV, tracesSampleRate: 0 });
+    }).catch(() => {});
+  }, []);
+
   // ── Route-change progress bar ──────────────────────────────────────────────
   // Shown for navigations TO non-stable pages (login, about, etc.) AND for
   // cross-page navigations TO the result page (homepage → result).

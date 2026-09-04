@@ -5,6 +5,9 @@ import { setRedisValue, getRedisValue, deleteRedisValue } from "@/lib/server/red
 import { sendEmail, verifyCodeHtml, getSiteLabel } from "@/lib/email";
 import { isDbReady, one } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/send-email-change-code");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -56,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Roll back stored code and rate-limit key so the user can retry immediately
     await deleteRedisValue(storeKey).catch(() => {});
     await deleteRedisValue(rateLimitKey).catch(() => {});
-    console.error("[send-email-change-code] sendEmail failed:", e.message);
+    logger.error("[send-email-change-code] sendEmail failed:", e.message);
     return res.status(500).json({ error: "Failed to send verification code, please check the email address and try again" });
   }
 

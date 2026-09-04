@@ -24,6 +24,9 @@ import { hash } from "bcryptjs";
 import { randomBytes, timingSafeEqual } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { getAdminEmail } from "@/lib/admin-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/init-admin");
 
 // ── In-process brute-force rate limiter ───────────────────────────────────────
 const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -82,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // SETUP_SECRET must always be configured
   const setupSecret = process.env.SETUP_SECRET;
   if (!setupSecret) {
-    console.warn(
+    logger.warn(
       "[init-admin] Blocked request: SETUP_SECRET environment variable is not set."
     );
     return res.status(403).json({
@@ -93,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const ip = getClientIp(req);
   const { allowed, remaining } = checkRateLimit(ip);
   if (!allowed) {
-    console.warn(`[init-admin] Rate limit exceeded for IP ${ip}`);
+    logger.warn(`[init-admin] Rate limit exceeded for IP ${ip}`);
     return res.status(429).json({
       error: "请求过于频繁，请 15 分钟后再试。",
     });
@@ -104,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!secret || !safeCompare(secret, setupSecret)) {
     recordFailure(ip);
     const left = MAX_FAILURES - (_failures.get(ip)?.count ?? 0);
-    console.warn(`[init-admin] Secret mismatch from IP ${ip}, ${left} attempts remaining`);
+    logger.warn(`[init-admin] Secret mismatch from IP ${ip}, ${left} attempts remaining`);
     return res.status(403).json({
       error: `SETUP_SECRET 不匹配，拒绝访问。剩余尝试次数：${Math.max(0, left)}`,
     });
@@ -134,7 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (existing) {
     const passwordHash = await hash(password, 12);
     await run("UPDATE users SET password_hash = $1 WHERE email = $2", [passwordHash, adminEmail]);
-    console.log(`[init-admin] Password reset for admin ${adminEmail} from IP ${ip}`);
+    logger.info(`[init-admin] Password reset for admin ${adminEmail} from IP ${ip}`);
     return res.json({ ok: true, action: "password_reset", email: adminEmail });
   }
 
@@ -146,10 +149,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4)`,
       [id, adminEmail, passwordHash, "管理员"],
     );
-    console.log(`[init-admin] Admin account created for ${adminEmail} from IP ${ip}`);
+    logger.info(`[init-admin] Admin account created for ${adminEmail} from IP ${ip}`);
     return res.json({ ok: true, action: "created", email: adminEmail });
   } catch (err: any) {
-    console.error("[init-admin]", err);
+    logger.error("[init-admin]", err);
     return res.status(500).json({ error: "Initialization failed" });
   }
 }

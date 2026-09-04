@@ -7,6 +7,9 @@ import { checkHotPrefix } from "@/lib/server/hot-prefix-cache";
 import { analyzeDomainWithAi } from "@/lib/server/domain-value-ai";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
 import { DnsProbeResult } from "@/lib/whois/dns-check";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("server/save-search-record");
 
 export function detectQueryType(query: string): "domain" | "ipv4" | "ipv6" | "asn" | "cidr" {
   if (/^(\d{1,3}\.){3}\d{1,3}$/.test(query)) return "ipv4";
@@ -112,7 +115,7 @@ export async function maybeSendHighValueAlert(
     to: ADMIN_EMAIL,
     subject: `${subjectPrefix}：${query}（评分 ${scoreResult.score}${hotPrefixMatch ? ` · 前缀:${hotPrefixMatch.prefix.prefix}` : ""}）`,
     html,
-  }).catch(err => console.error("[high-value-alert]", err.message));
+  }).catch(err => logger.error("[high-value-alert]", err.message));
 }
 
 // Prune anonymous search_history records older than 30 days (1% of requests).
@@ -191,6 +194,6 @@ export async function saveSearchRecord(
     // Opportunistically prune old anonymous records (fire-and-forget)
     if (!userId) maybePruneAnonymous().catch(() => {});
   } catch (err: any) {
-    console.error("[save-search-record] DB write failed:", err?.message ?? err);
+    logger.error("[save-search-record] DB write failed:", err?.message ?? err);
   }
 }

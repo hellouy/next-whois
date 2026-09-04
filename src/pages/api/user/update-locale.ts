@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { run, isDbReady } from "@/lib/db-query";
 import { SUPPORTED_EMAIL_LOCALES, normalizeEmailLocale } from "@/lib/email-strings";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/update-locale");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -30,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res.json({ ok: true, locale: normalized });
   } catch (err: any) {
-    console.error("[update-locale]", err.message);
+    logger.error("[update-locale]", err.message);
     return res.status(500).json({ error: "Failed to update locale" });
   }
 }

@@ -6,6 +6,9 @@
 
 import { getConfiguredProviders } from "./ai-providers";
 import { redis, isRedisAvailable } from "./redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("server/domain-value-ai");
 
 export interface DomainAiAnalysis {
   domain: string;
@@ -171,6 +174,6 @@ export async function analyzeDomainWithAi(domain: string): Promise<DomainAiAnaly
     }
   }
 
-  console.error("[domain-value-ai] All providers failed:", lastError?.message);
+  logger.error("[domain-value-ai] All providers failed:", lastError?.message);
   return null;
 }

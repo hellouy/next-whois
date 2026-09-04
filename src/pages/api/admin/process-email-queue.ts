@@ -23,6 +23,9 @@ import {
   getQueueStats,
   requeueFailed,
 } from "@/lib/email-queue";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/process-email-queue");
 
 async function isAuthorized(req: NextApiRequest, res: NextApiResponse): Promise<boolean> {
   const cronSecret = process.env.CRON_SECRET;
@@ -53,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let requeued = 0;
   if (requeue) {
     requeued = await requeueFailed().catch(() => 0);
-    console.log(`[process-email-queue] Re-queued ${requeued} failed emails`);
+    logger.info(`[process-email-queue] Re-queued ${requeued} failed emails`);
   }
 
   const result = await processEmailQueue(sendEmailDirect, limit);

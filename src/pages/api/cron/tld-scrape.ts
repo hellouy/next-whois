@@ -16,6 +16,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { one, run, many } from "@/lib/db-query";
 import { fetchPageText, extractWithAI } from "@/pages/api/admin/tld-rules";
 import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/cron/tld-scrape");
 
 const BATCH_SIZE = 5;
 const MAX_WARN_ATTEMPTS = 3;
@@ -117,7 +120,7 @@ async function saveFailure(tld: string, reason: string) {
        scrape_attempts    = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
     [tld, reason.slice(0, 500)]
   ).catch((e: Error) =>
-    console.warn(`[cron/tld-scrape] DB write failure for ${tld}:`, e.message)
+    logger.warn(`[cron/tld-scrape] DB write failure for ${tld}:`, e.message)
   );
 }
 
@@ -178,11 +181,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const batch = await getNextBatch();
 
   if (batch.length === 0) {
-    console.log("[cron/tld-scrape] No pending TLDs — all done or exhausted.");
+    logger.info("[cron/tld-scrape] No pending TLDs — all done or exhausted.");
     return res.json({ ok: true, processed: 0, message: "No pending TLDs" });
   }
 
-  console.log(`[cron/tld-scrape] Processing ${batch.length} TLDs: ${batch.map(r => r.tld).join(", ")}`);
+  logger.info(`[cron/tld-scrape] Processing ${batch.length} TLDs: ${batch.map(r => r.tld).join(", ")}`);
 
   const results: Array<{
     tld: string;
@@ -201,7 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const reason = `已连续 ${scrape_attempts} 次 ${scrape_status}，自动标记为 no_data`;
       await markNoData(tld, reason);
       results.push({ tld, status: "no_data" });
-      console.log(`[cron/tld-scrape] .${tld} → no_data (exhausted ${scrape_attempts} attempts)`);
+      logger.info(`[cron/tld-scrape] .${tld} → no_data (exhausted ${scrape_attempts} attempts)`);
       continue;
     }
 
@@ -221,14 +224,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       invalidateLifecycleOverridesCache();
 
       results.push({ tld, status: scrapeStatus, model: extracted.model_used });
-      console.log(
+      logger.info(
         `[cron/tld-scrape] .${tld} → ${scrapeStatus} | grace=${extracted.grace_period_days}d redemption=${extracted.redemption_period_days}d pending=${extracted.pending_delete_days}d [${extracted.model_used}]`
       );
     } catch (err: any) {
       const reason = (err.message ?? String(err)).slice(0, 400);
       await saveFailure(tld, reason);
       results.push({ tld, status: "failed", error: reason.slice(0, 120) });
-      console.error(`[cron/tld-scrape] .${tld} → failed: ${reason.slice(0, 120)}`);
+      logger.error(`[cron/tld-scrape] .${tld} → failed: ${reason.slice(0, 120)}`);
     }
   }
 
@@ -239,7 +242,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     no_data: results.filter(r => r.status === "no_data").length,
   };
 
-  console.log(`[cron/tld-scrape] Done. ok=${summary.ok} warn=${summary.warn_defaults} failed=${summary.failed} no_data=${summary.no_data}`);
+  logger.info(`[cron/tld-scrape] Done. ok=${summary.ok} warn=${summary.warn_defaults} failed=${summary.failed} no_data=${summary.no_data}`);
 
   return res.json({
     ok: true,

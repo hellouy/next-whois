@@ -49,8 +49,18 @@ function ErrorPage({ statusCode, message }: ErrorProps) {
   );
 }
 
-ErrorPage.getInitialProps = ({ res, err }: NextPageContext): ErrorProps => {
+ErrorPage.getInitialProps = ({ res, err, req }: NextPageContext): ErrorProps => {
   const statusCode = res?.statusCode ?? err?.statusCode ?? 500;
+  if (err && typeof window !== "undefined") {
+    // SSR-render errors: report client-side once hydration finishes
+    void import("@sentry/nextjs").then(Sentry => {
+      if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+        Sentry.captureException(err);
+      }
+    }).catch(() => {});
+  } else if (err) {
+    void import("@/lib/monitoring-server").then(m => m.captureException(err, { req: req?.url })).catch(() => {});
+  }
   return { statusCode };
 };
 

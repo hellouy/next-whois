@@ -2,13 +2,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
 import { DnsProbeResult } from "@/lib/whois/dns-check";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/lookup-batch");
 
 export const config = {
   maxDuration: 60,
@@ -97,7 +100,7 @@ export default async function handler(
                   :                 `${ip}:anon:batch`;
 
   {
-    const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+    const { ok: allowed, remaining, resetMs } = await checkRateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
     res.setHeader("X-RateLimit-Limit", String(tierLimit));
     res.setHeader("X-RateLimit-Remaining", String(remaining));
     res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetMs / 1_000)));
@@ -187,12 +190,12 @@ export default async function handler(
         errorCode: item.status ? null : (item.error?.slice(0, 60) ?? null),
         source: item.source ?? null,
         userId, userEmail, ip,
-      }).catch(e => console.error("[lookup-batch] logQuery failed:", e.message)),
+      }).catch(e => logger.error("[lookup-batch] logQuery failed:", e.message)),
     ];
     if (item.status && item.result) {
       tasks.push(
         saveSearchRecord(item.domain, item.result, item.dnsProbe, userId, userEmail)
-          .catch(e => console.error("[lookup-batch] saveSearchRecord failed:", e.message)),
+          .catch(e => logger.error("[lookup-batch] saveSearchRecord failed:", e.message)),
       );
     }
     return Promise.all(tasks);

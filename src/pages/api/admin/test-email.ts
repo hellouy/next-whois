@@ -46,6 +46,9 @@ import {
   stampVerifyTimeoutHtml,
   feedbackHtml,
 } from "@/lib/email";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/test-email");
 
 // ── sample data used for all preview emails ────────────────────────────────
 
@@ -356,10 +359,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await sendEmailDirect(to, t.subject, t.html);
       results.push({ key: t.key, subject: t.subject, ok: true });
-      console.log(`[test-email] Sent "${t.key}" → ${to}`);
+      logger.info(`[test-email] Sent "${t.key}" → ${to}`);
     } catch (err: any) {
       results.push({ key: t.key, subject: t.subject, ok: false, error: err.message });
-      console.error(`[test-email] Failed "${t.key}" → ${to}:`, err.message);
+      logger.error(`[test-email] Failed "${t.key}" → ${to}:`, err.message);
     }
   }
 

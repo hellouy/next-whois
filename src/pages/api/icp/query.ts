@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { queryMiitIcp, type MiitIcpPage } from "@/lib/server/icp-miit";
 
 export const config = { maxDuration: 15 };
@@ -146,7 +146,7 @@ export default async function handler(
     });
   }
 
-  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  const { ok: allowed } = await checkRateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
   if (!allowed) {
     return res.status(429).json({
       ok: false, type: "web", search: "", pageNum: 1, pageSize: 10,

@@ -5,6 +5,9 @@ import { compare, hash } from "bcryptjs";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordChangedHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/change-password");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -47,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       to: session.user!.email!,
       subject: `Password Changed — Security Notice | ${siteName}`,
       html: passwordChangedHtml({ name: nameRow?.name ?? null, email: session.user!.email!, siteName }),
-    }).catch(e => console.error("[change-password] email error:", e))
+    }).catch(e => logger.error("[change-password] email error:", e))
   );
 
   return res.status(200).json({ ok: true });

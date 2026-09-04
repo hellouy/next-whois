@@ -5,6 +5,9 @@ import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { localeFromCookieHeader, getEmailStrings } from "@/lib/email-strings";
 import { getSiteUrl } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/forgot-password");
 
 const RESET_EXPIRES_MINUTES = 60;
 
@@ -49,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [tokenId, user.id, rawToken, expiresAt],
     );
   } catch (err: any) {
-    console.error("[forgot-password] token insert error:", err.message);
+    logger.error("[forgot-password] token insert error:", err.message);
     return res.status(500).json({ error: "Operation failed, please try again later" });
   }
 
@@ -64,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       html: passwordResetHtml({ resetUrl, siteName, locale }),
     });
   } catch (e) {
-    console.error("[forgot-password] Failed to send email:", e);
+    logger.error("[forgot-password] Failed to send email:", e);
     return res.status(500).json({ error: "Failed to send email, please try again later" });
   }
 

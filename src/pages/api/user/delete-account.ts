@@ -4,6 +4,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isAdminEmail } from "@/lib/admin-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/delete-account");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "DELETE") return res.status(405).end();
@@ -40,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ ok: true });
   } catch (err: any) {
-    console.error("[delete-account]", err.message);
+    logger.error("[delete-account]", err.message);
     return res.status(500).json({ error: "Deletion failed, please try again" });
   }
 }

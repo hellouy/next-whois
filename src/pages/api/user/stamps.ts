@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, isDbReady } from "@/lib/db-query";
 import { invalidateStampCache } from "@/lib/stamp-cache";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/stamps");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -20,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       return res.status(200).json({ stamps: rows });
     } catch (err: any) {
-      console.error("[stamps] GET error:", err.message);
+      logger.error("[stamps] GET error:", err.message);
       return res.status(500).json({ error: "Failed to retrieve data" });
     }
   }
@@ -66,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
-      console.error("[stamps] PATCH error:", err.message);
+      logger.error("[stamps] PATCH error:", err.message);
       return res.status(500).json({ error: "Update failed, please try again" });
     }
     return res.status(200).json({ ok: true });
@@ -87,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       if (existing?.domain) invalidateStampCache(String(existing.domain).toLowerCase());
     } catch (err: any) {
-      console.error("[stamps] DELETE error:", err.message);
+      logger.error("[stamps] DELETE error:", err.message);
       return res.status(500).json({ error: "Deletion failed, please try again" });
     }
     return res.status(200).json({ ok: true });

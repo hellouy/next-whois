@@ -5,6 +5,9 @@ import { toast } from "sonner";
 import { parse } from "tldts";
 import { getSpecialDomain } from "@/lib/whois/lib";
 import { useTranslation } from "@/lib/i18n";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("utils");
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -63,7 +66,7 @@ export function useClipboard() {
       await copyClipboard(text);
       toast.success(t("toast.copied"));
     } catch (e) {
-      console.error(e);
+      logger.error("copy failed", e);
 
       const err = e as Error;
       toast.error(t("toast.copy_failed", { message: err.message }));
@@ -79,7 +82,7 @@ export function useSaver() {
       saveAsFile(filename, content);
       toast.success(t("toast.saved"));
     } catch (e) {
-      console.error(e);
+      logger.error("save failed", e);
 
       toast.error(t("toast.save_failed", { message: toErrorMessage(e) }));
     }

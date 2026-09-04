@@ -15,6 +15,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, isDbReady } from "@/lib/db-query";
 import { computeLifecycle } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/dashboard");
 
 const THRESHOLDS = [60, 30, 10, 5, 1];
 
@@ -196,7 +199,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       run(
         "UPDATE users SET subscription_access = FALSE, subscription_expires_at = NULL, updated_at = NOW() WHERE email = $1",
         [email]
-      ).catch(e => console.error("[dashboard] expiry revoke error:", e));
+      ).catch(e => logger.error("[dashboard] expiry revoke error:", e));
       subscriptionAccess = false;
       subscriptionExpiresAt = null;
     }
@@ -222,7 +225,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[dashboard] GET error:", msg);
+    logger.error("[dashboard] GET error:", msg);
     return res.status(500).json({ error: "Failed to retrieve data" });
   }
 }

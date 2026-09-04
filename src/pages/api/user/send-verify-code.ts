@@ -5,6 +5,9 @@ import {
   deleteRedisValue,
   isRedisAvailable,
 } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/send-verify-code");
 import { sendEmailDirect, verifyCodeHtml, getSiteLabel } from "@/lib/email";
 import { isDbReady, one, run } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -92,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isRedisAvailable()) await deleteRedisValue(`verify:register:${cleanEmail}`).catch(() => {});
     if (await isDbReady())
       await run("DELETE FROM verify_codes WHERE email = $1 AND scope = 'register'", [cleanEmail]).catch(() => {});
-    console.error("[send-verify-code] email send failed:", err.message);
+    logger.error("[send-verify-code] email send failed:", err.message);
     return res.status(500).json({ error: "Failed to send email, please check your email address or try again later" });
   }
 

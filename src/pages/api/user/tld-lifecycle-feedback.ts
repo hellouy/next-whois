@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes } from "crypto";
 import { run, isDbReady } from "@/lib/db-query";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/tld-lifecycle-feedback");
 
 let _tableReady = false;
 async function ensureTable() {
@@ -72,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res.status(201).json({ ok: true, id });
   } catch (err: any) {
-    console.error("[tld-lifecycle-feedback] error:", err.message);
+    logger.error("[tld-lifecycle-feedback] error:", err.message);
     return res.status(500).json({ error: "Submission failed, please try again" });
   }
 }

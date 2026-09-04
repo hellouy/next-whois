@@ -7,6 +7,9 @@ import {
   setRedisValue,
   deleteRedisValue,
 } from "@/lib/server/redis";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/admin/tld-rules");
 import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -51,7 +54,7 @@ function updateLocalCache(tld: string, data: Record<string, unknown>): void {
     writeFileSync(LOCAL_CACHE_PATH, JSON.stringify(cache, null, 2), "utf8");
   } catch (e) {
     // Silent: production (Vercel) has read-only FS; local backup is best-effort
-    console.warn("[tld-rules] local-cache write skipped:", (e as Error).message);
+    logger.warn("[tld-rules] local-cache write skipped:", (e as Error).message);
   }
 }
 
@@ -410,7 +413,7 @@ async function findRegistryLifecyclePage(
 
   // ── Strategy 4: Jina Reader (JS-rendered sites) ───────────────────────────
   // Used when direct fetching finds no lifecycle info (JS-heavy sites like DENIC, nic.fr, nic.uk)
-  console.log(`[tld-rules] Strategy 4: Trying Jina Reader for ${registryUrl}`);
+  logger.info(`[tld-rules] Strategy 4: Trying Jina Reader for ${registryUrl}`);
   try {
     // 4a: Render registry homepage via Jina
     const jinaMarkdown = await fetchViaJina(registryUrl);
@@ -420,7 +423,7 @@ async function findRegistryLifecyclePage(
 
     // 4b: Extract lifecycle links from Jina-rendered Markdown, follow them via Jina
     const jinaLinks = extractLifecycleLinksFromMarkdown(jinaMarkdown, registryUrl);
-    console.log(`[tld-rules] Jina found ${jinaLinks.length} lifecycle-keyword links`);
+    logger.info(`[tld-rules] Jina found ${jinaLinks.length} lifecycle-keyword links`);
     for (const jLink of jinaLinks) {
       try {
         const jPageText = await fetchViaJina(jLink);
@@ -454,7 +457,7 @@ async function findRegistryLifecyclePage(
       } catch { /* try next */ }
     }
   } catch (jinaErr) {
-    console.warn(`[tld-rules] Jina Reader failed for ${registryUrl}:`, (jinaErr as Error).message);
+    logger.warn(`[tld-rules] Jina Reader failed for ${registryUrl}:`, (jinaErr as Error).message);
   }
 
   return null;

@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { markOrderPaid, verifyXunhupayWebhook } from "@/lib/payment";
 import { isDbReady } from "@/lib/db-query";
 import { getSetting } from "@/lib/server/site-settings-server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/payment/webhook/xunhupay");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -11,12 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const appSecret = (await getSetting("payment_xunhupay_secret")) || process.env.XUNHUPAY_APP_SECRET || "";
 
   if (!appSecret) {
-    console.warn("[xunhupay webhook] payment_xunhupay_secret not configured");
+    logger.warn("[xunhupay webhook] payment_xunhupay_secret not configured");
     return res.status(500).end();
   }
 
   if (!verifyXunhupayWebhook(body, appSecret)) {
-    console.warn("[xunhupay webhook] Invalid signature, body:", JSON.stringify(body).slice(0, 200));
+    logger.warn("[xunhupay webhook] Invalid signature, body:", JSON.stringify(body).slice(0, 200));
     return res.status(400).json({ errcode: 1, errmsg: "invalid sign" });
   }
 
@@ -34,9 +37,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       providerOrderId: transaction_id,
       webhookRaw: JSON.stringify(body).slice(0, 2000),
     });
-    console.log(`[xunhupay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
+    logger.info(`[xunhupay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
   } catch (err: any) {
-    console.error("[xunhupay webhook] markOrderPaid error:", err.message);
+    logger.error("[xunhupay webhook] markOrderPaid error:", err.message);
     return res.status(500).json({ errcode: 1, errmsg: err.message });
   }
 

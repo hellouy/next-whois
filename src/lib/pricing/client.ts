@@ -1,3 +1,7 @@
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("pricing/client");
+
 const NAZHUMI_API_URL = "https://www.nazhumi.com/api/v1";
 const MIQINGJU_API_URL = "https://api.miqingju.com/api/v1/query";
 const TIANHU_API_URL = "https://api.tian.hu/tlds/pricing";
@@ -308,7 +312,7 @@ export async function getDomainPricing(
       externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
     };
   } catch (error) {
-    console.error("Error fetching domain pricing:", error);
+    logger.error("Error fetching domain pricing:", error);
     return null;
   }
 }

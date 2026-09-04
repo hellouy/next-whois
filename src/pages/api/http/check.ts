@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isBlockedHost } from "@/lib/ssrf-guard";
 
 export const config = { maxDuration: 15 };
@@ -149,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     });
   }
 
-  const { allowed } = rateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
+  const { ok: allowed } = await checkRateLimit(getClientIp(req), RL_LIMIT, RL_WINDOW);
   if (!allowed) {
     return res.status(429).json({
       ok: false, url: "", finalUrl: "", statusCode: null, statusText: null,

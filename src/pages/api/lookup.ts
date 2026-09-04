@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { DnsProbeResult } from "@/lib/whois/dns-check";
-import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
@@ -10,6 +10,9 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/lookup");
 
 export const config = {
   maxDuration: 30,
@@ -86,7 +89,7 @@ export default async function handler(
                     : userEmail    ? `${ip}:auth`
                     :                `${ip}:anon`;
 
-  const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+  const { ok: allowed, remaining, resetMs } = await checkRateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
 
   res.setHeader("X-RateLimit-Limit", String(tierLimit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
@@ -124,9 +127,9 @@ export default async function handler(
       domain: trimmed, tld: cnTld, success: true, cached: false,
       durationMs: 0, errorCode: null, source: "whois",
       userId, userEmail, ip,
-    }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+    }).catch(e => logger.error("[lookup] logQuery failed:", e.message));
     await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
-      .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message));
+      .catch(e => logger.error("[lookup] saveSearchRecord failed:", e.message));
     res.setHeader("Cache-Control", "s-maxage=43200, stale-while-revalidate=86400");
     return res.status(200).json({
       time: 0,
@@ -151,7 +154,7 @@ export default async function handler(
       domain: trimmed, tld, success: false, cached: false,
       durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null,
       userId, userEmail, ip,
-    }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+    }).catch(e => logger.error("[lookup] logQuery failed:", e.message));
     return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
   }
 
@@ -162,12 +165,12 @@ export default async function handler(
   // stats depend on these writes not being frozen out).
   await Promise.allSettled([
     saveSearchRecord(trimmed, result ?? { ...initialWhoisAnalyzeResult }, dnsProbe, userId, userEmail)
-      .catch(e => console.error("[lookup] saveSearchRecord failed:", e.message)),
+      .catch(e => logger.error("[lookup] saveSearchRecord failed:", e.message)),
     logQuery({
       domain: trimmed, tld, success: true, cached: cached ?? false,
       durationMs: time * 1000, errorCode: null, source: source ?? null,
       userId, userEmail, ip,
-    }).catch(e => console.error("[lookup] logQuery failed:", e.message)),
+    }).catch(e => logger.error("[lookup] logQuery failed:", e.message)),
   ]);
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
