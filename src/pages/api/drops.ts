@@ -32,6 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let drops: { date: string; domains: DomainRow[] }[] = [];
   if (publicEnabled || email) {
     try {
+      // Crawled leads only carry a year (e.g. "2026") in available_date, so no
+      // exact date-window filter is applied here — group everything we have.
       const rows = await many<{
         domain: string; tld: string; available_date: string | null;
       }>(
@@ -39,11 +41,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          FROM expired_domain_leads
          WHERE status = 'available'
            AND available_date IS NOT NULL
-           AND available_date >= $1
-           AND available_date <= $2
          ORDER BY available_date ASC, domain ASC
-         LIMIT $3`,
-        [todayStr, endStr, PUBLIC_GROUP_LIMIT],
+         LIMIT $1`,
+        [PUBLIC_GROUP_LIMIT],
       );
       const byDate = new Map<string, DomainRow[]>();
       for (const r of rows) {

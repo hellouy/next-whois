@@ -1883,7 +1883,7 @@
   },
   "drops": {
     "title": "Drop Calendar",
-    "subtitle": "Domains expected to drop in the next {{days}} days",
+    "subtitle": "Crawled domains available for re-registration, grouped by availability",
     "empty": "No drops in this period",
     "public_locked_title": "Sign in required",
     "public_locked_desc": "The drop calendar is only visible to signed-in users.",

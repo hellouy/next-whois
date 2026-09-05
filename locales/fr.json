@@ -1883,7 +1883,7 @@
   },
   "drops": {
     "title": "Calendrier des drops",
-    "subtitle": "Domaines attendus dans les {{days}} prochains jours",
+    "subtitle": "Domaines collectés disponibles à la ré-enregistrement, groupés par année",
     "empty": "Aucun drop sur cette période",
     "public_locked_title": "Connexion requise",
     "public_locked_desc": "Le calendrier des drops est visible uniquement par les utilisateurs connectés.",

@@ -172,7 +172,7 @@ export default function DropsPage() {
               <RiCalendarLine className="w-4 h-4 text-primary" />
               <div className="flex-1 min-w-0">
                 <h1 className="text-sm font-bold leading-tight">{t("drops.title")}</h1>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t("drops.subtitle", { days: 30 })}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t("drops.subtitle")}</p>
               </div>
               {totalCount > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-muted/60 rounded-full px-2 py-1 shrink-0">

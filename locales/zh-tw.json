@@ -1883,7 +1883,7 @@
   },
   "drops": {
     "title": "掉落日曆",
-    "subtitle": "未來 {{days}} 天預計掉落的網域",
+    "subtitle": "已收錄的可重新註冊網域，按可用年份分組",
     "empty": "該時段暫無掉落網域",
     "public_locked_title": "需要登入",
     "public_locked_desc": "掉落日曆僅對登入用戶開放。",

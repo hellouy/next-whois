@@ -26,7 +26,8 @@ const logger = createLogger("api/admin/expired-domains-crawl");
 export const config = { maxDuration: 60 };
 
 const BASE = "https://member.expireddomains.net";
-const LOGIN_URL = `${BASE}/login/`;
+const LOGIN_URL = "https://www.expireddomains.net/login/";
+const LOGIN_CHECK_URL = "https://www.expireddomains.net/logincheck/";
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 // ── Cookie helpers ────────────────────────────────────────────────────────────
@@ -52,20 +53,15 @@ function cookieHeader(cookies: string[]): string {
 // ── Login ─────────────────────────────────────────────────────────────────────
 
 async function loginToExpiredDomains(username: string, password: string): Promise<string> {
+  // The site migrated to www.expireddomains.net and its login form now posts to
+  // /logincheck/ with fields `login`, `password`, `rememberme` (no CSRF token).
   const getRes = await fetch(LOGIN_URL, {
     headers: { "User-Agent": UA },
     redirect: "follow",
   });
   const loginCookies = extractCookies(getRes);
-  const html = await getRes.text();
-  // Match csrfmiddlewaretoken regardless of attribute order in the <input> tag
-  const csrfMatch =
-    html.match(/name=["']csrfmiddlewaretoken["'][^>]+value=["']([^"']+)["']/) ||
-    html.match(/value=["']([^"']+)["'][^>]+name=["']csrfmiddlewaretoken["']/) ||
-    html.match(/csrfmiddlewaretoken[\s\S]*?value=["']([^"']+)["']/);
-  const csrf = csrfMatch?.[1] ?? "";
 
-  const postRes = await fetch(LOGIN_URL, {
+  const postRes = await fetch(LOGIN_CHECK_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -74,22 +70,40 @@ async function loginToExpiredDomains(username: string, password: string): Promis
       "User-Agent": UA,
       "Origin": BASE,
     },
-    body: new URLSearchParams({ username, password, csrfmiddlewaretoken: csrf }).toString(),
+    body: new URLSearchParams({ login: username, password, rememberme: "1" }).toString(),
     redirect: "manual",
   });
 
   const postCookies = extractCookies(postRes);
   const allCookies = cookieHeader([...loginCookies, ...postCookies]);
 
-  if (!allCookies.includes("sessionid")) {
-    const hint = !csrf
-      ? " (CSRF token not found — the login page structure may have changed)"
-      : postRes.status !== 302 && postRes.status !== 200
-      ? ` (unexpected HTTP ${postRes.status} after POST)`
-      : "";
+  // New flow: /logincheck/ 302s to member.expireddomains.net/auth/?token=… which
+  // sets the member-subdomain sessionid cookie. Follow it before judging success.
+  const authUrl = postRes.headers.get("location");
+  let authCookies: string[] = [];
+  if (authUrl && authUrl.includes("/auth/")) {
+    try {
+      const authRes = await fetch(authUrl, {
+        headers: {
+          "Cookie": cookieHeader([...loginCookies, ...postCookies]),
+          "User-Agent": UA,
+        },
+        redirect: "manual",
+      });
+      authCookies = extractCookies(authRes);
+    } catch { /* cookie may still arrive on the logincheck response */ }
+  }
+  const sessionCookies = cookieHeader([...loginCookies, ...postCookies, ...authCookies]);
+
+  // The member subdomain sets the session cookie as `ExpiredDomainssessid`.
+  if (!sessionCookies.includes("ExpiredDomainssessid")) {
+    const hint =
+      postRes.status !== 302 && postRes.status !== 200
+        ? ` (unexpected HTTP ${postRes.status} after POST)`
+        : "";
     throw new Error(`Login failed — check your expireddomains.net username and password${hint}`);
   }
-  return allCookies;
+  return sessionCookies;
 }
 
 // ── Parse listing page ────────────────────────────────────────────────────────
@@ -240,7 +254,20 @@ async function crawlByPrefix(
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!(await requireAdmin(req, res))) return;
+  // Crawl can be triggered either by a Vercel cron (CRON_SECRET bearer) or by an
+  // admin session. Every other action (list/stats/patch/delete) stays admin-only.
+  const isCrawl = req.method === "POST" && req.query.action === "crawl";
+  if (!isCrawl) {
+    if (!(await requireAdmin(req, res))) return;
+  } else {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.authorization;
+    const legacyHeader = req.headers["x-cron-secret"] as string | undefined;
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    const provided = bearerToken || legacyHeader;
+    const cronOk = !!(cronSecret && provided && provided === cronSecret);
+    if (!cronOk && !(await requireAdmin(req, res))) return;
+  }
   if (!(await isDbReady())) return res.status(503).json({ error: "DB unavailable" });
 
   const action = req.query.action as string | undefined;

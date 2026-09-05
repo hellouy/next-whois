@@ -1883,7 +1883,7 @@
   },
   "drops": {
     "title": "掉落日历",
-    "subtitle": "未来 {{days}} 天预计掉落的域名",
+    "subtitle": "已收录的可重新注册域名，按可用年份分组",
     "empty": "该时段暂无掉落域名",
     "public_locked_title": "需要登录",
     "public_locked_desc": "掉落日历仅对登录用户开放。",

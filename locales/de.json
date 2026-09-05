@@ -1883,7 +1883,7 @@
   },
   "drops": {
     "title": "Drop-Kalender",
-    "subtitle": "In den nächsten {{days}} Tagen erwartete Drops",
+    "subtitle": "Gecrawlte Domains zur Wiederverfügbarkeit, nach Verfügbarkeit gruppiert",
     "empty": "In diesem Zeitraum keine Drops",
     "public_locked_title": "Anmeldung erforderlich",
     "public_locked_desc": "Der Drop-Kalender ist nur für angemeldete Benutzer sichtbar.",
