@@ -1,6 +1,6 @@
 import { cn, toSearchURI, isSearchRoute, cleanDomain, isValidDomainTld } from "@/lib/utils";
 import { prefetchLookup } from "@/lib/lookup-prefetch";
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/router";
 import { QueryLoadingSkeleton } from "@/components/query/query-loading-skeleton";
@@ -202,12 +202,14 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
 
   const [isSearching, setIsSearching] = useState(false);
   const [searchingDomain, setSearchingDomain] = useState("");
+  // Guard against duplicate navigations (double Enter/click fires two pushes)
+  const isNavigatingRef = useRef(false);
 
   // Only reset on navigation ERROR — on success the index page unmounts
   // (Next.js replaces the Component), so resetting on routeChangeComplete
   // would cause a 1-frame flicker: skeleton → home → result page.
   useEffect(() => {
-    const reset = () => { setIsSearching(false); setSearchingDomain(""); };
+    const reset = () => { isNavigatingRef.current = false; setIsSearching(false); setSearchingDomain(""); };
     router.events.on("routeChangeError", reset);
     return () => {
       router.events.off("routeChangeError", reset);
@@ -216,6 +218,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
 
   const handleSearch = useCallback(
     (query: string) => {
+      if (isNavigatingRef.current) return;
       const cleaned = cleanDomain(query.replace(/\s+/g, ""));
       const queryLooksValid =
         cleaned &&
@@ -225,6 +228,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
       if (queryLooksValid) prefetchLookup(cleaned);
       setSearchingDomain(cleaned || query.trim());
       setIsSearching(true);
+      isNavigatingRef.current = true;
       router.push(toSearchURI(query));
     },
     [router],

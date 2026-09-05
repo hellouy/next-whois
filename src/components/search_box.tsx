@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -169,25 +169,47 @@ export function SearchBox({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+  const suggestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // Prevent double-mount in React StrictMode
+    if (mountedRef.current) return;
+    mountedRef.current = true;
     setMounted(true);
-    setHistory(listHistory().slice(0, 8));
+    // Load history asynchronously so it does not block the initial render
+    requestAnimationFrame(() => {
+      try {
+        setHistory(listHistory().slice(0, 8));
+      } catch {
+        // Silently fail if localStorage is unavailable
+      }
+    });
+    return () => {
+      if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
     setInputValue(initialValue);
   }, [initialValue]);
 
-  const computeDropdownPos = () => {
+  const computeDropdownPos = useCallback(() => {
     if (!inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();
-    setDropdownPos({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
+    // Only update when the position actually changed to avoid needless re-renders
+    setDropdownPos(prev => {
+      const next = {
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      };
+      if (prev && prev.top === next.top && prev.left === next.left && prev.width === next.width) {
+        return prev;
+      }
+      return next;
     });
-  };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -212,13 +234,23 @@ export function SearchBox({
       window.removeEventListener("resize", handleResizeOrScroll);
       window.removeEventListener("scroll", handleResizeOrScroll, true);
     };
-  }, [showSuggestions]);
+  }, [showSuggestions, computeDropdownPos]);
+
+  // Compute the initial dropdown position once mounted
+  useEffect(() => {
+    if (mounted && inputRef.current) {
+      requestAnimationFrame(() => {
+        computeDropdownPos();
+      });
+    }
+  }, [mounted, computeDropdownPos]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
       inputRef.current.focus();
+      computeDropdownPos();
     }
-  }, [autoFocus]);
+  }, [autoFocus, computeDropdownPos]);
 
   const predictQueryType = (value: string): string => {
     if (!value) return "domain";
@@ -424,6 +456,7 @@ export function SearchBox({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.slice(0, MAX_INPUT_LENGTH);
     setInputValue(value);
+    if (validationError) setValidationError(null);
     computeDropdownPos();
     const cleaned = sanitizeInput(value);
 
@@ -443,10 +476,14 @@ export function SearchBox({
         return;
       }
     }
-    setValidationError(null);
 
-    const newSuggestions = generateSuggestions(cleaned || value);
-    setShowSuggestions(newSuggestions.length > 0);
+    // Debounce suggestion generation so fast typing does not block the input
+    if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current);
+    suggestionTimeoutRef.current = setTimeout(() => {
+      const debouncedCleaned = sanitizeInput(value);
+      const newSuggestions = generateSuggestions(debouncedCleaned || value);
+      setShowSuggestions(newSuggestions.length > 0);
+    }, 50);
     setSelectedIndex(-1);
 
     // Debounced prefetch: if the input looks like a complete query (has a dot
@@ -534,11 +571,15 @@ export function SearchBox({
   };
 
   const handleSuggestionClick = (suggestion: string) => {
+    // Prevent duplicate submission while a search is already loading
+    if (loading) return;
     setInputValue(suggestion);
     submitQuery(suggestion);
   };
 
   const handleSearch = () => {
+    // Prevent duplicate submission while loading or with an empty query
+    if (loading || !inputValue) return;
     submitQuery(inputValue);
   };
 
@@ -639,7 +680,7 @@ export function SearchBox({
       {mounted &&
         ReactDOM.createPortal(
           <AnimatePresence mode="wait">
-            {showSuggestions && suggestions.length > 0 && dropdownPos && (
+            {showSuggestions && suggestions.length > 0 && (
             <motion.div
               key="suggestions-portal"
               ref={suggestionsRef}
@@ -649,9 +690,11 @@ export function SearchBox({
               transition={{ duration: 0.1 }}
               style={{
                 position: "fixed",
-                top: dropdownPos.top,
-                left: dropdownPos.left,
-                width: dropdownPos.width,
+                // Use the computed position, falling back to an on-the-fly
+                // measurement so the dropdown never blocks on a stale value.
+                top: dropdownPos?.top ?? (inputRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                left: dropdownPos?.left ?? inputRef.current?.getBoundingClientRect().left ?? 0,
+                width: dropdownPos?.width ?? inputRef.current?.getBoundingClientRect().width ?? 300,
                 zIndex: 9999,
               }}
               className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg overflow-hidden divide-y divide-border/50"
