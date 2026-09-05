@@ -1669,7 +1669,8 @@
     "notify_email_placeholder": "任意 — 空欄ならアカウントのメールを使用",
     "notify_email_desc": "このドメインのリマインダーは、アカウントのメールではなくこのアドレスに送信されます。",
     "free_usage_label": "無料プラン使用量",
-    "free_usage_full": "無料プランの上限に達しました。アップグレードで無制限に。"
+    "free_usage_full": "無料プランの上限に達しました。アップグレードで無制限に。",
+    "export_ics": "iCal をエクスポート"
   },
   "admin": {
     "no_access_title": "アクセス権限なし",
@@ -1858,5 +1859,26 @@
     "step_connect": "RDAP サーバーに接続中…",
     "step_whois": "WHOIS データベースを照会中…",
     "step_parse": "登録情報を解析中…"
+  },
+  "notifications": {
+    "title": "通知",
+    "empty": "通知はありません",
+    "all_clear": "新しい通知はありません",
+    "unread": "未読",
+    "mark_all_read": "すべて既読にする",
+    "mark_read": "既読にする",
+    "view_all": "すべて表示",
+    "bell_aria": "通知",
+    "type_threshold": "期限リマインダー",
+    "type_grace": "猶予期間",
+    "type_redemption": "回復期間",
+    "type_pending_delete": "削除待ち",
+    "type_drop_soon": "ドロップ間近",
+    "type_dropped": "ドロップ済み",
+    "type_hold": "保留中",
+    "type_reserved": "予約済み",
+    "type_membership": "会員",
+    "back_to_dashboard": "ダッシュボードに戻る",
+    "load_failed": "通知の読み込みに失敗しました"
   }
 }

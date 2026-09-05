@@ -9,7 +9,7 @@ import {
   RiCheckLine, RiSearchLine, RiCloseLine, RiGlobalLine, RiShieldCheckLine,
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
   RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
-  RiPauseLine, RiPlayLine,
+  RiPauseLine, RiPlayLine, RiCalendarScheduleLine,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
@@ -138,6 +138,14 @@ export function SubscriptionsTab({
             >
               <RiDownloadLine className="w-3 h-3" />{t("dashboard.export_csv")}
             </button>
+          )}
+          {activeSubs.length > 0 && (
+            <a
+              href="/api/user/subscriptions/ics"
+              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
+            >
+              <RiCalendarScheduleLine className="w-3 h-3" />{t("dashboard.export_ics")}
+            </a>
           )}
           <button
             onClick={onShowBulkImport}

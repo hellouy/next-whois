@@ -142,13 +142,16 @@ export async function markOrderPaid(params: {
       if (durationDays) {
         await run(
           `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
-           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL
+           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
+           membership_remind_stage = NULL
            WHERE id = $1`,
           [order.user_id, durationDays]
         );
       } else {
         await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL WHERE id = $1`,
+          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
+           membership_remind_stage = NULL
+           WHERE id = $1`,
           [order.user_id]
         );
       }
@@ -156,13 +159,16 @@ export async function markOrderPaid(params: {
       if (durationDays) {
         await run(
           `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
-           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL
+           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
+           membership_remind_stage = NULL
            WHERE email = $1`,
           [order.user_email, durationDays]
         );
       } else {
         await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL WHERE email = $1`,
+          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
+           membership_remind_stage = NULL
+           WHERE email = $1`,
           [order.user_email]
         );
       }

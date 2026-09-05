@@ -123,6 +123,20 @@ export interface EmailStrings {
   dd_note: string;
   dd_cta: string;
 
+  // Domain on hold (clientHold / serverHold)
+  hd_label: string;
+  hd_sub: string;
+  hd_body: (domain: string) => string;
+  hd_note: string;
+  hd_cta: string;
+
+  // Reserved domain
+  rv_label: string;
+  rv_sub: string;
+  rv_body: (domain: string) => string;
+  rv_note: string;
+  rv_cta: string;
+
   // Password reset
   pr_label: string;
   pr_title: string;
@@ -155,6 +169,8 @@ export interface EmailStrings {
   subj_pending: (domain: string) => string;
   subj_drop_soon: (domain: string, days: number) => string;
   subj_dropped: (domain: string) => string;
+  subj_hold: (domain: string) => string;
+  subj_reserved: (domain: string) => string;
   subj_password_reset: (siteName: string) => string;
   subj_stamp_verify: (domain: string) => string;
 
@@ -215,6 +231,16 @@ export interface EmailStrings {
   pay_receipt: string;
   pay_cta: string;
   subj_payment: (siteName: string) => string;
+
+  // Membership renewal reminder
+  mr_label: string;
+  mr_sub: string;
+  mr_body: string;
+  mr_days_7: string;
+  mr_days_1: string;
+  mr_expired: string;
+  mr_cta: string;
+  subj_membership: (daysLeft: number) => string;
 
   // Password reset: "didn't request this" section
   pr_not_you: string;
@@ -365,6 +391,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_note: "请前往你的注册商查看是否可以注册。部分域名释放后会进入抢注竞价流程，可关注 DropCatch、NameJet 等平台。",
     dd_cta: "查看域名详情",
 
+    hd_label: "域名被暂停解析",
+    hd_sub: "检测到您的域名处于 Hold 状态",
+    hd_body: (domain) => `我们检测到您的域名 <strong>${domain}</strong> 当前处于 Hold 状态（clientHold/serverHold）。该状态下域名解析将被暂停，网站与邮箱可能无法正常访问。`,
+    hd_note: "请立即联系您的注册商，确认触发 Hold 的原因（常见原因包括未实名认证、未及时续费、注册信息异常或监管机构要求），并尽快解除该状态。",
+    hd_cta: "查看域名详情",
+
+    rv_label: "域名处于保留状态",
+    rv_sub: "检测到您的域名状态为 Reserved",
+    rv_body: (domain) => `我们检测到您的域名 <strong>${domain}</strong> 当前处于保留（Reserved）状态，该状态通常表示域名被注册局或注册商保留，不对外公开注册。`,
+    rv_note: "保留状态的域名可能无法正常注册或续费。如您对此有疑问，请联系您的注册商或注册局了解详情。",
+    rv_cta: "查看域名详情",
+
     pr_label: "账户安全",
     pr_title: "重置您的密码",
     pr_body: "我们收到了您的密码重置请求。点击下方按钮设置新密码，链接在 <strong>60 分钟</strong>内有效。",
@@ -394,6 +432,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} 即将被删除，域名进入待删除期`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} 将在 ${n} 天后可抢注`,
     subj_dropped: (d: string) => `✅ ${d} 已释放，现在可以注册了`,
+    subj_hold: (d: string) => `🛑 ${d} 已进入 Hold 状态，域名解析被暂停`,
+    subj_reserved: (d: string) => `ℹ️ ${d} 当前为保留（Reserved）状态`,
     subj_password_reset: (s: string) => `${s} 密码重置请求`,
     subj_stamp_verify: (d: string) => `${d} 域名验证超时 — 请改用文件验证`,
     subj_password_changed: (s: string) => `🔒 ${s} 密码已修改`,
@@ -445,6 +485,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "付款金额",
     pay_receipt: "如需发票或有任何问题，请联系客服。",
     pay_cta: "查看会员权益",
+    mr_label: "会员即将到期",
+    mr_sub: "您的会员订阅即将过期",
+    mr_body: "您的会员订阅将在以下时间过期。过期后您将无法继续使用会员专属功能，订阅的域名提醒不会自动续费。",
+    mr_days_7: "您的会员将于 <strong>7 天</strong>后到期，请及时续费以免影响使用。",
+    mr_days_1: "您的会员将于 <strong>明天</strong>到期，请尽快续费以免影响使用。",
+    mr_expired: "您的会员已过期，会员专属功能已暂停。续费即可立即恢复。",
+    mr_cta: "立即续费",
+    subj_membership: (d) => d <= 0 ? `⏰ 会员已过期，请及时续费` : d === 1 ? `⏰ 会员将于明天到期` : `⏰ 会员将于 ${d} 天后到期`,
 
     pr_not_you: "不是您本人发起的？",
     pr_not_you_body: "如果您没有发起此密码重置请求，请忽略此邮件。您的密码不会发生变化，账户依然安全。",
@@ -542,6 +590,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_note: "請前往您的註冊商查看是否可以註冊。部分域名釋放後會進入搶註競價流程，可關注 DropCatch、NameJet 等平台。",
     dd_cta: "查看域名詳情",
 
+    hd_label: "域名被暫停解析",
+    hd_sub: "偵測到您的域名處於 Hold 狀態",
+    hd_body: (domain) => `我們偵測到您的域名 <strong>${domain}</strong> 目前處於 Hold 狀態（clientHold/serverHold）。該狀態下域名解析將被暫停，網站與郵箱可能無法正常存取。`,
+    hd_note: "請立即聯絡您的註冊商，確認觸發 Hold 的原因（常見原因包括未實名認證、未及時續費、註冊資訊異常或監管機構要求），並盡快解除該狀態。",
+    hd_cta: "查看域名詳情",
+
+    rv_label: "域名處於保留狀態",
+    rv_sub: "偵測到您的域名狀態為 Reserved",
+    rv_body: (domain) => `我們偵測到您的域名 <strong>${domain}</strong> 目前處於保留（Reserved）狀態，該狀態通常表示域名被註冊局或註冊商保留，不對外公開註冊。`,
+    rv_note: "保留狀態的域名可能無法正常註冊或續費。如您對此有疑問，請聯絡您的註冊商或註冊局了解詳情。",
+    rv_cta: "查看域名詳情",
+
     pr_label: "帳戶安全",
     pr_title: "重置您的密碼",
     pr_body: "我們收到了您的密碼重置請求。點擊下方按鈕設置新密碼，連結在 <strong>60 分鐘</strong>內有效。",
@@ -571,6 +631,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} 即將被刪除，域名進入待刪除期`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} 將在 ${n} 天後可搶註`,
     subj_dropped: (d: string) => `✅ ${d} 已釋放，現在可以註冊了`,
+    subj_hold: (d: string) => `🛑 ${d} 已進入 Hold 狀態，域名解析被暫停`,
+    subj_reserved: (d: string) => `ℹ️ ${d} 目前為保留（Reserved）狀態`,
     subj_password_reset: (s: string) => `${s} 密碼重置請求`,
     subj_stamp_verify: (d: string) => `${d} 域名驗證超時 — 請改用檔案驗證`,
     subj_password_changed: (s: string) => `🔒 ${s} 密碼已修改`,
@@ -622,6 +684,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "付款金額",
     pay_receipt: "如需發票或有任何問題，請聯絡客服。",
     pay_cta: "查看會員權益",
+    mr_label: "會員即將到期",
+    mr_sub: "您的會員訂閱即將過期",
+    mr_body: "您的會員訂閱將在以下時間過期。過期後您將無法繼續使用會員專屬功能，訂閱的網域提醒不會自動續費。",
+    mr_days_7: "您的會員將於 <strong>7 天</strong>後到期，請及時續費以免影響使用。",
+    mr_days_1: "您的會員將於 <strong>明天</strong>到期，請盡快續費以免影響使用。",
+    mr_expired: "您的會員已過期，會員專屬功能已暫停。續費即可立即恢復。",
+    mr_cta: "立即續費",
+    subj_membership: (d) => d <= 0 ? `⏰ 會員已過期，請及時續費` : d === 1 ? `⏰ 會員將於明天到期` : `⏰ 會員將於 ${d} 天後到期`,
 
     pr_not_you: "不是您本人發起的？",
     pr_not_you_body: "如果您沒有發起此密碼重置請求，請忽略此郵件。您的密碼不會發生變化，帳戶依然安全。",
@@ -719,6 +789,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_note: "Check with your preferred registrar to register it. Some domains go to auction (DropCatch, NameJet) after release.",
     dd_cta: "View Domain Details",
 
+    hd_label: "Domain Paused",
+    hd_sub: "Your domain is in Hold status",
+    hd_body: (domain) => `We detected your domain <strong>${domain}</strong> is currently in Hold status (clientHold/serverHold). DNS resolution is paused, so your website and email may be unreachable.`,
+    hd_note: "Please contact your registrar immediately to find out why the Hold was placed (common causes: pending identity verification, missed renewal, abnormal registration info, or a regulator request) and resolve it as soon as possible.",
+    hd_cta: "View Domain Details",
+
+    rv_label: "Domain Reserved",
+    rv_sub: "Your domain status is Reserved",
+    rv_body: (domain) => `We detected your domain <strong>${domain}</strong> is currently in Reserved status, which usually means the registry or registrar has reserved it and it is not open for public registration.`,
+    rv_note: "Reserved domains may not be registered or renewed normally. If you have questions, contact your registrar or the registry for details.",
+    rv_cta: "View Domain Details",
+
     pr_label: "Account Security",
     pr_title: "Reset Your Password",
     pr_body: "We received a request to reset your password. Click the button below to set a new password. The link is valid for <strong>60 minutes</strong>.",
@@ -748,6 +830,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — Pending delete`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — Drops in ${n} day${n === 1 ? "" : "s"}`,
     subj_dropped: (d: string) => `✅ ${d} — Now available to register`,
+    subj_hold: (d: string) => `🛑 ${d} is on Hold — DNS resolution paused`,
+    subj_reserved: (d: string) => `ℹ️ ${d} is Reserved`,
     subj_password_reset: (s: string) => `Reset your ${s} password`,
     subj_stamp_verify: (d: string) => `${d} — DNS timeout, use file verification`,
     subj_password_changed: (s: string) => `🔒 ${s} — Password changed`,
@@ -799,6 +883,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "Amount charged",
     pay_receipt: "For invoices or questions, please contact support.",
     pay_cta: "View Member Benefits",
+    mr_label: "Membership Expiring",
+    mr_sub: "Your membership subscription is expiring",
+    mr_body: "Your membership subscription will expire soon. After it expires you'll lose access to member-only features, and domain reminder subscriptions will not renew automatically.",
+    mr_days_7: "Your membership expires in <strong>7 days</strong>. Renew in time to avoid interruption.",
+    mr_days_1: "Your membership expires <strong>tomorrow</strong>. Renew now to avoid interruption.",
+    mr_expired: "Your membership has expired and member-only features are paused. Renew to restore them instantly.",
+    mr_cta: "Renew Now",
+    subj_membership: (d) => d <= 0 ? `⏰ Membership expired — renew now` : d === 1 ? `⏰ Membership expires tomorrow` : `⏰ Membership expires in ${d} days`,
 
     pr_not_you: "Didn't request this?",
     pr_not_you_body: "If you did not request a password reset, you can safely ignore this email. Your password will not change and your account remains secure.",
@@ -860,6 +952,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_available: "✅ Domain für die Öffentlichkeit freigegeben.",
     dd_note: "Prüfen Sie bei Ihrem Registrar, ob die Registrierung möglich ist.",
     dd_cta: "Domain-Details anzeigen",
+
+    hd_label: "Domain angehalten",
+    hd_sub: "Ihre Domain ist im Hold-Status",
+    hd_body: (domain) => `Wir haben festgestellt, dass Ihre Domain <strong>${domain}</strong> derzeit im Hold-Status (clientHold/serverHold) ist. DNS-Auflösung ist pausiert, Ihre Website und E-Mail können nicht erreichbar sein.`,
+    hd_note: "Kontaktieren Sie umgehend Ihren Registrar, um den Grund für den Hold zu klären (häufige Ursachen: ausstehende Identitätsprüfung, versäumte Verlängerung, abnormale Registrierungsdaten oder behördliche Anordnung).",
+    hd_cta: "Domain-Details ansehen",
+
+    rv_label: "Domain reserviert",
+    rv_sub: "Ihre Domain ist im Status Reserved",
+    rv_body: (domain) => `Wir haben festgestellt, dass Ihre Domain <strong>${domain}</strong> derzeit im Reserved-Status ist. Dies bedeutet üblicherweise, dass sie von Registry oder Registrar reserviert und nicht öffentlich registrierbar ist.`,
+    rv_note: "Reservierte Domains können möglicherweise nicht normal registriert oder verlängert werden. Bei Fragen wenden Sie sich an Ihren Registrar oder die Registry.",
+    rv_cta: "Domain-Details ansehen",
     pr_label: "Kontosicherheit", pr_title: "Passwort zurücksetzen",
     pr_body: "Wir haben eine Anfrage zum Zurücksetzen Ihres Passworts erhalten. Der Link ist <strong>60 Minuten</strong> gültig.",
     pr_cta: "Passwort zurücksetzen", pr_link_note: "Falls der Button nicht funktioniert, kopieren Sie diesen Link:",
@@ -881,6 +985,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — Löschung ausstehend`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — Freigabe in ${n} Tag${n === 1 ? "" : "en"}`,
     subj_dropped: (d: string) => `✅ ${d} — Jetzt registrierbar`,
+    subj_hold: (d: string) => `🛑 ${d} ist im Hold — DNS-Auflösung pausiert`,
+    subj_reserved: (d: string) => `ℹ️ ${d} ist reserviert`,
     subj_password_reset: (s: string) => `Passwort zurücksetzen bei ${s}`,
     subj_stamp_verify: (d: string) => `${d} — DNS-Timeout, Datei-Verifizierung verwenden`,
     subj_password_changed: (s: string) => `🔒 ${s} — Passwort geändert`,
@@ -932,6 +1038,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "Betrag",
     pay_receipt: "Für Rechnungen oder Fragen wenden Sie sich an den Support.",
     pay_cta: "Mitgliedsvorteile ansehen",
+    mr_label: "Mitgliedschaft läuft ab",
+    mr_sub: "Ihre Mitgliedschaft läuft bald ab",
+    mr_body: "Ihre Mitgliedschaft läuft in Kürze ab. Danach verlieren Sie den Zugriff auf exklusive Funktionen; Domain-Erinnerungen werden nicht automatisch verlängert.",
+    mr_days_7: "Ihre Mitgliedschaft läuft in <strong>7 Tagen</strong> ab. Verlängern Sie rechtzeitig.",
+    mr_days_1: "Ihre Mitgliedschaft läuft <strong>morgen</strong> ab. Verlängern Sie jetzt.",
+    mr_expired: "Ihre Mitgliedschaft ist abgelaufen, exklusive Funktionen sind pausiert. Mit einer Verlängerung werden sie sofort wiederhergestellt.",
+    mr_cta: "Jetzt verlängern",
+    subj_membership: (d) => d <= 0 ? `⏰ Mitgliedschaft abgelaufen` : d === 1 ? `⏰ Mitgliedschaft läuft morgen ab` : `⏰ Mitgliedschaft läuft in ${d} Tagen ab`,
 
     pr_not_you: "Nicht von Ihnen angefordert?",
     pr_not_you_body: "Wenn Sie kein Passwort zurücksetzen angefordert haben, können Sie diese E-Mail ignorieren. Ihr Passwort bleibt unverändert und Ihr Konto ist sicher.",
@@ -993,6 +1107,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_available: "✅ Домен доступен для публичной регистрации.",
     dd_note: "Проверьте у своего регистратора возможность регистрации.",
     dd_cta: "Подробности домена",
+
+    hd_label: "Домен приостановлен",
+    hd_sub: "Ваш домен находится в статусе Hold",
+    hd_body: (domain) => `Мы обнаружили, что ваш домен <strong>${domain}</strong> находится в статусе Hold (clientHold/serverHold). DNS-резолвинг приостановлен — сайт и почта могут быть недоступны.`,
+    hd_note: "Немедленно свяжитесь с регистратором, чтобы выяснить причину Hold (частые причины: ожидающая верификация, пропущенное продление, некорректные данные регистрации или требование регулятора).",
+    hd_cta: "Подробнее о домене",
+
+    rv_label: "Домен зарезервирован",
+    rv_sub: "Статус вашего домена — Reserved",
+    rv_body: (domain) => `Мы обнаружили, что ваш домен <strong>${domain}</strong> находится в статусе Reserved. Обычно это означает, что домен зарезервирован регистратурой или регистратором и не открыт для публичной регистрации.`,
+    rv_note: "Зарезервированные домены могут не подлежать обычной регистрации или продлению. При вопросах обратитесь к регистратору или регистратуре.",
+    rv_cta: "Подробнее о домене",
     pr_label: "Безопасность аккаунта", pr_title: "Сброс пароля",
     pr_body: "Мы получили запрос на сброс вашего пароля. Ссылка действительна <strong>60 минут</strong>.",
     pr_cta: "Сбросить пароль", pr_link_note: "Если кнопка не работает, скопируйте эту ссылку в браузер:",
@@ -1014,6 +1140,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — Ожидание удаления`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — Освобождение через ${n} дней`,
     subj_dropped: (d: string) => `✅ ${d} — Теперь доступен для регистрации`,
+    subj_hold: (d: string) => `🛑 ${d} в статусе Hold — резолвинг DNS приостановлен`,
+    subj_reserved: (d: string) => `ℹ️ ${d} зарезервирован (Reserved)`,
     subj_password_reset: (s: string) => `Сброс пароля ${s}`,
     subj_stamp_verify: (d: string) => `${d} — Тайм-аут DNS, используйте верификацию через файл`,
     subj_password_changed: (s: string) => `🔒 ${s} — Пароль изменён`,
@@ -1065,6 +1193,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "Сумма",
     pay_receipt: "Для получения счёта или по любым вопросам обратитесь в поддержку.",
     pay_cta: "Просмотреть преимущества",
+    mr_label: "Подписка истекает",
+    mr_sub: "Ваша подписка скоро закончится",
+    mr_body: "Ваша подписка скоро закончится. После этого вы потеряете доступ к функциям для участников; напоминания о доменах не продлеваются автоматически.",
+    mr_days_7: "Подписка истекает через <strong>7 дней</strong>. Продлите вовремя.",
+    mr_days_1: "Подписка истекает <strong>завтра</strong>. Продлите сейчас.",
+    mr_expired: "Подписка истекла, функции для участников приостановлены. Продление восстановит их мгновенно.",
+    mr_cta: "Продлить",
+    subj_membership: (d) => d <= 0 ? `⏰ Подписка истекла` : d === 1 ? `⏰ Подписка истекает завтра` : `⏰ Подписка истекает через ${d} дн.`,
 
     pr_not_you: "Не вы запрашивали?",
     pr_not_you_body: "Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо. Ваш пароль останется прежним, а аккаунт — в безопасности.",
@@ -1126,6 +1262,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_available: "✅ ドメインは一般登録に開放されました。",
     dd_note: "レジストラでの登録可否をご確認ください。",
     dd_cta: "ドメイン詳細を見る",
+
+    hd_label: "ドメインが保留中",
+    hd_sub: "ドメインがHold状態です",
+    hd_body: (domain) => `ドメイン <strong>${domain}</strong> が現在Hold状態（clientHold/serverHold）であることを検出しました。DNS解決が停止しており、Webサイトやメールにアクセスできない可能性があります。`,
+    hd_note: "レジストラにすぐご連絡いただき、Holdの原因（本人確認未完了、更新漏れ、登録情報の異常、規制当局の要請など）を確認して速やかに解除してください。",
+    hd_cta: "ドメイン詳細を見る",
+
+    rv_label: "ドメインが予約状態",
+    rv_sub: "ドメインのステータスがReservedです",
+    rv_body: (domain) => `ドメイン <strong>${domain}</strong> が現在Reserved（予約）状態であることを検出しました。通常、レジストリまたはレジストラによって予約され、一般登録はできません。`,
+    rv_note: "予約状態のドメインは通常の登録・更新ができない場合があります。不明な点はレジストラまたはレジストリにお問い合わせください。",
+    rv_cta: "ドメイン詳細を見る",
     pr_label: "アカウントセキュリティ", pr_title: "パスワードをリセット",
     pr_body: "パスワードリセットのリクエストを受け付けました。リンクは<strong>60分間</strong>有効です。",
     pr_cta: "パスワードをリセット", pr_link_note: "ボタンが機能しない場合は、このリンクをブラウザにコピーしてください：",
@@ -1147,6 +1295,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — 削除待ち`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — ${n}日後にドロップ`,
     subj_dropped: (d: string) => `✅ ${d} — 登録可能になりました`,
+    subj_hold: (d: string) => `🛑 ${d} がHold状態 — DNS解決が停止中`,
+    subj_reserved: (d: string) => `ℹ️ ${d} は予約状態です`,
     subj_password_reset: (s: string) => `${s} パスワードリセット`,
     subj_stamp_verify: (d: string) => `${d} — DNSタイムアウト、ファイル検証をご利用ください`,
     subj_password_changed: (s: string) => `🔒 ${s} — パスワードが変更されました`,
@@ -1198,6 +1348,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "請求金額",
     pay_receipt: "領収書やご質問はサポートまでお問い合わせください。",
     pay_cta: "会員特典を確認",
+    mr_label: "会員期限が近づいています",
+    mr_sub: "会員サブスクリプションの期限が近づいています",
+    mr_body: "会員サブスクリプションの期限が近づいています。期限が切れると会員限定機能を利用できなくなり、ドメインのリマインダーは自動更新されません。",
+    mr_days_7: "会員期限は <strong>7 日後</strong>です。お早めに更新してください。",
+    mr_days_1: "会員期限は <strong>明日</strong>です。今すぐ更新してください。",
+    mr_expired: "会員期限が切れ、会員限定機能は停止中です。更新するとすぐに復旧します。",
+    mr_cta: "今すぐ更新",
+    subj_membership: (d) => d <= 0 ? `⏰ 会員期限が切れました` : d === 1 ? `⏰ 会員期限は明日です` : `⏰ 会員期限は ${d} 日後です`,
 
     pr_not_you: "このリクエストを行っていない場合",
     pr_not_you_body: "パスワードリセットを要求していない場合は、このメールを無視してください。パスワードは変更されず、アカウントは安全です。",
@@ -1259,6 +1417,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_available: "✅ Ce domaine est ouvert à l'enregistrement public.",
     dd_note: "Vérifiez auprès de votre registrar si vous pouvez l'enregistrer.",
     dd_cta: "Détails du domaine",
+
+    hd_label: "Domaine suspendu",
+    hd_sub: "Votre domaine est en statut Hold",
+    hd_body: (domain) => `Nous avons détecté que votre domaine <strong>${domain}</strong> est actuellement en statut Hold (clientHold/serverHold). La résolution DNS est suspendue : votre site et votre messagerie peuvent être inaccessibles.`,
+    hd_note: "Contactez immédiatement votre bureau d'enregistrement pour connaître la raison du Hold (causes fréquentes : vérification d'identité en attente, renouvellement manqué, informations d'enregistrement anormales ou demande réglementaire).",
+    hd_cta: "Voir les détails du domaine",
+
+    rv_label: "Domaine réservé",
+    rv_sub: "Votre domaine est en statut Reserved",
+    rv_body: (domain) => `Nous avons détecté que votre domaine <strong>${domain}</strong> est actuellement en statut Reserved, ce qui signifie généralement que le registre ou le bureau d'enregistrement l'a réservé et qu'il n'est pas ouvert à l'enregistrement public.`,
+    rv_note: "Les domaines réservés ne peuvent pas être enregistrés ou renouvelés normalement. Pour toute question, contactez votre bureau d'enregistrement ou le registre.",
+    rv_cta: "Voir les détails du domaine",
     pr_label: "Sécurité du compte", pr_title: "Réinitialiser votre mot de passe",
     pr_body: "Nous avons reçu une demande de réinitialisation de mot de passe. Le lien est valable <strong>60 minutes</strong>.",
     pr_cta: "Réinitialiser le mot de passe", pr_link_note: "Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :",
@@ -1280,6 +1450,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — Suppression en attente`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — Libération dans ${n} jour${n > 1 ? "s" : ""}`,
     subj_dropped: (d: string) => `✅ ${d} — Disponible à l'enregistrement`,
+    subj_hold: (d: string) => `🛑 ${d} est en Hold — résolution DNS suspendue`,
+    subj_reserved: (d: string) => `ℹ️ ${d} est réservé`,
     subj_password_reset: (s: string) => `Réinitialisation de votre mot de passe ${s}`,
     subj_stamp_verify: (d: string) => `${d} — Délai DNS dépassé, utilisez la vérification par fichier`,
     subj_password_changed: (s: string) => `🔒 ${s} — Mot de passe modifié`,
@@ -1331,6 +1503,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "Montant facturé",
     pay_receipt: "Pour une facture ou des questions, contactez le support.",
     pay_cta: "Voir les avantages membres",
+    mr_label: "Abonnement bientôt expiré",
+    mr_sub: "Votre abonnement membre expire bientôt",
+    mr_body: "Votre abonnement membre expire bientôt. Après expiration, vous perdrez l'accès aux fonctionnalités membres et les alertes de domaine ne se renouvellent pas automatiquement.",
+    mr_days_7: "Votre abonnement expire dans <strong>7 jours</strong>. Renouvelez à temps.",
+    mr_days_1: "Votre abonnement expire <strong>demain</strong>. Renouvelez dès maintenant.",
+    mr_expired: "Votre abonnement a expiré et les fonctionnalités membres sont suspendues. Le renouvellement les restaure immédiatement.",
+    mr_cta: "Renouveler",
+    subj_membership: (d) => d <= 0 ? `⏰ Abonnement expiré` : d === 1 ? `⏰ Abonnement expire demain` : `⏰ Abonnement expire dans ${d} jours`,
 
     pr_not_you: "Pas à votre initiative ?",
     pr_not_you_body: "Si vous n'avez pas demandé de réinitialisation de mot de passe, ignorez cet e-mail. Votre mot de passe restera inchangé et votre compte est sécurisé.",
@@ -1392,6 +1572,18 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     dd_available: "✅ 이 도메인은 공개 등록에 개방되었습니다.",
     dd_note: "레지스트라에서 등록 가능 여부를 확인하세요.",
     dd_cta: "도메인 상세 보기",
+
+    hd_label: "도메인 정지됨",
+    hd_sub: "도메인이 Hold 상태입니다",
+    hd_body: (domain) => `도메인 <strong>${domain}</strong> 이 현재 Hold 상태(clientHold/serverHold)임을 감지했습니다. DNS 해석이 중지되어 웹사이트와 이메일에 접속하지 못할 수 있습니다.`,
+    hd_note: "즉시 레지스트라에 연락하여 Hold 사유(미완료 실명 인증, 갱신 누락, 등록 정보 이상, 규제 기관 요청 등)를 확인하고 빠르게 해제하세요.",
+    hd_cta: "도메인 상세 보기",
+
+    rv_label: "도메인 예약 상태",
+    rv_sub: "도메인 상태가 Reserved입니다",
+    rv_body: (domain) => `도메인 <strong>${domain}</strong> 이 현재 Reserved(예약) 상태임을 감지했습니다. 일반적으로 레지스트리나 레지스트라가 예약하여 공개 등록이 불가능합니다.`,
+    rv_note: "예약 상태 도메인은 일반 등록·갱신이 어려울 수 있습니다. 문의 사항은 레지스트라나 레지스트리에 연락하세요.",
+    rv_cta: "도메인 상세 보기",
     pr_label: "계정 보안", pr_title: "비밀번호 재설정",
     pr_body: "비밀번호 재설정 요청을 받았습니다. 링크는 <strong>60분</strong> 동안 유효합니다.",
     pr_cta: "비밀번호 재설정", pr_link_note: "버튼이 작동하지 않으면 이 링크를 브라우저에 복사하세요:",
@@ -1413,6 +1605,8 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     subj_pending: (d: string) => `❌ ${d} — 삭제 대기`,
     subj_drop_soon: (d: string, n: number) => `⚡ ${d} — ${n}일 후 해제`,
     subj_dropped: (d: string) => `✅ ${d} — 이제 등록 가능합니다`,
+    subj_hold: (d: string) => `🛑 ${d}이(가) Hold 상태 — DNS 해석 중지`,
+    subj_reserved: (d: string) => `ℹ️ ${d}이(가) 예약 상태입니다`,
     subj_password_reset: (s: string) => `${s} 비밀번호 재설정`,
     subj_stamp_verify: (d: string) => `${d} — DNS 시간 초과, 파일 인증을 사용하세요`,
     subj_password_changed: (s: string) => `🔒 ${s} — 비밀번호가 변경되었습니다`,
@@ -1464,6 +1658,14 @@ export const EMAIL_STRINGS: Record<EmailLocale, EmailStrings> = {
     pay_amount_label: "청구 금액",
     pay_receipt: "영수증이나 문의 사항은 고객 지원에 연락하세요.",
     pay_cta: "회원 혜택 보기",
+    mr_label: "멤버십 만료 예정",
+    mr_sub: "멤버십 구독이 곧 만료됩니다",
+    mr_body: "멤버십 구독이 곧 만료됩니다. 만료 후에는 회원 전용 기능을 사용할 수 없으며 도메인 알림은 자동으로 갱신되지 않습니다.",
+    mr_days_7: "멤버십이 <strong>7일 후</strong> 만료됩니다. 차질 없도록 미리 갱신하세요.",
+    mr_days_1: "멤버십이 <strong>내일</strong> 만료됩니다. 지금 갱신하세요.",
+    mr_expired: "멤버십이 만료되어 회원 전용 기능이 중지되었습니다. 갱신하면 즉시 복구됩니다.",
+    mr_cta: "지금 갱신",
+    subj_membership: (d) => d <= 0 ? `⏰ 멤버십이 만료되었습니다` : d === 1 ? `⏰ 멤버십이 내일 만료됩니다` : `⏰ 멤버십이 ${d}일 후 만료됩니다`,
 
     pr_not_you: "요청하지 않으셨나요?",
     pr_not_you_body: "비밀번호 재설정을 요청하지 않으셨다면 이 이메일을 무시하세요. 비밀번호는 변경되지 않으며 계정은 안전합니다.",

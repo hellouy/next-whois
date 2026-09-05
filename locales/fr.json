@@ -1670,7 +1670,8 @@
     "notify_email_placeholder": "Optionnel — vide = e-mail du compte",
     "notify_email_desc": "Les alertes pour ce domaine seront envoyées à cette adresse au lieu de votre e-mail de compte.",
     "free_usage_label": "Utilisation du plan gratuit",
-    "free_usage_full": "Limite gratuite atteinte. Passez à l'offre supérieure."
+    "free_usage_full": "Limite gratuite atteinte. Passez à l'offre supérieure.",
+    "export_ics": "Exporter iCal"
   },
   "admin": {
     "no_access_title": "Accès Refusé",
@@ -1858,5 +1859,26 @@
     "step_connect": "Connexion au serveur RDAP…",
     "step_whois": "Interrogation de la base WHOIS…",
     "step_parse": "Analyse des données d'enregistrement…"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Aucune notification",
+    "all_clear": "Vous êtes à jour",
+    "unread": "Non lues",
+    "mark_all_read": "Tout marquer comme lu",
+    "mark_read": "Marquer comme lu",
+    "view_all": "Tout voir",
+    "bell_aria": "Notifications",
+    "type_threshold": "Rappel d'expiration",
+    "type_grace": "Période de grâce",
+    "type_redemption": "Période de récupération",
+    "type_pending_delete": "Suppression en attente",
+    "type_drop_soon": "Drop imminent",
+    "type_dropped": "Expiré",
+    "type_hold": "En attente",
+    "type_reserved": "Réservé",
+    "type_membership": "Abonnement",
+    "back_to_dashboard": "Retour au tableau de bord",
+    "load_failed": "Échec du chargement des notifications"
   }
 }

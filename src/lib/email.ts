@@ -600,7 +600,6 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
   const s         = getEmailStrings(p.locale);
   const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
   const expiryStr = fmtEmailDate(p.expirationDate, s);
-
   return emailLayout(`
     ${colorHeader("#059669", s.dd_label, domainBadge(p.domain), s.dd_sub)}
 
@@ -650,6 +649,92 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
 
     ${divider()}
     ${actionRow(`${BASE_URL()}/${p.domain}`, s.dd_cta, cancelUrl, "#059669", s.unsubscribe)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 5c. Domain on hold (clientHold / serverHold)
+// ──────────────────────────────────────────────────────────────────────────────
+export interface DomainHoldParams {
+  domain: string;
+  expirationDate: string | null;
+  cancelToken: string;
+  statuses: string[];
+}
+
+export function domainHoldHtml(p: DomainHoldParams & { siteName?: string; locale?: string }): string {
+  const siteName  = p.siteName || "WHOIS";
+  const s         = getEmailStrings(p.locale);
+  const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
+  const expiryStr = fmtEmailDate(p.expirationDate, s);
+
+  return emailLayout(`
+    ${colorHeader("#d97706", s.hd_label, domainBadge(p.domain), s.hd_sub)}
+
+    ${section(`
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+        <p style="margin:0;font-size:13px;color:#92400e;line-height:1.8">${s.hd_body(p.domain)}</p>
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:12px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.da_orig_expiry}</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace">${expiryStr}</p>
+        </div>
+        <div style="padding:12px 18px;background:#f8fafc">
+          <p style="margin:0;font-size:12px;color:#475569;line-height:1.7">
+            <strong style="color:#64748b">EPP status:</strong> ${p.statuses.join(", ") || "—"}
+          </p>
+        </div>
+      </div>
+
+      <div style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:16px">
+        <p style="margin:0;font-size:12px;color:#92400e;line-height:1.7">⚠️ ${s.hd_note}</p>
+      </div>
+    `)}
+
+    ${divider()}
+    ${actionRow(`${BASE_URL()}/${p.domain}`, s.hd_cta, cancelUrl, "#d97706", s.unsubscribe)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 5d. Reserved domain
+// ──────────────────────────────────────────────────────────────────────────────
+export interface ReservedDomainParams {
+  domain: string;
+  expirationDate: string | null;
+  cancelToken: string;
+}
+
+export function reservedDomainHtml(p: ReservedDomainParams & { siteName?: string; locale?: string }): string {
+  const siteName  = p.siteName || "WHOIS";
+  const s         = getEmailStrings(p.locale);
+  const cancelUrl = `${BASE_URL()}/remind/cancel?token=${p.cancelToken}`;
+  const expiryStr = fmtEmailDate(p.expirationDate, s);
+
+  return emailLayout(`
+    ${colorHeader("#0369a1", s.rv_label, domainBadge(p.domain), s.rv_sub)}
+
+    ${section(`
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+        <p style="margin:0;font-size:13px;color:#0c4a6e;line-height:1.8">${s.rv_body(p.domain)}</p>
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:12px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.da_orig_expiry}</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace">${expiryStr}</p>
+        </div>
+      </div>
+
+      <div style="padding:14px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:16px">
+        <p style="margin:0;font-size:12px;color:#0c4a6e;line-height:1.7">ℹ️ ${s.rv_note}</p>
+      </div>
+    `)}
+
+    ${divider()}
+    ${actionRow(`${BASE_URL()}/${p.domain}`, s.rv_cta, cancelUrl, "#0369a1", s.unsubscribe)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
@@ -1019,6 +1104,47 @@ export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency
 
       ${ctaBtn(BASE_URL() + "/account", s.pay_cta, "#059669")}
     `)}
+  `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Membership renewal reminder
+// ──────────────────────────────────────────────────────────────────────────────
+export function membershipRenewHtml({ daysLeft, expiresAt, siteName = "WHOIS", locale }: {
+  daysLeft: number;
+  expiresAt: string | null;
+  siteName?: string;
+  locale?: string;
+}): string {
+  const s = getEmailStrings(locale);
+  const urgency = daysLeft <= 0
+    ? s.mr_expired
+    : daysLeft <= 1
+      ? s.mr_days_1
+      : s.mr_days_7;
+  const color = daysLeft <= 1 ? "#dc2626" : "#d97706";
+
+  return emailLayout(`
+    ${colorHeader(color, s.mr_label, "⏰", s.mr_sub)}
+
+    ${section(`
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+        <p style="margin:0;font-size:13px;color:#92400e;line-height:1.8">${s.mr_body}</p>
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:18px">
+        <div style="padding:13px 18px;border-bottom:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">${s.pay_expires_label}</p>
+          <p style="margin:5px 0 0;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace">${expiresAt ? fmtEmailDate(expiresAt, s) : "—"}</p>
+        </div>
+        <div style="padding:13px 18px;background:#fffbeb">
+          <p style="margin:0;font-size:13px;font-weight:700;color:${color}">${urgency}</p>
+        </div>
+      </div>
+    `)}
+
+    ${divider()}
+    ${actionRow(BASE_URL() + "/payment/checkout", s.mr_cta, BASE_URL() + "/dashboard", color, s.unsubscribe)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 

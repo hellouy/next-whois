@@ -1670,7 +1670,8 @@
     "notify_email_placeholder": "Optional — leave blank to use your account email",
     "notify_email_desc": "Reminders for this domain will be sent to this address instead of your account email.",
     "free_usage_label": "Free plan usage",
-    "free_usage_full": "You've reached the free limit. Upgrade for unlimited subscriptions."
+    "free_usage_full": "You've reached the free limit. Upgrade for unlimited subscriptions.",
+    "export_ics": "Export iCal"
   },
   "admin": {
     "no_access_title": "No Access",
@@ -1858,5 +1859,26 @@
     "step_connect": "Connecting to RDAP server…",
     "step_whois": "Querying WHOIS database…",
     "step_parse": "Parsing registration data…"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet",
+    "all_clear": "You're all caught up",
+    "unread": "Unread",
+    "mark_all_read": "Mark all as read",
+    "mark_read": "Mark as read",
+    "view_all": "View all",
+    "bell_aria": "Notifications",
+    "type_threshold": "Expiry Reminder",
+    "type_grace": "Grace Period",
+    "type_redemption": "Redemption Period",
+    "type_pending_delete": "Pending Delete",
+    "type_drop_soon": "Drop Approaching",
+    "type_dropped": "Dropped",
+    "type_hold": "Client Hold",
+    "type_reserved": "Reserved",
+    "type_membership": "Membership",
+    "back_to_dashboard": "Back to Dashboard",
+    "load_failed": "Failed to load notifications"
   }
 }

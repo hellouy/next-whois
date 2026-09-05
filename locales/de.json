@@ -1670,7 +1670,8 @@
     "notify_email_placeholder": "Optional — leer lassen für Kontoe-Mail",
     "notify_email_desc": "Erinnerungen für diese Domain werden an diese Adresse statt an Ihre Kontoe-Mail gesendet.",
     "free_usage_label": "Nutzung im kostenlosen Tarif",
-    "free_usage_full": "Kostenloses Limit erreicht. Für unbegrenzte Abos upgraden."
+    "free_usage_full": "Kostenloses Limit erreicht. Für unbegrenzte Abos upgraden.",
+    "export_ics": "iCal exportieren"
   },
   "admin": {
     "no_access_title": "Kein Zugriff",
@@ -1858,5 +1859,26 @@
     "step_connect": "Verbindung zum RDAP-Server…",
     "step_whois": "WHOIS-Datenbank wird abgefragt…",
     "step_parse": "Registrierungsdaten werden analysiert…"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "empty": "Noch keine Benachrichtigungen",
+    "all_clear": "Sie sind auf dem neuesten Stand",
+    "unread": "Ungelesen",
+    "mark_all_read": "Alle als gelesen markieren",
+    "mark_read": "Als gelesen markieren",
+    "view_all": "Alle anzeigen",
+    "bell_aria": "Benachrichtigungen",
+    "type_threshold": "Ablauf-Erinnerung",
+    "type_grace": "Gnadenfrist",
+    "type_redemption": "Rückkaufsphase",
+    "type_pending_delete": "Ausstehende Löschung",
+    "type_drop_soon": "Drop steht bevor",
+    "type_dropped": "Gefallen",
+    "type_hold": "Client Hold",
+    "type_reserved": "Reserviert",
+    "type_membership": "Mitgliedschaft",
+    "back_to_dashboard": "Zurück zum Dashboard",
+    "load_failed": "Benachrichtigungen konnten nicht geladen werden"
   }
 }

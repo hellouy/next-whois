@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes } from "crypto";
 import {
   sendEmail, reminderHtml, phaseEventHtml,
-  dropApproachingHtml, domainDroppedHtml, getSiteLabel, getSiteBaseUrl,
+  dropApproachingHtml, domainDroppedHtml, domainHoldHtml, reservedDomainHtml,
+  membershipRenewHtml, getSiteLabel, getSiteBaseUrl,
 } from "@/lib/email";
 import { createLogger } from "@/lib/logger";
 
@@ -22,6 +23,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdminEmail } from "@/lib/admin-server";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { recordNotification } from "@/lib/notifications";
 
 /** Stale thresholds: refresh WHOIS more frequently as expiry approaches */
 const WHOIS_STALE_CRITICAL_DAYS = 1;   // within 7 days of expiry → refresh every day
@@ -108,9 +110,10 @@ async function refreshStaleWhoisDates(
       await run(
         `UPDATE reminders
          SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW(),
-             registrar = $3, creation_date = $4, nameservers_json = $5
+             registrar = $3, creation_date = $4, nameservers_json = $5, last_epp_status = $7
          WHERE id = $6`,
-        [dateStr, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id],
+        [dateStr, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id,
+         epp.length ? JSON.stringify(epp) : null],
       );
       updated.set(r.id, { date: dateStr, eppStatus: epp, registrar, creationDate, nameservers });
       logger.info(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
@@ -162,11 +165,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expiration_date: string | null; cancel_token: string; phase_flags: string | null;
       thresholds_json: string | null; whois_synced_at: string | null; whois_expiry_date: string | null;
       registrar: string | null; creation_date: string | null; nameservers_json: string | null;
-      notify_email: string | null;
+      notify_email: string | null; last_epp_status: string | null; hold_notified_at: string | null;
+      reserved_notified_at: string | null;
     }>(
       `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json,
               whois_synced_at, whois_expiry_date, registrar, creation_date, nameservers_json,
-              notify_email
+              notify_email, last_epp_status, hold_notified_at, reserved_notified_at
        FROM reminders WHERE active = true AND paused = false AND expiration_date IS NOT NULL`,
     );
 
@@ -204,11 +208,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fresh = whoisRefreshed.get(r.id);
       let nameservers: string[] = [];
       try { if (r.nameservers_json) nameservers = JSON.parse(r.nameservers_json); } catch { /* ignore */ }
+      let persistedEpp: string[] = [];
+      try { if (r.last_epp_status) persistedEpp = JSON.parse(r.last_epp_status); } catch { /* ignore */ }
       return {
         ...r,
         // Prefer WHOIS-refreshed data from this run, then stored fields, then user-entered
         effective_expiry: fresh?.date ?? r.whois_expiry_date ?? r.expiration_date,
-        epp_status:       fresh?.eppStatus ?? [],
+        epp_status:       fresh?.eppStatus ?? persistedEpp,
         registrar:        fresh?.registrar ?? r.registrar ?? null,
         creation_date:    fresh?.creationDate ?? r.creation_date ?? null,
         nameservers:      fresh?.nameservers ?? nameservers,
@@ -262,6 +268,76 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // ── Domain dropped: send notification then deactivate ─────────────────
         const locale = localeMap.get(reminder.email) || "zh";
         const ls = getEmailStrings(locale);
+
+        // ── Hold / Reserved detection (independent of lifecycle phase) ────────
+        // Uses EPP status from the current WHOIS refresh, or the last persisted status.
+        const eppLower = reminder.epp_status.map(s => s.toLowerCase());
+        const isHold = eppLower.some(s => s === "clienthold" || s === "serverhold");
+        const isReserved = eppLower.some(s => s === "reserved" || s === "inactive" || s === "serverupdateprohibited");
+        if (isHold && !reminder.hold_notified_at) {
+          await sendEmail({
+            to: reminder.notify_email ?? reminder.email,
+            subject: ls.subj_hold(reminder.domain),
+            html: domainHoldHtml({
+              domain: reminder.domain,
+              expirationDate: reminder.expiration_date,
+              cancelToken: reminder.cancel_token,
+              statuses: reminder.epp_status,
+              siteName,
+              locale,
+            }),
+          });
+          await recordNotification({
+            email: reminder.email,
+            type: "hold",
+            title: ls.subj_hold(reminder.domain),
+            body: ls.hd_note,
+            domain: reminder.domain,
+          });
+          await run(
+            `UPDATE reminders SET hold_notified_at = $1 WHERE id = $2`,
+            [now.toISOString(), reminder.id],
+          );
+          results.sent++;
+        } else if (!isHold && reminder.hold_notified_at) {
+          // Hold cleared — allow future notifications if it re-enters hold
+          await run(
+            `UPDATE reminders SET hold_notified_at = NULL WHERE id = $1`,
+            [reminder.id],
+          );
+        }
+
+        if (isReserved && !reminder.reserved_notified_at) {
+          await sendEmail({
+            to: reminder.notify_email ?? reminder.email,
+            subject: ls.subj_reserved(reminder.domain),
+            html: reservedDomainHtml({
+              domain: reminder.domain,
+              expirationDate: reminder.expiration_date,
+              cancelToken: reminder.cancel_token,
+              siteName,
+              locale,
+            }),
+          });
+          await recordNotification({
+            email: reminder.email,
+            type: "reserved",
+            title: ls.subj_reserved(reminder.domain),
+            body: ls.rv_note,
+            domain: reminder.domain,
+          });
+          await run(
+            `UPDATE reminders SET reserved_notified_at = $1 WHERE id = $2`,
+            [now.toISOString(), reminder.id],
+          );
+          results.sent++;
+        } else if (!isReserved && reminder.reserved_notified_at) {
+          await run(
+            `UPDATE reminders SET reserved_notified_at = NULL WHERE id = $1`,
+            [reminder.id],
+          );
+        }
+
         if (phase === "dropped") {
           if (phaseFlags.dropped && !sentKeys.includes(DROPPED_KEY)) {
             await sendEmail({
@@ -276,6 +352,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }),
             });
             await upsertLog(DROPPED_KEY);
+            await recordNotification({
+              email: reminder.email,
+              type: "dropped",
+              title: ls.subj_dropped(reminder.domain),
+              body: ls.dd_available,
+              domain: reminder.domain,
+            });
             results.sent++;
           }
           // Deactivate after notifying
@@ -325,6 +408,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }),
           });
           await upsertLog(GRACE_KEY);
+          await recordNotification({
+            email: reminder.email,
+            type: "grace",
+            title: ls.subj_grace(reminder.domain),
+            body: ls.pe_grace_body,
+            domain: reminder.domain,
+          });
           results.sent++;
           didSend = true;
         }
@@ -348,6 +438,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }),
           });
           await upsertLog(REDEMPTION_KEY);
+          await recordNotification({
+            email: reminder.email,
+            type: "redemption",
+            title: ls.subj_redemption(reminder.domain),
+            body: ls.pe_redemption_body,
+            domain: reminder.domain,
+          });
           results.sent++;
           didSend = true;
         }
@@ -370,6 +467,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }),
           });
           await upsertLog(PENDING_KEY);
+          await recordNotification({
+            email: reminder.email,
+            type: "pending_delete",
+            title: ls.subj_pending(reminder.domain),
+            body: ls.pe_pending_body,
+            domain: reminder.domain,
+          });
           results.sent++;
           didSend = true;
         }
@@ -390,6 +494,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }),
           });
           await upsertLog(DROP_SOON_KEY);
+          await recordNotification({
+            email: reminder.email,
+            type: "drop_soon",
+            title: ls.subj_drop_soon(reminder.domain, daysToDropDate),
+            body: ls.da_body,
+            domain: reminder.domain,
+          });
           results.sent++;
           didSend = true;
         }
@@ -419,6 +530,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }),
             });
             await upsertLog(firing.days);
+            await recordNotification({
+              email: reminder.email,
+              type: "threshold",
+              title: subject,
+              domain: reminder.domain,
+            });
             results.sent++;
             didSend = true;
           }
@@ -426,6 +543,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (reminderErr: any) {
         logger.error("[remind/process] Error processing reminder", reminder.id, reminderErr.message);
         results.skipped++;
+      }
+    }
+
+    // ── Membership renewal reminders (staged: 7d → 1d → expired) ────────────
+    const membershipUsers = await many<{
+      email: string; locale: string | null; subscription_expires_at: string | null;
+      membership_remind_stage: string | null;
+    }>(
+      `SELECT u.email, u.locale, u.subscription_expires_at, u.membership_remind_stage
+       FROM users u
+       WHERE u.subscription_access = true
+         AND u.subscription_expires_at IS NOT NULL
+         AND u.disabled = false`,
+    ).catch(() => []);
+    for (const mu of membershipUsers) {
+      try {
+        const expires = mu.subscription_expires_at ? new Date(mu.subscription_expires_at) : null;
+        if (!expires || isNaN(expires.getTime())) continue;
+        const daysLeft = Math.ceil((expires.getTime() - Date.now()) / 86_400_000);
+        const stage = mu.membership_remind_stage;
+        const mLocale = mu.locale || "zh";
+        const ms = getEmailStrings(mLocale);
+
+        if (daysLeft <= 0) {
+          if (stage !== "expired") {
+            await sendEmail({
+              to: mu.email,
+              subject: ms.subj_membership(0),
+              html: membershipRenewHtml({ daysLeft: 0, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+            });
+            await recordNotification({
+              email: mu.email,
+              type: "membership",
+              title: ms.subj_membership(0),
+              body: ms.mr_expired,
+            });
+            await run(
+              `UPDATE users SET membership_remind_stage = 'expired' WHERE email = $1`,
+              [mu.email],
+            );
+            results.sent++;
+          }
+        } else if (daysLeft <= 1) {
+          if (stage === null || stage === "7d") {
+            await sendEmail({
+              to: mu.email,
+              subject: ms.subj_membership(1),
+              html: membershipRenewHtml({ daysLeft: 1, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+            });
+            await recordNotification({
+              email: mu.email,
+              type: "membership",
+              title: ms.subj_membership(1),
+              body: ms.mr_days_1,
+            });
+            await run(
+              `UPDATE users SET membership_remind_stage = '1d' WHERE email = $1`,
+              [mu.email],
+            );
+            results.sent++;
+          }
+        } else if (daysLeft <= 7) {
+          if (stage === null) {
+            await sendEmail({
+              to: mu.email,
+              subject: ms.subj_membership(daysLeft),
+              html: membershipRenewHtml({ daysLeft, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+            });
+            await recordNotification({
+              email: mu.email,
+              type: "membership",
+              title: ms.subj_membership(daysLeft),
+              body: ms.mr_days_7,
+            });
+            await run(
+              `UPDATE users SET membership_remind_stage = '7d' WHERE email = $1`,
+              [mu.email],
+            );
+            results.sent++;
+          }
+        }
+      } catch (memErr) {
+        logger.error("[remind/process] Error processing membership reminder", mu.email, memErr instanceof Error ? memErr.message : String(memErr));
       }
     }
 

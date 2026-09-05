@@ -26,6 +26,15 @@ import {
   RiWifiLine,
   RiArrowLeftSLine,
   RiHome3Line,
+  RiNotification3Line,
+  RiNotificationOffLine,
+  RiTimeLine,
+  RiAlertLine,
+  RiErrorWarningLine,
+  RiAlarmWarningLine,
+  RiCloseCircleLine,
+  RiPauseCircleLine,
+  RiStarLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -698,6 +707,212 @@ export function NavDrawer() {
   );
 }
 
+interface NotifItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  domain: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+const NOTIF_TYPE_ICON: Record<string, React.ReactNode> = {
+  threshold: <RiTimeLine className="w-3.5 h-3.5" />,
+  grace: <RiAlertLine className="w-3.5 h-3.5" />,
+  redemption: <RiErrorWarningLine className="w-3.5 h-3.5" />,
+  pending_delete: <RiDeleteBinLine className="w-3.5 h-3.5" />,
+  drop_soon: <RiAlarmWarningLine className="w-3.5 h-3.5" />,
+  dropped: <RiCloseCircleLine className="w-3.5 h-3.5" />,
+  hold: <RiPauseCircleLine className="w-3.5 h-3.5" />,
+  reserved: <RiLockLine className="w-3.5 h-3.5" />,
+  membership: <RiStarLine className="w-3.5 h-3.5" />,
+};
+
+function NotificationBell() {
+  const { data: session, status } = useSession();
+  const { t, locale } = useTranslation();
+  const settings = useSiteSettings();
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [items, setItems] = React.useState<NotifItem[]>([]);
+  const [unread, setUnread] = React.useState(0);
+  const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
+  const queryOnlyMode = settings.query_only_mode === "1";
+  const isAdminUser = (session?.user as any)?.isAdmin === true;
+
+  const fetchNotifications = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/notifications?limit=8");
+      if (!res.ok) return;
+      const data = await res.json();
+      setItems(Array.isArray(data.notifications) ? data.notifications : []);
+      setUnread(typeof data.unread === "number" ? data.unread : 0);
+    } catch {
+      /* network errors are non-fatal here */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (status !== "authenticated") return;
+    fetchNotifications();
+    const iv = setInterval(fetchNotifications, 60_000);
+    function onVisible() {
+      if (document.visibilityState === "visible") fetchNotifications();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [status, fetchNotifications]);
+
+  // Close on outside tap/click
+  React.useEffect(() => {
+    if (!open) return;
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    function handleReposition() { setOpen(false); }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    window.addEventListener("scroll", handleReposition, { passive: true, capture: true });
+    window.addEventListener("resize", handleReposition, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+      window.removeEventListener("scroll", handleReposition, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [open]);
+
+  const handleToggle = React.useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+        zIndex: 9999,
+        width: 320,
+      });
+    }
+    setOpen(v => {
+      const next = !v;
+      if (next) fetchNotifications();
+      return next;
+    });
+  }, [fetchNotifications]);
+
+  const markRead = React.useCallback(async (id: string) => {
+    setItems(prev => prev.map(it => (it.id === id ? { ...it, read: true } : it)));
+    setUnread(prev => Math.max(0, prev - 1));
+    try {
+      await fetch("/api/user/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      /* best-effort */
+    }
+  }, []);
+
+  if (status === "loading") return null;
+  if (status !== "authenticated") return null;
+  if (queryOnlyMode && !isAdminUser) return null;
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const isChinese = locale === "zh" || locale === "zh-tw";
+    return isChinese ? format(d, "M月d日 HH:mm") : format(d, "MMM d, HH:mm");
+  };
+
+  return (
+    <div className="relative inline-flex">
+      <motion.button
+        {...TAP}
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="p-2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors touch-manipulation min-h-[44px] min-w-[44px]"
+        aria-label={t("notifications.bell_aria")}
+      >
+        <span className="relative inline-flex">
+          <RiNotification3Line className="h-[1rem] w-[1rem]" />
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </span>
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: -4 }}
+            transition={{ duration: 0.14 }}
+            style={dropdownStyle}
+            className="bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+          >
+            <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
+              <p className="text-xs font-semibold">{t("notifications.title")}</p>
+              {unread > 0 && (
+                <span className="text-[9px] text-red-500 font-semibold">{unread} {t("notifications.unread")}</span>
+              )}
+            </div>
+            {items.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <RiNotificationOffLine className="w-5 h-5 mx-auto text-muted-foreground/60 mb-1" />
+                <p className="text-xs text-muted-foreground">{t("notifications.all_clear")}</p>
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto">
+                {items.map(it => (
+                  <button
+                    key={it.id}
+                    type="button"
+                    onClick={() => markRead(it.id)}
+                    className={cn(
+                      "w-full text-left flex items-start gap-2 px-3 py-2 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation border-b border-border/30 last:border-b-0",
+                      !it.read && "bg-primary/[0.04]",
+                    )}
+                  >
+                    <span className={cn(
+                      "mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0",
+                      !it.read ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                    )}>
+                      {NOTIF_TYPE_ICON[it.type] ?? <RiNotification3Line className="w-3.5 h-3.5" />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className={cn("block text-xs truncate", !it.read && "font-semibold")}>{it.title}</span>
+                      {it.body && <span className="block text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{it.body}</span>}
+                      <span className="block text-[9px] text-muted-foreground/70 mt-0.5">{fmtDate(it.created_at)}</span>
+                    </span>
+                    {!it.read && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-center gap-1 px-3 py-2 text-[11px] font-medium border-t border-border/50 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
+            >
+              {t("notifications.view_all")}
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function UserButton() {
   const { data: session, status } = useSession();
   const { t } = useTranslation();
@@ -915,6 +1130,7 @@ export function Navbar() {
               <RiCompassLine className="h-[1rem] w-[1rem]" />
             </Link>
           </motion.div>
+          <NotificationBell />
           <UserButton />
           <div className="hidden sm:block">
             <HistoryDrawer />

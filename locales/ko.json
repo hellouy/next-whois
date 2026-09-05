@@ -1670,7 +1670,8 @@
     "notify_email_placeholder": "선택사항 — 비워두면 계정 이메일 사용",
     "notify_email_desc": "이 도메인의 알림은 계정 이메일 대신 이 주소로 전송됩니다.",
     "free_usage_label": "무료 플랜 사용량",
-    "free_usage_full": "무료 한도에 도달했습니다. 무제한 구독을 위해 업그레이드하세요."
+    "free_usage_full": "무료 한도에 도달했습니다. 무제한 구독을 위해 업그레이드하세요.",
+    "export_ics": "iCal 내보내기"
   },
   "admin": {
     "no_access_title": "접근 권한 없음",
@@ -1858,5 +1859,26 @@
     "step_connect": "RDAP 서버 연결 중…",
     "step_whois": "WHOIS 데이터베이스 조회 중…",
     "step_parse": "등록 정보 파싱 중…"
+  },
+  "notifications": {
+    "title": "알림",
+    "empty": "알림이 없습니다",
+    "all_clear": "새로운 알림이 없습니다",
+    "unread": "읽지 않음",
+    "mark_all_read": "모두 읽음으로 표시",
+    "mark_read": "읽음으로 표시",
+    "view_all": "모두 보기",
+    "bell_aria": "알림",
+    "type_threshold": "만료 알림",
+    "type_grace": "유예 기간",
+    "type_redemption": "복구 기간",
+    "type_pending_delete": "삭제 대기 중",
+    "type_drop_soon": "드롭 임박",
+    "type_dropped": "드롭됨",
+    "type_hold": "보류 중",
+    "type_reserved": "예약됨",
+    "type_membership": "멤버십",
+    "back_to_dashboard": "대시보드로 돌아가기",
+    "load_failed": "알림을 불러오지 못했습니다"
   }
 }

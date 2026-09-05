@@ -1670,7 +1670,8 @@
     "notify_email_placeholder": "选填 — 留空则使用账户邮箱",
     "notify_email_desc": "该域名的提醒邮件将发送到此地址，而非账户邮箱。",
     "free_usage_label": "免费版用量",
-    "free_usage_full": "已达免费版上限。升级会员可无限订阅。"
+    "free_usage_full": "已达免费版上限。升级会员可无限订阅。",
+    "export_ics": "导出 iCal"
   },
   "admin": {
     "no_access_title": "无访问权限",
@@ -1858,5 +1859,26 @@
     "step_connect": "连接 RDAP 服务器…",
     "step_whois": "查询 WHOIS 数据库…",
     "step_parse": "解析注册信息…"
+  },
+  "notifications": {
+    "title": "通知",
+    "empty": "暂无通知",
+    "all_clear": "没有新消息",
+    "unread": "未读",
+    "mark_all_read": "全部标为已读",
+    "mark_read": "标为已读",
+    "view_all": "查看全部",
+    "bell_aria": "通知",
+    "type_threshold": "到期提醒",
+    "type_grace": "宽限期",
+    "type_redemption": "赎回期",
+    "type_pending_delete": "待删除",
+    "type_drop_soon": "即将掉落",
+    "type_dropped": "已掉落",
+    "type_hold": "域名暂停",
+    "type_reserved": "保留",
+    "type_membership": "会员",
+    "back_to_dashboard": "返回仪表盘",
+    "load_failed": "通知加载失败"
   }
 }
