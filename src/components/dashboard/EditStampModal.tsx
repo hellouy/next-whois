@@ -90,9 +90,9 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
         <div className="fixed inset-0 z-[80] flex flex-col items-stretch" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
           <div className="flex-1" onClick={() => setThemePickerOpen(false)} />
           <div className="bg-background rounded-t-2xl shadow-2xl max-h-[82vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <div>
-                <p className="font-bold text-base">{isZh ? "选择弹窗样式" : "Card Theme"}</p>
+            <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5 border-b border-border shrink-0">
+              <div className="min-w-0">
+                <p className="font-bold text-base truncate">{isZh ? "选择品牌卡片样式" : "Card Theme"}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{isZh ? "点击样式即可选中并关闭" : "Tap to select"}</p>
               </div>
               <button type="button" onClick={() => setThemePickerOpen(false)}
@@ -103,42 +103,56 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
             <div className="overflow-y-auto px-5 py-4 space-y-5">
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">{isZh ? "标准配色" : "Standard"}</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !th.special).map(([key, th]) => (
-                    <button key={key} type="button"
-                      onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all active:scale-[0.97]",
-                        cardTheme === key ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/40"
-                      )}>
-                      <span className={cn("w-full h-6 rounded-lg", th.hero)} />
-                      <span className="text-[10px] font-semibold leading-none">{th.label}</span>
-                      {cardTheme === key && <span className="text-[8px] text-primary font-bold uppercase tracking-widest">{isZh ? "已选" : "✓"}</span>}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !th.special).map(([key, th]) => {
+                    const selected = cardTheme === key;
+                    return (
+                      <button key={key} type="button"
+                        onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                        aria-pressed={selected}
+                        className={cn(
+                          "group flex min-w-0 items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors active:scale-[0.98]",
+                          selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
+                        )}>
+                        <span className={cn("h-9 w-9 shrink-0 rounded-lg shadow-inner", th.hero)} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">{th.label}</span>
+                          <span className="mt-0.5 block text-[9px] text-muted-foreground">{key}</span>
+                        </span>
+                        <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", selected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{selected && <RiCheckLine className="size-3" />}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                   {isZh ? "特殊排版" : "Special layouts"} <span className="normal-case font-normal opacity-60">· {isZh ? "实际效果预览" : "preview"}</span>
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !!th.special).map(([key, th]) => (
-                    <button key={key} type="button"
-                      onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
-                      className={cn(
-                        "flex flex-col gap-2 rounded-xl border-2 overflow-hidden transition-all active:scale-[0.97]",
-                        cardTheme === key ? "border-primary" : "border-transparent hover:border-border"
-                      )}>
-                      <div className="pointer-events-none scale-[0.72] origin-top-left w-[138.8%]">
-                        <StampPreviewCard themeKey={key} />
-                      </div>
-                      <div className="flex items-center justify-between px-2 pb-2 -mt-[28%]">
-                        <span className="text-[11px] font-semibold">{th.special} {th.label}</span>
-                        {cardTheme === key && <span className="text-[9px] text-primary font-bold uppercase tracking-widest">{isZh ? "已选" : "✓"}</span>}
-                      </div>
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !!th.special).map(([key, th]) => {
+                    const selected = cardTheme === key;
+                    return (
+                      <button key={key} type="button"
+                        onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                        aria-pressed={selected}
+                        className={cn(
+                          "flex min-w-0 items-center gap-3 rounded-xl border p-2.5 text-left transition-colors active:scale-[0.99]",
+                          selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
+                        )}>
+                        <div className="pointer-events-none h-16 w-28 shrink-0 overflow-hidden rounded-lg border border-border/40 bg-muted/20">
+                          <div className="w-[178px] origin-top-left scale-[0.63]">
+                            <StampPreviewCard themeKey={key} />
+                          </div>
+                        </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">{th.special} {th.label}</span>
+                          <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">{isZh ? "独特的品牌展示排版" : "Distinctive card composition"}</span>
+                        </span>
+                        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", selected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{selected && <RiCheckLine className="size-3.5" />}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="pb-safe" />
