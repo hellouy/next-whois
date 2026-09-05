@@ -1026,6 +1026,46 @@ export function fmtDate(d: Date): string {
   return `${d.getUTCFullYear()}/${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}`;
 }
 
+/**
+ * Compute the next reminder firing under interval-based threshold semantics.
+ *
+ * Thresholds are sorted descending; a threshold `t` (with next-smaller `lower`)
+ * only fires while `lower < daysToExpiry <= t`. This guarantees each domain-day
+ * falls in at most one interval — late subscriptions no longer trigger every
+ * higher threshold on consecutive cron runs (the pre-interval bug).
+ *
+ * Returns:
+ *   - { at: now, days: t }  when the remaining window is already inside an
+ *     unsent threshold's interval (fires at the next processing run)
+ *   - { at: expiry - t }    when the threshold's firing date is still in the future
+ *   - null                  when every threshold was sent or is out of range
+ */
+export function nextReminderFiring(
+  thresholds: number[],
+  daysToExpiry: number,
+  expiry: Date,
+  sentKeys: number[],
+  now: Date = new Date(),
+): { at: Date; days: number } | null {
+  const ts = [...new Set(thresholds)]
+    .filter((n) => Number.isFinite(n) && n >= 1)
+    .sort((a, b) => b - a);
+  const msPerDay = 86_400_000;
+  for (let i = 0; i < ts.length; i++) {
+    const t = ts[i];
+    if (sentKeys.includes(t)) continue;
+    const lower = i + 1 < ts.length ? ts[i + 1] : 0;
+    if (daysToExpiry <= t && daysToExpiry > lower) {
+      return { at: now, days: t };
+    }
+    if (daysToExpiry > t) {
+      return { at: new Date(expiry.getTime() - t * msPerDay), days: t };
+    }
+    // daysToExpiry <= lower → this threshold's window already passed
+  }
+  return null;
+}
+
 /** Format a Date to YYYY/MM/DD HH:mm:ss UTC (full precision). */
 export function fmtDateTime(d: Date, showTz = true): string {
   const pad = (n: number) => String(n).padStart(2, "0");

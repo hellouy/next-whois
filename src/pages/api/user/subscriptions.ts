@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, run, isDbReady } from "@/lib/db-query";
-import { computeLifecycle } from "@/lib/lifecycle";
+import { computeLifecycle, nextReminderFiring } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { createLogger } from "@/lib/logger";
 
@@ -92,20 +92,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (r.nameservers_json) nameservers = JSON.parse(r.nameservers_json);
         } catch { /* ignore */ }
 
-        // Compute when the next reminder threshold will fire
+        // Compute when the next reminder threshold will fire (interval semantics,
+        // mirroring the process.ts engine exactly)
         const daysToExpiry = lc?.daysToExpiry ?? null;
         let nextReminderAt: string | null = null;
         let nextReminderDays: number | null = null;
-        if (r.expiration_date && daysToExpiry !== null && daysToExpiry > 0) {
-          for (const t of subThresholds) {
-            // Threshold fires when daysToExpiry reaches t; only relevant if we haven't sent it
-            if (daysToExpiry > t && !sentKeys.includes(t)) {
-              const d = new Date(r.expiration_date);
-              d.setDate(d.getDate() - t);
-              nextReminderAt = d.toISOString();
-              nextReminderDays = t;
-              break;
-            }
+        if (effectiveExpiry && daysToExpiry !== null && daysToExpiry > 0) {
+          const firing = nextReminderFiring(subThresholds, daysToExpiry, new Date(effectiveExpiry), sentKeys);
+          if (firing) {
+            nextReminderAt = firing.at.toISOString();
+            nextReminderDays = firing.days;
           }
         }
 

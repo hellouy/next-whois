@@ -95,6 +95,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Update failed, please try again" });
     }
 
+    // ── Email ownership migration ─────────────────────────────────────────────
+    // When the account email changes, migrate reminders + stamps ownership so the
+    // new email inherits the user's subscriptions and brand records. Independently
+    // configured notify_email fields are intentionally left untouched.
+    const oldEmail = session.user.email;
+    const newEmail = email !== undefined ? String(email).toLowerCase().trim() : null;
+    if (emailChangeCodeKey && newEmail && newEmail !== oldEmail) {
+      try {
+        await run(
+          `WITH r AS (
+             UPDATE reminders SET email = $1 WHERE email = $2 RETURNING id
+           ),
+           s AS (
+             UPDATE stamps SET email = $1 WHERE email = $2 RETURNING id
+           )
+           SELECT 1`,
+          [newEmail, oldEmail],
+        );
+      } catch (migrationErr: any) {
+        // Roll back the users.email change to keep ownership consistent.
+        logger.error("[profile] email migration error:", migrationErr.message);
+        await run("UPDATE users SET email = $1, updated_at = NOW() WHERE email = $2", [oldEmail, newEmail]).catch(() => {});
+        return res.status(500).json({ error: "Email change failed during data migration, please try again" });
+      }
+    }
+
     // Consume the email change code only after the DB update succeeds
     if (emailChangeCodeKey) {
       await deleteRedisValue(emailChangeCodeKey).catch(() => {});

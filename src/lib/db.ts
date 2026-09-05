@@ -307,11 +307,29 @@ const CREATE_TABLES = [
     version         TEXT,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
+  `CREATE TABLE IF NOT EXISTS user_notifications (
+    id         VARCHAR(20)  PRIMARY KEY,
+    email      TEXT         NOT NULL,
+    type       TEXT         NOT NULL,
+    title      TEXT         NOT NULL,
+    body       TEXT,
+    domain     TEXT,
+    read_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_user_notifications_email ON user_notifications (email, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications (email) WHERE read_at IS NULL`,
 ];
 
 const ALTER_COLUMNS = [
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ`,
   `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS phase_flags          TEXT`,
+  `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS notify_email         TEXT`,
+  `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS paused              BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS last_epp_status     TEXT`,
+  `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS hold_notified_at    TIMESTAMPTZ`,
+  `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS reserved_notified_at TIMESTAMPTZ`,
+  `ALTER TABLE users        ADD COLUMN IF NOT EXISTS membership_remind_stage TEXT`,
   `ALTER TABLE search_history ADD COLUMN IF NOT EXISTS reg_status         TEXT`,
   `ALTER TABLE search_history ADD COLUMN IF NOT EXISTS expiration_date    TEXT`,
   `ALTER TABLE search_history ADD COLUMN IF NOT EXISTS remaining_days     INTEGER`,

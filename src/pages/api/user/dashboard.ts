@@ -13,7 +13,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, isDbReady } from "@/lib/db-query";
-import { computeLifecycle } from "@/lib/lifecycle";
+import { computeLifecycle, nextReminderFiring } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { createLogger } from "@/lib/logger";
 
@@ -150,14 +150,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let nextReminderAt: string | null = null;
       let nextReminderDays: number | null = null;
       if (effectiveExpiry && daysToExpiry !== null && daysToExpiry > 0) {
-        for (const t of thresholdsToUse) {
-          if (daysToExpiry > t && !sentKeys.includes(t)) {
-            const d = new Date(effectiveExpiry);
-            d.setDate(d.getDate() - t);
-            nextReminderAt = d.toISOString();
-            nextReminderDays = t;
-            break;
-          }
+        // Interval semantics — mirrors the process.ts engine exactly
+        const firing = nextReminderFiring(thresholdsToUse, daysToExpiry, new Date(effectiveExpiry), sentKeys);
+        if (firing) {
+          nextReminderAt = firing.at.toISOString();
+          nextReminderDays = firing.days;
         }
       }
 

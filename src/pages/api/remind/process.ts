@@ -13,6 +13,7 @@ import {
   GRACE_KEY,
   REDEMPTION_KEY,
   PENDING_KEY,
+  nextReminderFiring,
 } from "@/lib/lifecycle";
 import { many, run, isDbReady } from "@/lib/db-query";
 import { getEmailStrings } from "@/lib/email-strings";
@@ -29,11 +30,15 @@ const WHOIS_STALE_NORMAL_DAYS = 5;     // within 90 days of expiry → refresh e
 /** Only sync WHOIS for reminders within this many days of expiry */
 const WHOIS_SYNC_WINDOW_DAYS = 90;
 /** Max WHOIS lookups per cron run to avoid rate limits */
-const WHOIS_SYNC_LIMIT = 20;
+const WHOIS_SYNC_LIMIT = 50;
 
 /**
  * Refresh WHOIS expiry date for reminders that are approaching expiry and have
  * stale WHOIS data. Updates DB in-place and returns a map of reminderId → new date.
+ *
+ * Candidates are ordered by urgency (days to expiry ascending); reminders without
+ * any stored expiry date (bulk imports awaiting backfill) are included last and
+ * refreshed whenever they are stale or never synced.
  */
 async function refreshStaleWhoisDates(
   reminders: Array<{ id: string; domain: string; expiration_date: string | null; whois_synced_at: string | null }>,
@@ -41,12 +46,20 @@ async function refreshStaleWhoisDates(
   const now = Date.now();
   const msPerDay = 86_400_000;
 
-  // Pick candidates: within sync window, stale or never synced
-  // Stale threshold varies by urgency: critical (<7d) = 1d, urgent (<30d) = 2d, normal (<90d) = 5d
-  const candidates = reminders.filter((r) => {
-    if (!r.expiration_date) return false;
-    const expMs = new Date(r.expiration_date).getTime();
-    const daysToExpiry = (expMs - now) / msPerDay;
+  // Pick candidates: within sync window, stale or never synced; no-expiry records backfill last
+  const scored = reminders.map((r) => {
+    let daysToExpiry: number | null = null;
+    if (r.expiration_date) {
+      const expMs = new Date(r.expiration_date).getTime();
+      daysToExpiry = (expMs - now) / msPerDay;
+    }
+    return { r, daysToExpiry };
+  });
+  const eligible = scored.filter(({ r, daysToExpiry }) => {
+    if (daysToExpiry === null) {
+      const lastSync = r.whois_synced_at ? new Date(r.whois_synced_at).getTime() : 0;
+      return now - lastSync > WHOIS_STALE_NORMAL_DAYS * msPerDay;
+    }
     if (daysToExpiry < -30 || daysToExpiry > WHOIS_SYNC_WINDOW_DAYS) return false;
     const lastSync = r.whois_synced_at ? new Date(r.whois_synced_at).getTime() : 0;
     const staleDays = daysToExpiry <= 7
@@ -55,7 +68,12 @@ async function refreshStaleWhoisDates(
         ? WHOIS_STALE_URGENT_DAYS
         : WHOIS_STALE_NORMAL_DAYS;
     return now - lastSync > staleDays * msPerDay;
-  }).slice(0, WHOIS_SYNC_LIMIT);
+  }).sort((a, b) => {
+    const av = a.daysToExpiry === null ? Number.POSITIVE_INFINITY : a.daysToExpiry;
+    const bv = b.daysToExpiry === null ? Number.POSITIVE_INFINITY : b.daysToExpiry;
+    return av - bv;
+  });
+  const candidates = eligible.slice(0, WHOIS_SYNC_LIMIT).map((e) => e.r);
 
   const updated = new Map<string, { date: string; eppStatus: string[]; registrar: string | null; creationDate: string | null; nameservers: string[] }>();
   await Promise.all(candidates.map(async (r) => {
@@ -265,6 +283,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
              WHERE id = $2`,
             [now.toISOString(), reminder.id],
           );
+          // Domain no longer resolves to anyone — brand claims become meaningless.
+          await run("DELETE FROM stamps WHERE domain = $1", [reminder.domain]).catch(() => {});
           results.expired++;
           continue;
         }
@@ -372,34 +392,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           didSend = true;
         }
 
-        // ── Active phase: days-to-expiry thresholds ───────────────────────────
+        // ── Active phase: days-to-expiry thresholds (interval semantics) ──────
         if (!didSend && phase === "active") {
-          for (const threshold of thresholds) {
-            if (daysToExpiry <= threshold && !sentKeys.includes(threshold)) {
-              const subject =
-                daysToExpiry <= 5  ? ls.subj_reminder_urgent(reminder.domain, daysToExpiry) :
-                daysToExpiry <= 10 ? ls.subj_reminder_warn(reminder.domain, daysToExpiry)   :
-                                     ls.subj_reminder(reminder.domain, daysToExpiry);
+          const firing = nextReminderFiring(thresholds, daysToExpiry, expiry, sentKeys, now);
+          if (firing && firing.at.getTime() <= now.getTime()) {
+            const subject =
+              daysToExpiry <= 5  ? ls.subj_reminder_urgent(reminder.domain, daysToExpiry) :
+              daysToExpiry <= 10 ? ls.subj_reminder_warn(reminder.domain, daysToExpiry)   :
+                                   ls.subj_reminder(reminder.domain, daysToExpiry);
 
-              await sendEmail({
-                to: reminder.email,
-                subject,
-                html: reminderHtml({
-                  domain: reminder.domain,
-                  expirationDate: reminder.expiration_date,
-                  daysLeft: daysToExpiry,
-                  cancelToken: reminder.cancel_token,
-                  registrar: reminder.registrar,
-                  creationDate: reminder.creation_date,
-                  nameservers: reminder.nameservers,
-                  siteName,
-                  locale,
-                }),
-              });
-              await upsertLog(threshold);
-              results.sent++;
-              break;
-            }
+            await sendEmail({
+              to: reminder.email,
+              subject,
+              html: reminderHtml({
+                domain: reminder.domain,
+                expirationDate: reminder.expiration_date,
+                daysLeft: daysToExpiry,
+                cancelToken: reminder.cancel_token,
+                registrar: reminder.registrar,
+                creationDate: reminder.creation_date,
+                nameservers: reminder.nameservers,
+                siteName,
+                locale,
+              }),
+            });
+            await upsertLog(firing.days);
+            results.sent++;
+            didSend = true;
           }
         }
       } catch (reminderErr: any) {

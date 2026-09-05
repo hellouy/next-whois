@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isAdminEmail } from "@/lib/admin-server";
 import { createLogger } from "@/lib/logger";
@@ -36,12 +36,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const user = await one<{ id: string }>("SELECT id FROM users WHERE email = $1", [email]);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    const result = await one<{
+      email: string | null; reminders: string; emails: string; stamps: string;
+    }>(
+      `WITH del AS (
+         DELETE FROM users WHERE email = $1 RETURNING email
+       ),
+       rem AS (
+         UPDATE reminders
+         SET active = false, cancelled_at = NOW(), cancel_reason = 'account_deleted'
+         WHERE email = (SELECT email FROM del) AND active = true
+         RETURNING id
+       ),
+       eq AS (
+         DELETE FROM email_queue
+         WHERE to_email = (SELECT email FROM del) AND status = 'pending'
+         RETURNING id
+       ),
+       st AS (
+         DELETE FROM stamps WHERE email = (SELECT email FROM del) RETURNING id
+       )
+       SELECT
+         (SELECT email FROM del)                          AS email,
+         (SELECT COUNT(*) FROM rem)::text                 AS reminders,
+         (SELECT COUNT(*) FROM eq)::text                  AS emails,
+         (SELECT COUNT(*) FROM st)::text                  AS stamps`,
+      [email],
+    );
+    if (!result?.email) return res.status(404).json({ error: "User not found" });
 
-    await run("DELETE FROM users WHERE id = $1", [user.id]);
-
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({
+      ok: true,
+      cleaned: {
+        reminders: parseInt(result.reminders, 10) || 0,
+        emails: parseInt(result.emails, 10) || 0,
+        stamps: parseInt(result.stamps, 10) || 0,
+      },
+    });
   } catch (err: any) {
     logger.error("[delete-account]", err.message);
     return res.status(500).json({ error: "Deletion failed, please try again" });
