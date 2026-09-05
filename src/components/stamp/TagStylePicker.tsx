@@ -72,7 +72,7 @@ export function TagStylePicker({
             : <span className="text-[10px] text-muted-foreground/50">{s("click_preview")}</span>
           }
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           {TAG_STYLES.map((ts) => {
             const isSelected = selectedStyle === ts.id;
             const Icon = ts.icon;
@@ -88,48 +88,25 @@ export function TagStylePicker({
                   onPreviewOpen(ts.id);
                 }}
                 className={cn(
-                  "relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all duration-150 text-left",
-                  locked ? "opacity-45 cursor-not-allowed border-border/20"
-                    : isSelected ? "border-violet-400 dark:border-violet-500 shadow-md shadow-violet-500/10"
-                    : "border-border/40 hover:border-border/70 hover:shadow-sm"
+                  "relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
+                  locked ? "opacity-50 cursor-not-allowed border-border/30 bg-muted/20"
+                    : isSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
+                    : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
                 )}
               >
-                <div className={cn("relative h-[68px] w-full flex flex-col items-center justify-center gap-1.5 overflow-hidden bg-gradient-to-br", ts.accent)}>
-                  <div className="absolute inset-0 opacity-[0.06]"
-                    style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "9px 9px" }} />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
-                  <div className="relative w-7 h-7 rounded-xl bg-white/20 border border-white/25 flex items-center justify-center shadow-sm">
-                    {locked
-                      ? <RiVipCrownLine className="w-3.5 h-3.5 text-white/75 drop-shadow" />
-                      : <Icon className="w-3.5 h-3.5 text-white drop-shadow" />}
-                  </div>
-                  {!locked && (
-                    <span className={cn(
-                      "relative inline-flex items-center gap-0.5 px-1.5 py-[2px] rounded text-[6.5px] font-bold overflow-hidden max-w-[calc(100%-8px)] truncate",
-                      ts.className
-                    )}>
-                      <Icon className="w-1.5 h-1.5 shrink-0" />
-                      <span className="truncate">{isZh ? ts.zhName : ts.label}</span>
-                    </span>
-                  )}
-                  {isSelected && !locked && (
-                    <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-white/95 flex items-center justify-center shadow-sm">
-                      <RiCheckLine className="w-2 h-2 text-violet-600" />
-                    </div>
-                  )}
-                  {isFree && !isMember && (
-                    <div className="absolute top-1.5 left-1.5 text-[5.5px] font-bold px-1 py-[2px] rounded-full bg-emerald-500 text-white leading-tight shadow-sm whitespace-nowrap">
-                      FREE
-                    </div>
-                  )}
+                <div className={cn("relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br", ts.accent)}>
+                  <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "8px 8px" }} />
+                  {locked ? <RiVipCrownLine className="relative h-5 w-5 text-white/80 drop-shadow" /> : <Icon className="relative h-5 w-5 text-white drop-shadow" />}
                 </div>
-                <div className={cn("px-1.5 py-1.5 text-center",
-                  isSelected && !locked ? "bg-violet-50 dark:bg-violet-950/40" : "bg-background")}>
-                  <p className={cn("text-[10px] font-semibold leading-none tracking-tight",
-                    isSelected && !locked ? "text-violet-600 dark:text-violet-400" : "text-foreground/70")}>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate text-xs font-bold", isSelected && !locked ? "text-primary" : "text-foreground")}>
                     {isZh ? ts.zhName : ts.label}
                   </p>
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                    {locked ? (isZh ? "会员专属配色" : "Members only") : isSelected ? (isZh ? "当前已选" : "Selected") : (isFree && !isMember ? "FREE" : (isZh ? "点击查看预览" : "Tap to preview"))}
+                  </p>
                 </div>
+                <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSelected && !locked ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSelected && !locked && <RiCheckLine className="size-3" />}</span>
               </button>
             );
           })}

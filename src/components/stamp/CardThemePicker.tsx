@@ -84,7 +84,7 @@ export function CardThemePicker({
             </span>
           )}
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           {(SPECIAL_THEME_IDS as readonly string[]).map((themeId) => {
             const th = STAMP_CARD_THEMES[themeId];
             if (!th) return null;
@@ -104,26 +104,29 @@ export function CardThemePicker({
                   }
                 }}
                 className={cn(
-                  "relative flex flex-col overflow-hidden rounded-xl border-2 transition-all duration-150",
-                  locked ? "opacity-50 cursor-not-allowed border-border/20"
-                    : isSpecialSelected ? "border-violet-400 dark:border-violet-500 shadow-md shadow-violet-500/15"
-                    : "border-border/40 hover:border-border/70"
+                  "group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
+                  locked ? "opacity-55 cursor-not-allowed border-border/30 bg-muted/20"
+                    : isSpecialSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
+                    : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
                 )}
               >
-                <div className={cn("h-10 w-full flex items-center justify-center", th.hero)}>
+                <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl shadow-inner", th.hero)}>
                   {locked
-                    ? <RiVipCrownLine className="w-3.5 h-3.5 text-white/70 drop-shadow" />
+                    ? <RiVipCrownLine className="h-5 w-5 text-white/80 drop-shadow" />
                     : isSpecialSelected
-                      ? <RiCheckLine className="w-3.5 h-3.5 text-white drop-shadow" />
-                      : <span className="text-[11px]">{th.special || "✨"}</span>
+                      ? <RiCheckLine className="h-5 w-5 text-white drop-shadow" />
+                      : <span className="text-xl">{th.special || "*"}</span>
                   }
                 </div>
-                <div className={cn("px-0.5 py-1 text-center", isSpecialSelected ? "bg-violet-50 dark:bg-violet-950/40" : "bg-background")}>
-                  <p className={cn("text-[8.5px] font-semibold leading-none tracking-tight",
-                    isSpecialSelected ? "text-violet-600 dark:text-violet-400" : "text-foreground/70")}>
-                    {th.label}
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate text-xs font-bold", isSpecialSelected ? "text-primary" : "text-foreground")}>
+                    {th.special} {th.label}
+                  </p>
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                    {locked ? (isZh ? "会员专属排版" : "Members only") : isSpecialSelected ? (isZh ? "当前已选" : "Selected") : (isZh ? "点击查看预览" : "Tap to preview")}
                   </p>
                 </div>
+                <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSpecialSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSpecialSelected && <RiCheckLine className="size-3" />}</span>
               </button>
             );
           })}
