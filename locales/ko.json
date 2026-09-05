@@ -1880,5 +1880,27 @@
     "type_membership": "멤버십",
     "back_to_dashboard": "대시보드로 돌아가기",
     "load_failed": "알림을 불러오지 못했습니다"
-  }
+  },
+  "drops": {
+    "title": "드롭 캘린더",
+    "subtitle": "향후 {{days}}일 내 드롭 예정 도메인",
+    "empty": "이 기간에 드롭 예정이 없습니다",
+    "public_locked_title": "로그인 필요",
+    "public_locked_desc": "드롭 캘린더는 로그인한 사용자만 볼 수 있습니다.",
+    "monitor": "모니터링",
+    "monitoring": "구독 중…",
+    "monitored": "구독됨",
+    "already_subscribed": "이미 구독한 도메인입니다",
+    "limit_exceeded": "무료 한도 도달 — 더 구독하려면 업그레이드하세요",
+    "subscribed_ok": "구독 완료. 확인 이메일을 보냈습니다.",
+    "failed": "구독 실패, 다시 시도하세요",
+    "login_hint": "이 도메인을 모니터링하려면 로그인하세요",
+    "public_note": "공개 드롭 데이터를 표시 중입니다. 로그인하면 내 구독을 볼 수 있습니다.",
+    "domains_count": "도메인 {{count}}개",
+    "load_failed": "드롭 캘린더를 불러오지 못했습니다",
+    "retry": "재시도",
+    "back_home": "홈으로 돌아가기"
+  },
+  "nav_drops": "드롭 캘린더",
+  "nav_drops_desc": "곧 드롭될 도메인"
 }

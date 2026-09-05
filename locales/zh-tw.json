@@ -1880,5 +1880,27 @@
     "type_membership": "會員",
     "back_to_dashboard": "返回儀表板",
     "load_failed": "通知載入失敗"
-  }
+  },
+  "drops": {
+    "title": "掉落日曆",
+    "subtitle": "未來 {{days}} 天預計掉落的網域",
+    "empty": "該時段暫無掉落網域",
+    "public_locked_title": "需要登入",
+    "public_locked_desc": "掉落日曆僅對登入用戶開放。",
+    "monitor": "監控",
+    "monitoring": "正在訂閱…",
+    "monitored": "已訂閱",
+    "already_subscribed": "您已訂閱該網域",
+    "limit_exceeded": "免費額度已滿，升級會員可訂閱更多",
+    "subscribed_ok": "訂閱成功，確認郵件已發送。",
+    "failed": "訂閱失敗，請重試",
+    "login_hint": "登入後即可監控該網域",
+    "public_note": "目前顯示公開掉落資料，登入後可查看您的訂閱掉落。",
+    "domains_count": "{{count}} 個網域",
+    "load_failed": "掉落日曆載入失敗",
+    "retry": "重試",
+    "back_home": "返回首頁"
+  },
+  "nav_drops": "掉落日曆",
+  "nav_drops_desc": "即將掉落的網域"
 }

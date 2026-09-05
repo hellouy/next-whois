@@ -1880,5 +1880,27 @@
     "type_membership": "会員",
     "back_to_dashboard": "ダッシュボードに戻る",
     "load_failed": "通知の読み込みに失敗しました"
-  }
+  },
+  "drops": {
+    "title": "ドロップカレンダー",
+    "subtitle": "今後 {{days}} 日以内に落ちるドメイン",
+    "empty": "この期間にドロップ予定はありません",
+    "public_locked_title": "ログインが必要です",
+    "public_locked_desc": "ドロップカレンダーはログインユーザーのみ閲覧できます。",
+    "monitor": "監視",
+    "monitoring": "登録中…",
+    "monitored": "登録済み",
+    "already_subscribed": "このドメインは登録済みです",
+    "limit_exceeded": "無料枠の上限に達しました。会員登録でさらに登録できます",
+    "subscribed_ok": "登録しました。確認メールを送信しました。",
+    "failed": "登録に失敗しました。もう一度お試しください",
+    "login_hint": "ログインしてこのドメインを監視",
+    "public_note": "公開ドロップデータを表示中。ログインすると自分の登録が表示されます。",
+    "domains_count": "{{count}} ドメイン",
+    "load_failed": "ドロップカレンダーを読み込めませんでした",
+    "retry": "再試行",
+    "back_home": "ホームに戻る"
+  },
+  "nav_drops": "ドロップカレンダー",
+  "nav_drops_desc": "まもなくドロップするドメイン"
 }

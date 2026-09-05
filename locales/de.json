@@ -1880,5 +1880,27 @@
     "type_membership": "Mitgliedschaft",
     "back_to_dashboard": "Zurück zum Dashboard",
     "load_failed": "Benachrichtigungen konnten nicht geladen werden"
-  }
+  },
+  "drops": {
+    "title": "Drop-Kalender",
+    "subtitle": "In den nächsten {{days}} Tagen erwartete Drops",
+    "empty": "In diesem Zeitraum keine Drops",
+    "public_locked_title": "Anmeldung erforderlich",
+    "public_locked_desc": "Der Drop-Kalender ist nur für angemeldete Benutzer sichtbar.",
+    "monitor": "Überwachen",
+    "monitoring": "Abonnieren…",
+    "monitored": "Abonniert",
+    "already_subscribed": "Diese Domain ist bereits abonniert",
+    "limit_exceeded": "Kostenloses Limit erreicht – Upgraden für weitere Abos",
+    "subscribed_ok": "Abonniert. Bestätigungsmail gesendet.",
+    "failed": "Abonnieren fehlgeschlagen, bitte erneut versuchen",
+    "login_hint": "Anmelden, um diese Domain zu überwachen",
+    "public_note": "Öffentliche Drop-Daten werden angezeigt. Melden Sie sich an, um Ihre Abos zu sehen.",
+    "domains_count": "{{count}} Domains",
+    "load_failed": "Drop-Kalender konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "back_home": "Zurück zur Startseite"
+  },
+  "nav_drops": "Drop-Kalender",
+  "nav_drops_desc": "Bevorstehende Domain-Drops"
 }

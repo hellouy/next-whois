@@ -1880,5 +1880,27 @@
     "type_membership": "Abonnement",
     "back_to_dashboard": "Retour au tableau de bord",
     "load_failed": "Échec du chargement des notifications"
-  }
+  },
+  "drops": {
+    "title": "Calendrier des drops",
+    "subtitle": "Domaines attendus dans les {{days}} prochains jours",
+    "empty": "Aucun drop sur cette période",
+    "public_locked_title": "Connexion requise",
+    "public_locked_desc": "Le calendrier des drops est visible uniquement par les utilisateurs connectés.",
+    "monitor": "Surveiller",
+    "monitoring": "Inscription…",
+    "monitored": "Inscrit",
+    "already_subscribed": "Déjà inscrit à ce domaine",
+    "limit_exceeded": "Limite gratuite atteinte — passez à un forfait pour en ajouter",
+    "subscribed_ok": "Inscription réussie. Email de confirmation envoyé.",
+    "failed": "Échec de l'inscription, réessayez",
+    "login_hint": "Connectez-vous pour surveiller ce domaine",
+    "public_note": "Affichage des données publiques. Connectez-vous pour voir vos inscriptions.",
+    "domains_count": "{{count}} domaines",
+    "load_failed": "Impossible de charger le calendrier des drops",
+    "retry": "Réessayer",
+    "back_home": "Retour à l'accueil"
+  },
+  "nav_drops": "Calendrier des drops",
+  "nav_drops_desc": "Domaines bientôt libérés"
 }

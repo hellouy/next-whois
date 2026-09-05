@@ -20,7 +20,7 @@ import {
   RiExternalLinkLine, RiMessage3Line, RiMedalLine, RiHeartLine,
   RiShareLine, RiServerLine, RiMapPin2Line, RiFileList3Line,
   RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
-  RiArrowRightLine, RiTimerLine, RiWifiLine,
+  RiArrowRightLine, RiTimerLine, RiWifiLine, RiCalendarLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -839,6 +839,7 @@ function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
 
   const NAV_FEATURES: FeatureDef[] = [
     { key: "enable_remind",   label: "域名到期提醒", icon: RiAlarmLine,   desc: "用户可设置域名到期邮件提醒（需配置邮件服务）", adminLink: "/admin/reminders", adminLabel: "管理提醒", requires: "需配置邮件" },
+    { key: "drop_calendar_public", label: "掉落日历公开", icon: RiCalendarLine, desc: "未登录用户可浏览公开掉落日历（关闭后需登录访问）", adminLink: "/drops", adminLabel: "查看日历" },
     { key: "enable_sponsor",  label: "赞助/打赏",    icon: RiHeartLine,   desc: "导航显示赞助入口，支持支付宝、微信、PayPal 等", adminLink: "/admin/sponsors", adminLabel: "管理赞助" },
     { key: "enable_tools",    label: "在线工具",     icon: RiToolsLine,   desc: "导航显示工具页面入口" },
     { key: "enable_links",    label: "友情链接",     icon: RiLinksLine,   desc: "导航显示友情链接页面", adminLink: "/admin/links", adminLabel: "管理链接" },

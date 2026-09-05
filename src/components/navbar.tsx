@@ -35,6 +35,7 @@ import {
   RiCloseCircleLine,
   RiPauseCircleLine,
   RiStarLine,
+  RiCalendarLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -333,6 +334,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: "nav_section_tools",
     items: [
       { labelKey: "nav_domain_lookup",  descKey: "nav_domain_lookup_desc",  href: "/",           icon: <RiGlobalLine className="h-6 w-6" /> },
+      { labelKey: "nav_drops",          descKey: "nav_drops_desc",          href: "/drops",      icon: <RiCalendarLine className="h-6 w-6" />, settingKey: "enable_remind" },
       { labelKey: "nav_tools",          descKey: "nav_tools_desc",           subPanel: "tools",   icon: <RiToolsLine className="h-6 w-6" />, settingKey: "enable_tools" },
       { labelKey: "nav_directory",      descKey: "nav_directory_desc",       href: "/directory",  icon: <RiCompassLine className="h-6 w-6" /> },
       { labelKey: "nav_search_history", descKey: "nav_search_history",       subPanel: "history", icon: <RiHistoryLine className="h-6 w-6" /> },

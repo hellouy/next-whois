@@ -1880,5 +1880,27 @@
     "type_membership": "会员",
     "back_to_dashboard": "返回仪表盘",
     "load_failed": "通知加载失败"
-  }
+  },
+  "drops": {
+    "title": "掉落日历",
+    "subtitle": "未来 {{days}} 天预计掉落的域名",
+    "empty": "该时段暂无掉落域名",
+    "public_locked_title": "需要登录",
+    "public_locked_desc": "掉落日历仅对登录用户开放。",
+    "monitor": "监控",
+    "monitoring": "正在订阅…",
+    "monitored": "已订阅",
+    "already_subscribed": "你已订阅该域名",
+    "limit_exceeded": "免费额度已满，升级会员可订阅更多",
+    "subscribed_ok": "订阅成功，确认邮件已发送。",
+    "failed": "订阅失败，请重试",
+    "login_hint": "登录后即可监控该域名",
+    "public_note": "当前展示公开掉落数据，登录后可查看你的订阅掉落。",
+    "domains_count": "{{count}} 个域名",
+    "load_failed": "掉落日历加载失败",
+    "retry": "重试",
+    "back_home": "返回首页"
+  },
+  "nav_drops": "掉落日历",
+  "nav_drops_desc": "即将掉落的域名"
 }

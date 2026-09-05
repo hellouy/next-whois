@@ -44,6 +44,7 @@ export interface SiteSettings {
   enable_remind: string;
   enable_links: string;
   enable_about: string;
+  drop_calendar_public: string;
   enable_changelog: string;
   enable_docs: string;
   // Home page content
@@ -207,6 +208,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   enable_remind: "1",
   enable_links: "1",
   enable_about: "1",
+  drop_calendar_public: "1",
   enable_changelog: "1",
   enable_docs: "1",
   home_hero_title: "",

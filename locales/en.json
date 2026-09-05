@@ -1880,5 +1880,27 @@
     "type_membership": "Membership",
     "back_to_dashboard": "Back to Dashboard",
     "load_failed": "Failed to load notifications"
-  }
+  },
+  "drops": {
+    "title": "Drop Calendar",
+    "subtitle": "Domains expected to drop in the next {{days}} days",
+    "empty": "No drops in this period",
+    "public_locked_title": "Sign in required",
+    "public_locked_desc": "The drop calendar is only visible to signed-in users.",
+    "monitor": "Monitor",
+    "monitoring": "Subscribing…",
+    "monitored": "Subscribed",
+    "already_subscribed": "Already subscribed to this domain",
+    "limit_exceeded": "Free limit reached — upgrade to subscribe more",
+    "subscribed_ok": "Subscribed. Confirmation email sent.",
+    "failed": "Subscribe failed, please try again",
+    "login_hint": "Sign in to monitor this domain",
+    "public_note": "Showing public drop data. Sign in to see your own subscriptions.",
+    "domains_count": "{{count}} domains",
+    "load_failed": "Failed to load the drop calendar",
+    "retry": "Retry",
+    "back_home": "Back to Home"
+  },
+  "nav_drops": "Drop Calendar",
+  "nav_drops_desc": "Upcoming domain drops"
 }
