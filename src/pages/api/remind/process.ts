@@ -162,10 +162,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expiration_date: string | null; cancel_token: string; phase_flags: string | null;
       thresholds_json: string | null; whois_synced_at: string | null; whois_expiry_date: string | null;
       registrar: string | null; creation_date: string | null; nameservers_json: string | null;
+      notify_email: string | null;
     }>(
       `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json,
-              whois_synced_at, whois_expiry_date, registrar, creation_date, nameservers_json
-       FROM reminders WHERE active = true AND expiration_date IS NOT NULL`,
+              whois_synced_at, whois_expiry_date, registrar, creation_date, nameservers_json,
+              notify_email
+       FROM reminders WHERE active = true AND paused = false AND expiration_date IS NOT NULL`,
     );
 
     // Batch-fetch user locales so each email can be sent in the user's language
@@ -263,7 +265,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (phase === "dropped") {
           if (phaseFlags.dropped && !sentKeys.includes(DROPPED_KEY)) {
             await sendEmail({
-              to: reminder.email,
+              to: reminder.notify_email ?? reminder.email,
               subject: ls.subj_dropped(reminder.domain),
               html: domainDroppedHtml({
                 domain: reminder.domain,
@@ -308,7 +310,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // ── Grace phase notification ──────────────────────────────────────────
         if (phaseFlags.grace && phase === "grace" && cfg.grace > 0 && !sentKeys.includes(GRACE_KEY)) {
           await sendEmail({
-            to: reminder.email,
+            to: reminder.notify_email ?? reminder.email,
             subject: ls.subj_grace(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
@@ -330,7 +332,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // ── Redemption phase notification ─────────────────────────────────────
         if (!didSend && phaseFlags.redemption && phase === "redemption" && cfg.redemption > 0 && !sentKeys.includes(REDEMPTION_KEY)) {
           await sendEmail({
-            to: reminder.email,
+            to: reminder.notify_email ?? reminder.email,
             subject: ls.subj_redemption(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
@@ -353,7 +355,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // ── Pending-delete phase notification ─────────────────────────────────
         if (!didSend && phaseFlags.pendingDelete && phase === "pendingDelete" && cfg.pendingDelete > 0 && !sentKeys.includes(PENDING_KEY)) {
           await sendEmail({
-            to: reminder.email,
+            to: reminder.notify_email ?? reminder.email,
             subject: ls.subj_pending(reminder.domain),
             html: phaseEventHtml({
               domain: reminder.domain,
@@ -375,7 +377,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // ── Drop approaching: 7 days before drop date ─────────────────────────
         if (!didSend && phaseFlags.dropSoon && phase === "pendingDelete" && daysToDropDate <= 7 && !sentKeys.includes(DROP_SOON_KEY)) {
           await sendEmail({
-            to: reminder.email,
+            to: reminder.notify_email ?? reminder.email,
             subject: ls.subj_drop_soon(reminder.domain, daysToDropDate),
             html: dropApproachingHtml({
               domain: reminder.domain,
@@ -402,7 +404,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                    ls.subj_reminder(reminder.domain, daysToExpiry);
 
             await sendEmail({
-              to: reminder.email,
+              to: reminder.notify_email ?? reminder.email,
               subject,
               html: reminderHtml({
                 domain: reminder.domain,

@@ -8,7 +8,8 @@ import {
   RiDeleteBinLine, RiEdit2Line, RiFireLine, RiTimeLine, RiTimerLine,
   RiCheckLine, RiSearchLine, RiCloseLine, RiGlobalLine, RiShieldCheckLine,
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
-  RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine,
+  RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
+  RiPauseLine, RiPlayLine,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
@@ -16,6 +17,7 @@ import type { TranslationKey } from "@/lib/i18n";
 
 export type SubscriptionsTabProps = {
   subscriptionAccessDB: boolean | null;
+  freeLimit: number | null;
   subscriptions: Subscription[];
   filteredSubscriptions: Subscription[];
   loadingData: boolean;
@@ -40,18 +42,24 @@ export type SubscriptionsTabProps = {
   onExportCSV: () => void;
   onCancelSubscription: (id: string) => void;
   onEditSubscription: (sub: Subscription) => void;
+  onTogglePause: (id: string) => void;
+  onShowBulkImport: () => void;
+  togglingPause: string | null;
+  bulkImporting: boolean;
   onApplyInviteCode: (e: React.FormEvent) => void;
   setInviteCodeInput: (v: string) => void;
   onRetryLoad: () => void;
 };
 
 export function SubscriptionsTab({
-  subscriptionAccessDB, subscriptions, filteredSubscriptions, loadingData, dashError,
+  subscriptionAccessDB, freeLimit, subscriptions, filteredSubscriptions, loadingData, dashError,
   subSearch, subFilter, subscriptionExpiresAt,
   activeSubs, expiringSoon, urgentSubs, postExpirySubs,
   cancelling, inviteCodeInput, applyingCode, paymentEnabled, user, locale, t,
   setSubSearch, setSubFilter, onShowSubscribeGuide, onExportCSV,
-  onCancelSubscription, onEditSubscription, onApplyInviteCode, setInviteCodeInput,
+  onCancelSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
+  togglingPause, bulkImporting,
+  onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
 }: SubscriptionsTabProps) {
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
@@ -132,6 +140,15 @@ export function SubscriptionsTab({
             </button>
           )}
           <button
+            onClick={onShowBulkImport}
+            className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
+          >
+            {bulkImporting
+              ? <RiLoader4Line className="w-3 h-3 animate-spin" />
+              : <RiUploadCloud2Line className="w-3 h-3" />}
+            {t("dashboard.bulk_import")}
+          </button>
+          <button
             onClick={onShowSubscribeGuide}
             className="text-[11px] text-primary hover:underline flex items-center gap-1"
           >
@@ -164,6 +181,25 @@ export function SubscriptionsTab({
         <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-700/30 text-[11px] text-violet-700 dark:text-violet-400">
           <RiVipCrownLine className="w-3 h-3 shrink-0" />
           <span>{t("dashboard.member_until")} <span className="font-semibold font-mono">{new Date(subscriptionExpiresAt).toLocaleDateString()}</span></span>
+        </div>
+      )}
+
+      {/* Free-tier usage bar */}
+      {freeLimit !== null && (
+        <div className="space-y-1 px-0.5">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-muted-foreground">{t("dashboard.free_usage_label")}</span>
+            <span className="font-semibold text-muted-foreground tabular-nums">{activeSubs.length}/{freeLimit}</span>
+          </div>
+          <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", activeSubs.length >= freeLimit ? "bg-red-500" : activeSubs.length >= freeLimit * 0.8 ? "bg-amber-500" : "bg-emerald-500")}
+              style={{ width: `${Math.min(100, Math.round((activeSubs.length / freeLimit) * 100))}%` }}
+            />
+          </div>
+          {activeSubs.length >= freeLimit && (
+            <p className="text-[10px] text-red-500">{t("dashboard.free_usage_full")}</p>
+          )}
         </div>
       )}
 
@@ -346,6 +382,11 @@ export function SubscriptionsTab({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-semibold truncate">{sub.domain}</span>
                     {!sub.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("dashboard.cancelled")}</span>}
+                    {sub.active && sub.paused && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 font-semibold border border-sky-300/50">
+                        {t("dashboard.paused")}
+                      </span>
+                    )}
                     {isUrgent && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
                         {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
@@ -401,6 +442,18 @@ export function SubscriptionsTab({
                   <Link href={`/${sub.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
                     <RiExternalLinkLine className="w-3.5 h-3.5" />
                   </Link>
+                  {sub.active && (
+                    <button
+                      onClick={() => onTogglePause(sub.id)}
+                      disabled={togglingPause === sub.id}
+                      title={sub.paused ? t("dashboard.sub_resume") : t("dashboard.sub_pause")}
+                      className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    >
+                      {togglingPause === sub.id
+                        ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                        : sub.paused ? <RiPlayLine className="w-3.5 h-3.5" /> : <RiPauseLine className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                   {sub.active && (
                     <button onClick={() => onCancelSubscription(sub.id)} disabled={cancelling === sub.id}
                       className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">

@@ -13,6 +13,8 @@ export type Subscription = {
   next_reminder_days: number | null;
   thresholds: number[];
   phase_flags: Record<string, boolean>;
+  notify_email: string | null;
+  paused: boolean;
   nameservers: string[];
   registrar: string | null;
   creation_date: string | null;

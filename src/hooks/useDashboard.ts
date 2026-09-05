@@ -38,6 +38,9 @@ export function useDashboard() {
   const [editingSubscription, setEditingSubscription] = React.useState<Subscription | null>(null);
   const [savingDaysBefore, setSavingDaysBefore] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState<string | null>(null);
+  const [togglingPause, setTogglingPause] = React.useState<string | null>(null);
+  const [showBulkImport, setShowBulkImport] = React.useState(false);
+  const [bulkImporting, setBulkImporting] = React.useState(false);
   const [deletingStamp, setDeletingStamp] = React.useState<string | null>(null);
   const [showClaimGuide, setShowClaimGuide] = React.useState(false);
   const [showSubscribeGuide, setShowSubscribeGuide] = React.useState(false);
@@ -167,6 +170,59 @@ export function useDashboard() {
     setDashError(false);
     setLoadingData(true);
     fetchDashData().then(applyDashData).catch(() => setDashError(true)).finally(() => setLoadingData(false));
+  }
+
+  async function togglePauseSubscription(id: string) {
+    const sub = subscriptions.find(s => s.id === id);
+    if (!sub) return;
+    setTogglingPause(id);
+    try {
+      const res = await fetch(`/api/user/subscriptions?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: !sub.paused }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSubscriptions(prev => prev.map(s => s.id === id ? { ...s, paused: !sub.paused } : s));
+      invalidateDashCache();
+      toast.success(sub.paused ? t("dashboard.sub_resumed") : t("dashboard.sub_paused"));
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.op_failed"));
+    } finally {
+      setTogglingPause(null);
+    }
+  }
+
+  async function bulkImport(domains: string) {
+    setBulkImporting(true);
+    try {
+      const res = await fetch("/api/user/subscriptions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "LIMIT_EXCEEDED") {
+          toast.error(data.error ?? t("dashboard.op_failed"));
+          return { ok: false, truncated: false, limit: data.limit, current: data.current } as const;
+        }
+        throw new Error(data.error || t("dashboard.op_failed"));
+      }
+      const createdCount = data.created?.length ?? 0;
+      refreshData();
+      if (data.truncated) {
+        toast.warning(t("dashboard.bulk_import_truncated", { created: createdCount, limit: data.limit }));
+      } else {
+        toast.success(t("dashboard.bulk_import_ok", { count: createdCount, skipped: data.skipped ?? 0 }));
+      }
+      return { ok: true, skipped: data.skipped ?? 0, truncated: data.truncated === true, limit: data.limit, current: data.current } as const;
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.op_failed"));
+      return { ok: false, truncated: false } as const;
+    } finally {
+      setBulkImporting(false);
+    }
   }
 
   async function cancelSubscription(id: string) {
@@ -502,8 +558,10 @@ export function useDashboard() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, togglePauseSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
+    showBulkImport, setShowBulkImport,
+    togglingPause, bulkImporting,
   };
 }

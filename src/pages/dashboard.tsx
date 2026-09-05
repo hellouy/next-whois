@@ -19,6 +19,7 @@ import { AccountTab } from "@/components/dashboard/AccountTab";
 import type { DashboardUser } from "@/components/dashboard/types";
 import { EditStampModal } from "@/components/dashboard/EditStampModal";
 import { EditExpiryModal } from "@/components/dashboard/EditExpiryModal";
+import { BulkImportModal } from "@/components/dashboard/BulkImportModal";
 import { ClaimGuideModal, SubscribeGuideModal } from "@/components/dashboard/GuideModals";
 import { invalidateDashCache } from "@/lib/dashboard-cache";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -38,6 +39,9 @@ export default function DashboardPage() {
     editingStamp, setEditingStamp,
     editingSubscription, setEditingSubscription,
     cancelling,
+    togglingPause,
+    showBulkImport, setShowBulkImport,
+    bulkImporting,
     deletingStamp,
     showClaimGuide, setShowClaimGuide,
     showSubscribeGuide, setShowSubscribeGuide,
@@ -84,7 +88,7 @@ export default function DashboardPage() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, togglePauseSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
   } = useDashboard();
@@ -146,6 +150,9 @@ export default function DashboardPage() {
 
       {showClaimGuide && <ClaimGuideModal onClose={() => setShowClaimGuide(false)} />}
       {showSubscribeGuide && <SubscribeGuideModal onClose={() => setShowSubscribeGuide(false)} />}
+      {showBulkImport && (
+        <BulkImportModal onClose={() => setShowBulkImport(false)} onImport={bulkImport} />
+      )}
       {editingStamp && (
         <EditStampModal stamp={editingStamp} onClose={() => setEditingStamp(null)} onSaved={refreshData} isMember={!!subscriptionAccessDB} />
       )}
@@ -335,6 +342,7 @@ export default function DashboardPage() {
           {tab === "subscriptions" && (
             <SubscriptionsTab
               subscriptionAccessDB={subscriptionAccessDB}
+              freeLimit={subscriptionAccessDB ? null : 5}
               subscriptions={subscriptions}
               filteredSubscriptions={filteredSubscriptions}
               loadingData={loadingData}
@@ -359,6 +367,10 @@ export default function DashboardPage() {
               onExportCSV={exportSubscriptionsCSV}
               onCancelSubscription={cancelSubscription}
               onEditSubscription={setEditingSubscription}
+              onTogglePause={togglePauseSubscription}
+              onShowBulkImport={() => setShowBulkImport(true)}
+              togglingPause={togglingPause}
+              bulkImporting={bulkImporting}
               onApplyInviteCode={handleApplyInviteCode}
               setInviteCodeInput={setInviteCodeInput}
               onRetryLoad={retryLoad}

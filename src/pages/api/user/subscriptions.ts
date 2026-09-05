@@ -28,10 +28,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         registrar: string | null;
         creation_date: string | null;
         nameservers_json: string | null;
+        notify_email: string | null;
+        paused: boolean;
       }>(
         `SELECT id, domain, expiration_date, whois_expiry_date, whois_synced_at,
                 active, cancel_token, created_at, days_before,
-                thresholds_json, phase_flags, registrar, creation_date, nameservers_json
+                thresholds_json, phase_flags, registrar, creation_date, nameservers_json,
+                notify_email, paused
          FROM reminders WHERE email = $1 ORDER BY created_at DESC`,
         [session.user.email],
       );
@@ -130,6 +133,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           next_reminder_days: nextReminderDays,
           thresholds: subThresholds,
           phase_flags: phaseFlags,
+          notify_email: r.notify_email ?? null,
+          paused: r.paused,
         };
       });
 
@@ -144,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: "Missing id" });
 
-    const { expiration_date, days_before, active, whois_sync } = req.body ?? {};
+    const { expiration_date, days_before, active, whois_sync, thresholds, phase_flags, notify_email, paused } = req.body ?? {};
 
     // Full WHOIS sync: update expiry date + all WHOIS metadata atomically
     if (whois_sync && typeof whois_sync === "object") {
@@ -209,6 +214,86 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (err) {
         logger.error("[subscriptions] PATCH active error:", err instanceof Error ? err.message : String(err));
         return res.status(500).json({ error: "Failed to update status" });
+      }
+    }
+
+    if (thresholds !== undefined) {
+      if (!Array.isArray(thresholds) || thresholds.length === 0 || thresholds.length > 10) {
+        return res.status(400).json({ error: "thresholds must be an array of 1-10 integers" });
+      }
+      const clean = [...new Set(thresholds.map(Number))]
+        .filter(n => Number.isInteger(n) && n >= 1 && n <= 365)
+        .sort((a, b) => b - a);
+      if (clean.length === 0) {
+        return res.status(400).json({ error: "thresholds must contain integers between 1 and 365" });
+      }
+      try {
+        await run(
+          "UPDATE reminders SET thresholds_json = $1 WHERE id = $2 AND email = $3",
+          [JSON.stringify(clean), id as string, session.user.email],
+        );
+      } catch (err) {
+        logger.error("[subscriptions] PATCH thresholds error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "Failed to update reminder thresholds" });
+      }
+    }
+
+    if (phase_flags !== undefined) {
+      if (typeof phase_flags !== "object" || phase_flags === null || Array.isArray(phase_flags)) {
+        return res.status(400).json({ error: "phase_flags must be an object" });
+      }
+      const keys = ["grace", "redemption", "pendingDelete", "dropSoon", "dropped"];
+      const cleanFlags: Record<string, boolean> = {};
+      for (const k of keys) {
+        if (typeof phase_flags[k] === "boolean") cleanFlags[k] = phase_flags[k];
+      }
+      try {
+        const existing = await many<{ phase_flags: string | null }>(
+          "SELECT phase_flags FROM reminders WHERE id = $1 AND email = $2",
+          [id as string, session.user.email],
+        );
+        let merged: Record<string, boolean> = {};
+        if (existing[0]?.phase_flags) {
+          try { merged = JSON.parse(existing[0].phase_flags); } catch { /* ignore */ }
+        }
+        merged = { ...merged, ...cleanFlags };
+        await run(
+          "UPDATE reminders SET phase_flags = $1 WHERE id = $2 AND email = $3",
+          [JSON.stringify(merged), id as string, session.user.email],
+        );
+      } catch (err) {
+        logger.error("[subscriptions] PATCH phase_flags error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "Failed to update phase event settings" });
+      }
+    }
+
+    if (notify_email !== undefined) {
+      const val = notify_email === "" || notify_email === null ? null : String(notify_email).trim();
+      if (val !== null) {
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRe.test(val)) return res.status(400).json({ error: "Invalid notification email" });
+      }
+      try {
+        await run(
+          "UPDATE reminders SET notify_email = $1 WHERE id = $2 AND email = $3",
+          [val, id as string, session.user.email],
+        );
+      } catch (err) {
+        logger.error("[subscriptions] PATCH notify_email error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "Failed to update notification email" });
+      }
+    }
+
+    if (paused !== undefined) {
+      const pausedVal = Boolean(paused);
+      try {
+        await run(
+          "UPDATE reminders SET paused = $1 WHERE id = $2 AND email = $3",
+          [pausedVal, id as string, session.user.email],
+        );
+      } catch (err) {
+        logger.error("[subscriptions] PATCH paused error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "Failed to update paused state" });
       }
     }
 

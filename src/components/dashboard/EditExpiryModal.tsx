@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   RiLoader4Line, RiCloseLine, RiCheckLine, RiCalendarLine,
-  RiRefreshLine, RiShieldCheckLine, RiInformationLine,
+  RiRefreshLine, RiShieldCheckLine, RiInformationLine, RiMailLine,
 } from "@remixicon/react";
 import { useTranslation } from "@/lib/i18n";
 import type { Subscription } from "@/components/dashboard/types";
@@ -18,10 +19,13 @@ type WhoisMeta = {
   nameservers: string[];
 };
 
+const THRESHOLD_OPTIONS = [60, 30, 10, 5, 1];
+const PHASE_FLAG_KEYS = ["grace", "redemption", "pendingDelete", "dropSoon", "dropped"] as const;
+
 export function EditExpiryModal({ sub, onClose, onSaved }: {
   sub: Subscription;
   onClose: () => void;
-  onSaved: (update: { expiration_date: string; whois_synced_at?: string; registrar?: string | null; creation_date?: string | null; nameservers?: string[] }) => void;
+  onSaved: (update: { expiration_date: string; whois_synced_at?: string; registrar?: string | null; creation_date?: string | null; nameservers?: string[]; thresholds?: number[]; phase_flags?: Record<string, boolean>; notify_email?: string | null; paused?: boolean }) => void;
 }) {
   const [dateValue, setDateValue] = React.useState(
     sub.expiration_date ? sub.expiration_date.slice(0, 10) : ""
@@ -30,6 +34,22 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
   const [syncing, setSyncing] = React.useState(false);
   const [synced, setSynced] = React.useState<WhoisMeta | null>(null);
   const { t } = useTranslation();
+
+  const [thresholds, setThresholds] = React.useState<number[]>(
+    (sub.thresholds?.length ? sub.thresholds : [60, 30, 1]).sort((a, b) => b - a)
+  );
+  const [phaseFlags, setPhaseFlags] = React.useState<Record<string, boolean>>({
+    grace: sub.phase_flags?.grace ?? true,
+    redemption: sub.phase_flags?.redemption ?? true,
+    pendingDelete: sub.phase_flags?.pendingDelete ?? true,
+    dropSoon: sub.phase_flags?.dropSoon ?? true,
+    dropped: sub.phase_flags?.dropped ?? true,
+  });
+  const [notifyEmail, setNotifyEmail] = React.useState(sub.notify_email ?? "");
+
+  const toggleThreshold = (d: number) => {
+    setThresholds(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => b - a));
+  };
 
   React.useEffect(() => {
     const prev = document.body.style.overflow;
@@ -98,19 +118,30 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
 
   async function handleSave() {
     if (!dateValue) { toast.error(t("dashboard.date_required")); return; }
+    if (thresholds.length === 0) { toast.error(t("dashboard.threshold_required")); return; }
     setSaving(true);
     try {
       const res = await fetch(`/api/user/subscriptions?id=${sub.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expiration_date: dateValue }),
+        body: JSON.stringify({
+          expiration_date: dateValue,
+          thresholds,
+          phase_flags: phaseFlags,
+          notify_email: notifyEmail.trim() || "",
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || t("dashboard.update_failed"));
       }
       toast.success(t("dashboard.expiry_updated"));
-      onSaved({ expiration_date: new Date(dateValue).toISOString() });
+      onSaved({
+        expiration_date: new Date(dateValue).toISOString(),
+        thresholds,
+        phase_flags: phaseFlags,
+        notify_email: notifyEmail.trim() || null,
+      });
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("dashboard.update_failed"));
@@ -188,6 +219,74 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
               )}
             </div>
           )}
+
+          {/* Reminder thresholds */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">{t("dashboard.reminder_threshold")}</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {THRESHOLD_OPTIONS.map(d => {
+                const active = thresholds.includes(d);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleThreshold(d)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors tabular-nums",
+                      active
+                        ? "bg-primary/10 text-primary border-primary/40"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    {t("dashboard.n_days_abbr", { days: d })}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground/70">{t("dashboard.threshold_desc")}</p>
+          </div>
+
+          {/* Phase event toggles */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">{t("dashboard.phase_alerts_title")}</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PHASE_FLAG_KEYS.map(k => {
+                const active = phaseFlags[k];
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setPhaseFlags(prev => ({ ...prev, [k]: !prev[k] }))}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
+                      active
+                        ? "bg-primary/10 text-primary border-primary/40"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-primary" : "bg-muted-foreground/40")} />
+                    {t(("dashboard.phase_" + k) as any)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Notification email */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">{t("dashboard.notify_email")}</Label>
+            <div className="relative">
+              <RiMailLine className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+              <input
+                type="email"
+                value={notifyEmail}
+                onChange={e => setNotifyEmail(e.target.value)}
+                placeholder={t("dashboard.notify_email_placeholder")}
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground/70">{t("dashboard.notify_email_desc")}</p>
+          </div>
         </div>
         <div className="flex gap-2 px-6 py-4 border-t border-border/50 shrink-0">
           <Button onClick={onClose} variant="outline" className="flex-1 h-9 rounded-xl text-sm">{t("dashboard.cancel")}</Button>
