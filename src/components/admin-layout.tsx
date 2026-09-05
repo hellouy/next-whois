@@ -235,17 +235,17 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
       {/* ── Mobile layout ───────────────────────────────── */}
       <div className="md:hidden min-h-screen flex flex-col">
         {/* Top header */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 h-14 flex items-center gap-3">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-3 h-14 flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
             <RiShieldUserLine className="w-3.5 h-3.5 text-white" />
           </div>
-          <p className="flex-1 text-sm font-bold truncate">{currentLabel}</p>
+          <p className="flex-1 min-w-0 text-sm font-bold truncate">{currentLabel}</p>
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted"
+            aria-label={t("admin.frontend")}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <RiArrowLeftLine className="w-3.5 h-3.5" />
-            <span>{t("admin.frontend")}</span>
+            <RiArrowLeftLine className="w-4 h-4" />
           </button>
           <button
             onClick={() => setDrawerOpen(true)}
@@ -273,12 +273,12 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
                   key={href}
                   onClick={() => navigate(href)}
                   className={cn(
-                    "flex-1 flex flex-col items-center justify-center gap-1 transition-colors",
+                    "min-w-0 flex-1 flex flex-col items-center justify-center gap-1 px-0.5 transition-colors",
                     active ? "text-primary" : "text-muted-foreground"
                   )}
                 >
                   {active ? <ActiveIcon className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                  <span className={cn("text-[10px] font-semibold leading-none", active ? "text-primary" : "text-muted-foreground/70")}>
+                  <span className={cn("max-w-full truncate text-[10px] font-semibold leading-none", active ? "text-primary" : "text-muted-foreground/70")}>
                     {t(labelKey as any)}
                   </span>
                 </button>
