@@ -879,9 +879,9 @@ export function Navbar() {
         }}
         style={{ pointerEvents: isVisible ? "auto" : "none" }}
         className={cn(
-          "mt-4 px-2 h-10 rounded-full",
+          "mt-4 px-2 h-10 max-w-[calc(100vw-1rem)] rounded-full",
           "bg-background shadow-sm",
-          "flex items-center gap-6",
+          "flex items-center gap-2 sm:gap-6",
           "border border-primary/25 border-dashed",
         )}
       >
@@ -894,9 +894,9 @@ export function Navbar() {
           <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
         </button>
 
-        <div className="h-4 w-[1px] bg-primary/10" />
+          <div className="hidden sm:block h-4 w-[1px] bg-primary/10" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <ThemeToggle />
           <LanguageSwitcher />
           <motion.div {...TAP} className="hidden sm:inline-flex">

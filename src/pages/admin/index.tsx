@@ -93,14 +93,14 @@ function StatCard({ icon: Icon, label, value, sub, subValue, href, color, badge,
     <button
       type="button"
       onClick={() => router.push(href, undefined, { locale: false })}
-      className="glass-panel border border-border rounded-2xl p-4 flex items-start gap-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full active:scale-[0.98]"
+      className="glass-panel border border-border rounded-2xl p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left w-full min-w-0 active:scale-[0.98]"
     >
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
-        <p className="text-xl font-bold tabular-nums mt-0.5">
+        <p className="text-[11px] sm:text-xs text-muted-foreground font-medium whitespace-nowrap truncate">{label}</p>
+        <p className="text-lg sm:text-xl font-bold tabular-nums mt-0.5 truncate">
           {value === undefined ? <RiLoader4Line className="w-4 h-4 animate-spin text-muted-foreground" /> : (typeof value === "number" ? value.toLocaleString() : value)}
         </p>
         {sub && subValue !== undefined && (
