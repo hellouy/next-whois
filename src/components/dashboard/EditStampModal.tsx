@@ -53,6 +53,7 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
   const [nickname, setNickname] = React.useState(stamp.nickname);
   const [saving, setSaving] = React.useState(false);
   const [themePickerOpen, setThemePickerOpen] = React.useState(false);
+  const [pickerStyle, setPickerStyle] = React.useState<"gallery" | "editorial" | "compact">("gallery");
   const { t, locale } = useTranslation();
   const isZh = locale.startsWith("zh");
 
@@ -100,18 +101,48 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
                 <RiCloseLine className="w-4 h-4" />
               </button>
             </div>
-            <div className="overflow-y-auto px-5 py-4 space-y-5">
+            <div className="overflow-y-auto px-4 py-4 sm:px-5 space-y-5">
+              <div className="rounded-2xl border border-border/70 bg-muted/20 p-3 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold">{isZh ? "实时预览" : "Live preview"}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{stamp.domain}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{isZh ? "当前样式" : "Current"}</span>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-background p-2.5 shadow-sm">
+                  <StampPreviewCard themeKey={cardTheme} />
+                </div>
+              </div>
+
+              <div className="flex gap-1 rounded-xl border border-border/70 bg-muted/30 p-1">
+                {([
+                  ["gallery", isZh ? "画廊预览" : "Gallery"],
+                  ["editorial", isZh ? "编辑精选" : "Editorial"],
+                  ["compact", isZh ? "紧凑选择" : "Compact"],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setPickerStyle(value)}
+                    className={cn("min-w-0 flex-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition-colors", pickerStyle === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">{isZh ? "标准配色" : "Standard"}</p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <p className="text-xs font-semibold">{isZh ? "标准配色" : "Standard palettes"}</p>
+                  <p className="text-[10px] text-muted-foreground">8 {isZh ? "种方案" : "options"}</p>
+                </div>
+                <div className={cn("grid gap-2", pickerStyle === "compact" ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
                   {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !th.special).map(([key, th]) => {
                     const selected = cardTheme === key;
                     return (
                       <button key={key} type="button"
-                        onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                        onClick={() => setCardTheme(key)}
                         aria-pressed={selected}
                         className={cn(
-                          "group flex min-w-0 items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors active:scale-[0.98]",
+                          "group flex min-w-0 items-center gap-2.5 rounded-xl border text-left transition-colors active:scale-[0.98]",
+                          pickerStyle === "gallery" ? "p-3" : pickerStyle === "editorial" ? "p-2.5" : "p-2",
                           selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
                         )}>
                         <span className={cn("h-9 w-9 shrink-0 rounded-lg shadow-inner", th.hero)} />
@@ -134,7 +165,7 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
                     const selected = cardTheme === key;
                     return (
                       <button key={key} type="button"
-                        onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
+                        onClick={() => setCardTheme(key)}
                         aria-pressed={selected}
                         className={cn(
                           "flex min-w-0 items-center gap-3 rounded-xl border p-2.5 text-left transition-colors active:scale-[0.99]",
