@@ -171,8 +171,8 @@ export default function DashboardPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-0 sm:border-0 sm:bg-transparent">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold flex items-center gap-2">
               {t("nav_dashboard")}
               {isAdminUser && (
@@ -183,25 +183,25 @@ export default function DashboardPage() {
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2">
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors px-3 py-1.5 rounded-lg font-medium active:opacity-70 touch-manipulation">
-              <RiSearchLine className="w-3.5 h-3.5" />
-              <span>{t("not_found.back_home")}</span>
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary active:opacity-70 touch-manipulation">
+              <RiSearchLine className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{t("not_found.back_home")}</span>
             </button>
             {isAdminUser && (
               <Link href="/admin"
-                className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors px-3 py-1.5 rounded-lg font-semibold active:scale-[0.96]">
-                <RiShieldUserLine className="w-3.5 h-3.5" />
-                {t("nav_admin")}
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30 active:scale-[0.96]">
+                <RiShieldUserLine className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{t("nav_admin")}</span>
               </Link>
             )}
             <button onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted active:scale-[0.96]">
-              <RiLogoutBoxLine className="w-3.5 h-3.5" />
-              {t("sign_out")}
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-[0.96]">
+              <RiLogoutBoxLine className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{t("sign_out")}</span>
             </button>
           </div>
         </div>
