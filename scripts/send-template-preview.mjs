@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const { Pool }  = pg;
 
 const ADMIN_RECIPIENT = process.argv[2] || "9208522@qq.com";
-const SITE_NAME       = "X.RW";
+const SITE_NAME       = "域见你";
 
 // ── DB connect ─────────────────────────────────────────────────────────────
 const dbUrl = process.env.POSTGRES_URL_NON_POOLING
@@ -116,7 +116,7 @@ const expYear = new Date(now.getTime() + 365 * 86400 * 1000).toLocaleDateString(
 const TEMPLATES = [
   { key: "welcome",
     subject: `[预览] 欢迎加入 ${SITE_NAME}`,
-    html: tpl("#0f172a","欢迎","欢迎加入 X.RW！",`
+    html: tpl("#0f172a","欢迎","欢迎加入 域见你！",`
       <p style="color:#475569;line-height:1.8">亲爱的 <strong>管理员</strong>，欢迎注册 ${SITE_NAME}！</p>
       <div style="border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0">
         <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">快速开始</p>

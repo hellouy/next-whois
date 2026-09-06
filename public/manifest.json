@@ -1,6 +1,6 @@
 {
-  "name": "X.RW · RDAP+WHOIS",
-  "short_name": "X.RW",
+  "name": "域见你 · RDAP+WHOIS",
+  "short_name": "域见你",
   "description": "快速查询域名、IP、ASN、CIDR 的 WHOIS / RDAP 信息，支持多节点并行查询。",
   "start_url": "/",
   "display": "standalone",

@@ -34,6 +34,7 @@ const args = process.argv.slice(2);
 const getArg  = n => { const i = args.indexOf(n); return i >= 0 ? args[i+1] : null; };
 const hasFlag = n => args.includes(n);
 const SINGLE_TLD   = getArg("--tld");
+const TLD_LIST_ARG = getArg("--tlds");
 const TYPE         = getArg("--type") ?? "iana";   // default: all IANA TLDs
 const FORCE        = hasFlag("--force");
 const CLEAR_DEFS   = hasFlag("--clear-defaults");
@@ -258,7 +259,7 @@ const PROBE_PATHS = [
 async function fetchRaw(url, ms = 15000) {
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; domain-lifecycle-crawler/2.0; +https://x.rw)",
+      "User-Agent": "Mozilla/5.0 (compatible; domain-lifecycle-crawler/2.0; +https://example.com)",
       Accept: "text/html,application/xhtml+xml,*/*;q=0.9",
       "Accept-Language": "en,zh;q=0.9,ja;q=0.8,de;q=0.7,fr;q=0.6,ko;q=0.5,nl;q=0.4",
     },
@@ -630,9 +631,20 @@ function parseAiJson(content) {
     drop_hour:              toNullInt(p.drop_hour, 0, 23),
     drop_minute:            toNullInt(p.drop_minute, 0, 59),
     drop_second:            toNullInt(p.drop_second, 0, 59),
-    drop_timezone: typeof p.drop_timezone==="string" && p.drop_timezone ? p.drop_timezone.slice(0,50) : null,
+    drop_timezone:          sanitizeTimezone(p.drop_timezone),
     reasoning: String(p.reasoning||"").slice(0, 800),
   };
+}
+
+// Only accept IANA timezone names (e.g. Europe/Copenhagen, UTC); anything else
+// is rejected to keep the drop_timezone column clean. "GMT+x"/"CET"/garbage
+// yield null (design: timezone whitelist check).
+const VALID_TIMEZONES = new Set(Intl.supportedValuesOf("timeZone"));
+function sanitizeTimezone(v) {
+  if (typeof v !== "string" || !v) return null;
+  const tz = v.trim();
+  if (tz === "UTC" || tz === "Etc/UTC") return tz === "Etc/UTC" ? "UTC" : tz;
+  return VALID_TIMEZONES.has(tz) ? tz : null;
 }
 
 // Is the AI result just plain ICANN defaults (often means "no data found")?
@@ -706,7 +718,17 @@ function applyKnownPolicy(tld, extracted) {
       model_used: "curated-database",
     };
   }
-  return extracted;
+  // AI extracted real numbers: keep them, but fill in missing drop timing
+  // from the curated database when the AI found nothing (registry policy
+  // pages rarely state an exact drop time; curated data may).
+  const merged = { ...extracted };
+  if (extracted.drop_hour === null && known.drop_hour != null) {
+    merged.drop_hour     = known.drop_hour;
+    merged.drop_minute   = known.drop_minute ?? 0;
+    merged.drop_timezone = known.drop_timezone ?? null;
+    merged.reasoning = `${extracted.reasoning || ""} [Drop time: known policy ${known.note}]`.trim();
+  }
+  return merged;
 }
 
 // ── DB save ───────────────────────────────────────────────────────────────────
@@ -1043,6 +1065,8 @@ async function main() {
   let tldList = [];
   if (SINGLE_TLD) {
     tldList = [SINGLE_TLD.toLowerCase().replace(/^\./,"")];
+  } else if (TLD_LIST_ARG) {
+    tldList = TLD_LIST_ARG.split(",").map(t => t.trim().toLowerCase().replace(/^\./,"")).filter(Boolean);
   } else if (TYPE === "iana") {
     console.log("⏳ 从 IANA 根区文件获取全量 TLD 列表...");
     tldList = await fetchAllIanaTlds();

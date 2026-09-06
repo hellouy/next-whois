@@ -185,7 +185,7 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
 
   // ── Strip locale prefix from catch-all segments ───────────────────────────
   // URLs no longer include a locale prefix.  Old bookmarked URLs like
-  // /zh/x.rw or /en/x.rw are 301-redirected to /x.rw for canonicality.
+  // /zh/example.com or /en/example.com are 301-redirected to /example.com for canonicality.
   const VALID_LOCALES = new Set(["en", "zh", "zh-tw", "de", "ru", "ja", "fr", "ko"]);
   const hasLocalePrefix =
     querySegments.length >= 2 && VALID_LOCALES.has(querySegments[0]);

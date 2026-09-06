@@ -337,10 +337,10 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Logo 文字" desc="显示在导航栏左上角">
-            <Input value={s.site_logo_text} onChange={e => set("site_logo_text", e.target.value)} placeholder="X.RW" className="text-xs" />
+            <Input value={s.site_logo_text} onChange={e => set("site_logo_text", e.target.value)} placeholder="域见你" className="text-xs" />
           </Field>
           <Field label="站点标题" desc="浏览器标签页 / SEO title">
-            <Input value={s.site_title} onChange={e => set("site_title", e.target.value)} placeholder="X.RW · RDAP+WHOIS" className="text-xs" />
+            <Input value={s.site_title} onChange={e => set("site_title", e.target.value)} placeholder="域见你 · RDAP+WHOIS" className="text-xs" />
           </Field>
           <Field label="站点副标题" desc="首页 Logo 下方小字 & 导航栏 tagline">
             <Input value={s.site_subtitle} onChange={e => set("site_subtitle", e.target.value)} placeholder="专业的 WHOIS / RDAP 查询工具" className="text-xs" />
@@ -350,7 +350,7 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           </Field>
         </div>
         <Field label="页脚文字" desc="显示在所有页面底部（© 版权行）">
-          <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 X.RW · WHOIS & RDAP Lookup Service" className="text-xs" />
+          <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 域见你 · WHOIS & RDAP Lookup Service" className="text-xs" />
         </Field>
       </div>
 
@@ -672,10 +672,10 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="站点名称" desc="分享卡片上显示的站点名">
-            <Input value={s.og_site_name} onChange={e => set("og_site_name", e.target.value)} placeholder="X.RW" className="text-xs" />
+            <Input value={s.og_site_name} onChange={e => set("og_site_name", e.target.value)} placeholder="域见你" className="text-xs" />
           </Field>
           <Field label="站点 URL" desc="分享卡片的链接地址（影响 canonical URL）">
-            <Input value={s.og_url} onChange={e => set("og_url", e.target.value)} placeholder="https://x.rw" className="text-xs" />
+            <Input value={s.og_url} onChange={e => set("og_url", e.target.value)} placeholder="https://example.com" className="text-xs" />
           </Field>
           <Field label="默认封面图" desc="未指定平台时使用的分享封面（OG image）">
             <Input value={s.og_image} onChange={e => set("og_image", e.target.value)} placeholder="https://..." className="text-xs" />
@@ -1090,7 +1090,7 @@ function EmailTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v:
           </Field>
           <PasswordField label="SMTP 密码" value={s.smtp_pass} onChange={v => set("smtp_pass", v)} />
           <Field label="发件人地址">
-            <Input value={s.smtp_from} onChange={e => set("smtp_from", e.target.value)} placeholder="X.RW <noreply@example.com>" className="text-xs" />
+            <Input value={s.smtp_from} onChange={e => set("smtp_from", e.target.value)} placeholder="域见你 <noreply@example.com>" className="text-xs" />
           </Field>
           <SelectField
             label="加密方式"
@@ -1109,7 +1109,7 @@ function EmailTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v:
         <SectionTitle icon={RiMailLine} title="Resend 邮件配置" desc="使用 Resend 服务发送邮件（与 SMTP 二选一）" />
         <PasswordField label="Resend API Key" desc="从 resend.com 后台获取" value={s.resend_api_key} onChange={v => set("resend_api_key", v)} placeholder="re_..." />
         <Field label="发件人地址">
-          <Input value={s.resend_from_email} onChange={e => set("resend_from_email", e.target.value)} placeholder="X.RW <noreply@example.com>" className="text-xs" />
+          <Input value={s.resend_from_email} onChange={e => set("resend_from_email", e.target.value)} placeholder="域见你 <noreply@example.com>" className="text-xs" />
         </Field>
       </div>
     </div>

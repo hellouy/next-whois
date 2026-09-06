@@ -337,7 +337,7 @@ function writeSessionCache(s: Partial<SiteSettings>) {
 // On the server useLayoutEffect is a no-op (and triggers a warning), so we
 // fall back to useEffect there.  On the client we use useLayoutEffect so the
 // sessionStorage cache is applied synchronously BEFORE the first paint,
-// eliminating any visible "X.RW → real name" flash for returning visitors.
+// eliminating any visible "default → real name" flash for returning visitors.
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
@@ -373,7 +373,7 @@ export function SiteSettingsProvider({
   // --- Phase 1: apply cached settings BEFORE the first paint ---
   // useLayoutEffect fires synchronously after React hydrates the DOM but
   // before the browser paints the frame.  Reading sessionStorage here means
-  // the user never sees the default "X.RW" text — only the cached real value.
+  // the user never sees the default "域见你" text — only the cached real value.
   useIsomorphicLayoutEffect(() => {
     const cache = readSessionCache();
     if (cache) {
@@ -388,7 +388,7 @@ export function SiteSettingsProvider({
     const cache = readSessionCache();
     // With cache: defer 1500 ms so sessionStorage-hydrated UI is already shown.
     // Without cache: fetch immediately (0 ms delay) so the correct logo/settings
-    // replace the code-default "X.RW" as fast as possible — before the user
+    // replace the code-default "域见你" as fast as possible — before the user
     // has time to notice.  Previously this was 500 ms, which caused a visible
     // flash on every new browser session.
     const initialDelay = setTimeout(fetchSettings, cache ? 1500 : 0);

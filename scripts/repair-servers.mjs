@@ -63,7 +63,7 @@ async function getRdapBootstrap() {
   if (_rdapBootstrap) return _rdapBootstrap;
   try {
     const res = await fetch("https://data.iana.org/rdap/dns.json", {
-      headers: { "User-Agent": "x.rw-repair-bot/1.0" },
+      headers: { "User-Agent": "domain-repair-bot/1.0 (contact: admin@example.com)" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
