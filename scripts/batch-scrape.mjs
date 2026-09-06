@@ -679,9 +679,11 @@ async function fetchPageText(tld, ianaUrl) {
 // Will be populated in main() after loading keys from env + site_settings DB
 let AI_PROVIDERS = [];
 
-// Provider circuit breaker: name → { consecutive429: n, until: timestamp }
-// Temporarily skip a provider after repeated HTTP 429 to avoid wasting time.
-const AI_COOLDOWN_MS = 5 * 60 * 1000;
+// Provider circuit breaker: name → { count, until }
+// Temporarily skip a provider after repeated bad responses (429/4xx/5xx)
+// to avoid wasting a failed call on every TLD.
+const AI_COOLDOWN_429_MS = 5 * 60 * 1000;
+const AI_COOLDOWN_ERR_MS = 30 * 60 * 1000;
 const AI_BREAKER = new Map();
 
 /**
@@ -755,14 +757,15 @@ async function callAI(messages, providerIndex = 0) {
         body: JSON.stringify({ model: p.model, messages, temperature: 0.05, max_tokens: 700 }),
         signal: AbortSignal.timeout(35000),
       });
-      if (res.status === 429) {
+      if (!res.ok) {
+        const is429 = res.status === 429;
         const prev = AI_BREAKER.get(p.name) ?? { count: 0 };
         const count = prev.count + 1;
-        AI_BREAKER.set(p.name, { count, until: Date.now() + AI_COOLDOWN_MS });
-        console.warn(`  [AI] ${p.name} HTTP 429 (×${count}, cooling ${AI_COOLDOWN_MS / 60000}min)`);
+        const cooldown = is429 ? AI_COOLDOWN_429_MS : AI_COOLDOWN_ERR_MS;
+        AI_BREAKER.set(p.name, { count, until: Date.now() + cooldown });
+        console.warn(`  [AI] ${p.name} HTTP ${res.status} (×${count}, cooling ${cooldown / 60000}min)`);
         continue;
       }
-      if (!res.ok) { console.warn(`  [AI] ${p.name} HTTP ${res.status}`); continue; }
       const json = await res.json();
       const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
       if (!content) continue;
