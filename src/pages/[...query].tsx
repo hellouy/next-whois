@@ -396,6 +396,15 @@ const _EMPTY_WHOIS_RESULT: WhoisResult = {
   result: { ...initialWhoisAnalyzeResult },
 };
 
+/** Clamp a horizontally-centered popover's center so it never overflows the
+ *  viewport on any screen width (half the width + 8px safety gap on each side). */
+function clampPopoverX(centerX: number, width: number, gap = 8): number {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+  if (!vw) return centerX;
+  const half = width / 2 + gap;
+  return Math.min(Math.max(centerX, half), Math.max(half, vw - half));
+}
+
 export default function LookupPage({
   data: initialData,
   target: propTarget,
@@ -1917,7 +1926,7 @@ export default function LookupPage({
                                   animate={{ opacity: 1, y: 0, scale: 1 }}
                                   exit={{ opacity: 0, y: 5, scale: 0.96 }}
                                   transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                                  style={{ position: "fixed", bottom: `${officialPopoverPos.bottom}px`, left: `${officialPopoverPos.centerX}px`, transform: "translateX(-50%)", width: "260px", zIndex: 9999 }}
+                                  style={{ position: "fixed", bottom: `${officialPopoverPos.bottom}px`, left: `${clampPopoverX(officialPopoverPos.centerX, 260)}px`, transform: "translateX(-50%)", width: "260px", zIndex: 9999 }}
                                   onClick={e => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl border border-blue-200/70 dark:border-blue-700/50 bg-white dark:bg-zinc-900 shadow-2xl shadow-blue-500/15 overflow-hidden relative">

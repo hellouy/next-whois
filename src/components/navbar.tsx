@@ -61,6 +61,24 @@ import { useTranslation, TranslationKey } from "@/lib/i18n";
 
 const TAP = { whileTap: { scale: 0.88 }, transition: { type: "spring" as const, stiffness: 500, damping: 22 } };
 
+/**
+ * Compute a fixed-position dropdown box that stays fully inside the viewport.
+ * The panel is right-aligned to the trigger button when there is room, and
+ * clamps its width/right so neither edge ever goes off-screen (mobile-safe).
+ */
+function fitDropdown(
+  buttonRight: number,
+  preferredWidth: number,
+  gap = 8,
+): { right: number; width: number } {
+  const vw = window.innerWidth;
+  const width = Math.max(gap * 2, Math.min(preferredWidth, vw - gap * 2));
+  const alignRight = vw - buttonRight; // panel right edge at button right edge
+  const maxRight = Math.max(gap, vw - width - gap); // keep left edge >= gap
+  const right = Math.min(Math.max(gap, alignRight), maxRight);
+  return { right, width };
+}
+
 function HistoryTypeIcon({ type }: { type: string }) {
   const config: Record<string, { label: string; color: string }> = {
     domain: { label: "🌐", color: "text-blue-500" },
@@ -794,12 +812,13 @@ function NotificationBell() {
   const handleToggle = React.useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
+      const pos = fitDropdown(rect.right, 320);
       setDropdownStyle({
         position: "fixed",
         top: rect.bottom + 8,
-        right: Math.max(8, window.innerWidth - rect.right),
+        right: pos.right,
         zIndex: 9999,
-        width: 320,
+        width: pos.width,
       });
     }
     setOpen(v => {
@@ -954,13 +973,13 @@ function UserButton() {
   const handleToggle = React.useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      // Position dropdown using fixed coords so it escapes the overflow:hidden navbar wrapper
+      const pos = fitDropdown(rect.right, 192);
       setDropdownStyle({
         position: "fixed",
         top: rect.bottom + 8,
-        right: Math.max(8, window.innerWidth - rect.right),
+        right: pos.right,
         zIndex: 9999,
-        width: 192,
+        width: pos.width,
       });
     }
     setOpen(v => !v);
