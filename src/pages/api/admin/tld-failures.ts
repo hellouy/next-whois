@@ -2,6 +2,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdmin } from "@/lib/admin";
 import { getDbReady } from "@/lib/db";
 
+export type TldFailureEventRow = {
+  id: string;
+  tld: string;
+  fail_reason: string;
+  reason_detail: string | null;
+  domain: string | null;
+  context: string | null;
+  created_at: string;
+};
+
 export type TldFailureRow = {
   tld: string;
   fail_count: number;
@@ -19,6 +29,7 @@ export type TldFailureRow = {
   tld_api_source: string | null;
   this_week_count?: number;
   prev_week_count?: number;
+  window_events?: number;
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -30,6 +41,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // ── GET: paginated config/repair list + windowed dashboard ──────────────
   if (req.method === "GET") {
+    // ── Optional: recent failure events for a single TLD ───────────────────
+    const eventsFor = (req.query.events_for as string | undefined)?.trim();
+    if (eventsFor) {
+      const client = await db.connect();
+      try {
+        const { rows } = await client.query<TldFailureEventRow>(
+          `SELECT id::text, tld, fail_reason, reason_detail, domain, context,
+                  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+           FROM tld_failure_events
+           WHERE tld = $1
+           ORDER BY created_at DESC, id DESC
+           LIMIT 50`,
+          [eventsFor.toLowerCase().replace(/^\./, "")],
+        );
+        return res.status(200).json({ events: rows });
+      } finally {
+        client.release();
+      }
+    }
+
     // fail_count is frozen at 0 since R5 (metric source = query_logs + events).
     // min_fails kept only for backward compat; 0 = no counter filter.
     const minFails   = Math.max(0, parseInt(String(req.query.min_fails ?? "0"), 10));
@@ -159,6 +190,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         this_week_count: periodMap[r.tld]?.this_week ?? 0,
         prev_week_count: periodMap[r.tld]?.prev_week ?? 0,
       }));
+
+      // Diagnostic events per TLD within the dashboard window — lets the
+      // config/repair list show how many failures each suffix actually
+      // produced in the window (fact source = tld_failure_events).
+      const evCountArg = [windowDays, tldList] as (string | number | string[])[];
+      const evCountRows = await client.query<{ tld: string; count: string }>(
+        `SELECT tld, COUNT(*)::text AS count
+         FROM tld_failure_events
+         WHERE created_at > NOW() - make_interval(days => $1)
+           AND tld = ANY($2::text[])
+         GROUP BY tld`,
+        evCountArg,
+      );
+      const evCountMap: Record<string, number> = {};
+      for (const r of evCountRows.rows) evCountMap[r.tld] = parseInt(r.count, 10);
+      rowsWithPeriod.forEach(r => { r.window_events = evCountMap[r.tld] ?? 0; });
 
       // ── Windowed dashboard aggregates ─────────────────────────────────────
       // Metrics (totals / success rate / delta) come from query_logs — the

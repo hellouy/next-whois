@@ -180,6 +180,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const batch = await getNextBatch();
 
+  // Best-effort maintenance: prune diagnostic failure events older than 90d.
+  // Fire-and-forget — never blocks the scrape queue.
+  import("@/lib/server/failure-events")
+    .then(m => m.pruneFailureEvents(90).catch(() => {}))
+    .catch(() => {});
+
   if (batch.length === 0) {
     logger.info("[cron/tld-scrape] No pending TLDs — all done or exhausted.");
     return res.json({ ok: true, processed: 0, message: "No pending TLDs" });

@@ -17,7 +17,7 @@ import {
   RiStopCircleLine, RiPlayCircleLine, RiScanLine,
   RiBarChartLine, RiTimerLine, RiArrowUpDownLine,
 } from "@remixicon/react";
-import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
+import type { TldFailureRow, TldFailureEventRow } from "@/pages/api/admin/tld-failures";
 
 type ScanResult = {
   tld: string;
@@ -32,7 +32,7 @@ type ScanSummary = { total: number; found: number; saved: number; failed: number
 
 const REASON_COLORS: Record<string, { label: string; cls: string }> = {
   // 旧枚举（兼容 tld_fallback_stats 历史值）
-  iana_fallback:   { label: "无服务器", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
+  iana_fallback:   { label: "IANA 兜底", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
   no_server:       { label: "无可达服务器", cls: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400" },
   timeout:         { label: "超时", cls: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400" },
   parse_error:     { label: "解析失败", cls: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400" },
@@ -50,23 +50,9 @@ const REASON_COLORS: Record<string, { label: string; cls: string }> = {
   unknown:         { label: "未归类", cls: "bg-muted text-muted-foreground" },
 };
 
-const FAILURE_LABELS: Record<string, string> = {
-  dns_failure: "DNS 解析失败",
-  connect_timeout: "连接超时",
-  socket_error: "连接错误",
-  http_blocked: "被拦截 403",
-  http_not_found: "404 未上线",
-  http_server_error: "服务器错误 5xx",
-  rdap_error: "RDAP 错误",
-  empty_response: "空响应",
-  no_server: "无可达服务器",
-  parse_error: "解析失败",
-  rate_limited: "速率限制",
-  third_party_failed: "第三方兜底失败",
-  iana_fallback: "IANA 兜底",
-  timeout: "超时",
-  unknown: "未归类",
-};
+const FAILURE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(REASON_COLORS).map(([k, v]) => [k, v.label]),
+) as Record<string, string>;
 
 type DashboardMetrics = {
   window_days: number;
@@ -97,6 +83,15 @@ const REPAIR_STATUS: Record<string, { label: string; cls: string }> = {
 
 const PER_PAGE_OPTIONS = [20, 50, 100];
 
+/** Third-party API source display names (single source of truth). */
+const API_SOURCE_LABELS: Record<string, string> = {
+  tianhu: "天虎",
+  nazhumi: "哪煮米",
+  miqingju: "米情局",
+  yisi: "亿思云",
+  ph_web: "NIC.PH",
+};
+
 function fmt(d: string | null) {
   if (!d) return "—";
   const date = new Date(d);
@@ -109,6 +104,17 @@ function fmt(d: string | null) {
   if (hours < 24) return `${hours}小时前`;
   if (days < 7) return `${days}天前`;
   return date.toLocaleDateString("zh-CN", { year: "2-digit", month: "2-digit", day: "2-digit" });
+}
+
+/** Localized absolute timestamp (e.g. 09-06 15:30) for event panels. */
+function fmtTs(d: string | null) {
+  if (!d) return "—";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return d;
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
 }
 
 type Summary = { reason: string | null; count: string };
@@ -141,6 +147,11 @@ type ApiPanelResult = {
 type ApiPanel = {
   service: "tianhu" | "nazhumi" | "miqingju" | "yisi" | "ph_web";
   result: ApiPanelResult | null;
+  loading: boolean;
+};
+
+type EventPanel = {
+  events: TldFailureEventRow[] | null;
   loading: boolean;
 };
 
@@ -343,6 +354,50 @@ function DashboardSection(props: {
   );
 }
 
+/**
+ * Shared WHOIS server endpoint editor used by both the connectivity-test panel
+ * and the server-config panel. Renders the TCP/HTTP type toggle plus the
+ * host/port (or URL) inputs for the chosen mode.
+ */
+function ServerEndpointFields(props: {
+  tld: string;
+  type: "tcp" | "http";
+  host: string;
+  port: string;
+  url: string;
+  onChange: (patch: { type?: "tcp" | "http"; host?: string; port?: string; url?: string }) => void;
+}) {
+  const { tld, type, host, port, url, onChange } = props;
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1">
+        {(["tcp", "http"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => onChange({ type: t })}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all",
+              type === t
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border/60 text-muted-foreground hover:border-primary/40 bg-background",
+            )}
+          >
+            {t === "tcp" ? "WHOIS TCP" : "RDAP / HTTP"}
+          </button>
+        ))}
+      </div>
+      {type === "tcp" ? (
+        <div className="flex gap-2">
+          <Input value={host} onChange={e => onChange({ host: e.target.value })} placeholder={`whois.nic.${tld}`} className="h-7 text-[11px] rounded-lg flex-1 font-mono" />
+          <Input value={port} onChange={e => onChange({ port: e.target.value })} placeholder="43" className="h-7 text-[11px] rounded-lg w-16 font-mono" />
+        </div>
+      ) : (
+        <Input value={url} onChange={e => onChange({ url: e.target.value })} placeholder={`https://rdap.nic.${tld}/domain/`} className="h-7 text-[11px] rounded-lg font-mono" />
+      )}
+    </div>
+  );
+}
+
 export default function TldFailuresPage() {
   const [rows, setRows]           = React.useState<TldFailureRow[]>([]);
   const [summary, setSummary]     = React.useState<Summary[]>([]);
@@ -380,9 +435,13 @@ export default function TldFailuresPage() {
   const [resettingAllBypasses, setResettingAllBypasses] = React.useState(false);
   const [testPanels, setTestPanels] = React.useState<Record<string, TestPanel>>({});
   const [apiPanels, setApiPanels]   = React.useState<Record<string, ApiPanel>>({});
+  const [eventPanels, setEventPanels] = React.useState<Record<string, EventPanel>>({});
   const [cfgPanels, setCfgPanels]   = React.useState<Record<string, CfgPanel>>({});
   const [settingApiSource, setSettingApiSource] = React.useState<string | null>(null);
   const [lookingUp, setLookingUp]   = React.useState<string | null>(null);
+
+  // Per-TLD request sequence to ignore stale event-panel responses.
+  const eventSeq = React.useRef<Record<string, number>>({});
 
   // ── Batch auto-scan state ────────────────────────────────────────────────
   const [scanning, setScanning]         = React.useState(false);
@@ -431,10 +490,16 @@ export default function TldFailuresPage() {
       .finally(() => setLoading(false));
   }
 
+  // Debounce the free-text search so typing doesn't spam the API.
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   React.useEffect(() => {
     setPage(1);
     load(1);
-  }, [minFails, reasonFilter, hideManual, windowDays]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [minFails, reasonFilter, hideManual, windowDays, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goPage(p: number) {
     const np = Math.max(1, Math.min(totalPages, p));
@@ -458,7 +523,6 @@ export default function TldFailuresPage() {
   }
 
   async function clearAll() {
-    const total = summary.reduce((s, r) => s + parseInt(r.count), 0);
     if (!confirm(`确认清零全部 ${summaryTotal} 条失败记录？此操作不可撤销。`)) return;
     setClearingAll(true);
     try {
@@ -547,13 +611,20 @@ export default function TldFailuresPage() {
     } finally { setSavingNotes(false); }
   }
 
+  /** Shared defaults for the WHOIS test / config server panels. */
+  function makeServerPanelDefaults(tld: string) {
+    return {
+      type: "tcp" as const,
+      host: `whois.nic.${tld}`,
+      port: "",
+      url: `https://rdap.nic.${tld}/domain/`,
+    };
+  }
+
   function openTestPanel(tld: string) {
     setTestPanels(prev => ({
       ...prev,
-      [tld]: prev[tld] ?? {
-        type: "tcp", host: `whois.nic.${tld}`, port: "",
-        url: `https://rdap.nic.${tld}/domain/`, result: null, loading: false,
-      },
+      [tld]: prev[tld] ?? { ...makeServerPanelDefaults(tld), result: null, loading: false },
     }));
   }
 
@@ -628,6 +699,41 @@ export default function TldFailuresPage() {
     }
   }
 
+  // ── Per-TLD failure events detail panel ─────────────────────────────────
+  function closeEventPanel(tld: string) {
+    setEventPanels(prev => { const n = { ...prev }; delete n[tld]; return n; });
+  }
+
+  function updateEventPanel(tld: string, patch: Partial<EventPanel>) {
+    setEventPanels(prev => ({ ...prev, [tld]: { ...prev[tld], ...patch } }));
+  }
+
+  async function loadEventPanel(tld: string) {
+    const seq = (eventSeq.current[tld] ?? 0) + 1;
+    eventSeq.current[tld] = seq;
+    updateEventPanel(tld, { loading: true, events: null });
+    try {
+      const r = await fetch(`/api/admin/tld-failures?events_for=${encodeURIComponent(tld)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (eventSeq.current[tld] === seq) {
+        updateEventPanel(tld, { loading: false, events: d.events ?? [] });
+      }
+    } catch (e: any) {
+      if (eventSeq.current[tld] === seq) {
+        updateEventPanel(tld, { loading: false, events: [] });
+        toast.error(`加载事件失败: ${e?.message || "网络错误"}`);
+      }
+    }
+  }
+
+  function toggleEventPanel(tld: string) {
+    if (eventPanels[tld]) { closeEventPanel(tld); return; }
+    eventSeq.current[tld] = (eventSeq.current[tld] ?? 0) + 1;
+    setEventPanels(prev => ({ ...prev, [tld]: { events: null, loading: true } }));
+    loadEventPanel(tld);
+  }
+
   // ── Per-TLD API source management ───────────────────────────────────────
   async function applyTldApiSource(tld: string, source: string | null) {
     setSettingApiSource(tld);
@@ -641,8 +747,7 @@ export default function TldFailuresPage() {
       setRows(prev => prev.map(row =>
         row.tld === tld ? { ...row, tld_api_source: source } : row,
       ));
-      const srcLabel: Record<string, string> = { tianhu: "天虎", yisi: "亿思云", ph_web: "NIC.PH" };
-      toast.success(source ? `已将 .${tld} 设为默认 ${srcLabel[source] ?? source} 查询` : `已清除 .${tld} 的第三方 API 设置`);
+      toast.success(source ? `已将 .${tld} 设为默认 ${API_SOURCE_LABELS[source] ?? source} 查询` : `已清除 .${tld} 的第三方 API 设置`);
     } catch {
       toast.error("操作失败，请重试");
     } finally {
@@ -655,8 +760,7 @@ export default function TldFailuresPage() {
     setCfgPanels(prev => ({
       ...prev,
       [tld]: prev[tld] ?? {
-        type: "tcp", host: `whois.nic.${tld}`, port: "",
-        url: `https://rdap.nic.${tld}/domain/`, saving: false, saved: false, error: null,
+        ...makeServerPanelDefaults(tld), saving: false, saved: false, error: null,
       },
     }));
   }
@@ -1103,6 +1207,7 @@ export default function TldFailuresPage() {
                 const isEditing  = editingNotes === row.tld;
                 const testPanel  = testPanels[row.tld];
                 const apiPanel   = apiPanels[row.tld];
+                const evPanel    = eventPanels[row.tld];
                 const isSelected = selected.has(row.tld);
 
                 return (
@@ -1146,7 +1251,7 @@ export default function TldFailuresPage() {
                         {row.tld_api_source && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 font-semibold shrink-0 flex items-center gap-0.5">
                             <RiExternalLinkLine className="w-2.5 h-2.5" />
-                            {row.tld_api_source === "tianhu" ? "天虎 API" : row.tld_api_source === "yisi" ? "亿思云 API" : row.tld_api_source === "ph_web" ? "NIC.PH" : row.tld_api_source}
+                            {API_SOURCE_LABELS[row.tld_api_source] ?? row.tld_api_source}
                           </span>
                         )}
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0", repairInfo.cls)}>{repairInfo.label}</span>
@@ -1235,30 +1340,14 @@ export default function TldFailuresPage() {
                             <RiCloseLine className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="flex gap-1">
-                          {(["tcp", "http"] as const).map(t => (
-                            <button
-                              key={t}
-                              onClick={() => updateTestPanel(row.tld, { type: t, result: null })}
-                              className={cn(
-                                "px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all",
-                                testPanel.type === t
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "border-border/60 text-muted-foreground hover:border-primary/40 bg-background",
-                              )}
-                            >
-                              {t === "tcp" ? "WHOIS TCP" : "RDAP / HTTP"}
-                            </button>
-                          ))}
-                        </div>
-                        {testPanel.type === "tcp" ? (
-                          <div className="flex gap-2">
-                            <Input value={testPanel.host} onChange={e => updateTestPanel(row.tld, { host: e.target.value })} placeholder={`whois.nic.${row.tld}`} className="h-7 text-[11px] rounded-lg flex-1 font-mono" />
-                            <Input value={testPanel.port} onChange={e => updateTestPanel(row.tld, { port: e.target.value })} placeholder="43" className="h-7 text-[11px] rounded-lg w-16 font-mono" />
-                          </div>
-                        ) : (
-                          <Input value={testPanel.url} onChange={e => updateTestPanel(row.tld, { url: e.target.value })} placeholder={`https://rdap.nic.${row.tld}/domain/`} className="h-7 text-[11px] rounded-lg font-mono" />
-                        )}
+                        <ServerEndpointFields
+                          tld={row.tld}
+                          type={testPanel.type}
+                          host={testPanel.host}
+                          port={testPanel.port}
+                          url={testPanel.url}
+                          onChange={patch => updateTestPanel(row.tld, { ...patch, result: null })}
+                        />
                         <button
                           onClick={() => runTest(row.tld)}
                           disabled={testPanel.loading || (testPanel.type === "tcp" ? !testPanel.host.trim() : !testPanel.url.trim())}
@@ -1308,7 +1397,6 @@ export default function TldFailuresPage() {
                         </div>
                         <div className="flex gap-1 flex-wrap">
                           {(["tianhu", "nazhumi", "miqingju", "yisi", "ph_web"] as const).map(svc => {
-                            const labels: Record<string, string> = { tianhu: "天虎", nazhumi: "哪煮米", miqingju: "米情局", yisi: "亿思云", ph_web: "NIC.PH" };
                             return (
                               <button
                                 key={svc}
@@ -1320,7 +1408,7 @@ export default function TldFailuresPage() {
                                     : "border-border/60 text-muted-foreground hover:border-violet-400/60 bg-background",
                                 )}
                               >
-                                {labels[svc]}
+                                {API_SOURCE_LABELS[svc]}
                               </button>
                             );
                           })}
@@ -1339,7 +1427,7 @@ export default function TldFailuresPage() {
                             const svc    = apiPanel.service as "tianhu" | "yisi" | "ph_web";
                             const isActive = row.tld_api_source === svc;
                             const isBusy   = settingApiSource === row.tld;
-                            const labels: Record<string, string> = { tianhu: "天虎", yisi: "亿思云", ph_web: "NIC.PH" };
+                            const labels   = API_SOURCE_LABELS;
                             return isActive ? (
                               <button
                                 onClick={() => applyTldApiSource(row.tld, null)}
@@ -1402,30 +1490,14 @@ export default function TldFailuresPage() {
                               <RiCloseLine className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <div className="flex gap-1">
-                            {(["tcp", "http"] as const).map(t => (
-                              <button
-                                key={t}
-                                onClick={() => updateCfgPanel(row.tld, { type: t })}
-                                className={cn(
-                                  "px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all",
-                                  cfgPanel.type === t
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "border-border/60 text-muted-foreground hover:border-primary/40 bg-background",
-                                )}
-                              >
-                                {t === "tcp" ? "WHOIS TCP" : "HTTP / RDAP"}
-                              </button>
-                            ))}
-                          </div>
-                          {cfgPanel.type === "tcp" ? (
-                            <div className="flex gap-2">
-                              <Input value={cfgPanel.host} onChange={e => updateCfgPanel(row.tld, { host: e.target.value })} placeholder={`whois.nic.${row.tld}`} className="h-7 text-[11px] rounded-lg flex-1 font-mono" />
-                              <Input value={cfgPanel.port} onChange={e => updateCfgPanel(row.tld, { port: e.target.value })} placeholder="43" className="h-7 text-[11px] rounded-lg w-16 font-mono" />
-                            </div>
-                          ) : (
-                            <Input value={cfgPanel.url} onChange={e => updateCfgPanel(row.tld, { url: e.target.value })} placeholder={`https://rdap.nic.${row.tld}/domain/`} className="h-7 text-[11px] rounded-lg font-mono" />
-                          )}
+                          <ServerEndpointFields
+                            tld={row.tld}
+                            type={cfgPanel.type}
+                            host={cfgPanel.host}
+                            port={cfgPanel.port}
+                            url={cfgPanel.url}
+                            onChange={patch => updateCfgPanel(row.tld, patch)}
+                          />
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => saveCfgPanel(row.tld)}
@@ -1447,6 +1519,57 @@ export default function TldFailuresPage() {
                         </div>
                       );
                     })()}
+
+                    {/* Per-TLD failure events detail */}
+                    {evPanel && (
+                      <div className="border border-border/60 rounded-xl bg-muted/20 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5">
+                            <RiErrorWarningLine className="w-3.5 h-3.5 text-red-500" />
+                            失败事件明细 · .{row.tld}
+                            {!evPanel.loading && evPanel.events && (
+                              <span className="text-[10px] font-normal text-muted-foreground">共 {evPanel.events.length} 条（最新 50）</span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {evPanel.events && !evPanel.loading && (
+                              <button onClick={() => loadEventPanel(row.tld)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground transition-colors" title="刷新">
+                                <RiRefreshLine className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button onClick={() => closeEventPanel(row.tld)} className="text-muted-foreground/60 hover:text-foreground transition-colors">
+                              <RiCloseLine className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        {evPanel.loading ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                            <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> 加载事件中…
+                          </div>
+                        ) : !evPanel.events || evPanel.events.length === 0 ? (
+                          <div className="text-xs text-muted-foreground py-3">窗口内无诊断事件记录</div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {evPanel.events.map(ev => {
+                              const c = REASON_COLORS[ev.fail_reason ?? ""] ?? { label: FAILURE_LABELS[ev.fail_reason ?? ""] ?? "未知", cls: "bg-muted text-muted-foreground" };
+                              return (
+                                <div key={ev.id} className="rounded-lg bg-background/60 border border-border/40 px-3 py-2 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0", c.cls)}>{c.label}</span>
+                                    {ev.domain && <code className="text-[10px] font-mono text-foreground/70 truncate max-w-[200px]">{ev.domain}</code>}
+                                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0 tabular-nums" title={ev.created_at}>{fmtTs(ev.created_at)}</span>
+                                    {ev.context && <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">{ev.context}</span>}
+                                  </div>
+                                  {ev.reason_detail && (
+                                    <p className="text-[10px] text-muted-foreground/90 leading-relaxed break-all">{ev.reason_detail}</p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5 border-t border-border/40">
@@ -1474,7 +1597,7 @@ export default function TldFailuresPage() {
                       {/* ── Per-TLD API source quick-set ─────────────────── */}
                       <div className="h-3 w-px bg-border/60 mx-0.5 shrink-0" />
                       {(["tianhu", "yisi"] as const).map(src => {
-                        const label = src === "tianhu" ? "天虎" : "亿思云";
+                        const label = API_SOURCE_LABELS[src];
                         const isActive = row.tld_api_source === src;
                         const isBusy   = settingApiSource === row.tld;
                         return (
@@ -1545,6 +1668,23 @@ export default function TldFailuresPage() {
                       >
                         {lookingUp === row.tld ? <RiLoader4Line className="w-2.5 h-2.5 animate-spin" /> : <RiFlashlightLine className="w-2.5 h-2.5" />}
                         查询并移除
+                      </button>
+                      <button
+                        onClick={() => toggleEventPanel(row.tld)}
+                        title={`查看 .${row.tld} 的失败事件明细`}
+                        className={cn(
+                          "text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1 transition-all",
+                          evPanel
+                            ? "border-red-400/60 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400"
+                            : "border-border/60 text-muted-foreground hover:border-red-400/60 hover:text-red-500",
+                        )}
+                      >
+                        <RiErrorWarningLine className="w-2.5 h-2.5" />事件明细
+                        {(row.window_events ?? 0) > 0 && (
+                          <span className={cn("text-[9px] px-1 rounded-full font-semibold", evPanel ? "bg-red-100 dark:bg-red-950/50" : "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400")}>
+                            {row.window_events}
+                          </span>
+                        )}
                       </button>
                       <button
                         onClick={() => apiPanel ? closeApiPanel(row.tld) : openApiPanel(row.tld)}

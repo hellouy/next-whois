@@ -60,8 +60,8 @@ export async function recordFailureEvent(input: FailureEventInput): Promise<void
 /** Best-effort prune of events older than `days`. Returns nothing. */
 export async function pruneFailureEvents(days = 90): Promise<void> {
   try {
-    await run(`DELETE FROM tld_failure_events WHERE created_at < NOW() - ($1 || ' days')::interval`, [
-      String(days),
+    await run(`DELETE FROM tld_failure_events WHERE created_at < NOW() - make_interval(days => $1)`, [
+      days,
     ]);
   } catch (e) {
     logger.warn(`[failure-events] prune failed:`, (e as Error).message);

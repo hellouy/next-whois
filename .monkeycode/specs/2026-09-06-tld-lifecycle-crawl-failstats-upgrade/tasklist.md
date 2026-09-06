@@ -6,17 +6,17 @@ Status: In Progress
 
 ## 批次 1 — 失败统计后端（修复周对比 + 双事实源基础）
 
-- [ ] 1.1 建表 `tld_failure_events` + `ai_call_log`（db.ts 迁移数组追加，含索引）
-- [ ] 1.2 新建 `classifyFailure` 归因模块（12+ 类扩展枚举 + 规则映射）
-- [ ] 1.3 新建 `recordFailureEvent`（写事件表，fire-and-forget，不阻塞查询）
-- [ ] 1.4 改造 `recordTldLookupFailure`：写事件表，不再累加 `tld_fallback_stats`（R5）；lookup 调用点补充 context
-- [ ] 1.5 改造 `GET /api/admin/tld-failures`：window 参数 + metrics（query_logs 成功率健康度）+ 修复期望对比（修复 B1）
+- [x] 1.1 建表 `tld_failure_events` + `ai_call_log`（db.ts 迁移数组追加，含索引）
+- [x] 1.2 新建 `classifyFailure` 归因模块（12+ 类扩展枚举 + 规则映射）
+- [x] 1.3 新建 `recordFailureEvent`（写事件表，fire-and-forget，不阻塞查询）
+- [x] 1.4 改造 `recordTldLookupFailure`：写事件表，不再累加 `tld_fallback_stats`（R5）；lookup 调用点补充 context
+- [x] 1.5 改造 `GET /api/admin/tld-failures`：window 参数 + metrics（query_logs 成功率健康度）+ 修复期望对比（修复 B1）
 
 ## 批次 2 — 失败统计仪表盘
 
-- [ ] 2.1 GET 扩展 `reason_dist` / `trend` / `top_failed`
-- [ ] 2.2 `tld-failures.tsx` 改造：窗口仪表盘（卡片/原因分布/Top 列表/成功率列，纯 DOM 图）
-- [ ] 2.3 历史 `tld_fallback_stats.fail_count` 一次性清零迁移
+- [x] 2.1 GET 扩展 `reason_dist` / `trend` / `top_failed`
+- [x] 2.2 `tld-failures.tsx` 改造：窗口仪表盘（卡片/原因分布/Top 列表/成功率列，纯 DOM 图）
+- [x] 2.3 历史 `tld_fallback_stats.fail_count` 一次性清零迁移（含批量扫描/管理端统计改从事件表读）
 
 ## 批次 3 — B 组统一抓取服务层
 
