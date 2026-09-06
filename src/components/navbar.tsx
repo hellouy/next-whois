@@ -1103,24 +1103,24 @@ export function Navbar() {
         }}
         style={{ pointerEvents: isVisible ? "auto" : "none" }}
         className={cn(
-          "mt-4 px-2 h-10 rounded-full",
+          "mt-4 px-2 h-10 max-w-[calc(100vw-1rem)] rounded-full",
           "bg-background shadow-sm",
-          "flex items-center gap-6",
+          "flex items-center gap-2 sm:gap-6",
           "border border-primary/25 border-dashed",
         )}
       >
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 active:opacity-70 transition-colors flex items-center touch-manipulation select-none"
+          className="text-xs ml-2 font-medium tracking-wide hover:text-primary/80 active:opacity-70 transition-colors flex items-center touch-manipulation select-none min-w-0"
         >
-          <span suppressHydrationWarning>{logoText}</span>
-          <p className="text-xs text-muted-foreground ml-1.5" suppressHydrationWarning>{VERSION}</p>
+          <span className="truncate" suppressHydrationWarning>{logoText}</span>
+          <p className="text-xs text-muted-foreground ml-1.5 hidden min-[390px]:inline" suppressHydrationWarning>{VERSION}</p>
         </button>
 
-        <div className="h-4 w-[1px] bg-primary/10" />
+        <div className="hidden sm:block h-4 w-[1px] bg-primary/10 shrink-0" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <ThemeToggle />
           <LanguageSwitcher />
           <motion.div {...TAP} className="hidden sm:inline-flex">
