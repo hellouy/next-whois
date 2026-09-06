@@ -28,6 +28,16 @@
 import pg from "pg";
 import * as cheerio from "cheerio";
 import fs from "fs";
+import {
+  AUTHORITY_ORDER,
+  sanitizeTimezone,
+  isAllDefaults,
+  isProblematic,
+  parseAiJson,
+  sortByAuthority,
+  strategyOf,
+  hasRealSource,
+} from "./lifecycle-parse.mjs";
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -255,6 +265,57 @@ const PROBE_PATHS = [
   "/registration/lifecycle", "/registration/lifecycle.php",
 ];
 
+// ── Multi-channel routing constants ───────────────────────────────────────────
+// Authority order for AI arbitration (highest first) — defined in lifecycle-parse.mjs.
+
+// Registrar TLD policy page URL templates (dynamically constructed per TLD).
+const REGISTRAR_TEMPLATES = [
+  { name: "namecheap", host: "namecheap.com", url: tld => `https://www.namecheap.com/domains/registration/gtld/${tld}/` },
+  { name: "godaddy",   host: "godaddy.com",   url: tld => `https://www.godaddy.com/en-ie/tlds/${tld}-domain` },
+  { name: "cloudflare",host: "cloudflare.com",url: () => `https://www.cloudflare.com/tld-policy/` },
+  { name: "ionos",     host: "ionos.com",     url: tld => `https://www.ionos.com/domains/domain-offers/${tld}-domain` },
+];
+
+// Per-host request spacing to avoid triggering rate limits / blocks.
+const HOST_GAP_MS = 2000;          // registrar policy pages
+const SEARCH_GAP_MS = 5000;        // Bing/Google search calls (global, throttled)
+const hostLastReq = new Map();     // host -> last request timestamp
+let lastSearchReq = 0;
+
+// Canonical lifecycle terms from the ICANN 2012 standardized Registry
+// Agreement, which applies uniformly to all gTLDs. Injected as the "icann"
+// channel for gTLD TLDs so the AI always has the official standard baseline.
+const ICANN_RA_STANDARD_TERMS = `ICANN Standardized Registry Agreement — lifecycle terms (apply to all gTLDs):
+- Add Grace Period (AGP): 5 days. A sponsoring registrar may delete a domain name during this period without charge.
+- Auto-Renewal Grace Period: up to 45 days. Registrar must delete the domain at end of this period unless renewed.
+- Renewal Grace Period: 30 days after expiry in which the domain may be renewed at no additional cost; otherwise deleted.
+- Redemption Grace Period: 30 days. After deletion (but before release), the domain enters a redemption grace period during which the previous registrant may restore it at a premium fee.
+- Pending Delete: 5 days. Following the redemption grace period, the domain remains in pending-delete status before being released to the public.
+- No pre-expiry early deletion: domains are deleted only after the grace periods above elapse.
+Exact grace/redemption/pending values may vary slightly per registry, but the standard is Add 5 / Redemption 30 / Pending Delete 5.`;
+
+async function throttleHost(host, gapMs = HOST_GAP_MS) {
+  const now = Date.now();
+  const last = hostLastReq.get(host) || 0;
+  const wait = Math.max(0, last + gapMs - now);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  hostLastReq.set(host, Date.now());
+}
+
+async function throttleSearch() {
+  const now = Date.now();
+  const wait = Math.max(0, lastSearchReq + SEARCH_GAP_MS - now);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastSearchReq = Date.now();
+}
+
+function stripHtml(html) {
+  const $ = cheerio.load(html);
+  $("script,style,nav,header,footer,noscript,iframe,svg,button,form,aside").remove();
+  return $("body").text().replace(/\s{3,}/g, "\n").replace(/\n{4,}/g, "\n\n").trim();
+}
+
+
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 async function fetchRaw(url, ms = 15000) {
   const res = await fetch(url, {
@@ -462,6 +523,119 @@ async function findLifecyclePage(registryUrl) {
   return null;
 }
 
+// ── Multi-channel collection ──────────────────────────────────────────────────
+/**
+ * Collect lifecycle policy text from multiple independent channels for one TLD.
+ * Primary channels (registry / registrar / icann / wiki) run concurrently;
+ * search (Bing) and Wayback act as fallbacks only when no primary channel hit.
+ *
+ * Returns an array of channel snapshots:
+ *   { channel, url, text_excerpt, status }
+ * where status ∈ 'ok' | 'empty' | 'error'.
+ */
+async function collectChannels(tld, ianaUrl) {
+  const isGtld = tld.length > 2;
+  const channels = [];
+
+  // ── Primary: registry website (reuse existing IANA discovery chain) ──────
+  const registryHit = await fetchPageText(tld, ianaUrl).catch(() => null);
+  if (registryHit?.text && registryHit.text.length > 30) {
+    channels.push({
+      channel: "registry",
+      url: registryHit.finalUrl ?? ianaUrl,
+      text_excerpt: registryHit.text.slice(0, 7000),
+      status: "ok",
+    });
+  }
+
+  // ── Primary: registrar policy pages (parallel, per-host throttled) ───────
+  const registrarResults = await Promise.allSettled(
+    REGISTRAR_TEMPLATES.map(async tpl => {
+      const url = tpl.url(tld);
+      await throttleHost(tpl.host);
+      let html;
+      try {
+        html = await fetchRaw(url, 8000);
+      } catch (e) {
+        return { channel: "registrar", name: tpl.name, url, status: "error", error: e.message.slice(0, 80) };
+      }
+      const text = stripHtml(html).slice(0, 5000);
+      if (text.length < 80 || /not found|404|no such domain|tld not available/i.test(text)) {
+        return { channel: "registrar", name: tpl.name, url, status: "empty" };
+      }
+      return { channel: "registrar", name: tpl.name, url, text_excerpt: text, status: "ok" };
+    })
+  );
+  for (const r of registrarResults) {
+    const c = r.status === "fulfilled" ? r.value : { channel: "registrar", status: "error", error: "settled reject" };
+    if (c.status === "ok") channels.push({ ...c, channel: "registrar", text_excerpt: c.text_excerpt.slice(0, 5000) });
+  }
+
+  // ── Primary: ICANN Registry Agreement (gTLD only) ─────────────────────────
+  // The standardized Registry Agreement lifecycle terms apply to ALL gTLDs and
+  // are identical (Add Grace 5d / Redemption 30d / Pending Delete 5d). Injecting
+  // the canonical text avoids a 1.16MB JS-rendered list page that is impractical
+  // to scrape per-TLD. Source points at the official agreement collection.
+  if (isGtld) {
+    channels.push({
+      channel: "icann",
+      url: "https://www.icann.org/en/registry-agreements",
+      text_excerpt: ICANN_RA_STANDARD_TERMS,
+      status: "ok",
+    });
+  }
+
+  // ── Primary: Wikipedia lifecycle section ──────────────────────────────────
+  await throttleHost("en.wikipedia.org", 1000);
+  try {
+    const html = await fetchRaw(`https://en.wikipedia.org/wiki/.${tld}`, 10000);
+    const text = stripHtml(html);
+    const kw = LIFECYCLE_KEYWORDS.filter(k => text.toLowerCase().includes(k.toLowerCase()));
+    if (kw.length > 0) {
+      const excerpt = text.slice(0, 4000);
+      channels.push({ channel: "wiki", url: `https://en.wikipedia.org/wiki/.${tld}`, text_excerpt: excerpt, status: "ok" });
+    } else {
+      channels.push({ channel: "wiki", url: `https://en.wikipedia.org/wiki/.${tld}`, status: "empty" });
+    }
+  } catch { /* wikipedia best-effort */ }
+
+  // ── Fallback chain: only when NO primary channel returned usable text ─────
+  const primaryHits = channels.filter(c => c.status === "ok");
+  if (primaryHits.length === 0) {
+    // Search engine (Bing first, Google conditional) to locate lifecycle pages
+    await throttleSearch();
+    const bingQuery = encodeURIComponent(`${tld} domain grace period redemption lifecycle`);
+    try {
+      const html = await fetchRaw(`https://www.bing.com/search?q=${bingQuery}&setlang=en`, 10000);
+      const text = stripHtml(html).slice(0, 5000);
+      if (text.length > 150 && !/No results found/i.test(text)) {
+        channels.push({ channel: "search", url: `https://www.bing.com/search?q=${bingQuery}`, text_excerpt: text, status: "ok" });
+      }
+    } catch { /* bing best-effort */ }
+
+    // Wayback snapshot of the registry homepage (need registry URL from IANA)
+    const registryUrl = registryHit?.finalUrl && !registryHit.finalUrl.startsWith("https://www.iana.org")
+      ? registryHit.finalUrl
+      : null;
+    if (registryUrl) {
+      try {
+        const html = await fetchRaw(`https://web.archive.org/web/2024/${registryUrl}`, 12000);
+        const text = stripHtml(html).slice(0, 4000);
+        if (text.length > 150) {
+          channels.push({ channel: "wayback", url: `https://web.archive.org/web/2024/${registryUrl}`, text_excerpt: text, status: "ok" });
+        }
+      } catch { /* wayback best-effort */ }
+    }
+  }
+
+  // Always include an IANA channel so the AI has at least type context.
+  if (!channels.some(c => c.channel === "registry") && registryHit?.text) {
+    channels.push({ channel: "iana", url: ianaUrl, text_excerpt: registryHit.text.slice(0, 2000), status: "ok" });
+  }
+
+  return channels;
+}
+
 async function fetchPageText(tld, ianaUrl) {
   // A: Use curated URL directly
   const curatedUrl = CURATED_LIFECYCLE_URLS[tld];
@@ -607,73 +781,39 @@ const SYSTEM_PROMPT = `你是域名注册局政策专家，精通ICANN及各国�
 ★ 若页面内容是IANA信息页（只有联系信息，无任何天数）且 TLD 是 gTLD → grace:30, redemption:30, pending:5
 ★ 若页面内容是IANA信息页且 TLD 是 ccTLD → 请在reasoning中明确说明无数据，但仍填行业估计值
 
+【多渠道综合裁决规则】：
+★ 你会同时收到来自多个渠道的原文（每个渠道标注 [channel名] + URL）。
+★ 权威优先级：registry（注册局官网）> registrar（注册商政策页）> icann（ICANN协议）> wiki（Wikipedia）> search（搜索引擎）> wayback（存档）> iana（IANA页）
+★ 高权威渠道的明确数值优先于低权威渠道；多源一致时可提升置信度并在reasoning中注明"多源一致"。
+★ 若某渠道给出具体天数，请优先采纳并注明来自该渠道；冲突时以最高权威渠道为准。
+★ 每个数值字段需在 fields_source 中标注其来源渠道（registry/registrar/icann/wiki/search/wayback/iana），无来源支撑的字段标 industry_default。
+
 【请注意】：reasoning 中说明数据来源、提取依据、是否有信心。
 
-严格输出JSON，不加任何额外文字或代码块：
-{"grace_period_days":0,"redemption_period_days":30,"pending_delete_days":0,"pre_expiry_days":0,"drop_hour":null,"drop_minute":null,"drop_second":null,"drop_timezone":null,"reasoning":"简短说明"}`;
+ 严格输出JSON，不加任何额外文字或代码块：
+{"grace_period_days":0,"redemption_period_days":30,"pending_delete_days":0,"pre_expiry_days":0,"drop_hour":null,"drop_minute":null,"drop_second":null,"drop_timezone":null,"reasoning":"简短说明","fields_source":{"grace_period_days":"registry","redemption_period_days":"registry","pending_delete_days":"registry"}}`;
 
-function parseAiJson(content) {
-  const c = content
-    .replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```\s*$/,"")
-    .replace(/^[^{]*({[\s\S]*})[^}]*$/,"$1").trim();
-  const p = JSON.parse(c);
-  const toInt = (v, min=0) => Math.max(min, parseInt(String(v)) || 0);
-  const toNullInt = (v, lo, hi) => {
-    if (v===null||v===undefined||v==="") return null;
-    const n = parseInt(String(v));
-    return isNaN(n) ? null : Math.min(hi, Math.max(lo, n));
-  };
-  return {
-    grace_period_days:      toInt(p.grace_period_days),
-    redemption_period_days: toInt(p.redemption_period_days),
-    pending_delete_days:    toInt(p.pending_delete_days),
-    pre_expiry_days:        toNullInt(p.pre_expiry_days, 0, 365),
-    drop_hour:              toNullInt(p.drop_hour, 0, 23),
-    drop_minute:            toNullInt(p.drop_minute, 0, 59),
-    drop_second:            toNullInt(p.drop_second, 0, 59),
-    drop_timezone:          sanitizeTimezone(p.drop_timezone),
-    reasoning: String(p.reasoning||"").slice(0, 800),
-  };
-}
-
-// Only accept IANA timezone names (e.g. Europe/Copenhagen, UTC); anything else
-// is rejected to keep the drop_timezone column clean. "GMT+x"/"CET"/garbage
-// yield null (design: timezone whitelist check).
-const VALID_TIMEZONES = new Set(Intl.supportedValuesOf("timeZone"));
-function sanitizeTimezone(v) {
-  if (typeof v !== "string" || !v) return null;
-  const tz = v.trim();
-  if (tz === "UTC" || tz === "Etc/UTC") return tz === "Etc/UTC" ? "UTC" : tz;
-  return VALID_TIMEZONES.has(tz) ? tz : null;
-}
-
-// Is the AI result just plain ICANN defaults (often means "no data found")?
-function isAllDefaults(r) {
-  return r.grace_period_days === 30 && r.redemption_period_days === 30 && r.pending_delete_days === 5;
-}
-
-// Is the result clearly problematic? Either 0/0/0 or 30/30/5 defaults
-function isProblematic(r) {
-  const total = r.grace_period_days + r.redemption_period_days + r.pending_delete_days;
-  // 0/0/0 is suspicious unless registry explicitly does instant deletion
-  const isZero = total === 0 && !r.reasoning?.toLowerCase().match(/instant|immediately|sofort|unmittelbar/);
-  return isAllDefaults(r) || isZero;
-}
-
-async function extractWithAI(tld, pageText, sourceUrl, pageStrategy) {
-  if (!pageText || pageText.length < 30) throw new Error("No page text to analyze");
+async function extractWithAI(tld, channels, sourceUrl) {
+  const usable = channels.filter(c => c.status === "ok" && c.text_excerpt);
+  if (usable.length === 0) throw new Error("No page text to analyze");
 
   const isCcTld = tld.length === 2;
   const typeHint = isCcTld
     ? `[TLD 类型: ccTLD - 各国注册局，政策差异大，可能无标准 grace period]`
     : `[TLD 类型: gTLD - 通常遵循 ICANN 标准 grace:30 redemption:30 pending:5]`;
 
-  const snippet = pageText.slice(0, 7000);
+  // Build channel-ordered prompt: highest authority first.
+  const ordered = sortByAuthority(usable);
+  const channelBlocks = ordered
+    .map((c, i) => `[${c.channel} | 渠道${i + 1}] ${c.url}\n${c.text_excerpt}`)
+    .join("\n\n────────────────────────\n\n")
+    .slice(0, 12000);
+
   if (DEBUG) {
-    console.log(`\n${"─".repeat(60)}\n[DEBUG] .${tld} 传给AI的文本 (${snippet.length} chars, strategy:${pageStrategy}):\n${snippet.slice(0,500)}\n${"─".repeat(60)}`);
+    console.log(`\n${"─".repeat(60)}\n[DEBUG] .${tld} 传给AI的渠道 (${ordered.map(c=>c.channel).join(",")}):\n${channelBlocks.slice(0,500)}\n${"─".repeat(60)}`);
   }
 
-  const userMsg = `TLD: .${tld}\n${typeHint}\n来源: ${sourceUrl} [策略:${pageStrategy}]\n\n页面内容：\n${snippet}`;
+  const userMsg = `TLD: .${tld}\n${typeHint}\n主来源: ${sourceUrl}\n\n以下为多渠道原文（按权威优先级排序）：\n\n${channelBlocks}`;
   const messages = [{ role:"system", content:SYSTEM_PROMPT }, { role:"user", content:userMsg }];
 
   const { content, name, providerIndex } = await callAI(messages);
@@ -684,7 +824,7 @@ async function extractWithAI(tld, pageText, sourceUrl, pageStrategy) {
   result.model_used = name;
 
   // If result is problematic (all-defaults or 0/0/0) from ccTLD, retry with another model
-  if (isProblematic(result) && isCcTld && pageStrategy !== "curated" && providerIndex < AI_PROVIDERS.length - 1) {
+  if (isProblematic(result) && isCcTld && providerIndex < AI_PROVIDERS.length - 1) {
     console.log(`  ⟳ 结果全默认值，用备用模型重试...`);
     try {
       const { content: c2, name: n2 } = await callAI(messages, providerIndex + 1);
@@ -732,16 +872,28 @@ function applyKnownPolicy(tld, extracted) {
 }
 
 // ── DB save ───────────────────────────────────────────────────────────────────
-async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy) {
+async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy, channelsArg = []) {
   // Confidence grading:
-  //   high   — curated policy database (verified by humans)
-  //   medium — AI extracted real numbers from an official policy page
+  //   high   — curated policy database, OR ≥2 independent channels agree on values
+  //   medium — AI extracted real numbers from a single channel
   //   low    — AI returned ICANN standard defaults (no specific data found)
+  const okChannels = channelsArg.filter(c => c.status === "ok");
+  const sources = ex.fields_source ? Object.values(ex.fields_source) : [];
+  const realSourceCount = new Set(sources.filter(s => s && s !== "industry_default")).size;
+  const multiSource = realSourceCount >= 2 || (okChannels.length >= 2 && !isProblematic(ex));
   const confidence = ex.model_used === "curated-database" ? "high"
-                   : scrapeStatus === "ok"               ? "medium"
-                   :                                       "low";
+                   : multiSource                       ? "high"
+                   : scrapeStatus === "ok"             ? "medium"
+                   :                                     "low";
   // needs_admin_review: flag low-confidence results for admin inspection
-  const needsReview = scrapeStatus !== "ok";
+  const needsReview = scrapeStatus !== "ok" && !multiSource;
+
+  const channelsJson = okChannels.map(c => ({
+    channel: c.channel,
+    url: c.url ?? null,
+    text_excerpt: (c.text_excerpt ?? "").slice(0, 1200),
+    status: "ok",
+  }));
 
   await dbRun(
     `INSERT INTO tld_rules
@@ -750,8 +902,8 @@ async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy
         drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
         scraped_at, updated_at,
         scrape_status, fetch_strategy, failure_reason, needs_admin_review,
-        scrape_attempts)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW(),$15,$16,NULL,$17,1)
+        scrape_attempts, channels)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW(),$15,$16,NULL,$17,1,$18)
      ON CONFLICT (tld) DO UPDATE SET
        grace_period_days=$2, redemption_period_days=$3, pending_delete_days=$4,
        source_url=$5, confidence=$6, raw_excerpt=$7, ai_reasoning=$8,
@@ -760,6 +912,7 @@ async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy
        scraped_at=NOW(), updated_at=NOW(),
        scrape_status=$15, fetch_strategy=$16, failure_reason=NULL,
        needs_admin_review=$17,
+       channels=$18,
        scrape_attempts=COALESCE(tld_rules.scrape_attempts,0)+1`,
     [
       tld,
@@ -774,6 +927,7 @@ async function saveToDb(tld, ex, finalUrl, pageText, scrapeStatus, fetchStrategy
       scrapeStatus,
       fetchStrategy ?? null,
       needsReview,
+      JSON.stringify(channelsJson),
     ]
   );
 }
@@ -894,10 +1048,15 @@ async function scrapeTld(tld) {
   }
 
   try {
-    const { text: pageText, finalUrl, strategy } = await fetchPageText(tld, ianaUrl);
-    if (!pageText || pageText.length < 30) throw new Error("页面内容为空");
+    // Multi-channel collection: registry website + registrars + ICANN + wiki,
+    // with search/Wayback fallbacks. Returns array of channel snapshots.
+    const channels = await collectChannels(tld, ianaUrl);
+    const primarySource = channels.find(c => c.status === "ok");
+    const finalUrl = primarySource?.url ?? ianaUrl;
+    if (channels.filter(c => c.status === "ok").length === 0) throw new Error("多渠道均无内容");
 
-    let extracted = await extractWithAI(tld, pageText, finalUrl, strategy);
+    let extracted = await extractWithAI(tld, channels, finalUrl);
+    extracted.channels = channels;
 
     // Last resort: apply curated known policy
     extracted = applyKnownPolicy(tld, extracted);
@@ -911,21 +1070,23 @@ async function scrapeTld(tld) {
       extracted.reasoning = `[自动修正] 原始结果为0/0/0（AI未找到具体数据）→ 已应用行业标准值30/30/5。${extracted.reasoning || ""}`;
     }
 
-    const isProblem = isProblematic(extracted);
-    // scrape_status: 'ok' = real data found, 'warn_defaults' = only got industry defaults
+    // scrape_status: 'ok' when any field has a real channel source; only
+    // industry-default-only results are flagged warn_defaults for review.
+    const isProblem = !hasRealSource(extracted.fields_source) && isProblematic(extracted);
     const scrapeStatus = isProblem ? "warn_defaults" : "ok";
 
-    await saveToDb(tld, extracted, finalUrl, pageText, scrapeStatus, strategy);
+    await saveToDb(tld, extracted, finalUrl, (extracted.channels?.[0]?.text_excerpt ?? ""), scrapeStatus, strategyOf(channels), channels);
 
     const total = extracted.grace_period_days + extracted.redemption_period_days + extracted.pending_delete_days;
     const dropInfo = extracted.drop_hour !== null
       ? ` 掉落${String(extracted.drop_hour).padStart(2,"0")}:${String(extracted.drop_minute??0).padStart(2,"0")} ${extracted.drop_timezone??"UTC"}`
       : "";
     const problemFlag = isProblem ? (total === 0 ? " ⚠(全零!)" : " ⚠(默认值)") : "";
+    const chInfo = channels.filter(c=>c.status==="ok").map(c=>c.channel).join("+");
     stats.done++;
     if (isProblem) stats.defaultOnly++;
     log(tld, isProblem ? "warn" : "ok",
-      `宽限${extracted.grace_period_days}d 赎回${extracted.redemption_period_days}d 待删${extracted.pending_delete_days}d =${total}d${dropInfo}${problemFlag} [${extracted.model_used}][${strategy}]`
+      `宽限${extracted.grace_period_days}d 赎回${extracted.redemption_period_days}d 待删${extracted.pending_delete_days}d =${total}d${dropInfo}${problemFlag} [${extracted.model_used}][${chInfo}]`
     );
   } catch (err) {
     stats.err++;
