@@ -288,15 +288,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             LIMIT $1`;
         } else {
           // Default: failed TLDs with no repair attempted
+          // Metric source = tld_failure_events (R5; fail_count is frozen).
           query = `
-            SELECT f.tld FROM tld_fallback_stats f
-            LEFT JOIN custom_whois_servers c ON c.tld = f.tld
-            WHERE f.fail_reason IN ('no_server', 'iana_fallback', 'timeout')
-              AND (f.repair_status IS NULL OR f.repair_status = 'pending')
+            SELECT ev.tld FROM (
+              SELECT tld, COUNT(*) AS cnt
+              FROM tld_failure_events
+              WHERE created_at > NOW() - INTERVAL '90 days'
+              GROUP BY tld
+            ) ev
+            LEFT JOIN tld_fallback_stats f ON f.tld = ev.tld
+            LEFT JOIN custom_whois_servers c ON c.tld = ev.tld
+            WHERE (f.repair_status IS NULL OR f.repair_status = 'pending')
               AND c.tld IS NULL
-              AND char_length(f.tld) BETWEEN 2 AND 10
-              AND f.tld ~ '^[a-z]+$'
-            ORDER BY f.fail_count DESC
+              AND char_length(ev.tld) BETWEEN 2 AND 10
+              AND ev.tld ~ '^[a-z]+$'
+            ORDER BY ev.cnt DESC
             LIMIT $1`;
         }
         const { rows } = await client.query<{ tld: string }>(query, [limit]);

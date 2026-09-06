@@ -319,6 +319,26 @@ const CREATE_TABLES = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_user_notifications_email ON user_notifications (email, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications (email) WHERE read_at IS NULL`,
+  `CREATE TABLE IF NOT EXISTS tld_failure_events (
+    id            BIGSERIAL   PRIMARY KEY,
+    tld           TEXT        NOT NULL,
+    fail_reason   TEXT        NOT NULL,
+    reason_detail TEXT,
+    domain        TEXT,
+    context       TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS ai_call_log (
+    id         BIGSERIAL   PRIMARY KEY,
+    provider   TEXT        NOT NULL,
+    model      TEXT        NOT NULL,
+    kind       TEXT        NOT NULL,
+    tld        TEXT,
+    ok         BOOLEAN     NOT NULL,
+    ms         INTEGER,
+    error      TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 const ALTER_COLUMNS = [
@@ -534,6 +554,10 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_sld     ON expired_domain_leads (sld text_pattern_ops)`,
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_starred ON expired_domain_leads (starred) WHERE starred = true`,
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_unseen  ON expired_domain_leads (seen) WHERE seen = false`,
+  `CREATE INDEX IF NOT EXISTS idx_fev_tld_created ON tld_failure_events (tld, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_fev_created     ON tld_failure_events (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_fev_reason      ON tld_failure_events (fail_reason)`,
+  `CREATE INDEX IF NOT EXISTS idx_acl_created     ON ai_call_log (created_at DESC)`,
 ];
 
 /**
@@ -698,6 +722,34 @@ export async function runMigrations(db: Pool): Promise<void> {
       `\nEND $$`;
     await client.query(indexBlock);
 
+    // Batch 4: one-time data migration — transfer legacy diagnostic state from
+    // tld_fallback_stats to tld_failure_events, then zero the counter columns.
+    // After this, fail_count/fail_reason/last_domain/sample_error stay frozen at
+    // 0/NULL and serve as server-config repair status only (R5). The migration
+    // is idempotent: it only copies events that don't already exist, and the
+    // zeroing only targets rows that still carry a stale legacy signature.
+    await client.query(
+      `INSERT INTO tld_failure_events (tld, fail_reason, reason_detail, domain, context)
+       SELECT tld, COALESCE(fail_reason, 'unknown'), sample_error, last_domain, 'legacy-migration'
+       FROM tld_fallback_stats
+       WHERE fail_count > 0
+         AND char_length(tld) BETWEEN 2 AND 24
+         AND tld ~ '^[a-zA-Z]'
+         AND tld NOT LIKE '%.%'
+         AND tld NOT IN (SELECT tld FROM tld_failure_events)
+       ON CONFLICT DO NOTHING`,
+    ).catch((e: Error) => logger.warn(`[db] legacy failure event migration skipped: ${e.message}`));
+
+    await client.query(
+      `UPDATE tld_fallback_stats
+       SET fail_count = 0,
+           fail_reason = NULL,
+           sample_error = NULL,
+           last_domain = NULL,
+           last_fail_at = NULL
+       WHERE fail_count > 0`,
+    ).catch((e: Error) => logger.warn(`[db] legacy counter zeroing skipped: ${e.message}`));
+
     logger.info("[db] Schema ready");
   } finally {
     client.release();
@@ -850,10 +902,13 @@ export async function setTldApiSource(tld: string, source: string | null): Promi
 }
 
 /**
- * Delete a TLD's failure stats row.  Called after a successful third-party
- * API lookup proves the TLD can be handled — the row no longer needs to appear
- * in the admin failures list.
+ * Mark a TLD's repair status as resolved.  Called after a successful lookup
+ * proves the TLD can be handled.
  * Fire-and-forget — never throws.
+ *
+ * Since the failure-stats refactor (R5), tld_fallback_stats rows are never
+ * deleted here: the table holds server configuration / repair state that must
+ * survive statistical cleanup. Success only bumps the row to 'fixed'.
  */
 export async function clearTldFailureStats(tld: string): Promise<void> {
   const key = tld.toLowerCase().replace(/^\./, "");
@@ -862,19 +917,10 @@ export async function clearTldFailureStats(tld: string): Promise<void> {
   const client = await db.connect().catch(() => null);
   if (!client) return;
   try {
-    // When a tld_api_source is configured, preserve the row (and the config)
-    // but reset fail_count to 0 so the TLD disappears from the failures list.
-    // Only hard-delete rows that have no third-party override — those are pure
-    // failure records with nothing worth keeping.
     await client.query(
       `UPDATE tld_fallback_stats
-         SET fail_count = 0, repair_status = 'fixed', repaired_at = NOW()
-       WHERE tld = $1 AND tld_api_source IS NOT NULL`,
-      [key],
-    );
-    await client.query(
-      `DELETE FROM tld_fallback_stats
-       WHERE tld = $1 AND tld_api_source IS NULL`,
+         SET repair_status = 'fixed', repaired_at = NOW()
+       WHERE tld = $1`,
       [key],
     );
     // Clear the in-memory cache so any subsequent getTldApiSource() call reads
@@ -888,41 +934,22 @@ export async function clearTldFailureStats(tld: string): Promise<void> {
 }
 
 /**
- * Record a TLD lookup failure for admin review.
+ * Record a TLD lookup failure.
  * Fire-and-forget — never throws, never blocks the main query path.
+ *
+ * Since the failure-stats refactor this delegates to the event-based
+ * diagnostic fact source (tld_failure_events). Query metrics continue to flow
+ * through query_logs; tld_fallback_stats is reserved for server configuration /
+ * repair state only (R5 双表职责分离).
  */
 export async function recordTldLookupFailure(
   tld: string,
-  reason: "no_server" | "timeout" | "parse_error" | "rate_limited" | "iana_fallback",
+  reason: string,
   domain: string,
   errorMsg?: string,
 ): Promise<void> {
-  // Skip recording for obviously invalid TLDs:
-  // - too short or too long (IANA TLDs are at most 24 chars)
-  // - doesn't start with a letter
-  // - purely numeric
-  // - contains a dot (means it's a full domain label, not a TLD suffix)
-  if (!tld || tld.length < 2 || tld.length > 24) return;
-  if (!/^[a-zA-Z]/.test(tld) || /^\d+$/.test(tld) || tld.includes(".")) return;
-  const db = await getDbReady().catch(() => null);
-  if (!db) return;
-  const client = await db.connect().catch(() => null);
-  if (!client) return;
-  try {
-    await client.query(
-      `INSERT INTO tld_fallback_stats (tld, fail_count, last_fail_at, fail_reason, last_domain, sample_error)
-       VALUES ($1, 1, NOW(), $2, $3, $4)
-       ON CONFLICT (tld) DO UPDATE SET
-         fail_count   = tld_fallback_stats.fail_count + 1,
-         last_fail_at = NOW(),
-         fail_reason  = $2,
-         last_domain  = $3,
-         sample_error = COALESCE($4, tld_fallback_stats.sample_error)`,
-      [tld, reason, domain, errorMsg ? errorMsg.slice(0, 200) : null],
-    );
-  } catch {
-    // Silently ignore — never disrupt the query path
-  } finally {
-    client.release();
-  }
+  const { recordFailureEvent } = await import("@/lib/server/failure-events").catch(() => ({
+    recordFailureEvent: () => Promise.resolve(),
+  }));
+  await recordFailureEvent({ tld, reason, domain, errorMsg, context: "lookup" });
 }

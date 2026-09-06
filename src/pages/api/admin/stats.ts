@@ -105,7 +105,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (SELECT COUNT(*) FROM stamps WHERE verified = true)::text                       AS verified_stamps,
           (SELECT COUNT(*) FROM reminders WHERE active = true)::text                      AS reminders,
           (SELECT COUNT(*) FROM feedback)::text                                           AS feedback,
-          (SELECT COUNT(*) FROM tld_fallback_stats WHERE fail_count > 3)::text            AS tld_failures
+          (SELECT COUNT(*) FROM tld_failure_events
+             WHERE created_at > NOW() - INTERVAL '90 days')::text                             AS tld_failures
       `).catch(() => ({ stamps: "0", verified_stamps: "0", reminders: "0", feedback: "0", tld_failures: "0" })),
     ]);
 
@@ -118,12 +119,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "SELECT id, query, query_type, created_at, user_id, reg_status FROM search_history ORDER BY created_at DESC LIMIT 10",
       ),
       many<{ tld: string; fail_count: number; fail_reason: string | null; last_fail_at: string | null; has_custom_server: boolean }>(
-        `SELECT f.tld, f.fail_count, f.fail_reason, f.last_fail_at::text,
-                (c.tld IS NOT NULL) AS has_custom_server
-         FROM tld_fallback_stats f
-         LEFT JOIN custom_whois_servers c ON c.tld = f.tld
-         WHERE f.fail_count > 3
-         ORDER BY f.fail_count DESC LIMIT 8`,
+        `SELECT ev.tld, ev.cnt::int AS fail_count, ev.last_reason AS fail_reason,
+                ev.last_fail_at::text, (c.tld IS NOT NULL) AS has_custom_server
+         FROM (
+           SELECT tld, COUNT(*) AS cnt,
+                  (ARRAY_AGG(fail_reason ORDER BY created_at DESC))[1] AS last_reason,
+                  MAX(created_at) AS last_fail_at
+           FROM tld_failure_events
+           WHERE created_at > NOW() - INTERVAL '90 days'
+           GROUP BY tld
+         ) ev
+         LEFT JOIN custom_whois_servers c ON c.tld = ev.tld
+         WHERE ev.cnt > 3
+         ORDER BY ev.cnt DESC LIMIT 8`,
       ).catch(() => [] as any[]),
       many<{ day: string; count: string }>(
         `SELECT DATE(created_at)::text AS day, COUNT(*) AS count

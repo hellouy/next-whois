@@ -15,6 +15,7 @@ import {
   RiCheckboxLine, RiCheckboxBlankLine, RiEyeOffLine,
   RiExternalLinkLine, RiSettings3Line, RiFlashlightLine,
   RiStopCircleLine, RiPlayCircleLine, RiScanLine,
+  RiBarChartLine, RiTimerLine, RiArrowUpDownLine,
 } from "@remixicon/react";
 import type { TldFailureRow } from "@/pages/api/admin/tld-failures";
 
@@ -30,11 +31,61 @@ type ScanResult = {
 type ScanSummary = { total: number; found: number; saved: number; failed: number };
 
 const REASON_COLORS: Record<string, { label: string; cls: string }> = {
-  iana_fallback:  { label: "无服务器", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
-  no_server:      { label: "无可达服务器", cls: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400" },
-  timeout:        { label: "超时", cls: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400" },
-  parse_error:    { label: "解析失败", cls: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400" },
-  rate_limited:   { label: "速率限制", cls: "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400" },
+  // 旧枚举（兼容 tld_fallback_stats 历史值）
+  iana_fallback:   { label: "无服务器", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
+  no_server:       { label: "无可达服务器", cls: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400" },
+  timeout:         { label: "超时", cls: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400" },
+  parse_error:     { label: "解析失败", cls: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400" },
+  rate_limited:    { label: "速率限制", cls: "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400" },
+  // 新 13 类枚举（tld_failure_events）
+  dns_failure:     { label: "DNS 解析失败", cls: "bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400" },
+  connect_timeout: { label: "连接超时", cls: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400" },
+  socket_error:    { label: "连接错误", cls: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400" },
+  http_blocked:    { label: "被拦截 403", cls: "bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400" },
+  http_not_found:  { label: "404 未上线", cls: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400" },
+  http_server_error: { label: "服务器错误 5xx", cls: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400" },
+  rdap_error:      { label: "RDAP 错误", cls: "bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400" },
+  empty_response:  { label: "空响应", cls: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" },
+  third_party_failed: { label: "第三方兜底失败", cls: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400" },
+  unknown:         { label: "未归类", cls: "bg-muted text-muted-foreground" },
+};
+
+const FAILURE_LABELS: Record<string, string> = {
+  dns_failure: "DNS 解析失败",
+  connect_timeout: "连接超时",
+  socket_error: "连接错误",
+  http_blocked: "被拦截 403",
+  http_not_found: "404 未上线",
+  http_server_error: "服务器错误 5xx",
+  rdap_error: "RDAP 错误",
+  empty_response: "空响应",
+  no_server: "无可达服务器",
+  parse_error: "解析失败",
+  rate_limited: "速率限制",
+  third_party_failed: "第三方兜底失败",
+  iana_fallback: "IANA 兜底",
+  timeout: "超时",
+  unknown: "未归类",
+};
+
+type DashboardMetrics = {
+  window_days: number;
+  total_queries: number | null;
+  success: number | null;
+  fail: number | null;
+  success_rate: number | null;
+  prev_fail: number | null;
+  fail_delta_pct: number | null;
+};
+type ReasonDist = { reason: string; count: string };
+type TrendItem = { date: string; count: string };
+type TopFailed = {
+  tld: string;
+  fail_count: string;
+  last_reason: string | null;
+  last_domain: string | null;
+  last_fail_at: string | null;
+  success_rate: string | null;
 };
 
 const REPAIR_STATUS: Record<string, { label: string; cls: string }> = {
@@ -103,6 +154,195 @@ type CfgPanel = {
   error: string | null;
 };
 
+function DashboardSection(props: {
+  windowDays: number;
+  onWindowChange: (d: number) => void;
+  metrics: DashboardMetrics | null;
+  reasonDist: ReasonDist[];
+  trend: TrendItem[];
+  topFailed: TopFailed[];
+  loading: boolean;
+}) {
+  const { windowDays, onWindowChange, metrics, reasonDist, trend, topFailed, loading } = props;
+  const totalEvents = trend.reduce((s, t) => s + parseInt(t.count || "0", 10), 0);
+  const maxReason = Math.max(1, ...reasonDist.map(r => parseInt(r.count, 10)));
+  const maxTrend = Math.max(1, ...trend.map(t => parseInt(t.count, 10)));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+          <RiBarChartLine className="w-4 h-4" />
+          失败统计仪表盘
+        </h3>
+        <div className="flex items-center gap-1 rounded-xl border border-border p-0.5">
+          {[7, 30].map(d => (
+            <button
+              key={d}
+              onClick={() => onWindowChange(d)}
+              className={cn(
+                "h-6 px-3 rounded-lg text-xs font-semibold transition-colors",
+                windowDays === d
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              近{d}天
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && !metrics ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-6">
+          <RiLoader4Line className="w-4 h-4 animate-spin" /> 加载统计中…
+        </div>
+      ) : (
+        <>
+          {/* Metric cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <RiErrorWarningLine className="w-3.5 h-3.5" /> 窗口失败事件
+              </div>
+              <div className="text-2xl font-bold mt-1 tabular-nums">{totalEvents}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">诊断事件明细</div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <RiCheckboxLine className="w-3.5 h-3.5" /> 查询成功率
+              </div>
+              <div className={cn(
+                "text-2xl font-bold mt-1 tabular-nums",
+                (metrics?.success_rate ?? 100) >= 98 ? "text-emerald-600 dark:text-emerald-400"
+                  : (metrics?.success_rate ?? 100) >= 95 ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400",
+              )}>
+                {metrics?.success_rate == null ? "—" : `${metrics.success_rate}%`}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                共 {metrics?.total_queries ?? 0} 次 · 失败 {metrics?.fail ?? 0}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <RiTimerLine className="w-3.5 h-3.5" /> 较上期
+              </div>
+              <div className={cn(
+                "text-2xl font-bold mt-1 tabular-nums",
+                metrics?.fail_delta_pct == null ? "text-muted-foreground"
+                  : metrics.fail_delta_pct > 5 ? "text-red-600 dark:text-red-400"
+                    : metrics.fail_delta_pct < -5 ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-amber-600 dark:text-amber-400",
+              )}>
+                {metrics?.fail_delta_pct == null ? "—" : `${metrics.fail_delta_pct > 0 ? "+" : ""}${metrics.fail_delta_pct}%`}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                上期 {metrics?.prev_fail ?? 0} 次失败
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <RiArrowUpDownLine className="w-3.5 h-3.5" /> Top 失败 TLD
+              </div>
+              <div className="text-2xl font-bold mt-1 tabular-nums">{topFailed.length}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                诊断明细覆盖 {topFailed.length} 个后缀
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Reason distribution */}
+            <div className="rounded-xl border border-border bg-card p-4 md:col-span-1">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-3">失败原因分布</h4>
+              {reasonDist.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-6 text-center">窗口内无诊断事件</div>
+              ) : (
+                <div className="space-y-2">
+                  {reasonDist.map(r => (
+                    <div key={r.reason} className="flex items-center gap-2 text-xs">
+                      <span className="w-20 shrink-0 truncate text-muted-foreground" title={FAILURE_LABELS[r.reason] ?? r.reason}>
+                        {FAILURE_LABELS[r.reason] ?? r.reason}
+                      </span>
+                      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/70"
+                          style={{ width: `${(parseInt(r.count, 10) / maxReason) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right tabular-nums text-muted-foreground">{r.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Trend */}
+            <div className="rounded-xl border border-border bg-card p-4 md:col-span-2">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-3">每日失败趋势</h4>
+              {trend.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-6 text-center">窗口内无诊断事件</div>
+              ) : (
+                <div className="flex items-end gap-1 h-24">
+                  {trend.map(t => (
+                    <div key={t.date} className="flex-1 flex flex-col items-center gap-1 group" title={`${t.date} · ${t.count} 次`}>
+                      <span className="text-[10px] text-muted-foreground tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
+                        {t.count}
+                      </span>
+                      <div
+                        className={cn(
+                          "w-full rounded-t bg-gradient-to-t rounded-sm",
+                          parseInt(t.count, 10) > 0 ? "from-red-500/30 to-red-500/80" : "bg-muted/40",
+                        )}
+                        style={{ height: `${Math.max(6, (parseInt(t.count, 10) / maxTrend) * 70)}px` }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5">
+                <span>{trend[0]?.date ?? "—"}</span>
+                <span>{trend[trend.length - 1]?.date ?? "—"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Top failed TLDs */}
+          {topFailed.length > 0 && (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <h4 className="text-xs font-semibold text-muted-foreground px-4 py-3 border-b border-border/60">
+                Top 失败 TLD（含成功率）
+              </h4>
+              <div className="divide-y divide-border/50">
+                {topFailed.slice(0, 10).map(t => {
+                  const color = REASON_COLORS[t.last_reason ?? ""] ?? { label: FAILURE_LABELS[t.last_reason ?? ""] ?? "未知", cls: "bg-muted text-muted-foreground" };
+                  return (
+                    <div key={t.tld} className="flex items-center gap-3 px-4 py-2 text-xs">
+                      <span className="font-mono font-semibold w-24 shrink-0">.{t.tld}</span>
+                      <span className="text-red-600 dark:text-red-400 font-semibold tabular-nums w-12 shrink-0">{t.fail_count} 次</span>
+                      <span className={cn("px-1.5 py-0.5 rounded text-[11px] font-semibold shrink-0", color.cls)}>
+                        {color.label}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 w-16 tabular-nums">
+                        {t.success_rate == null ? "—" : `成功 ${t.success_rate}%`}
+                      </span>
+                      <span className="text-muted-foreground truncate flex-1 min-w-0" title={t.last_domain ?? ""}>
+                        {t.last_domain ? `最近 ${t.last_domain}` : "—"}
+                      </span>
+                      <span className="text-muted-foreground shrink-0">{fmt(t.last_fail_at)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function TldFailuresPage() {
   const [rows, setRows]           = React.useState<TldFailureRow[]>([]);
   const [summary, setSummary]     = React.useState<Summary[]>([]);
@@ -111,6 +351,13 @@ export default function TldFailuresPage() {
   const [minFails, setMinFails]   = React.useState(1);
   const [reasonFilter, setReasonFilter] = React.useState<string>("");
   const [hideManual, setHideManual]     = React.useState(false);
+
+  // Dashboard window
+  const [windowDays, setWindowDays] = React.useState(7);
+  const [metrics, setMetrics]       = React.useState<DashboardMetrics | null>(null);
+  const [reasonDist, setReasonDist] = React.useState<ReasonDist[]>([]);
+  const [trend, setTrend]           = React.useState<TrendItem[]>([]);
+  const [topFailed, setTopFailed]   = React.useState<TopFailed[]>([]);
 
   // Pagination
   const [page, setPage]           = React.useState(1);
@@ -155,8 +402,9 @@ export default function TldFailuresPage() {
       page:      String(page),
       per_page:  String(perPage),
       period_compare: "1",
+      window:    String(windowDays),
     };
-    if (reasonFilter) p.reason     = reasonFilter;
+    if (reasonFilter) p.repair    = reasonFilter;
     if (search.trim()) p.search    = search.trim();
     if (hideManual)    p.hide_manual = "1";
     Object.entries(overrides).forEach(([k, v]) => { p[k] = String(v); });
@@ -174,6 +422,10 @@ export default function TldFailuresPage() {
         setSummary(d.summary ?? []);
         setTotal(d.total ?? 0);
         setTotalPages(d.total_pages ?? 1);
+        setMetrics(d.metrics ?? null);
+        setReasonDist(d.reason_dist ?? []);
+        setTrend(d.trend ?? []);
+        setTopFailed(d.top_failed ?? []);
       })
       .catch(() => toast.error("加载失败"))
       .finally(() => setLoading(false));
@@ -182,7 +434,7 @@ export default function TldFailuresPage() {
   React.useEffect(() => {
     setPage(1);
     load(1);
-  }, [minFails, reasonFilter, hideManual]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [minFails, reasonFilter, hideManual, windowDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goPage(p: number) {
     const np = Math.max(1, Math.min(totalPages, p));
@@ -207,13 +459,13 @@ export default function TldFailuresPage() {
 
   async function clearAll() {
     const total = summary.reduce((s, r) => s + parseInt(r.count), 0);
-    if (!confirm(`确认清零全部 ${total} 条失败记录？此操作不可撤销。`)) return;
+    if (!confirm(`确认清零全部 ${summaryTotal} 条失败记录？此操作不可撤销。`)) return;
     setClearingAll(true);
     try {
       const r = await fetch("/api/admin/tld-failures", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clear_all: true, reason: reasonFilter || undefined }),
+        body: JSON.stringify({ clear_all: true }),
       });
       const d = await r.json();
       if (r.ok) { toast.success(`已清零 ${d.cleared ?? 0} 条失败记录`); load(1); setPage(1); }
@@ -656,6 +908,17 @@ export default function TldFailuresPage() {
           </div>
         </div>
 
+        {/* ── Failure statistics dashboard ── */}
+        <DashboardSection
+          windowDays={windowDays}
+          onWindowChange={setWindowDays}
+          metrics={metrics}
+          reasonDist={reasonDist}
+          trend={trend}
+          topFailed={topFailed}
+          loading={loading}
+        />
+
         {/* ── Batch scan progress / results panel ── */}
         {(scanning || (showScanPanel && scanResults !== null)) && (
           <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-950/20 overflow-hidden">
@@ -713,7 +976,7 @@ export default function TldFailuresPage() {
           </div>
         )}
 
-        {/* ── Summary pills ── */}
+        {/* ── Summary pills (grouped by repair status) ── */}
         {summary.length > 0 && (
           <div className="flex flex-wrap gap-2 items-center">
             <button
@@ -728,10 +991,10 @@ export default function TldFailuresPage() {
               全部 ({summaryTotal})
             </button>
             {summary.map(s => {
-              const r = REASON_COLORS[s.reason ?? ""] ?? { label: s.reason ?? "未知", cls: "bg-muted text-muted-foreground" };
+              const r = REPAIR_STATUS[s.reason ?? "pending"] ?? { label: s.reason ?? "待处理", cls: "bg-muted text-muted-foreground" };
               return (
                 <button
-                  key={s.reason ?? "null"}
+                  key={s.reason ?? "pending"}
                   onClick={() => setReasonFilter(reasonFilter === (s.reason ?? "") ? "" : (s.reason ?? ""))}
                   className={cn(
                     "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
@@ -760,16 +1023,21 @@ export default function TldFailuresPage() {
             />
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">最少失败</span>
-            {[1, 3, 5, 10, 20].map(n => (
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">修复状态</span>
+            {[
+              { v: "", label: "全部" },
+              { v: "pending", label: "待处理" },
+              { v: "fixed", label: "已修复" },
+              { v: "wont_fix", label: "忽略" },
+            ].map(o => (
               <button
-                key={n}
-                onClick={() => setMinFails(n)}
+                key={o.v}
+                onClick={() => setReasonFilter(o.v)}
                 className={cn(
-                  "w-8 h-8 rounded-lg text-xs font-semibold border transition-all",
-                  minFails === n ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:border-primary/50",
+                  "h-8 px-2.5 rounded-lg text-xs font-semibold border transition-all",
+                  reasonFilter === o.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:border-primary/50",
                 )}
-              >{n}</button>
+              >{o.label}</button>
             ))}
           </div>
           <div className="flex items-center gap-1.5">
@@ -794,9 +1062,9 @@ export default function TldFailuresPage() {
         <div className="flex items-start gap-2 bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/50 dark:border-sky-800/30 rounded-xl px-4 py-3">
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <div className="text-xs text-sky-700 dark:text-sky-400 space-y-0.5">
-            <p><strong>失败原因：</strong>无服务器 = IANA未收录；超时 = 无法连接；解析失败 = 响应无法识别；速率限制 = 被拒绝</p>
+            <p><strong>本页结构：</strong>顶部仪表盘统计近窗口失败事件（查询成功率来自查询日志，原因/趋势/Top 列表来自诊断事件表）；下方列表为各后缀的服务器配置与修复状态。</p>
             <p><strong>批量扫描修复：</strong>自动通过 IANA RDAP 引导、IANA WHOIS 转介、常见 URL 规律、TCP 探测等策略发现服务器并保存。「未查询」扫描 TLD 规则库中从未查询过的后缀。</p>
-            <p>勾选多行后点「清零已选」可批量清除。手动填写后的条目可用「隐藏手动填写」过滤。</p>
+            <p>「清零」操作删除诊断事件记录，不影响服务器配置与修复状态。手动填写后的条目可用「隐藏手动填写」过滤。</p>
           </div>
         </div>
 
@@ -885,8 +1153,11 @@ export default function TldFailuresPage() {
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[11px] font-bold text-red-500">{row.fail_count.toLocaleString()}</span>
-                        <span className="text-[10px] text-muted-foreground">次失败</span>
+                        <span className={cn(
+                          "text-[11px] font-bold tabular-nums",
+                          (row.this_week_count ?? 0) > 0 ? "text-red-500" : "text-muted-foreground",
+                        )}>{row.this_week_count ?? 0}</span>
+                        <span className="text-[10px] text-muted-foreground">次失败/近7天</span>
                         {row.this_week_count !== undefined && row.prev_week_count !== undefined && (row.this_week_count > 0 || row.prev_week_count > 0) && (() => {
                           const delta = row.this_week_count - row.prev_week_count;
                           if (delta === 0) return (
