@@ -679,6 +679,11 @@ async function fetchPageText(tld, ianaUrl) {
 // Will be populated in main() after loading keys from env + site_settings DB
 let AI_PROVIDERS = [];
 
+// Provider circuit breaker: name → { consecutive429: n, until: timestamp }
+// Temporarily skip a provider after repeated HTTP 429 to avoid wasting time.
+const AI_COOLDOWN_MS = 5 * 60 * 1000;
+const AI_BREAKER = new Map();
+
 /**
  * Load AI API keys from the site_settings DB table (admin-configured).
  * Returns a map of provider name → key string.
@@ -738,6 +743,11 @@ async function buildAiProviders() {
 async function callAI(messages, providerIndex = 0) {
   for (let i = providerIndex; i < AI_PROVIDERS.length; i++) {
     const p = AI_PROVIDERS[i];
+    const brk = AI_BREAKER.get(p.name);
+    if (brk && brk.until > Date.now()) {
+      console.warn(`  [AI] ${p.name} cooling (429×${brk.count})`);
+      continue;
+    }
     try {
       const res = await fetch(p.endpoint, {
         method: "POST",
@@ -745,10 +755,18 @@ async function callAI(messages, providerIndex = 0) {
         body: JSON.stringify({ model: p.model, messages, temperature: 0.05, max_tokens: 700 }),
         signal: AbortSignal.timeout(35000),
       });
+      if (res.status === 429) {
+        const prev = AI_BREAKER.get(p.name) ?? { count: 0 };
+        const count = prev.count + 1;
+        AI_BREAKER.set(p.name, { count, until: Date.now() + AI_COOLDOWN_MS });
+        console.warn(`  [AI] ${p.name} HTTP 429 (×${count}, cooling ${AI_COOLDOWN_MS / 60000}min)`);
+        continue;
+      }
       if (!res.ok) { console.warn(`  [AI] ${p.name} HTTP ${res.status}`); continue; }
       const json = await res.json();
       const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
       if (!content) continue;
+      AI_BREAKER.delete(p.name);
       return { content, name: p.name, providerIndex: i };
     } catch (e) {
       console.warn(`  [AI] ${p.name} error: ${e.message.slice(0, 60)}`);
