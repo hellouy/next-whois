@@ -102,6 +102,8 @@
   "target": "대상",
   "type": "유형",
   "time": "시간",
+  "time_e2e_hint": "요청부터 표시까지의 시간 포함",
+  "enriching_whois": "전체 WHOIS 정보를 가져오는 중…",
   "no_raw_response": "원본 응답 데이터가 없습니다",
   "show_less": "접기",
   "more_count": "+{{count}}개 더보기",

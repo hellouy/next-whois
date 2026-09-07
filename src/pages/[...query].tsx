@@ -465,6 +465,10 @@ export default function LookupPage({
   // refreshing=true means partial RDAP data is shown; WHOIS enrichment still in-flight.
   // A subtle indicator is shown while refreshing, but the main content is visible.
   const [refreshing, setRefreshing] = React.useState(false);
+  // End-to-end lookup time (search submitted → final data displayed).
+  // Overrides the server-reported `time` field so the badge matches what the
+  // user actually experienced instead of just the WHOIS/RDAP duration.
+  const [e2eSeconds, setE2eSeconds] = React.useState<number | null>(null);
   const [data, setData] = React.useState<WhoisResult>(initialData ?? _EMPTY_WHOIS_RESULT);
   // Incrementing this forces a fresh fetch for the same target (re-query button).
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -550,12 +554,16 @@ export default function LookupPage({
     }
 
     let cancelled = false;
+    const abortController = new AbortController();
     // Use a pre-started fetch if handleSearch already fired one (hides SSR +
     // hydration latency ~400-700 ms inside the reported lookup time).
     // refreshKey > 0 means a forced re-query, skip the prefetch cache.
     const prefetched = refreshKey === 0 ? consumePrefetch(target) : undefined;
+    // End-to-end timing: start clocks when the request is actually fired
+    // (the prefetch start when available, otherwise this useEffect's fetch).
+    const e2eStart = prefetched?.startedAt ?? Date.now();
     const streamUrl = `/api/lookup-stream?query=${encodeURIComponent(target)}${refreshKey > 0 ? "&nocache=1" : ""}`;
-    const responsePromise = prefetched ?? fetch(streamUrl);
+    const responsePromise = prefetched?.promise ?? fetch(streamUrl, { signal: abortController.signal });
 
     (async () => {
       try {
@@ -607,6 +615,7 @@ export default function LookupPage({
                 // Final chunk: fully merged result
                 setLoading(false);
                 setRefreshing(false);
+                setE2eSeconds((Date.now() - e2eStart) / 1000);
               }
             } catch { /* malformed JSON line, skip */ }
           }
@@ -614,9 +623,10 @@ export default function LookupPage({
 
         if (!cancelled) {
           // If stream ended without a final chunk (e.g. single-chunk response),
-          // ensure loading/refreshing states are cleared.
+          // ensure loading/refreshing states are cleared and timing is finalised.
           setLoading(false);
           setRefreshing(false);
+          setE2eSeconds((prev) => prev ?? (Date.now() - e2eStart) / 1000);
         }
       } catch {
         if (!cancelled) {
@@ -627,7 +637,13 @@ export default function LookupPage({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Abort the underlying fetch so an in-flight stream from a previous
+      // domain query is released immediately (network + server resources)
+      // instead of draining in the background until the next read tick.
+      abortController.abort();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, refreshKey]);
 
@@ -745,18 +761,32 @@ export default function LookupPage({
     setTianhuTranslation(null);
     const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(target) || /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/.test(target);
     if (!target || isIp) return;
+    let cancelled = false;
     const timer = setTimeout(() => {
       fetch(`/api/tianhu/translate?domain=${encodeURIComponent(target)}`)
         .then((r) => r.json())
-        .then((d) => { if (d.dst) setTianhuTranslation(d); })
+        .then((d) => {
+          // Guard against a stale response from a previously-queried domain
+          // resolving after this effect re-ran (race on fast back-to-back
+          // searches) — only apply the result for the current target.
+          if (!cancelled && d.dst) setTianhuTranslation(d);
+        })
         .catch(() => {});
     }, 400);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [target]);
 
   const current = getWindowHref();
   const queryType = detectQueryType(target);
   const { status, result, error, time, dnsProbe, registryUrl, cached, cachedAt, cacheTtl } = data as typeof data & { registryUrl?: string };
+
+  // Time shown to the user.  Prefer the true end-to-end measurement (search
+  // submitted → data displayed); fall back to the server-reported WHOIS/RDAP
+  // duration while the e2e timer hasn't finalized yet (e.g. SSR snapshot).
+  const displayTime = e2eSeconds ?? time ?? 0;
 
   const { data: session, status: sessionStatus } = useSession();
 
@@ -1225,7 +1255,7 @@ export default function LookupPage({
                             {t("registered_no_whois")}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground font-mono">
-                            {(time ?? 0).toFixed(2)}s
+                            {displayTime.toFixed(2)}s
                           </span>
                         </div>
                       </div>
@@ -1459,7 +1489,11 @@ export default function LookupPage({
                         <span className="text-muted-foreground font-mono uppercase">
                           {t("time")}
                         </span>
-                        <span className="font-mono">{(time ?? 0).toFixed(2)}s</span>
+                        <span className="font-mono">{displayTime.toFixed(2)}s</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground font-mono uppercase"></span>
+                        <span className="text-[9px] text-muted-foreground/60 font-mono">{t("time_e2e_hint")}</span>
                       </div>
                     </div>
                   </div>
@@ -1777,7 +1811,7 @@ export default function LookupPage({
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <span suppressHydrationWarning className="text-[10px] text-muted-foreground font-mono">
-                          {(time ?? 0).toFixed(2)}s
+                          {displayTime.toFixed(2)}s
                           {data.source && (
                             <>
                               {" · "}
@@ -1800,7 +1834,7 @@ export default function LookupPage({
                         {refreshing && (
                           <span className="flex items-center gap-1 text-[10px] text-primary/60 font-mono animate-pulse">
                             <RiLoader4Line className="w-2.5 h-2.5 animate-spin" />
-                            {isChinese ? "更新中" : "Updating"}
+                            {t("enriching_whois")}
                           </span>
                         )}
                         <div className="ml-auto flex items-center gap-1">

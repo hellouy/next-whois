@@ -1,5 +1,5 @@
 import { randomBytes, createHash, createHmac } from "crypto";
-import { run, one, many } from "@/lib/db-query";
+import { run, one, many, withTransaction } from "@/lib/db-query";
 import { sendEmail, paymentConfirmHtml, getSiteLabel } from "@/lib/email";
 import { createLogger } from "@/lib/logger";
 
@@ -94,24 +94,35 @@ export async function markOrderPaid(params: {
   providerOrderId?: string;
   webhookRaw?: string;
 }): Promise<{ alreadyPaid: boolean; userEmail: string; grantsSubscription: boolean }> {
+  // Atomically claim the "paid" transition. `WHERE status <> 'paid'` makes
+  // the whole mark+grant sequence idempotent under concurrent webhook retries
+  // (Stripe at-least-once delivery, PayPal page-refresh double capture): the
+  // second concurrent caller sees rowCount = 0 and returns alreadyPaid without
+  // re-granting subscription/balance. Without this guard two racing webhook
+  // deliveries could both pass the SELECT check and double-credit the user.
+  const claimed = await run(
+    `UPDATE payment_orders
+        SET status='paid', paid_at=NOW(),
+            provider_order_id=COALESCE($2, provider_order_id),
+            webhook_raw=COALESCE($3, webhook_raw)
+      WHERE id=$1 AND status <> 'paid'`,
+    [params.orderId, params.providerOrderId ?? null, params.webhookRaw ?? null]
+  );
+  if (claimed === 0) {
+    const already = await one<{ user_email: string }>(
+      `SELECT user_email FROM payment_orders WHERE id=$1`, [params.orderId]
+    );
+    if (!already) throw new Error("订单不存在");
+    return { alreadyPaid: true, userEmail: already.user_email, grantsSubscription: false };
+  }
+
   const order = await one<{
-    id: string; status: string; user_id: string | null;
-    user_email: string; plan_id: string | null;
+    id: string; user_id: string | null; user_email: string; plan_id: string | null;
   }>(
-    `SELECT id, status, user_id, user_email, plan_id FROM payment_orders WHERE id = $1`,
+    `SELECT id, user_id, user_email, plan_id FROM payment_orders WHERE id = $1`,
     [params.orderId]
   );
   if (!order) throw new Error("订单不存在");
-  if (order.status === "paid") return { alreadyPaid: true, userEmail: order.user_email, grantsSubscription: false };
-
-  await run(
-    `UPDATE payment_orders
-     SET status='paid', paid_at=NOW(),
-         provider_order_id=COALESCE($2, provider_order_id),
-         webhook_raw=COALESCE($3, webhook_raw)
-     WHERE id=$1`,
-    [params.orderId, params.providerOrderId ?? null, params.webhookRaw ?? null]
-  );
 
   let grantsSubscription = false;
   let balanceGrantCents = 0;
@@ -132,108 +143,119 @@ export async function markOrderPaid(params: {
     balanceGrantCents = orderRow?.balance_grant_cents ?? 0;
   }
 
-  if (grantsSubscription) {
-    const planRow = order.plan_id ? await one<{ duration_days: number | null }>(
-      `SELECT duration_days FROM payment_plans WHERE id = $1`, [order.plan_id]
-    ) : null;
-    const durationDays = planRow?.duration_days ?? null;
+  // Grant subscription + balance inside ONE transaction. If any write fails the
+  // whole grant rolls back, so an order can never be marked paid while its
+  // entitlements are only half-applied (the old code would burn the payment
+  // but lose the subscription when the balance UPDATE failed midway).
+  await withTransaction(async (tx) => {
+    if (grantsSubscription) {
+      const planRow = order.plan_id ? await tx.one<{ duration_days: number | null }>(
+        `SELECT duration_days FROM payment_plans WHERE id = $1`, [order.plan_id]
+      ) : null;
+      const durationDays = planRow?.duration_days ?? null;
 
-    if (order.user_id) {
-      if (durationDays) {
-        await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
-           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
-           membership_remind_stage = NULL
-           WHERE id = $1`,
-          [order.user_id, durationDays]
-        );
-      } else {
-        await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
-           membership_remind_stage = NULL
-           WHERE id = $1`,
-          [order.user_id]
-        );
-      }
-    } else if (order.user_email) {
-      if (durationDays) {
-        await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
-           subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
-           membership_remind_stage = NULL
-           WHERE email = $1`,
-          [order.user_email, durationDays]
-        );
-      } else {
-        await run(
-          `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
-           membership_remind_stage = NULL
-           WHERE email = $1`,
-          [order.user_email]
-        );
+      if (order.user_id) {
+        if (durationDays) {
+          await tx.run(
+            `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
+             subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
+             membership_remind_stage = NULL
+             WHERE id = $1`,
+            [order.user_id, durationDays]
+          );
+        } else {
+          await tx.run(
+            `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
+             membership_remind_stage = NULL
+             WHERE id = $1`,
+            [order.user_id]
+          );
+        }
+      } else if (order.user_email) {
+        if (durationDays) {
+          await tx.run(
+            `UPDATE users SET subscription_access = TRUE, updated_at = NOW(),
+             subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW()) + ($2 || ' days')::INTERVAL,
+             membership_remind_stage = NULL
+             WHERE email = $1`,
+            [order.user_email, durationDays]
+          );
+        } else {
+          await tx.run(
+            `UPDATE users SET subscription_access = TRUE, updated_at = NOW(), subscription_expires_at = NULL,
+             membership_remind_stage = NULL
+             WHERE email = $1`,
+            [order.user_email]
+          );
+        }
       }
     }
-  }
 
-  // Credit balance if applicable
-  if (balanceGrantCents > 0) {
-    const uid = order.user_id;
-    const email = order.user_email;
-    if (uid) {
-      await run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [uid, balanceGrantCents]);
-      await run(
-        `INSERT INTO balance_transactions (user_id, amount_cents, type, description) VALUES ($1, $2, 'recharge', $3)`,
-        [uid, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
-      );
-    } else if (email) {
-      const u = await one<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
-      if (u) {
-        await run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [u.id, balanceGrantCents]);
-        await run(
+    // Credit balance if applicable
+    if (balanceGrantCents > 0) {
+      const uid = order.user_id;
+      const email = order.user_email;
+      if (uid) {
+        await tx.run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [uid, balanceGrantCents]);
+        await tx.run(
           `INSERT INTO balance_transactions (user_id, amount_cents, type, description) VALUES ($1, $2, 'recharge', $3)`,
-          [u.id, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
+          [uid, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
         );
+      } else if (email) {
+        const u = await tx.one<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
+        if (u) {
+          await tx.run(`UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`, [u.id, balanceGrantCents]);
+          await tx.run(
+            `INSERT INTO balance_transactions (user_id, amount_cents, type, description) VALUES ($1, $2, 'recharge', $3)`,
+            [u.id, balanceGrantCents, `支付充值（订单 ${params.orderId}）`]
+          );
+        }
       }
     }
-  }
 
-  const paidOrder = await one<{ plan_name: string; amount: number; currency: string }>(
-    `SELECT plan_name, amount::float AS amount, currency FROM payment_orders WHERE id=$1`,
-    [params.orderId]
-  );
-  const userRow = await one<{ name: string | null }>(
-    `SELECT name FROM users WHERE id=$1 OR email=$2 LIMIT 1`,
-    [order.user_id ?? "", order.user_email]
-  );
-  // Record payment as a sponsor entry with the correct currency from the order
-  await run(
-    `INSERT INTO sponsors (id, name, avatar_url, amount, currency, message, sponsor_date, is_anonymous, is_visible, platform)
-     VALUES ($1, $2, NULL, $3, $4, $5, CURRENT_DATE, false, false, $6)
-     ON CONFLICT DO NOTHING`,
-    [
-      randomBytes(8).toString("hex"),
-      order.user_email,
-      paidOrder?.amount ?? 0,
-      paidOrder?.currency ?? "CNY",
-      "通过支付系统赞助",
-      order.plan_id ?? "payment",
-    ]
-  ).catch(e => logger.warn("[markOrderPaid] sponsor insert error:", e));
+    const paidOrder = await tx.one<{ plan_name: string; amount: number; currency: string }>(
+      `SELECT plan_name, amount::float AS amount, currency FROM payment_orders WHERE id=$1`,
+      [params.orderId]
+    );
+    const userRow = await tx.one<{ name: string | null }>(
+      `SELECT name FROM users WHERE id=$1 OR email=$2 LIMIT 1`,
+      [order.user_id ?? "", order.user_email]
+    );
+    // Record payment as a sponsor entry with the correct currency from the order
+    await tx.run(
+      `INSERT INTO sponsors (id, name, avatar_url, amount, currency, message, sponsor_date, is_anonymous, is_visible, platform)
+       VALUES ($1, $2, NULL, $3, $4, $5, CURRENT_DATE, false, false, $6)
+       ON CONFLICT DO NOTHING`,
+      [
+        randomBytes(8).toString("hex"),
+        order.user_email,
+        paidOrder?.amount ?? 0,
+        paidOrder?.currency ?? "CNY",
+        "通过支付系统赞助",
+        order.plan_id ?? "payment",
+      ]
+    );
 
-  const siteName = await getSiteLabel();
-  sendEmail({
-    to: order.user_email,
-    subject: `支付成功 — 您的会员订阅已开通 | ${siteName}`,
-    html: paymentConfirmHtml({
-      name: userRow?.name ?? null,
-      email: order.user_email,
-      planName: paidOrder?.plan_name ?? "订阅套餐",
-      amount: paidOrder?.amount ?? 0,
-      currency: paidOrder?.currency ?? "CNY",
-      orderId: params.orderId,
-      siteName,
-    }),
-  }).catch(e => logger.error("[markOrderPaid] email error:", e));
+    // Confirmation email — outside the DB transaction (SMTP must not hold a
+    // transaction open), but its failure never voids the payment.
+    const siteName = await getSiteLabel();
+    void sendEmail({
+      to: order.user_email,
+      subject: `支付成功 — 您的会员订阅已开通 | ${siteName}`,
+      html: paymentConfirmHtml({
+        name: userRow?.name ?? null,
+        email: order.user_email,
+        planName: paidOrder?.plan_name ?? "订阅套餐",
+        amount: paidOrder?.amount ?? 0,
+        currency: paidOrder?.currency ?? "CNY",
+        orderId: params.orderId,
+        siteName,
+      }),
+    }).catch(e => logger.error("[markOrderPaid] email error:", e));
+  }).catch(e => {
+    logger.error("[markOrderPaid] grant transaction failed:", e);
+    throw e;
+  });
 
   return { alreadyPaid: false, userEmail: order.user_email, grantsSubscription };
 }

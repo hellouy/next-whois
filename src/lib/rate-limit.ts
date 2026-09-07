@@ -1,4 +1,4 @@
-import { isDbReady, one, run } from "@/lib/db-query";
+import { isDbReady, run } from "@/lib/db-query";
 import { isRedisAvailable, incrRedisValue } from "@/lib/server/redis";
 
 const DEFAULT_WINDOW_MS = 60_000;
@@ -31,37 +31,32 @@ async function checkRedisRateLimit(
   return { ok: true, remaining: Math.max(0, maxRequests - count), resetMs: (windowKey + 1) * windowMs - Date.now() };
 }
 
-// ─── Supabase DB backend (fallback when Redis unavailable) ────────────────────
+// ─── DB stats backend (fallback when Redis unavailable) ────────────────────
+// When Redis is down, the allow/deny decision is made in local memory (fast,
+// zero network).  The DB row is only kept fresh for the admin dashboard
+// (system.ts counts/clears stale rows) — it is written ASYNC and never awaited
+// on the hot path, because a synchronous Postgres round-trip on every request
+// would add ~1-2 s of pre-lookup latency on Redis-less deployments.
 
-async function checkDbRateLimit(
+async function writeDbRateStats(
   ip: string,
-  maxRequests: number,
   windowMs: number,
-): Promise<{ ok: boolean; remaining: number; resetMs: number } | null> {
-  if (!(await isDbReady())) return null;
+  count: number,
+): Promise<void> {
+  if (!(await isDbReady())) return;
   const resetAt = new Date(Date.now() + windowMs);
   try {
     await run(
       `INSERT INTO rate_limit_records (key, count, reset_at)
-       VALUES ($1, 1, $2)
+       VALUES ($1, $2, $3)
        ON CONFLICT (key) DO UPDATE
-         SET count    = CASE WHEN rate_limit_records.reset_at < NOW() THEN 1
-                             ELSE rate_limit_records.count + 1 END,
-             reset_at = CASE WHEN rate_limit_records.reset_at < NOW() THEN $2
+         SET count    = rate_limit_records.count + $2,
+             reset_at = CASE WHEN rate_limit_records.reset_at < NOW() THEN $3
                              ELSE rate_limit_records.reset_at END`,
-      [ip, resetAt.toISOString()],
+      [ip, count, resetAt.toISOString()],
     );
-    const row = await one<{ count: number; reset_at: string }>(
-      "SELECT count, reset_at FROM rate_limit_records WHERE key = $1",
-      [ip],
-    );
-    const count = row?.count ?? 1;
-    const rowResetAt = row ? new Date(row.reset_at).getTime() : Date.now() + windowMs;
-    localCache.set(ip, { count, resetAt: rowResetAt });
-    if (count > maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, rowResetAt - Date.now()) };
-    return { ok: true, remaining: Math.max(0, maxRequests - count), resetMs: Math.max(0, rowResetAt - Date.now()) };
   } catch {
-    return null;
+    // Best-effort stats only — never fail the request.
   }
 }
 
@@ -99,14 +94,17 @@ export async function checkRateLimit(
     return redisResult;
   }
 
-  // L3: Supabase DB
-  const dbResult = await checkDbRateLimit(ip, maxRequests, windowMs);
-  if (dbResult !== null) return dbResult;
-
-  // L4: local in-memory only (no Redis, no DB)
+  // L3: Redis unavailable → decide in local memory, write stats async.
+  // This must never block: a synchronous DB round-trip here is what pushed
+  // page latency past 2 s on deployments without Redis (measured on the
+  // lookup-stream pre-lookup path).  Local-memory limiting is per-instance,
+  // which is a fine trade-off when Redis is down; Redis is the shared source
+  // of truth when it is available under L2.
   const entry = localCache.get(ip);
   if (!entry || now > entry.resetAt) {
     localCache.set(ip, { count: 1, resetAt: now + windowMs });
+    // Async stats write for the admin dashboard (never awaited).
+    void writeDbRateStats(ip, windowMs, 1);
     return { ok: true, remaining: maxRequests - 1, resetMs: windowMs };
   }
   if (entry.count >= maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, entry.resetAt - now) };

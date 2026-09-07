@@ -54,6 +54,9 @@ const DELAY_MS     = parseInt(getArg("--delay") ?? "3000");
 const DRY_RUN      = hasFlag("--dry-run");
 const DEBUG        = hasFlag("--debug");
 
+// run_key for tld_crawl_progress — single-row progress per invocation mode
+const RUN_KEY = SEED_ONLY ? `seed-${TYPE}` : TYPE || "iana";
+
 // ── Database ──────────────────────────────────────────────────────────────────
 const DB_URL =
   process.env.POSTGRES_URL ||
@@ -728,18 +731,14 @@ async function buildAiProviders() {
   const moonshot  = process.env.MOONSHOT_API_KEY  || db.moonshot;
 
   return [
-    { key: zhipu,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",                    model: "glm-4-flashx",            name: "GLM-4-FlashX" },
     { key: zhipu,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",                    model: "glm-4-flash",             name: "GLM-4-Flash" },
+    { key: zhipu,     endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",                    model: "glm-4-flashx",            name: "GLM-4-FlashX" },
     { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "llama-3.3-70b-versatile", name: "Llama-3.3-70B (Groq)" },
-    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "qwen-qwq-32b",            name: "QwQ-32B (Groq)" },
-    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "mixtral-8x7b-32768",      name: "Mixtral-8x7B (Groq)" },
     { key: gemini,    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.0-flash",        name: "Gemini-2.0-Flash" },
     { key: deepseek,  endpoint: "https://api.deepseek.com/v1/chat/completions",                             model: "deepseek-chat",           name: "DeepSeek-V3" },
     { key: dashscope, endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",       model: "qwen-turbo",              name: "Qwen-Turbo" },
     { key: moonshot,  endpoint: "https://api.moonshot.cn/v1/chat/completions",                              model: "moonshot-v1-8k",          name: "Kimi-8k" },
-    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "gemma2-9b-it",            name: "Gemma2-9B (Groq)" },
-    { key: groq,      endpoint: "https://api.groq.com/openai/v1/chat/completions",                          model: "llama-3.1-8b-instant",    name: "Llama-3.1-8B Instant (Groq)" },
-  ].filter(p => p.key);
+  ].filter(p => p.key && p.model !== "qwen-turbo");
 }
 
 async function callAI(messages, providerIndex = 0) {
@@ -972,12 +971,45 @@ async function saveFailureToDb(tld, reason) {
 
 // ── Progress tracking ─────────────────────────────────────────────────────────
 let stats = { done: 0, skip: 0, err: 0, defaultOnly: 0, total: 0 };
+let ianaTotalLive = null;  // runtime IANA root-zone non-IDN count (set from fetchAllIanaTlds)
 
 function log(tld, status, msg = "") {
   const icon = { ok:"✅", skip:"⏭ ", err:"❌", warn:"⚠️ " }[status] ?? "  ";
   const done = stats.done + stats.skip + stats.err;
   const pct  = stats.total ? `[${String(done).padStart(3)}/${stats.total}]` : "";
   console.log(`${pct} ${icon} .${tld.padEnd(8)} ${msg}`);
+}
+
+/**
+ * Persist crawl progress to tld_crawl_progress (single-row upsert per run_key).
+ * Best-effort: failures are warned but never abort the crawl.
+ * @param status 'running'|'done'|'stopped'
+ * @param currentTld optional currently-processing TLD
+ */
+async function upsertProgress(status, currentTld = null) {
+  try {
+    await dbRun(
+      `INSERT INTO tld_crawl_progress
+        (run_key, status, done, total, ok, skipped, errors, default_only,
+         iana_total, current_tld, pid, started_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+               COALESCE((SELECT started_at FROM tld_crawl_progress WHERE run_key=$1), NOW()),
+               NOW())
+       ON CONFLICT (run_key) DO UPDATE SET
+         status=EXCLUDED.status,
+         done=EXCLUDED.done, total=EXCLUDED.total,
+         ok=EXCLUDED.ok, skipped=EXCLUDED.skipped, errors=EXCLUDED.errors,
+         default_only=EXCLUDED.default_only, iana_total=EXCLUDED.iana_total,
+         current_tld=EXCLUDED.current_tld, pid=EXCLUDED.pid,
+         started_at=COALESCE(tld_crawl_progress.started_at, EXCLUDED.started_at),
+         updated_at=NOW()`,
+      [RUN_KEY, status, stats.done + stats.skip + stats.err, stats.total,
+       stats.done, stats.skip, stats.err, stats.defaultOnly,
+       ianaTotalLive ?? stats.total, currentTld, process.pid]
+    );
+  } catch (e) {
+    console.warn(`  [DB] 进度落库失败: ${e.message.slice(0, 80)}`);
+  }
 }
 
 // Max retry thresholds before promoting to no_data (exhausted)
@@ -1169,6 +1201,7 @@ async function fetchAllIanaTlds({ includeIdn = false } = {}) {
     const text = await fetchRaw("https://data.iana.org/TLD/tlds-alpha-by-domain.txt", 15000);
     const lines = text.split(/\r?\n/).map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith("#"));
     const result = includeIdn ? lines : lines.filter(t => !t.startsWith("xn--"));
+    ianaTotalLive = result.length;
     console.log(`   IANA root zone: ${result.length} TLDs (${lines.length - result.length} IDN xn-- excluded)`);
     return result;
   } catch (e) {
@@ -1272,14 +1305,19 @@ async function main() {
   const startTime = Date.now();
   const worker    = SEED_ONLY ? seedTldDefault : scrapeTld;
 
+  // Initialize persisted progress record (idempotent upsert)
+  await upsertProgress("running", tldList[0] ?? null);
+
   for (let i = 0; i < tldList.length; i += CONCURRENCY) {
     if (shuttingDown) { console.log("⚠️  终止请求，停止处理新批次"); break; }
     const batch = tldList.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map(tld => worker(tld)));
+    await upsertProgress("running", batch[0] ?? null);
     if (i + CONCURRENCY < tldList.length && !shuttingDown) {
       await new Promise(r => setTimeout(r, DELAY_MS));
     }
   }
+  await upsertProgress(shuttingDown ? "stopped" : "done");
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`\n${"═".repeat(64)}`);

@@ -242,6 +242,28 @@ export async function deleteRedisValue(key: string): Promise<boolean> {
 }
 
 /**
+ * Atomically set a key ONLY if it does not already exist (SET NX EX).
+ * Returns true when the key was newly created, false when it already existed.
+ * This is the safe primitive for "only the first caller wins" rate limits and
+ * idempotency locks — a check-then-set pair (GET followed by SET) is racy and
+ * lets concurrent requests both pass.
+ */
+export async function setRedisValueNX(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+  const up = getUpstashClient();
+  if (up) {
+    try {
+      const res = await up.set(key, value, { ex: ttlSeconds, nx: true });
+      return res === "OK";
+    } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] SETNX ${key}:`, err.message); return false; }
+  }
+  if (!redis || !_ioredisAvailable) return false;
+  try {
+    const res = await redis.set(key, value, "EX", ttlSeconds, "NX");
+    return res === "OK";
+  } catch (err: any) { logger.error(`[Redis] SETNX ${key}:`, err.message); return false; }
+}
+
+/**
  * Deletes all Redis keys matching a glob pattern using SCAN (non-blocking).
  * Note: Upstash free tier limits SCAN cursor usage; falls back to no-op
  * gracefully when pattern scanning is unavailable.
@@ -287,22 +309,26 @@ export async function deleteRedisKeysByPattern(pattern: string): Promise<number>
 
 /**
  * Atomically increments a counter key and sets TTL on first increment.
- * Uses INCR + EXPIRE pipeline for ioredis, or sequential calls for Upstash.
+ * Uses SET key 1 EX ttl NX (atomic first-increment + TTL) followed by INCR,
+ * so a crashed/racing caller can never leave a key without its expiry —
+ * the old INCR-then-EXPIRE pair leaked keys forever when EXPIRE was dropped.
  */
 export async function incrRedisValue(key: string, ttlSeconds: number): Promise<number | null> {
   const up = getUpstashClient();
   if (up) {
     try {
+      // Atomic "create if absent with TTL" — exactly one caller wins.
+      const created = await up.set(key, "1", { ex: ttlSeconds, nx: true });
+      if (created === "OK") return 1;
       const count = await up.incr(key);
-      if (count === 1) await up.expire(key, ttlSeconds);
       return count;
     } catch (err: any) { handleUpstashError(err); logger.error(`[Redis] INCR ${key}:`, err.message); return null; }
   }
   if (!redis || !_ioredisAvailable) return null;
   try {
-    const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, ttlSeconds);
-    return count;
+    const created = await redis.set(key, "1", "EX", ttlSeconds, "NX");
+    if (created === "OK") return 1;
+    return await redis.incr(key);
   } catch (err: any) { logger.error(`[Redis] INCR ${key}:`, err.message); return null; }
 }
 

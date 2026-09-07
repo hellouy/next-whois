@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, run, isDbReady, withTransaction } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createLogger } from "@/lib/logger";
 
@@ -53,17 +53,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (preview.expires_at && new Date(preview.expires_at) < new Date())
       return res.status(410).json({ error: "Activation code has expired" });
 
-    // Atomically claim the code — only ONE concurrent request can win.
-    // WHERE used = false ensures a second concurrent request returns zero rows.
-    const ac = await one<ClaimedCode>(
-      `UPDATE activation_codes
-          SET used = true, used_by = $1, used_at = NOW()
-        WHERE id = $2
-          AND used = false
-          AND (expires_at IS NULL OR expires_at > NOW())
-        RETURNING id, plan_name, duration_days, grants_subscription, balance_grant_cents`,
-      [dbUser.id, preview.id]
-    );
+    // Atomically claim the code AND grant its entitlements inside ONE
+    // transaction. The `WHERE used = false` claim only succeeds once; if any
+    // subsequent grant write fails the whole transaction rolls back, so a code
+    // can never be burned while its subscription/balance is only half-applied.
+    const ac = await withTransaction(async (tx) => {
+      const claimed = await tx.one<ClaimedCode>(
+        `UPDATE activation_codes
+            SET used = true, used_by = $1, used_at = NOW()
+          WHERE id = $2
+            AND used = false
+            AND (expires_at IS NULL OR expires_at > NOW())
+          RETURNING id, plan_name, duration_days, grants_subscription, balance_grant_cents`,
+        [dbUser.id, preview.id]
+      );
+      if (!claimed) return null;
+
+      if (claimed.grants_subscription) {
+        if (claimed.duration_days) {
+          await tx.run(
+            `UPDATE users
+             SET subscription_access = TRUE,
+                 membership_plan = $2,
+                 updated_at = NOW(),
+                 subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW())
+                   + ($3 || ' days')::INTERVAL
+             WHERE id = $1`,
+            [dbUser.id, claimed.plan_name, claimed.duration_days]
+          );
+        } else {
+          await tx.run(
+            `UPDATE users
+             SET subscription_access = TRUE,
+                 membership_plan = $2,
+                 updated_at = NOW(),
+                 subscription_expires_at = NULL
+             WHERE id = $1`,
+            [dbUser.id, claimed.plan_name]
+          );
+        }
+      }
+
+      if (claimed.balance_grant_cents > 0) {
+        await tx.run(
+          `UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`,
+          [dbUser.id, claimed.balance_grant_cents]
+        );
+        await tx.run(
+          `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
+           VALUES ($1, $2, 'recharge', $3)`,
+          [dbUser.id, claimed.balance_grant_cents, `Activation code recharge: ${code}`]
+        );
+      }
+      return claimed;
+    });
 
     if (!ac) {
       // Race lost — another request claimed it between our SELECT and UPDATE
@@ -71,46 +114,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const results: string[] = [];
-
-    // Grant subscription access
     if (ac.grants_subscription) {
-      if (ac.duration_days) {
-        await run(
-          `UPDATE users
-           SET subscription_access = TRUE,
-               membership_plan = $2,
-               updated_at = NOW(),
-               subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, NOW()), NOW())
-                 + ($3 || ' days')::INTERVAL
-           WHERE id = $1`,
-          [dbUser.id, ac.plan_name, ac.duration_days]
-        );
-        results.push(`Membership extended by ${ac.duration_days} days (${ac.plan_name})`);
-      } else {
-        await run(
-          `UPDATE users
-           SET subscription_access = TRUE,
-               membership_plan = $2,
-               updated_at = NOW(),
-               subscription_expires_at = NULL
-           WHERE id = $1`,
-          [dbUser.id, ac.plan_name]
-        );
-        results.push(`Lifetime membership activated (${ac.plan_name})`);
-      }
+      results.push(
+        ac.duration_days
+          ? `Membership extended by ${ac.duration_days} days (${ac.plan_name})`
+          : `Lifetime membership activated (${ac.plan_name})`
+      );
     }
-
-    // Grant balance
     if (ac.balance_grant_cents > 0) {
-      await run(
-        `UPDATE users SET balance_cents = balance_cents + $2 WHERE id = $1`,
-        [dbUser.id, ac.balance_grant_cents]
-      );
-      await run(
-        `INSERT INTO balance_transactions (user_id, amount_cents, type, description)
-         VALUES ($1, $2, 'recharge', $3)`,
-        [dbUser.id, ac.balance_grant_cents, `Activation code recharge: ${code}`]
-      );
       results.push(`Balance increased by ¥${(ac.balance_grant_cents / 100).toFixed(2)}`);
     }
 

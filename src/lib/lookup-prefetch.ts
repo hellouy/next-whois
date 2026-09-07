@@ -11,6 +11,10 @@
  * TLDs the first line (partial RDAP result) typically arrives within 1-2 s,
  * well before the full WHOIS round-trip completes.
  *
+ * Each cached entry also records the instant the prefetch was fired so the
+ * result page can report the TRUE end-to-end lookup time (search submit → data
+ * displayed), not just the server-side WHOIS duration (`time`).
+ *
  * Usage:
  *   1. Call `prefetchLookup(target)` right before `router.push(...)`.
  *   2. In the fetch useEffect, call `consumePrefetch(target)` to get the
@@ -52,12 +56,16 @@ export function prefetchLookup(target: string): void {
 
 /**
  * Returns and removes the cached Promise for `target`, or undefined if none.
+ * The `startedAt` timestamp is the moment the prefetch request was fired — the
+ * result page uses it as the start of its end-to-end timing.
  * Call this in the fetch useEffect to use the pre-started request.
  */
-export function consumePrefetch(target: string): Promise<Response> | undefined {
+export function consumePrefetch(
+  target: string,
+): { promise: Promise<Response>; startedAt: number } | undefined {
   const entry = cache.get(target);
   if (!entry) return undefined;
   cache.delete(target);
   if (Date.now() - entry.createdAt > TTL_MS) return undefined;
-  return entry.promise;
+  return { promise: entry.promise, startedAt: entry.createdAt };
 }

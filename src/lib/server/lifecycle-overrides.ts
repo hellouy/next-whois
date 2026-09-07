@@ -42,6 +42,10 @@ export async function loadLifecycleOverrides(): Promise<Record<string, TldLifecy
     const map: Record<string, TldLifecycle> = {};
 
     // Layer 1: AI-scraped tld_rules (base layer, lower priority)
+    // Only rows that are genuinely ok (real scraped data) or manually edited are
+    // trusted. Rows in warn_defaults / no_data / failed carry the fallback
+    // 30/30/5 defaults which would otherwise be treated as authoritative AI data
+    // and corrupt drop-date calculations for those TLDs.
     const aiRows = await many<{
       tld: string;
       grace_period_days: number;
@@ -57,6 +61,7 @@ export async function loadLifecycleOverrides(): Promise<Record<string, TldLifecy
       `SELECT tld, grace_period_days, redemption_period_days, pending_delete_days, confidence,
               drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days
        FROM tld_rules
+       WHERE scrape_status = 'ok' OR COALESCE(manually_edited, false) = true
        ORDER BY tld`,
     ).catch(() => []);
 

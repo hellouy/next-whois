@@ -24,24 +24,35 @@ export function generateId(): string {
   return randomBytes(8).toString("hex");
 }
 
-let _requireCache: { value: boolean; ts: number } | null = null;
-const CACHE_TTL_MS = 30_000;
+// 5 minutes — require_api_key changes only through the admin panel, which
+// calls invalidateKeyRequireCache() immediately, so a short-lived stale read
+// is harmless.  A longer TTL avoids a Postgres round-trip on every cold
+// function instance (the main source of the pre-lookup latency measured on
+// the lookup/lookup-stream path).
+const CACHE_TTL_MS = 5 * 60_000;
+
+// Persist on globalThis so the cache survives Next.js dev hot-reloads (which
+// reset module state and would otherwise turn each navigation into a DB hit).
+const _g = globalThis as any;
+if (!_g.__requireApiKeyCache) _g.__requireApiKeyCache = { value: null, ts: 0 };
+const _requireCacheRef: { value: boolean | null; ts: number } = _g.__requireApiKeyCache;
 
 export function invalidateKeyRequireCache() {
-  _requireCache = null;
+  _g.__requireApiKeyCache = { value: null, ts: 0 };
 }
 
 export async function isApiKeyRequired(): Promise<boolean> {
   const now = Date.now();
-  if (_requireCache && now - _requireCache.ts < CACHE_TTL_MS) {
-    return _requireCache.value;
+  if (_requireCacheRef.value !== null && now - _requireCacheRef.ts < CACHE_TTL_MS) {
+    return _requireCacheRef.value;
   }
   try {
     const row = await one<{ value: string }>(
       "SELECT value FROM site_settings WHERE key = 'require_api_key'",
     );
     const value = row?.value === "1";
-    _requireCache = { value, ts: now };
+    _requireCacheRef.value = value;
+    _requireCacheRef.ts = now;
     return value;
   } catch {
     return false;
@@ -130,13 +141,16 @@ export async function enforceApiKey(
   res: NextApiResponse,
   scope: KeyScope = "api",
 ): Promise<boolean> {
-  const required = await isApiKeyRequired();
-  if (!required) return true;
-
   // Always allow requests that originate from the same site (e.g. the query
   // page fetching /api/lookup client-side) even when external API key
-  // enforcement is enabled.
+  // enforcement is enabled.  Checked BEFORE the require_api_key DB read: the
+  // query page hits this endpoint for every lookup, and on a cold function
+  // instance the Postgres round-trip costs ~2-4 s of pre-lookup latency that
+  // a same-origin request must never pay.
   if (isSameOriginRequest(req)) return true;
+
+  const required = await isApiKeyRequired();
+  if (!required) return true;
 
   const key = extractApiKey(req);
   if (!key) {

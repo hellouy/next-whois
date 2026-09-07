@@ -20,6 +20,10 @@ export async function queryWhoisTcp(
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const net = require("node:net") as typeof import("net");
+    // Hard cap on the response size: a well-behaved WHOIS reply is tens of KB.
+    // A compromised/hijacked server could otherwise stream unbounded data and
+    // exhaust the lambda's memory (OOM) inside the 12s window.
+    const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2 MiB
     let data = "";
     const socket = net.connect({ host: resolvedHost, port }, () => {
       // Do NOT half-close the socket with socket.end() after writing. Some
@@ -30,7 +34,13 @@ export async function queryWhoisTcp(
       socket.write(query + "\r\n");
     });
     socket.setTimeout(timeoutMs);
-    socket.on("data", (chunk: Buffer) => (data += chunk.toString()));
+    socket.on("data", (chunk: Buffer) => {
+      if (data.length >= MAX_RESPONSE_BYTES) {
+        socket.destroy(new Error(`WHOIS response from ${host} exceeded ${MAX_RESPONSE_BYTES} bytes`));
+        return;
+      }
+      data += chunk.toString();
+    });
     socket.on("close", () => resolve(data));
     // A server that responds but never closes should still yield its data
     // once the timeout fires, rather than failing the whole query.

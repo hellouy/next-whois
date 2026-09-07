@@ -311,3 +311,33 @@ Entries discovered by the Agent during task execution should follow this format:
   - Real-data backfill is preferred over synthetic migrations: scripts/backfill-failure-events.mjs re-derives events from query_logs failure rows (19 TLDs / 87 failed rows -> 72 events) preserving original timestamps; legacy-migration batch (130 events) all share one synthetic created_at (2026-09-06 06:55:56) so the panel trend shows a one-day spike — expected
   - In SQL for this project (node-postgres pg.Client), numeric aggregate outputs arrive as strings (COUNT(*)::text pattern is used to avoid parseInt ambiguity); date formatting uses to_char in the query rather than JS
   - Admin pages have no ESLint config (next lint opens interactive setup — cancel); verification chain is npx tsc --noEmit -> npx vitest run -> npx next build (via background terminal, restore public/sw.js + workbox hash after build if gitignored artifacts changed)
+
+[Project Knowledge Summary]
+- Date: 2026-09-07
+- Context: Discovered while debugging slow full TLD lifecycle crawl (scripts/batch-scrape.mjs) and then reworked admin TLD hub (T5)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - Crawl restart command (auto-resumes, skips already-successful TLDs): `cd /workspace && set -a && . ./.env.local && set +a && node scripts/batch-scrape.mjs --type iana --concurrency 8 --delay 0`; run via background terminal (memory_percent 20), progress persisted to tld_crawl_progress (single row, run_key='iana') polled by the hub page every 15s
+  - AI provider health (probed 2026-09-07): only zhipu glm-4-flash (200) and glm-4-flashx (intermittent 429) are usable; DB-configured groq key returns 403 (dead) and dashscope qwen-turbo returns 400 (dead). buildAiProviders now filters out dead models and orders flash BEFORE flashx (flashx hits 429 rate limit under high concurrency). If crawl slows to a crawl, suspect the other providers entering 30-min cooldown
+  - batch-scrape.mjs circuit breaker: repeated 429 → 5min cooldown, other 4xx/5xx → 30min cooldown (AI_BREAKER map, callAI); per-host HTTP throttling HOST_GAP_MS=2000/SEARCH_GAP_MS=5000 protects registry/Bing hosts; concurrency>4 does NOT increase throughput when the bottleneck is the single usable AI provider
+  - A TLD is permanently skipped (no re-crawl) when scrape_status=ok (real data) or no_data (exhausted retries); warn_defaults retries until MAX_WARN_ATTEMPTS then becomes no_data; manually_edited is always skipped
+  - scripts/batch-scrape.mjs writes tld_crawl_progress via upsert (run_key) + writes failure rows via saveFailureToDb; run `--seed-only` to insert all IANA TLDs with default values without AI (needs no API key)
+  - Hub-page architecture (T5): src/pages/admin/tlds-hub.tsx owns the 5-tab shell (?tab= deep link), each tab imports a thin component from src/components/admin/hub/ (crawl-tab/lifecycle-tab/failures-tab/whois-tab/compare-tab); TldRulesWorkspace (exported from tld-rules.tsx) is reused for crawl/lifecycle/compare via `embedded` + `initialTab` + `workspaceTabs` props — the single-tab embedded mode hides the inner tab bar and the progress overview, while crawl view keeps it
+  - Old routes /admin/tld-rules /admin/tld-failures /admin/whois-servers are kept as thin redirect shells (useEffect router.replace to tlds-hub?tab=...) so bookmarks don't 404; Next.js pages/ dir treats every file as a page — embeddable tab components MUST live outside pages/ (components/admin/hub/) or the build fails with "pages without a React Component as default export"
+  - admin-layout isActive() was updated to match hrefs carrying ?tab= query params (splits href on '?', path match + query-key equality); admin nav now points at tlds-hub (and access-control?tab=providers for API 集成)
+
+[Project Knowledge Summary]
+- Date: 2026-09-07
+- Context: Discovered during full systematic code review + fix pass (payment/webhook/redeem/verify code/redis/whois-stream/pricing/lifecycle-overrides/dns-check/reliability)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 数据正确性关键修复：src/lib/server/lifecycle-overrides.ts 的 tld_rules 查询必须加 `WHERE scrape_status='ok' OR manually_edited=true` 过滤 — 否则 no_data/failed/warn_defaults 行的 30/30/5 默认值会被当作真实 AI 生命周期数据污染掉落日期计算。tld_lifecycle_overrides 手动表优先(最高层覆盖)。
+  - DNS 可用性判定：src/lib/whois/dns-check.ts 中 ESERVFAIL 是解析器/注册局瞬时错误，不得与 NXDOMAIN/ENODATA 一样当作"确定无记录" — ESERVFAIL 应返回 null(视为超时/无信息)，否则会把瞬态 DNS 故障误判为域名可注册。
+  - 验证码安全：send-verify-code.ts 用 crypto.randomInt 生成验证码(禁用 Math.random)；Redis per-email 60s 限流用 setRedisValueNX(SET NX EX，原子) 而非 GET+SET 竞态。新增的 setRedisValueNX 在 src/lib/server/redis.ts。
+  - 支付幂等：markOrderPaid 用 `UPDATE payment_orders SET status='paid' WHERE id=$1 AND status<>'paid'` 检查 rowCount===1 抢占，权益发放(订阅+余额+sponsors)整体包在 withTransaction 内 — 防止 webhook 并发重投双花。redeem-code.ts 同样将 code 原子认领与发放并入单事务。
+  - Redis 计数原子化：incrRedisValue 用 `SET key 1 EX ttl NX` 抢占首增+INCR(代替 INCR+EXPIRE 非原子对，防 key 永不过期泄漏)。
+  - WHOIS TCP 响应有 2MiB 上限(whois-transport.ts)，防恶意/劫持服务器无界流打爆内存。
+  - 定价缓存：src/lib/pricing/client.ts 新增 TLD 级 30 分钟内存缓存(cachedValue 包装 getDomainPricing/getDomainTransferNegotiable/getTopRegistrars) — 消除每次冷查询 6-8 个外部 HTTP 请求(nazhumi/miqingju/tianhu)。
+  - lookup-stream.ts 是 streaming 端点，Cache-Control 在 flushHeaders() 后设置是死代码(已移除) — 结果缓存靠服务端 Redis/DB，非 HTTP CDN。
+  - 结果页主数据流 effect 增加 AbortController，切换域名时 abort 旧 fetch 释放资源。
+  - batch-scrape.mjs --clear-defaults 会重抓所有 30/30/5 的 ok TLD(真实值恰为默认值的也会被抓) — 属正常设计但耗时长(~40-60min)；AI 对多数 ccTLD 官方政策页(nic.xx)反复抓取仍只能得默认值，这些(如 tl/ar/li)需人工依据注册局政策录入 tld_lifecycle_overrides，而非无限重抓。

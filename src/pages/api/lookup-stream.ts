@@ -186,9 +186,10 @@ export default async function handler(
 
     finalSent = true;
 
-    const sMaxAge = finalResult.cacheTtl && finalResult.cacheTtl > 0 ? finalResult.cacheTtl : 3600;
-    const swr     = Math.min(sMaxAge * 4, 86_400);
-    res.setHeader("Cache-Control", `s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`);
+    // NOTE: Cache-Control was already sent as "no-store" before flushHeaders()
+    // above. A streaming NDJSON response cannot be CDN-cached anyway — result
+    // caching lives server-side in lookupWhoisCacheStreaming (Redis + DB), so
+    // any setHeader() here would be dead code after the headers are flushed.
 
     writeChunk({
       ...finalResult,

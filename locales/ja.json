@@ -101,6 +101,8 @@
   "target": "対象",
   "type": "タイプ",
   "time": "時間",
+  "time_e2e_hint": "リクエストから表示までの時間を含みます",
+  "enriching_whois": "完全なWHOIS情報を取得中…",
   "no_raw_response": "生レスポンスデータがありません",
   "show_less": "折りたたむ",
   "more_count": "+{{count}}件",

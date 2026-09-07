@@ -69,10 +69,10 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
     titleKey: "admin.nav_config",
     items: [
       { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
-      { href: "/admin/tld-rules",      labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
-      { href: "/admin/tld-failures",   labelKey: "admin.nav_tld_failures",   icon: RiBarChartLine,   activeIcon: RiBarChartLine },
-      { href: "/admin/whois-servers",  labelKey: "admin.nav_whois_servers",  icon: RiGlobalLine,     activeIcon: RiGlobalLine },
-      { href: "/admin/api",            labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
+      { href: "/admin/tlds-hub",     labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
+      { href: "/admin/tlds-hub?tab=failures",  labelKey: "admin.nav_tld_failures",   icon: RiBarChartLine,   activeIcon: RiBarChartLine },
+      { href: "/admin/tlds-hub?tab=whois",     labelKey: "admin.nav_whois_servers",  icon: RiGlobalLine,     activeIcon: RiGlobalLine },
+      { href: "/admin/access-control?tab=providers", labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
     ],
   },
   {
@@ -104,7 +104,7 @@ const BOTTOM_PINNED: NavItem[] = [
   { href: "/admin",               labelKey: "admin.nav_overview",       icon: RiDashboardLine,  activeIcon: RiDashboardFill,  exact: true },
   { href: "/admin/users",         labelKey: "admin.nav_users",          icon: RiUserLine,       activeIcon: RiUserFill },
   { href: "/admin/query-logs",    labelKey: "admin.nav_query_logs",     icon: RiHistoryLine,    activeIcon: RiHistoryLine },
-  { href: "/admin/tld-rules",     labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
+  { href: "/admin/tlds-hub",     labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
 ];
 
 export function AdminLayout({ children, title }: { children: React.ReactNode; title?: string }) {
@@ -161,8 +161,15 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
 
   function isActive(href: string, exact?: boolean): boolean {
     const p = router.pathname;
-    if (exact) return p === href;
-    return p === href || p.startsWith(href + "/");
+    const [path, query] = href.split("?");
+    const pathMatch = exact ? p === path : (p === path || p.startsWith(path + "/"));
+    if (!pathMatch) return false;
+    if (!query) return true;
+    const params = new URLSearchParams(query);
+    for (const [k, v] of params) {
+      if (String(router.query[k] ?? "") !== v) return false;
+    }
+    return true;
   }
 
   function navigate(href: string) {

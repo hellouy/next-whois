@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ── db_optimize_preview  (dry-run: counts only, no deletes) ──────────────
     if (action === "db_optimize_preview") {
       try {
-        const [tokens, anonSearches, rateLimits, orphanLogs, expiredKeys, stalePending, staleUserHistory] =
+        const [tokens, anonSearches, rateLimits, orphanLogs, stalePending, staleUserHistory] =
           await Promise.all([
             one<{ count: string }>(
               `SELECT COUNT(*) AS count FROM password_reset_tokens WHERE expires_at < NOW()`,
@@ -43,10 +43,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             one<{ count: string }>(
               `SELECT COUNT(*) AS count FROM reminder_logs rl
                WHERE NOT EXISTS (SELECT 1 FROM reminders r WHERE r.id = rl.reminder_id)`,
-            ),
-            one<{ count: string }>(
-              `SELECT COUNT(*) AS count FROM access_keys
-               WHERE expires_at IS NOT NULL AND expires_at < NOW()`,
             ),
             one<{ count: string }>(
               `SELECT COUNT(*) AS count FROM payment_orders
@@ -66,7 +62,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             { op: "anon_searches_30d",   label: "匿名查询记录 (>30天)",    count: parseInt(anonSearches?.count ?? "0") },
             { op: "expired_rate_limits", label: "过期频率限制记录",         count: parseInt(rateLimits?.count ?? "0") },
             { op: "orphan_logs",         label: "孤立提醒日志",            count: parseInt(orphanLogs?.count ?? "0") },
-            { op: "expired_keys",        label: "过期访问密钥",            count: parseInt(expiredKeys?.count ?? "0") },
             { op: "stale_orders",        label: "超期未支付订单 (>7天)",    count: parseInt(stalePending?.count ?? "0") },
             { op: "stale_user_history",  label: "用户普通查询记录 (>10天)", count: parseInt(staleUserHistory?.count ?? "0") },
             { op: "analyze",             label: "刷新查询统计信息 (ANALYZE)", count: -1 },
@@ -102,8 +97,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           `DELETE FROM reminder_logs WHERE NOT EXISTS (
              SELECT 1 FROM reminders r WHERE r.id = reminder_logs.reminder_id
            )`),
-        safeRun("expired_keys",        "过期访问密钥",
-          `DELETE FROM access_keys WHERE expires_at IS NOT NULL AND expires_at < NOW()`),
         safeRun("stale_orders",        "超期未支付订单 (>7天)",
           `DELETE FROM payment_orders WHERE status = 'pending' AND created_at < NOW() - INTERVAL '7 days'`),
         safeRun("stale_user_history",  "用户普通查询记录 (>10天)",
@@ -111,6 +104,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            AND created_at < NOW() - INTERVAL '10 days'`),
         safeRun("expired_verify_codes", "过期注册验证码",
           `DELETE FROM verify_codes WHERE expires_at < NOW()`),
+        safeRun("orphan_feedback",     "孤立反馈记录",
+          `DELETE FROM feedback WHERE created_at < NOW() - INTERVAL '180 days'`),
       ]);
       const report: OpResult[] = [r1, r2, r3, r4, r5, r6, r7, r8];
 

@@ -15,6 +15,7 @@ import {
   RiPriceTag3Line,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import { DomainPricing } from "@/lib/pricing/client";
 
 function RegistrarIcon({ faviconDomain, name }: { faviconDomain: string | null; name: string }) {
@@ -98,6 +99,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
   };
   const [eurRates, setEurRates] = React.useState<Record<string, number>>(CARD_FALLBACK_RATES);
   const isZh = locale.startsWith("zh");
+  const confettiRef = React.useRef<ConfettiRef>(null);
 
   React.useEffect(() => {
     const tld = domain.substring(domain.lastIndexOf(".") + 1).toLowerCase();
@@ -214,6 +216,29 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
   };
   const labelText = isZh ? LABELS[labelType].zh : LABELS[labelType].en;
 
+  // Celebrate a genuinely available domain with a single confetti burst after
+  // the entrance animation settles (700 ms ≈ card entrance + badge fade-in).
+  // Only fires for "available" labels — premium / high-fee cards stay calm.
+  // The disabled/reduced-motion path is handled by canvas-confetti itself
+  // (it reads the browser's prefers-reduced-motion setting internally).
+  React.useEffect(() => {
+    if (labelType !== "available") return;
+    const timer = setTimeout(() => {
+      confettiRef.current?.fire({
+        particleCount: 90,
+        spread: 70,
+        startVelocity: 38,
+        ticks: 140,
+        gravity: 0.9,
+        scalar: 0.85,
+        origin: { x: 0.5, y: 0.35 },
+        colors: ["#22c55e", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"],
+        zIndex: 60,
+      });
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [labelType, domain]);
+
   const ICON_MAP = {
     available:  <RiCheckLine  className="w-5 h-5 text-primary" />,
     high_value: <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
@@ -326,6 +351,17 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
     >
       {/* Accent line */}
       <div className={cn("h-[3px] w-full", ACCENT_CLASS[labelType])} />
+
+      {/* Confetti celebration — only active for "available" labels. The canvas
+          overlay sits above the accent line, below interactive content, and is
+          pointer-events-none so it never blocks clicks. */}
+      {labelType === "available" && (
+        <Confetti
+          ref={confettiRef}
+          className="absolute inset-0 z-10 rounded-xl"
+          aria-hidden
+        />
+      )}
 
       {/* ── Hero ── */}
       <motion.div

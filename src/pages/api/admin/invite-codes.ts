@@ -1,27 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { randomBytes } from "crypto";
 import { many, one, run, isDbReady } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
-import { randomBytes } from "crypto";
-
-function genCode(): string {
-  const seg = () => randomBytes(3).toString("hex").toUpperCase();
-  return `${seg()}-${seg()}-${seg()}`;
-}
-
-function parseExpiresAt(duration: string | undefined): string | null {
-  if (!duration || duration === "permanent") return null;
-  const now = new Date();
-  const map: Record<string, number> = {
-    "1d":  1,
-    "7d":  7,
-    "30d": 30,
-    "365d": 365,
-  };
-  const days = map[duration];
-  if (!days) return null;
-  now.setDate(now.getDate() + days);
-  return now.toISOString();
-}
+import { genHumanCode, parseExpiresAt } from "@/lib/code-utils";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -46,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const creatorId = adminUser?.id ?? null;
     const records = Array.from({ length: count }, () => ({
       id: randomBytes(8).toString("hex"),
-      code: genCode(),
+      code: genHumanCode(),
     }));
     await Promise.all(records.map(({ id, code }) =>
       run(

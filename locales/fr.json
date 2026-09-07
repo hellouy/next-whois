@@ -102,6 +102,8 @@
   "target": "Cible",
   "type": "Type",
   "time": "Heure",
+  "time_e2e_hint": "Inclut le temps de la demande à l'affichage",
+  "enriching_whois": "Récupération des informations WHOIS complètes…",
   "no_raw_response": "Aucune donnée de réponse brute disponible",
   "show_less": "Voir moins",
   "more_count": "+{{count}} de plus",

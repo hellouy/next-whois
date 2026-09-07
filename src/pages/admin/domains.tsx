@@ -11,8 +11,8 @@ export default function DomainsPage() {
 
   React.useEffect(() => {
     const target = tabParam === "failures"
-      ? "/admin/tld-rules?inner=failures"
-      : "/admin/tld-rules?inner=lifecycle";
+      ? "/admin/tlds-hub?tab=failures"
+      : "/admin/tlds-hub?tab=lifecycle";
     router.replace(target);
   }, [tabParam]);
 
@@ -22,7 +22,7 @@ export default function DomainsPage() {
       <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
         <RiGlobalLine className="w-10 h-10 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">正在跳转到 TLD 规则页…</p>
-        <Button variant="outline" size="sm" onClick={() => router.replace("/admin/tld-rules")}>
+        <Button variant="outline" size="sm" onClick={() => router.replace("/admin/tlds-hub")}>
           <RiArrowRightLine className="w-4 h-4 mr-1.5" />立即跳转
         </Button>
       </div>

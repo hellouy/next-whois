@@ -1,6 +1,4 @@
 import React from "react";
-import { useRouter } from "next/router";
-import { AdminLayout } from "@/components/admin-layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -213,12 +211,7 @@ function AddEditForm({
   );
 }
 
-export default function AdminWhoisServersPage() {
-  const router = useRouter();
-  React.useEffect(() => {
-    router.replace("/admin/tlds-hub?tab=whois", undefined, { shallow: true });
-  }, [router]);
-
+export function WhoisTab() {
   const [rows, setRows] = React.useState<ServerRow[]>([]);
   const [userTlds, setUserTlds] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(false);
@@ -307,7 +300,6 @@ export default function AdminWhoisServersPage() {
   const registryCount = rows.filter((r) => r.source === "registry").length;
 
   return (
-    <AdminLayout title="WHOIS 服务器管理">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
@@ -429,6 +421,5 @@ export default function AdminWhoisServersPage() {
           </ul>
         </div>
       </div>
-    </AdminLayout>
   );
 }

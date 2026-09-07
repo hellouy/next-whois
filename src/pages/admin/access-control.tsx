@@ -7,15 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProvidersSection } from "@/components/admin/providers-section";
 import {
-  RiShieldUserLine, RiKeyLine, RiGiftLine,
+  RiShieldUserLine, RiKeyLine, RiGiftLine, RiPlugLine, RiRobot2Line,
   RiAddLine, RiDeleteBinLine, RiFileCopyLine,
   RiToggleLine, RiToggleFill, RiLoader4Line, RiCloseLine,
   RiCheckLine, RiFilterLine, RiTimeLine, RiLockLine, RiLockUnlockLine,
   RiVipCrownLine, RiCoinLine,
 } from "@remixicon/react";
 
-type MainTab = "keys" | "invite" | "activation";
+type MainTab = "keys" | "invite" | "activation" | "providers";
 
 /* ── Access Keys ────────────────────────────────────────────────────────── */
 type Scope = "api" | "subscription" | "all";
@@ -901,24 +902,26 @@ export default function AccessControlPage() {
   React.useEffect(() => {
     if (tabParam === "invite") setActiveTab("invite");
     else if (tabParam === "activation") setActiveTab("activation");
+    else if (tabParam === "providers") setActiveTab("providers");
     else setActiveTab("keys");
   }, [tabParam]);
 
   const tabs: { key: MainTab; label: string; icon: React.ElementType; desc: string }[] = [
     { key: "keys",       label: "API 密钥",  icon: RiShieldUserLine, desc: "访问控制密钥" },
+    { key: "providers",  label: "API 集成",  icon: RiPlugLine,       desc: "AI Key·数据源" },
     { key: "invite",     label: "邀请码",    icon: RiKeyLine,         desc: "注册邀请码" },
     { key: "activation", label: "激活码",    icon: RiGiftLine,        desc: "付费激活码" },
   ];
 
   return (
-    <AdminLayout title="访问控制">
-      <Head><title>访问控制 · Admin</title></Head>
+    <AdminLayout title="访问与密钥">
+      <Head><title>访问与密钥 · Admin</title></Head>
       <div className="space-y-5">
         <div>
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <RiShieldUserLine className="w-5 h-5 text-primary" />访问控制
+            <RiShieldUserLine className="w-5 h-5 text-primary" />访问与密钥
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">API 密钥、注册邀请码、付费激活码统一管理</p>
+          <p className="text-xs text-muted-foreground mt-0.5">访问密钥、AI/数据源凭据、注册邀请码、付费激活码统一管理</p>
         </div>
 
         {/* Tab selector */}
@@ -940,6 +943,7 @@ export default function AccessControlPage() {
 
         {/* Tab content */}
         {activeTab === "keys" && <KeysTab />}
+        {activeTab === "providers" && <ProvidersSection />}
         {activeTab === "invite" && <InviteTab />}
         {activeTab === "activation" && <ActivationTab />}
       </div>

@@ -102,6 +102,8 @@
   "target": "Ziel",
   "type": "Typ",
   "time": "Zeit",
+  "time_e2e_hint": "Inkl. Zeit von Anfrage bis Anzeige",
+  "enriching_whois": "Vollständige WHOIS-Informationen werden geladen…",
   "no_raw_response": "Keine Rohdaten verfügbar",
   "show_less": "Weniger anzeigen",
   "more_count": "+{{count}} weitere",

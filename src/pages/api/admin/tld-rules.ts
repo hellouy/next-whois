@@ -638,6 +638,39 @@ export { fetchPageText, extractWithAI, hasLifecycleInfo };
 export type { ExtractedLifecycle };
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
+/** Fetch runtime IANA root-zone non-IDN TLD count with 24h cache. */
+async function fetchIanaTotalLive(): Promise<number | null> {
+  const key = "iana:root_zone_total_v2";
+  if (isRedisAvailable()) {
+    try {
+      const cached = await getRedisValue(key);
+      if (cached) {
+        const n = parseInt(cached, 10);
+        if (!Number.isNaN(n) && n > 1000) return n;
+      }
+    } catch { /* fall through */ }
+  }
+  try {
+    const resp = await fetch("https://data.iana.org/TLD/tlds-alpha-by-domain.txt", {
+      headers: { "User-Agent": "next-whois-ui/1.0 (domain lifecycle tool)" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const all = text
+      .split(/\r?\n/)
+      .map((l) => l.trim().toLowerCase())
+      .filter((t) => t && !t.startsWith("#"));
+    const n = all.filter((t) => !t.startsWith("xn--")).length;
+    if (isRedisAvailable()) {
+      await setRedisValue(key, String(n), 24 * 60 * 60).catch(() => {});
+    }
+    return n;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -697,9 +730,20 @@ export default async function handler(
       return res.send([header, ...lines].join("\n"));
     }
 
-    /* IANA root zone has 1285 non-IDN TLDs (as of 2026-Q1, xn-- excluded).
-       The batch scraper fetches this live; we keep it as a stable reference total. */
-    const IANA_TOTAL = 1285;
+    /* IANA root zone non-IDN total — fetched live (matches batch-scrape's
+       fetchAllIanaTlds), cached 24h. Fallback: last crawl progress total. */
+    let IANA_TOTAL = 1285;
+    try {
+      const live = await fetchIanaTotalLive();
+      if (live) IANA_TOTAL = live;
+      else {
+        const prog = await one<{ total: number }>(
+          `SELECT total FROM tld_crawl_progress WHERE run_key='iana' ORDER BY updated_at DESC LIMIT 1`
+        );
+        if (prog?.total) IANA_TOTAL = prog.total;
+      }
+    } catch { /* keep fallback */ }
+
     const stats = {
       total: rows.length,
       ianaTotal: IANA_TOTAL,

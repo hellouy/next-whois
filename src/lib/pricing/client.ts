@@ -6,6 +6,26 @@ const NAZHUMI_API_URL = "https://www.nazhumi.com/api/v1";
 const MIQINGJU_API_URL = "https://api.miqingju.com/api/v1/query";
 const TIANHU_API_URL = "https://api.tian.hu/tlds/pricing";
 
+// ── TLD-level in-memory cache ────────────────────────────────────────────────
+// Prices change at most daily; a per-TLD cache removes the 6-8 external HTTP
+// calls (nazhumi + miqingju + tianhu across new/renew/transfer) that would
+// otherwise fire on EVERY cold WHOIS lookup. TTL is 30 minutes.
+const PRICE_CACHE_TTL_MS = 30 * 60 * 1000;
+const priceCache = new Map<
+  string,
+  { value: unknown; expiresAt: number }
+>();
+
+function cachedValue<T>(key: string, producer: () => Promise<T>): Promise<T> {
+  const hit = priceCache.get(key);
+  const now = Date.now();
+  if (hit && now < hit.expiresAt) return Promise.resolve(hit.value as T);
+  return producer().then((val) => {
+    priceCache.set(key, { value: val, expiresAt: now + PRICE_CACHE_TTL_MS });
+    return val;
+  });
+}
+
 type NazhumiOrder = "new" | "renew" | "transfer";
 
 interface NazhumiRegistrar {
@@ -52,47 +72,48 @@ export interface DomainPricing extends NazhumiRegistrar {
 }
 
 export async function getDomainTransferNegotiable(domain: string): Promise<boolean | null> {
-  try {
-    const tld = domain
-      .substring(domain.lastIndexOf(".") + 1)
-      .replace("www.", "")
-      .toLowerCase()
-      .trim();
+  const tld = domain
+    .substring(domain.lastIndexOf(".") + 1)
+    .replace("www.", "")
+    .toLowerCase()
+    .trim();
+  return cachedValue(`negotiable:${tld}`, async () => {
+    try {
+      // Run pricing check and domain scoring concurrently for speed
+      const [nazhumiData, miqingjuData, scoreResult] = await Promise.all([
+        fetchNazhumiData(tld, "transfer"),
+        fetchMiqingjuData(tld, "transfer"),
+        (async () => {
+          try {
+            const { scoreDomain } = await import("@/lib/domain-value");
+            return scoreDomain(domain, "domain");
+          } catch {
+            return null;
+          }
+        })(),
+      ]);
 
-    // Run pricing check and domain scoring concurrently for speed
-    const [nazhumiData, miqingjuData, scoreResult] = await Promise.all([
-      fetchNazhumiData(tld, "transfer"),
-      fetchMiqingjuData(tld, "transfer"),
-      (async () => {
-        try {
-          const { scoreDomain } = await import("@/lib/domain-value");
-          return scoreDomain(domain, "domain");
-        } catch {
-          return null;
-        }
-      })(),
-    ]);
+      const score = scoreResult?.score ?? 0;
 
-    const score = scoreResult?.score ?? 0;
+      // High-value domains (score ≥ 65) are almost always negotiable regardless of
+      // whether standard transfer pricing exists — owners of premium domains expect
+      // direct offers.
+      if (score >= 65) return true;
 
-    // High-value domains (score ≥ 65) are almost always negotiable regardless of
-    // whether standard transfer pricing exists — owners of premium domains expect
-    // direct offers.
-    if (score >= 65) return true;
+      const combined = [...nazhumiData, ...miqingjuData].filter(
+        (r) => typeof r.transfer === "number" && (r.transfer as number) > 0,
+      );
 
-    const combined = [...nazhumiData, ...miqingjuData].filter(
-      (r) => typeof r.transfer === "number" && (r.transfer as number) > 0,
-    );
+      // If no standard transfer pricing is available for this TLD, mid-value and
+      // above domains can still be acquired via direct owner negotiation.
+      if (combined.length === 0) return score >= 35;
 
-    // If no standard transfer pricing is available for this TLD, mid-value and
-    // above domains can still be acquired via direct owner negotiation.
-    if (combined.length === 0) return score >= 35;
-
-    // Standard transfer pricing exists → not an aftermarket negotiation scenario.
-    return false;
-  } catch {
-    return null;
-  }
+      // Standard transfer pricing exists → not an aftermarket negotiation scenario.
+      return false;
+    } catch {
+      return null;
+    }
+  });
 }
 
 const MQ_TYPE_MAP: Record<NazhumiOrder, string> = {
@@ -278,43 +299,44 @@ export async function getDomainPricing(
   domain: string,
   type: NazhumiOrder,
 ): Promise<DomainPricing | null> {
-  try {
-    const tld = domain
-      .substring(domain.lastIndexOf(".") + 1)
-      .replace("www.", "")
-      .toLowerCase()
-      .trim();
+  const tld = domain
+    .substring(domain.lastIndexOf(".") + 1)
+    .replace("www.", "")
+    .toLowerCase()
+    .trim();
+  return cachedValue(`price:${tld}:${type}`, async () => {
+    try {
+      const [nazhumiData, miqingjuData, tianhuData] = await Promise.all([
+        fetchNazhumiData(tld, type),
+        fetchMiqingjuData(tld, type),
+        fetchTianhuData(tld, type),
+      ]);
 
-    const [nazhumiData, miqingjuData, tianhuData] = await Promise.all([
-      fetchNazhumiData(tld, type),
-      fetchMiqingjuData(tld, type),
-      fetchTianhuData(tld, type),
-    ]);
+      // Prefer nazhumi/miqingju (authoritative) over tianhu.
+      // Only use tianhu if neither nazhumi nor miqingju has any entry for this TLD.
+      const trustedSources = nazhumiData.length > 0 || miqingjuData.length > 0;
+      const merged = trustedSources
+        ? mergeRegistrars([nazhumiData, miqingjuData], type)
+        : mergeRegistrars([tianhuData], type);
+      if (merged.length === 0) return null;
 
-    // Prefer nazhumi/miqingju (authoritative) over tianhu.
-    // Only use tianhu if neither nazhumi nor miqingju has any entry for this TLD.
-    const trustedSources = nazhumiData.length > 0 || miqingjuData.length > 0;
-    const merged = trustedSources
-      ? mergeRegistrars([nazhumiData, miqingjuData], type)
-      : mergeRegistrars([tianhuData], type);
-    if (merged.length === 0) return null;
+      merged.sort((a, b) => {
+        const av = typeof a[type] === "number" ? (a[type] as number) : Infinity;
+        const bv = typeof b[type] === "number" ? (b[type] as number) : Infinity;
+        return av - bv;
+      });
 
-    merged.sort((a, b) => {
-      const av = typeof a[type] === "number" ? (a[type] as number) : Infinity;
-      const bv = typeof b[type] === "number" ? (b[type] as number) : Infinity;
-      return av - bv;
-    });
-
-    const best = merged[0];
-    return {
-      ...best,
-      isPremium: calcIsPremium(best),
-      externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
-    };
-  } catch (error) {
-    logger.error("Error fetching domain pricing:", error);
-    return null;
-  }
+      const best = merged[0];
+      return {
+        ...best,
+        isPremium: calcIsPremium(best),
+        externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
+      };
+    } catch (error) {
+      logger.error("Error fetching domain pricing:", error);
+      return null;
+    }
+  });
 }
 
 export async function getTopRegistrars(
@@ -322,38 +344,39 @@ export async function getTopRegistrars(
   type: NazhumiOrder,
   count = 3,
 ): Promise<DomainPricing[]> {
-  try {
-    const tld = domain
-      .substring(domain.lastIndexOf(".") + 1)
-      .replace("www.", "")
-      .toLowerCase()
-      .trim();
+  const tld = domain
+    .substring(domain.lastIndexOf(".") + 1)
+    .replace("www.", "")
+    .toLowerCase()
+    .trim();
+  return cachedValue(`top:${tld}:${type}`, async () => {
+    try {
+      const [nazhumiData, miqingjuData, tianhuData] = await Promise.all([
+        fetchNazhumiData(tld, type),
+        fetchMiqingjuData(tld, type),
+        fetchTianhuData(tld, type),
+      ]);
 
-    const [nazhumiData, miqingjuData, tianhuData] = await Promise.all([
-      fetchNazhumiData(tld, type),
-      fetchMiqingjuData(tld, type),
-      fetchTianhuData(tld, type),
-    ]);
+      const trustedSourcesTop = nazhumiData.length > 0 || miqingjuData.length > 0;
+      const merged = trustedSourcesTop
+        ? mergeRegistrars([nazhumiData, miqingjuData], type)
+        : mergeRegistrars([tianhuData], type);
 
-    const trustedSourcesTop = nazhumiData.length > 0 || miqingjuData.length > 0;
-    const merged = trustedSourcesTop
-      ? mergeRegistrars([nazhumiData, miqingjuData], type)
-      : mergeRegistrars([tianhuData], type);
-
-    return merged
-      .filter((r) => typeof r[type] === "number" && (r[type] as number) > 0)
-      .sort((a, b) => {
-        const av = typeof a[type] === "number" ? (a[type] as number) : Infinity;
-        const bv = typeof b[type] === "number" ? (b[type] as number) : Infinity;
-        return av - bv;
-      })
-      .slice(0, count)
-      .map((r) => ({
-        ...r,
-        isPremium: calcIsPremium(r),
-        externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
-      }));
-  } catch {
-    return [];
-  }
+      return merged
+        .filter((r) => typeof r[type] === "number" && (r[type] as number) > 0)
+        .sort((a, b) => {
+          const av = typeof a[type] === "number" ? (a[type] as number) : Infinity;
+          const bv = typeof b[type] === "number" ? (b[type] as number) : Infinity;
+          return av - bv;
+        })
+        .slice(0, count)
+        .map((r) => ({
+          ...r,
+          isPremium: calcIsPremium(r),
+          externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
+        }));
+    } catch {
+      return [];
+    }
+  });
 }

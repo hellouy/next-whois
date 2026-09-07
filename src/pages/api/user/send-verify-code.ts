@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { randomInt } from "crypto";
 import {
   setRedisValue,
-  getRedisValue,
+  setRedisValueNX,
   deleteRedisValue,
   isRedisAvailable,
 } from "@/lib/server/redis";
@@ -53,9 +54,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Per-email rate limit: max 1 code per 60 s (Redis-preferred, DB fallback via checkRateLimit)
   if (isRedisAvailable()) {
-    const rateLimitKey = `verify:rate:${cleanEmail}`;
-    const recentlySent = await getRedisValue(rateLimitKey);
-    if (recentlySent) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
+    // Atomic SET NX EX — only the FIRST caller in each 60s window wins, so two
+    // concurrent requests cannot both pass the check and double-send. This
+    // doubles as the rate-limit marker (no separate SET after sending needed).
+    const locked = await setRedisValueNX(`verify:rate:${cleanEmail}`, "1", 60);
+    if (!locked) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
   } else if (await isDbReady()) {
     const rl = await checkRateLimit(`verify:rate:${cleanEmail}`, 1, 60_000);
     if (!rl.ok) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
@@ -63,7 +66,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(503).json({ error: "Verification service is temporarily unavailable, please try again later" });
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically secure 6-digit code (Math.random is predictable and lets
+  // an attacker guess/brute-force codes).
+  const code = String(randomInt(100000, 1000000));
 
   // Persist the code (Redis preferred, DB fallback — both may succeed simultaneously)
   let stored = false;
@@ -99,10 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Failed to send email, please check your email address or try again later" });
   }
 
-  // Set Redis rate-limit key (best-effort; DB rate-limit already recorded above when Redis was down)
-  if (isRedisAvailable()) {
-    await setRedisValue(`verify:rate:${cleanEmail}`, "1", 60).catch(() => {});
-  }
-
+  // Rate-limit marker was set atomically via SETNX above (Redis path) or by
+  // checkRateLimit (DB path) — nothing more to write here.
   return res.status(200).json({ ok: true });
 }

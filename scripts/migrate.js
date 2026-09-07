@@ -314,6 +314,21 @@ const TABLES = [
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT hot_prefixes_prefix_uniq UNIQUE (prefix)
   )`,
+  `CREATE TABLE IF NOT EXISTS tld_crawl_progress (
+    run_key      TEXT        PRIMARY KEY,
+    status       TEXT        NOT NULL DEFAULT 'idle',
+    done         INTEGER     NOT NULL DEFAULT 0,
+    total        INTEGER     NOT NULL DEFAULT 0,
+    ok           INTEGER     NOT NULL DEFAULT 0,
+    skipped      INTEGER     NOT NULL DEFAULT 0,
+    errors       INTEGER     NOT NULL DEFAULT 0,
+    default_only INTEGER     NOT NULL DEFAULT 0,
+    iana_total   INTEGER,
+    current_tld  TEXT,
+    pid          INTEGER,
+    started_at   TIMESTAMPTZ,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 // Safe ALTER TABLE statements — add columns to pre-existing tables.

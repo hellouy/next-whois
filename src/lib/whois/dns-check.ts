@@ -28,10 +28,13 @@ const DNS_TIMEOUT_MS = 5000;
  *
  * Returns:
  *  - The resolved value on success
- *  - An empty array on DNS errors (ENOTFOUND = NXDOMAIN, ENODATA = no records of
- *    this type, ESERVFAIL = registry error) — these are definitive "no records"
- *    answers, distinct from a timeout.
- *  - null on actual network timeout (DNS server unreachable / no response)
+ *  - An empty array on definitive "no records" answers (ENOTFOUND = NXDOMAIN,
+ *    ENODATA = domain exists but no records of this type) — these mean the
+ *    queried record type genuinely doesn't exist.
+ *  - null on anything ambiguous: timeouts, network errors, ESERVFAIL, EREFUSED,
+ *    etc. ESERVFAIL is a temporary resolver/registry failure, NOT a "no
+ *    records" answer — treating it as "domain unregistered" would mis-report a
+ *    transient DNS hiccup as a registrable domain.
  *
  * This distinction is critical: NXDOMAIN (domain doesn't exist) must not be
  * treated the same as a timeout (DNS unreachable) — the former means the domain
@@ -45,12 +48,12 @@ function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | n
       // Return an empty array so the caller knows we got a real response.
       if (
         code === "ENOTFOUND" ||  // NXDOMAIN — domain doesn't exist
-        code === "ENODATA"  ||  // Domain exists but no records of this type
-        code === "ESERVFAIL"    // Registry/resolver error — treat as no data
+        code === "ENODATA"       // Domain exists but no records of this type
       ) {
         return [] as unknown as T;
       }
-      // Everything else (ETIMEOUT, ECONNREFUSED, etc.) → treat as timeout / no info
+      // Everything else (ESERVFAIL = resolver/registry error, ETIMEOUT,
+      // ECONNREFUSED, etc.) → treat as no info, never as a definitive answer.
       return null;
     }),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), DNS_TIMEOUT_MS)),

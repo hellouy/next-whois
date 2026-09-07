@@ -102,6 +102,8 @@
   "target": "目標",
   "type": "類型",
   "time": "時間",
+  "time_e2e_hint": "含請求到顯示的完整耗時",
+  "enriching_whois": "正在取得完整的 WHOIS 資訊…",
   "no_raw_response": "無可用的原始回應資料",
   "show_less": "收起",
   "more_count": "還有 {{count}} 項",

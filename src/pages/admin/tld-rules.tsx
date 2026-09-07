@@ -1091,15 +1091,33 @@ const TLD_TABS = [
   { href: "/admin/tld-rules", label: "TLD 规则" },
 ];
 
-export default function AdminTldRulesPage() {
+type WorkspaceProps = { embedded?: boolean; initialTab?: Tab; workspaceTabs?: Tab[] };
+
+const WORKSPACE_TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "cc", label: "国别域名 (ccTLD)", icon: RiMapPin2Line },
+  { id: "gtld", label: "通用顶级域 (gTLD)", icon: RiGlobalLine },
+  { id: "compare", label: "对比分析", icon: RiBarChartLine },
+  { id: "failures", label: "失败记录", icon: RiAlertLine },
+  { id: "lifecycle", label: "生命周期设置", icon: RiSettings3Line },
+];
+
+export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspaceTabs }: WorkspaceProps = {}) {
   const router = useRouter();
   const innerParam = router.query.inner as string | undefined;
-  const [tab, setTab] = React.useState<Tab>("cc");
+  const [tab, setTab] = React.useState<Tab>(initialTab);
 
   React.useEffect(() => {
+    if (embedded || workspaceTabs) return;
     if (innerParam === "failures") setTab("failures");
     else if (innerParam === "lifecycle") setTab("lifecycle");
-  }, [innerParam]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [innerParam, embedded, workspaceTabs]);
+
+  const visibleTabs = workspaceTabs && workspaceTabs.length > 0
+    ? WORKSPACE_TABS.filter(t => workspaceTabs.includes(t.id))
+    : WORKSPACE_TABS;
+  const hideTabBar = embedded && visibleTabs.length <= 1;
+  const isCrawlView = visibleTabs.some(t => t.id === "cc" || t.id === "gtld");
 
   const [rules, setRules] = React.useState<TldRule[]>(
     () => getCached<{ rules: TldRule[]; stats: ScrapeStats | null }>(CACHE_RULES, TTL_RULES)?.rules ?? []
@@ -1650,21 +1668,24 @@ export default function AdminTldRulesPage() {
     );
   }
 
-  return (
-    <AdminLayout title="TLD 管理">
-      <Head><title>TLD 生命周期规则 - AI 抓取</title></Head>
-
+  const mainContent = (
+    <>
       <div className="space-y-6 max-w-6xl">
-        <PageTabs tabs={TLD_TABS} />
-        <div>
-          <h1 className="text-xl font-semibold">TLD 生命周期规则 — AI 自动抓取</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            爬取注册局页面，多模型 AI（GLM/Groq/Gemini/DeepSeek 自动回退）提取宽限期、赎回期、精确掉落时间和时区，IANA 页面自动发现注册局生命周期子页。
-          </p>
-        </div>
 
-        {/* ── AI 抓取进度总览 ─────────────────────────────────────────────── */}
-        {scrapeStats && (() => {
+        {!embedded && (
+          <>
+            <PageTabs tabs={TLD_TABS} />
+            <div>
+              <h1 className="text-xl font-semibold">TLD 生命周期规则 — AI 自动抓取</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                爬取注册局页面，多模型 AI（GLM/Groq/Gemini/DeepSeek 自动回退）提取宽限期、赎回期、精确掉落时间和时区，IANA 页面自动发现注册局生命周期子页。
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* ── AI 抓取进度总览 (crawl view only) ─────────────────────────── */}
+        {isCrawlView && scrapeStats && (() => {
           const iana = scrapeStats.ianaTotal ?? 1285;
           const inDb = scrapeStats.total;
           const notYet = Math.max(0, iana - inDb);
@@ -1751,8 +1772,8 @@ export default function AdminTldRulesPage() {
           );
         })()}
 
-        {/* ── Failed / Warn / No-data records panel ───────────────────────── */}
-        {!loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")).length > 0 && (
+        {/* ── Failed / Warn / No-data records panel (crawl view only) ────── */}
+        {isCrawlView && !loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")).length > 0 && (
           <div className="border rounded-xl overflow-hidden bg-card">
             <div className="flex items-center gap-3 px-4 py-3 border-b bg-red-50/50 dark:bg-red-950/10">
               <RiErrorWarningLine className="w-4 h-4 text-red-500" />
@@ -1881,30 +1902,26 @@ export default function AdminTldRulesPage() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b overflow-x-auto">
-          {([
-            { id: "cc", label: "国别域名 (ccTLD)", icon: RiMapPin2Line },
-            { id: "gtld", label: "通用顶级域 (gTLD)", icon: RiGlobalLine },
-            { id: "compare", label: "对比分析", icon: RiBarChartLine },
-            { id: "failures", label: "失败记录", icon: RiAlertLine },
-            { id: "lifecycle", label: "生命周期设置", icon: RiSettings3Line },
-          ] as const).map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0",
-                tab === id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Tab bar — hidden when a single embedded tab is pinned by the hub page */}
+        {!hideTabBar && (
+          <div className="flex gap-1 border-b overflow-x-auto">
+            {visibleTabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0",
+                  tab === id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── ccTLD tab ────────────────────────────────────────────────────── */}
         {tab === "cc" && (
@@ -2440,6 +2457,25 @@ export default function AdminTldRulesPage() {
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (embedded) return mainContent;
+
+  return (
+    <AdminLayout title="TLD 管理">
+      <Head><title>TLD 生命周期规则 - AI 抓取</title></Head>
+      {mainContent}
     </AdminLayout>
   );
+}
+
+export default function AdminTldRulesPage() {
+  const router = useRouter();
+  React.useEffect(() => {
+    const inner = router.query.inner as string | undefined;
+    const tab = inner === "failures" ? "failures" : inner === "lifecycle" ? "lifecycle" : "lifecycle";
+    router.replace(`/admin/tlds-hub?tab=${tab}`, undefined, { shallow: true });
+  }, [router]);
+  return <TldRulesWorkspace />;
 }

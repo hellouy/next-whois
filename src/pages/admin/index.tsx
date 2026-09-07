@@ -192,12 +192,10 @@ const ACTION_GROUPS: ActionGroup[] = [
     accentColor: "text-blue-500",
     items: [
       { href: "/admin/domain-access",           label: "域名接入",     desc: "接入监控总览与 TLD 分布",    icon: RiNetworkLine,    color: "text-blue-500" },
-      { href: "/admin/tld-rules",               label: "TLD 规则",     desc: "AI爬取·WHOIS/RDAP 规则定制", icon: RiCodeBoxLine,    color: "text-teal-500" },
-      { href: "/admin/tld-rules?inner=failures",label: "查询失败记录", desc: "后缀失败分析·一键添加服务器", icon: RiAlertLine,      color: "text-amber-500" },
-      { href: "/admin/tld-failures",            label: "失败详细统计", desc: "完整失败统计·repair·第三方API",icon: RiBarChartLine,   color: "text-orange-500" },
-      { href: "/admin/tld-rules?inner=lifecycle",label: "生命周期设置", desc: "宽限期·赎回期·用户纠错审核",  icon: RiTimeLine,       color: "text-blue-600" },
+      { href: "/admin/tlds-hub",                label: "域名与 TLD",   desc: "生命周期·AI抓取·失败·WHOIS·对比", icon: RiCodeBoxLine, color: "text-teal-500" },
+      { href: "/admin/tlds-hub?tab=failures",   label: "失败详细统计", desc: "完整失败统计·repair·第三方API",icon: RiBarChartLine,   color: "text-orange-500" },
       { href: "/admin/query-logs",              label: "查询日志",     desc: "实时请求日志与错误率监控",   icon: RiHistoryLine,    color: "text-sky-500" },
-      { href: "/admin/api",                     label: "API 集成",     desc: "AI Key · 第三方数据源配置",  icon: RiPlugLine,       color: "text-orange-500" },
+      { href: "/admin/access-control?tab=providers", label: "API 集成", desc: "AI Key · 第三方数据源配置", icon: RiPlugLine, color: "text-orange-500" },
       { href: "/admin/hot-prefixes",            label: "热门搜索词",   desc: "首页推荐查询词条管理",       icon: RiFireLine,       color: "text-red-500" },
     ],
   },
@@ -306,7 +304,7 @@ export default function AdminIndexPage() {
             )}
             {(stats.todayFailedSearches ?? 0) > 0 && (
               <button
-                onClick={() => router.push("/admin/tld-failures", undefined, { locale: false })}
+                onClick={() => router.push("/admin/tlds-hub?tab=failures", undefined, { locale: false })}
                 className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 hover:underline"
               >
                 <RiAlertLine className="w-3 h-3" />
@@ -391,7 +389,7 @@ export default function AdminIndexPage() {
           <StatCard
             icon={RiAlertLine} label="查询失败域名" value={stats?.failedDomainSearches}
             sub="今日失败" subValue={stats ? `${stats.todayFailedSearches}（${stats.failureRate}%）` : undefined}
-            href="/admin/tld-failures"
+            href="/admin/tlds-hub?tab=failures"
             color="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
             badge={stats?.tldFailures ? { label: "后缀异常", value: stats.tldFailures, color: "bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400" } : undefined}
           />
@@ -526,7 +524,7 @@ export default function AdminIndexPage() {
                   <h3 className="text-xs font-bold flex items-center gap-1.5">
                     <RiAlertLine className="w-3.5 h-3.5 text-amber-500" />查询失败后缀 Top 8
                   </h3>
-                  <button onClick={() => router.push("/admin/tld-failures", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">全部</button>
+                  <button onClick={() => router.push("/admin/tlds-hub?tab=failures", undefined, { locale: false })} className="text-[11px] text-primary hover:underline">全部</button>
                 </div>
                 <div className="space-y-1">
                   {stats.topFailingTlds.map(t => {

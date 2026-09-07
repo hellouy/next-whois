@@ -180,7 +180,7 @@ export default function AdminDomainAccessPage() {
                   variant="outline"
                   size="sm"
                   className="text-xs h-7 shrink-0 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                  onClick={() => router.push("/admin/tld-rules")}
+                  onClick={() => router.push("/admin/tlds-hub?tab=crawl")}
                 >
                   去补充规则
                 </Button>
@@ -248,7 +248,7 @@ export default function AdminDomainAccessPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { label: "管理所有监控域名", desc: "查看、搜索、删除到期提醒", href: "/admin/reminders", icon: RiFileListLine },
-                  { label: "后缀解析规则", desc: "配置 TLD WHOIS 解析规则", href: "/admin/tld-rules", icon: RiGlobalLine },
+                  { label: "后缀解析规则", desc: "配置 TLD WHOIS 解析规则", href: "/admin/tlds-hub?tab=crawl", icon: RiGlobalLine },
                   { label: "域名生命周期", desc: "管理域名生命周期阶段节点", href: "/admin/domains", icon: RiTimeLine },
                   { label: "查询记录", desc: "查看用户 WHOIS 查询历史", href: "/admin/search-records", icon: RiFileListLine },
                 ].map(({ label, desc, href, icon: Icon }) => (

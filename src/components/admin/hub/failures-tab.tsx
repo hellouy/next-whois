@@ -1,6 +1,5 @@
 import React from "react";
-import { useRouter } from "next/router";
-import { AdminLayout } from "@/components/admin-layout";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -399,12 +398,7 @@ function ServerEndpointFields(props: {
   );
 }
 
-export default function TldFailuresPage() {
-  const router = useRouter();
-  React.useEffect(() => {
-    router.replace("/admin/tlds-hub?tab=failures", undefined, { shallow: true });
-  }, [router]);
-
+export function FailuresTab() {
   const [rows, setRows]           = React.useState<TldFailureRow[]>([]);
   const [summary, setSummary]     = React.useState<Summary[]>([]);
   const [loading, setLoading]     = React.useState(true);
@@ -887,7 +881,6 @@ export default function TldFailuresPage() {
   const allSelected  = rows.length > 0 && selected.size === rows.length;
 
   return (
-    <AdminLayout title="查询失败统计">
       <div className="space-y-4">
 
         {/* ── Batch-scraper running banner ── */}
@@ -1798,6 +1791,5 @@ export default function TldFailuresPage() {
           </>
         )}
       </div>
-    </AdminLayout>
   );
 }
