@@ -1864,7 +1864,8 @@
     "loading": "조회 중…",
     "step_connect": "RDAP 서버 연결 중…",
     "step_whois": "WHOIS 데이터베이스 조회 중…",
-    "step_parse": "등록 정보 파싱 중…"
+    "step_parse": "등록 정보 파싱 중…",
+    "parking_detected": "판매 목록 등록 · {{provider}}"
   },
   "notifications": {
     "title": "알림",

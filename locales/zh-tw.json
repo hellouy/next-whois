@@ -1864,7 +1864,8 @@
     "loading": "正在查詢…",
     "step_connect": "連線 RDAP 伺服器…",
     "step_whois": "查詢 WHOIS 資料庫…",
-    "step_parse": "解析註冊資訊…"
+    "step_parse": "解析註冊資訊…",
+    "parking_detected": "疑似掛售 · {{provider}}"
   },
   "notifications": {
     "title": "通知",

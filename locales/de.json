@@ -1864,7 +1864,8 @@
     "loading": "Wird abgefragt…",
     "step_connect": "Verbindung zum RDAP-Server…",
     "step_whois": "WHOIS-Datenbank wird abgefragt…",
-    "step_parse": "Registrierungsdaten werden analysiert…"
+    "step_parse": "Registrierungsdaten werden analysiert…",
+    "parking_detected": "Zum Verkauf gelistet · {{provider}}"
   },
   "notifications": {
     "title": "Benachrichtigungen",

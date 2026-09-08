@@ -14,6 +14,7 @@ import { extractDomain } from "@/lib/utils";
 import { lookupRdap, convertRdapToWhoisResult, RdapResponse, RDAP_OUTER_TIMEOUT_MS } from "@/lib/whois/rdap_client";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { probeDomain } from "@/lib/whois/dns-check";
+import { checkDomainPremium } from "@/lib/server/premium-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
 import {
   isWhoisRateLimited,
@@ -900,6 +901,15 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     const dnsProbe = isDomainQuery
       ? await (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined)
       : undefined;
+    // Premium check runs in parallel with the DNS probe and is capped so it can
+    // never meaningfully delay an unregistered-domain answer (API timeouts are
+    // already <4 s and results are cached 24 h).
+    const premium = isDomainQuery
+      ? await Promise.race([
+          checkDomainPremium(domain),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ])
+      : null;
     return {
       time: elapsed(), status: false, cached: false,
       error: "Domain not found",
@@ -907,6 +917,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         domain, registrationStatus: "unregistered", confidence: "high",
         signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
       },
+      premium,
     };
   }
 

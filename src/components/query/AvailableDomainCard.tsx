@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import { DomainPricing } from "@/lib/pricing/client";
+import { PremiumCheckResult } from "@/lib/whois/types";
 
 function RegistrarIcon({ faviconDomain, name }: { faviconDomain: string | null; name: string }) {
   const [imgFailed, setImgFailed] = React.useState(false);
@@ -67,6 +68,8 @@ interface AvailableDomainCardProps {
   domain: string;
   locale: string;
   isPremiumByWhois?: boolean;
+  /** Registry-premium detection result (per-domain pricing APIs / heuristic). */
+  premium?: PremiumCheckResult | null;
   /** Optional callback opening the domain-reminder dialog — when provided,
    *  an "alert me when registered" entry point is rendered. */
   onSubscribe?: () => void;
@@ -85,7 +88,7 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, onSubscribe }: AvailableDomainCardProps) {
+export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, premium = null, onSubscribe }: AvailableDomainCardProps) {
   const [rawPrices, setRawPrices] = React.useState<DomainPricing[]>([]);
   const [registrars, setRegistrars] = React.useState<DomainPricing[]>([]);
   const [renewRegistrars, setRenewRegistrars] = React.useState<DomainPricing[]>([]);
@@ -191,22 +194,24 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
 
   const tldForDisplay = domain.substring(domain.lastIndexOf(".")).toLowerCase();
   const sldForDisplay = domain.substring(0, domain.lastIndexOf("."));
-  const isPremium = anyApiPremium || isPremiumByWhois || registrars.some((r) => r.isPremium);
+  const isPremium = anyApiPremium || isPremiumByWhois || premium?.isPremium === true || registrars.some((r) => r.isPremium);
   const premiumRegistrars = registrars.filter((r) => r.isPremium);
   const bestRegistrar = (isPremium && premiumRegistrars.length > 0)
     ? premiumRegistrars[0]
     : (registrars.find((r) => !r.isPremium) ?? registrars[0] ?? null);
 
   // ── Label logic ──────────────────────────────────────────────────────────────
-  // "高价值域名": only when WHOIS explicitly marks this domain as premium
-  //   (registry-level premium — the most reliable signal).
+  // "高价值域名": only when a registry-level signal marks this domain premium —
+  //   either the WHOIS text (isPremiumByWhois) or a per-domain pricing API
+  //   (premium.isPremium). Most reliable.
   // "高注册费":  price-based detection (API fee threshold / anyApiPremium).
   //   Accurate description: the registration fee is above average, but it is
   //   NOT necessarily a "premium" name in the registry-reserved sense.
   // "可注册":    regular available domain.
+  const isPremiumFlagged = isPremiumByWhois || premium?.isPremium === true;
   const labelType: "available" | "high_value" | "high_fee" =
     !isPremium ? "available" :
-    isPremiumByWhois ? "high_value" :
+    isPremiumFlagged ? "high_value" :
     "high_fee";
 
   const LABELS = {
@@ -268,6 +273,11 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
       return isZh ? "该域名目前可注册，抓紧时间抢注吧！" : "This domain is available. Grab it before someone else does.";
     }
     if (labelType === "high_value") {
+      if (premium?.isPremium && typeof premium.price === "number" && premium.price > 0) {
+        return isZh
+          ? `该域名为注册局溢价精品域名，注册价约 ${formatPrice(premium.price, premium.currency)}/年起，以注册商实时报价为准。`
+          : `This is a registry-premium name with a registration price around ${formatPrice(premium.price, premium.currency)}/yr. Confirm with your registrar.`;
+      }
       return isZh
         ? "该域名为注册局标注的高价值精品域名，注册价格通常显著高于普通域名。"
         : "This is a registry-level premium name. Registration costs significantly above standard rates.";

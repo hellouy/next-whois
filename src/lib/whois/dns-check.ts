@@ -3,6 +3,11 @@ import https from "https";
 import { domainToASCII } from "url";
 import { extractDomain } from "@/lib/utils";
 
+export type DnsParkingInfo = {
+  isParked: boolean;
+  provider: string | null;
+};
+
 export type DnsProbeResult = {
   domain: string;
   registrationStatus: "registered" | "unregistered" | "unknown";
@@ -13,6 +18,8 @@ export type DnsProbeResult = {
   ipv6: string[];
   mx: string[];
   hasSsl: boolean | null;
+  /** Detected domain-parking / aftermarket-listing platform via NS records. */
+  parking?: DnsParkingInfo;
 };
 
 export type DnsSignal = {
@@ -22,6 +29,45 @@ export type DnsSignal = {
 };
 
 const DNS_TIMEOUT_MS = 5000;
+
+/**
+ * Authoritative nameserver suffixes of well-known domain parking / aftermarket
+ * listing platforms. A domain whose NS points to one of these is very likely
+ * parked or listed for sale (i.e. a "premium" aftermarket name).
+ *
+ * `domaincontrol.com` is deliberately excluded: it is GoDaddy's generic DNS
+ * hosting and is used by countless normal, non-parked websites.
+ */
+const PARKING_NS_MAP: Array<{ provider: string; suffixes: string[] }> = [
+  { provider: "Sedo", suffixes: ["sedoparking.com", "sedo.com"] },
+  { provider: "Afternic", suffixes: ["afternic.com"] },
+  { provider: "BuyDomains", suffixes: ["buydomains.com"] },
+  { provider: "Bodis", suffixes: ["bodis.com"] },
+  { provider: "ParkingCrew", suffixes: ["parkingcrew.net"] },
+  { provider: "HugeDomains", suffixes: ["hugedomains.com"] },
+  { provider: "Dan.com", suffixes: ["dan.com"] },
+  { provider: "Above.com", suffixes: ["above.com"] },
+  { provider: "ParkLogic", suffixes: ["parklogic.com"] },
+  { provider: "DomainSponsor", suffixes: ["domainsponsor.com"] },
+];
+
+/**
+ * Match a list of nameserver hostnames against the parking platform map.
+ * Returns the provider name if any NS matches, otherwise null.
+ */
+export function detectParkingProvider(nameservers: string[]): string | null {
+  if (!nameservers || nameservers.length === 0) return null;
+  const lower = nameservers.map((ns) => ns.toLowerCase().trim());
+  for (const entry of PARKING_NS_MAP) {
+    for (const suffix of entry.suffixes) {
+      const matched = lower.some(
+        (ns) => ns === suffix || ns.endsWith(`.${suffix}`),
+      );
+      if (matched) return entry.provider;
+    }
+  }
+  return null;
+}
 
 /**
  * Wraps a DNS lookup promise with a timeout.
@@ -164,6 +210,8 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
   // Keep registrationStatus = "unknown" so the UI shows "查询失败" rather than
   // incorrectly reporting the domain as available / unregistered.
 
+  const parkingProvider = detectParkingProvider(nameservers);
+
   return {
     domain,
     registrationStatus,
@@ -174,5 +222,9 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
     ipv6,
     mx,
     hasSsl,
+    parking: {
+      isParked: parkingProvider !== null,
+      provider: parkingProvider,
+    },
   };
 }

@@ -1864,7 +1864,8 @@
     "loading": "検索中…",
     "step_connect": "RDAP サーバーに接続中…",
     "step_whois": "WHOIS データベースを照会中…",
-    "step_parse": "登録情報を解析中…"
+    "step_parse": "登録情報を解析中…",
+    "parking_detected": "売却出品中 · {{provider}}"
   },
   "notifications": {
     "title": "通知",

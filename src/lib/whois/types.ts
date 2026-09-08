@@ -19,7 +19,22 @@ export type WhoisResult = {
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;
+  /** Premium-domain detection for unregistered names (see premium-check). */
+  premium?: PremiumCheckResult | null;
   registryUrl?: string;
+};
+
+/**
+ * Result of premium-domain detection for an *unregistered* domain.
+ * Filled in only when the domain is available but likely carries a
+ * registry-premium / aftermarket price.
+ */
+export type PremiumCheckResult = {
+  isPremium: boolean;
+  /** Premium price in USD, when the source provided one. */
+  price: number | null;
+  currency: string;
+  source: "porkbun" | "namesilo" | "heuristic";
 };
 
 export type WhoisAnalyzeResult = {

@@ -781,7 +781,7 @@ export default function LookupPage({
 
   const current = getWindowHref();
   const queryType = detectQueryType(target);
-  const { status, result, error, time, dnsProbe, registryUrl, cached, cachedAt, cacheTtl } = data as typeof data & { registryUrl?: string };
+  const { status, result, error, time, dnsProbe, registryUrl, cached, cachedAt, cacheTtl, premium } = data as typeof data & { registryUrl?: string };
 
   // Time shown to the user.  Prefer the true end-to-end measurement (search
   // submitted → data displayed); fall back to the server-reported WHOIS/RDAP
@@ -1289,6 +1289,7 @@ export default function LookupPage({
                     domain={target}
                     locale={locale}
                     isPremiumByWhois={result ? getDomainRegistrationStatus(result, locale).isPremiumReserved : false}
+                    premium={premium ?? null}
                     onSubscribe={enableRemind ? openReminderWithGate : undefined}
                   />
                 ) : (
@@ -1686,6 +1687,14 @@ export default function LookupPage({
                               </Badge>
                             );
                           })()
+                        )}
+                        {dnsProbe?.parking?.isParked && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-violet-400/30 bg-violet-500/5">
+                            <RiShoppingCartLine className="w-3 h-3 text-violet-600 dark:text-violet-400 shrink-0" />
+                            <span className="text-[11px] font-normal text-violet-600 dark:text-violet-400">
+                              {t("query.parking_detected", { provider: dnsProbe.parking.provider ?? "" })}
+                            </span>
+                          </div>
                         )}
                         {result.domainAge !== null && (
                           <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-primary/30 bg-primary/5">

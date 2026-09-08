@@ -1864,7 +1864,8 @@
     "loading": "Запрос…",
     "step_connect": "Подключение к серверу RDAP…",
     "step_whois": "Запрос к базе WHOIS…",
-    "step_parse": "Разбор данных регистрации…"
+    "step_parse": "Разбор данных регистрации…",
+    "parking_detected": "Выставлен на продажу · {{provider}}"
   },
   "notifications": {
     "title": "Уведомления",

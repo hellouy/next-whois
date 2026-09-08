@@ -1864,7 +1864,8 @@
     "loading": "Interrogation…",
     "step_connect": "Connexion au serveur RDAP…",
     "step_whois": "Interrogation de la base WHOIS…",
-    "step_parse": "Analyse des données d'enregistrement…"
+    "step_parse": "Analyse des données d'enregistrement…",
+    "parking_detected": "Mis en vente · {{provider}}"
   },
   "notifications": {
     "title": "Notifications",

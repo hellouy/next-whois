@@ -1864,7 +1864,8 @@
     "loading": "正在查询…",
     "step_connect": "连接 RDAP 服务器…",
     "step_whois": "查询 WHOIS 数据库…",
-    "step_parse": "解析注册信息…"
+    "step_parse": "解析注册信息…",
+    "parking_detected": "疑似挂售 · {{provider}}"
   },
   "notifications": {
     "title": "通知",

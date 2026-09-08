@@ -1864,7 +1864,8 @@
     "loading": "Querying…",
     "step_connect": "Connecting to RDAP server…",
     "step_whois": "Querying WHOIS database…",
-    "step_parse": "Parsing registration data…"
+    "step_parse": "Parsing registration data…",
+    "parking_detected": "Listed for sale · {{provider}}"
   },
   "notifications": {
     "title": "Notifications",
