@@ -1095,11 +1095,11 @@ export default function LookupPage({
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
 
-          <div className="relative">
+          <div className={`relative ${loading && !status ? "min-h-[420px]" : ""}`}>
             <QueryProgressBar loading={loading} refreshing={refreshing} />
             <motion.div
               initial={false}
-              animate={{ opacity: loading ? 0.85 : 1 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
@@ -1164,8 +1164,8 @@ export default function LookupPage({
             return (
             <motion.div
               key={target}
-              initial={{ opacity: 0, y: 3 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             >
             <div

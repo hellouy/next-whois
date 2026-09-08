@@ -25,7 +25,7 @@ export function QueryLoadingSkeleton({ domain }: QueryLoadingSkeletonProps) {
       animate={{ opacity: entered ? 1 : 0 }}
       exit={{ opacity: 0, transition: { duration: 0.18, ease: "easeInOut" } }}
       transition={{ duration: 0.14 }}
-      className="grid grid-cols-1 gap-5"
+      className="absolute inset-x-0 top-0 z-10 grid grid-cols-1 gap-5"
     >
       <style>{`
         @keyframes sk-spin   { to { transform: rotate(360deg) } }
