@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { randomInt } from "crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { setRedisValue, getRedisValue, deleteRedisValue } from "@/lib/server/redis";
@@ -42,7 +43,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const recentlySent = await getRedisValue(rateLimitKey);
   if (recentlySent) return res.status(429).json({ error: "Please wait 60 seconds before requesting a new code" });
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically secure 6-digit code — Math.random() is predictable and
+  // would let an attacker brute-force the code space to take over the account.
+  const code = String(randomInt(100000, 1000000));
   const storeKey = `email-change:${currentEmail}:${cleanNew}`;
 
   await setRedisValue(storeKey, code, 600);

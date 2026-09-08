@@ -255,14 +255,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         } catch { /* keep defaults */ }
 
-        const upsertLog = async (daysKey: number) => {
+        //── Concurrency-safe notification slots ────────────────────────────
+        // Each notification is deduped by (reminder_id, days_before). We claim the
+        // slot with an atomic INSERT ... ON CONFLICT BEFORE sending so two overlapping
+        // cron runs can never both send for the same slot. On send failure the slot
+        // is released so a later run retries.
+        const claimLog = async (daysKey: number): Promise<boolean> => {
           const logId = randomBytes(8).toString("hex");
-          await run(
+          const inserted = await run(
             `INSERT INTO reminder_logs (id, reminder_id, days_before)
              VALUES ($1, $2, $3)
              ON CONFLICT (reminder_id, days_before) DO NOTHING`,
             [logId, reminder.id, daysKey],
           );
+          return inserted === 1;
+        };
+
+        const releaseLog = async (daysKey: number): Promise<void> => {
+          await run(
+            `DELETE FROM reminder_logs WHERE reminder_id = $1 AND days_before = $2`,
+            [reminder.id, daysKey],
+          ).catch(() => {});
+        };
+
+        const sendWithClaim = async (
+          daysKey: number,
+          fn: () => Promise<void>,
+        ): Promise<boolean> => {
+          if (!(await claimLog(daysKey))) return false;
+          try {
+            await fn();
+            return true;
+          } catch (err) {
+            await releaseLog(daysKey);
+            throw err;
+          }
         };
 
         // ── Domain dropped: send notification then deactivate ─────────────────
@@ -275,30 +302,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const isHold = eppLower.some(s => s === "clienthold" || s === "serverhold");
         const isReserved = eppLower.some(s => s === "reserved" || s === "inactive" || s === "serverupdateprohibited");
         if (isHold && !reminder.hold_notified_at) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_hold(reminder.domain),
-            html: domainHoldHtml({
-              domain: reminder.domain,
-              expirationDate: reminder.expiration_date,
-              cancelToken: reminder.cancel_token,
-              statuses: reminder.epp_status,
-              siteName,
-              locale,
-            }),
-          });
-          await recordNotification({
-            email: reminder.email,
-            type: "hold",
-            title: ls.subj_hold(reminder.domain),
-            body: ls.hd_note,
-            domain: reminder.domain,
-          });
-          await run(
-            `UPDATE reminders SET hold_notified_at = $1 WHERE id = $2`,
+          // Atomically claim the hold-notify slot; only one concurrent run wins.
+          const claimed = await run(
+            `UPDATE reminders SET hold_notified_at = $1 WHERE id = $2 AND hold_notified_at IS NULL`,
             [now.toISOString(), reminder.id],
           );
-          results.sent++;
+          if (claimed === 1) {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_hold(reminder.domain),
+              html: domainHoldHtml({
+                domain: reminder.domain,
+                expirationDate: reminder.expiration_date,
+                cancelToken: reminder.cancel_token,
+                statuses: reminder.epp_status,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "hold",
+              title: ls.subj_hold(reminder.domain),
+              body: ls.hd_note,
+              domain: reminder.domain,
+            });
+            results.sent++;
+          }
         } else if (!isHold && reminder.hold_notified_at) {
           // Hold cleared — allow future notifications if it re-enters hold
           await run(
@@ -308,29 +338,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         if (isReserved && !reminder.reserved_notified_at) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_reserved(reminder.domain),
-            html: reservedDomainHtml({
-              domain: reminder.domain,
-              expirationDate: reminder.expiration_date,
-              cancelToken: reminder.cancel_token,
-              siteName,
-              locale,
-            }),
-          });
-          await recordNotification({
-            email: reminder.email,
-            type: "reserved",
-            title: ls.subj_reserved(reminder.domain),
-            body: ls.rv_note,
-            domain: reminder.domain,
-          });
-          await run(
-            `UPDATE reminders SET reserved_notified_at = $1 WHERE id = $2`,
+          const claimed = await run(
+            `UPDATE reminders SET reserved_notified_at = $1 WHERE id = $2 AND reserved_notified_at IS NULL`,
             [now.toISOString(), reminder.id],
           );
-          results.sent++;
+          if (claimed === 1) {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_reserved(reminder.domain),
+              html: reservedDomainHtml({
+                domain: reminder.domain,
+                expirationDate: reminder.expiration_date,
+                cancelToken: reminder.cancel_token,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "reserved",
+              title: ls.subj_reserved(reminder.domain),
+              body: ls.rv_note,
+              domain: reminder.domain,
+            });
+            results.sent++;
+          }
         } else if (!isReserved && reminder.reserved_notified_at) {
           await run(
             `UPDATE reminders SET reserved_notified_at = NULL WHERE id = $1`,
@@ -340,26 +372,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (phase === "dropped") {
           if (phaseFlags.dropped && !sentKeys.includes(DROPPED_KEY)) {
-            await sendEmail({
-              to: reminder.notify_email ?? reminder.email,
-              subject: ls.subj_dropped(reminder.domain),
-              html: domainDroppedHtml({
+            const claimed = await sendWithClaim(DROPPED_KEY, async () => {
+              await sendEmail({
+                to: reminder.notify_email ?? reminder.email,
+                subject: ls.subj_dropped(reminder.domain),
+                html: domainDroppedHtml({
+                  domain: reminder.domain,
+                  expirationDate: reminder.expiration_date,
+                  cancelToken: reminder.cancel_token,
+                  siteName,
+                  locale,
+                }),
+              });
+              await recordNotification({
+                email: reminder.email,
+                type: "dropped",
+                title: ls.subj_dropped(reminder.domain),
+                body: ls.dd_available,
                 domain: reminder.domain,
-                expirationDate: reminder.expiration_date,
-                cancelToken: reminder.cancel_token,
-                siteName,
-                locale,
-              }),
+              });
             });
-            await upsertLog(DROPPED_KEY);
-            await recordNotification({
-              email: reminder.email,
-              type: "dropped",
-              title: ls.subj_dropped(reminder.domain),
-              body: ls.dd_available,
-              domain: reminder.domain,
-            });
-            results.sent++;
+            if (claimed) results.sent++;
           }
           // Deactivate after notifying
           await run(
@@ -392,117 +425,117 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // ── Grace phase notification ──────────────────────────────────────────
         if (phaseFlags.grace && phase === "grace" && cfg.grace > 0 && !sentKeys.includes(GRACE_KEY)) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_grace(reminder.domain),
-            html: phaseEventHtml({
+          const claimed = await sendWithClaim(GRACE_KEY, async () => {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_grace(reminder.domain),
+              html: phaseEventHtml({
+                domain: reminder.domain,
+                phase: "grace",
+                expirationDate: reminder.expiration_date,
+                graceEnd: fmtDate(graceEnd),
+                cancelToken: reminder.cancel_token,
+                registrar: reminder.registrar,
+                creationDate: reminder.creation_date,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "grace",
+              title: ls.subj_grace(reminder.domain),
+              body: ls.pe_grace_body,
               domain: reminder.domain,
-              phase: "grace",
-              expirationDate: reminder.expiration_date,
-              graceEnd: fmtDate(graceEnd),
-              cancelToken: reminder.cancel_token,
-              registrar: reminder.registrar,
-              creationDate: reminder.creation_date,
-              siteName,
-              locale,
-            }),
+            });
           });
-          await upsertLog(GRACE_KEY);
-          await recordNotification({
-            email: reminder.email,
-            type: "grace",
-            title: ls.subj_grace(reminder.domain),
-            body: ls.pe_grace_body,
-            domain: reminder.domain,
-          });
-          results.sent++;
-          didSend = true;
+          if (claimed) { results.sent++; didSend = true; }
         }
 
         // ── Redemption phase notification ─────────────────────────────────────
         if (!didSend && phaseFlags.redemption && phase === "redemption" && cfg.redemption > 0 && !sentKeys.includes(REDEMPTION_KEY)) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_redemption(reminder.domain),
-            html: phaseEventHtml({
+          const claimed = await sendWithClaim(REDEMPTION_KEY, async () => {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_redemption(reminder.domain),
+              html: phaseEventHtml({
+                domain: reminder.domain,
+                phase: "redemption",
+                expirationDate: reminder.expiration_date,
+                redemptionEnd: fmtDate(redemptionEnd),
+                dropDate: fmtDate(dropDate),
+                cancelToken: reminder.cancel_token,
+                registrar: reminder.registrar,
+                creationDate: reminder.creation_date,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "redemption",
+              title: ls.subj_redemption(reminder.domain),
+              body: ls.pe_redemption_body,
               domain: reminder.domain,
-              phase: "redemption",
-              expirationDate: reminder.expiration_date,
-              redemptionEnd: fmtDate(redemptionEnd),
-              dropDate: fmtDate(dropDate),
-              cancelToken: reminder.cancel_token,
-              registrar: reminder.registrar,
-              creationDate: reminder.creation_date,
-              siteName,
-              locale,
-            }),
+            });
           });
-          await upsertLog(REDEMPTION_KEY);
-          await recordNotification({
-            email: reminder.email,
-            type: "redemption",
-            title: ls.subj_redemption(reminder.domain),
-            body: ls.pe_redemption_body,
-            domain: reminder.domain,
-          });
-          results.sent++;
-          didSend = true;
+          if (claimed) { results.sent++; didSend = true; }
         }
 
         // ── Pending-delete phase notification ─────────────────────────────────
         if (!didSend && phaseFlags.pendingDelete && phase === "pendingDelete" && cfg.pendingDelete > 0 && !sentKeys.includes(PENDING_KEY)) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_pending(reminder.domain),
-            html: phaseEventHtml({
+          const claimed = await sendWithClaim(PENDING_KEY, async () => {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_pending(reminder.domain),
+              html: phaseEventHtml({
+                domain: reminder.domain,
+                phase: "pendingDelete",
+                expirationDate: reminder.expiration_date,
+                dropDate: fmtDate(dropDate),
+                cancelToken: reminder.cancel_token,
+                registrar: reminder.registrar,
+                creationDate: reminder.creation_date,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "pending_delete",
+              title: ls.subj_pending(reminder.domain),
+              body: ls.pe_pending_body,
               domain: reminder.domain,
-              phase: "pendingDelete",
-              expirationDate: reminder.expiration_date,
-              dropDate: fmtDate(dropDate),
-              cancelToken: reminder.cancel_token,
-              registrar: reminder.registrar,
-              creationDate: reminder.creation_date,
-              siteName,
-              locale,
-            }),
+            });
           });
-          await upsertLog(PENDING_KEY);
-          await recordNotification({
-            email: reminder.email,
-            type: "pending_delete",
-            title: ls.subj_pending(reminder.domain),
-            body: ls.pe_pending_body,
-            domain: reminder.domain,
-          });
-          results.sent++;
-          didSend = true;
+          if (claimed) { results.sent++; didSend = true; }
         }
 
         // ── Drop approaching: 7 days before drop date ─────────────────────────
         if (!didSend && phaseFlags.dropSoon && phase === "pendingDelete" && daysToDropDate <= 7 && !sentKeys.includes(DROP_SOON_KEY)) {
-          await sendEmail({
-            to: reminder.notify_email ?? reminder.email,
-            subject: ls.subj_drop_soon(reminder.domain, daysToDropDate),
-            html: dropApproachingHtml({
+          const claimed = await sendWithClaim(DROP_SOON_KEY, async () => {
+            await sendEmail({
+              to: reminder.notify_email ?? reminder.email,
+              subject: ls.subj_drop_soon(reminder.domain, daysToDropDate),
+              html: dropApproachingHtml({
+                domain: reminder.domain,
+                expirationDate: reminder.expiration_date,
+                dropDate: fmtDate(dropDate),
+                daysToDropDate,
+                cancelToken: reminder.cancel_token,
+                siteName,
+                locale,
+              }),
+            });
+            await recordNotification({
+              email: reminder.email,
+              type: "drop_soon",
+              title: ls.subj_drop_soon(reminder.domain, daysToDropDate),
+              body: ls.da_body,
               domain: reminder.domain,
-              expirationDate: reminder.expiration_date,
-              dropDate: fmtDate(dropDate),
-              daysToDropDate,
-              cancelToken: reminder.cancel_token,
-              siteName,
-              locale,
-            }),
+            });
           });
-          await upsertLog(DROP_SOON_KEY);
-          await recordNotification({
-            email: reminder.email,
-            type: "drop_soon",
-            title: ls.subj_drop_soon(reminder.domain, daysToDropDate),
-            body: ls.da_body,
-            domain: reminder.domain,
-          });
-          results.sent++;
-          didSend = true;
+          if (claimed) { results.sent++; didSend = true; }
         }
 
         // ── Active phase: days-to-expiry thresholds (interval semantics) ──────
@@ -514,30 +547,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               daysToExpiry <= 10 ? ls.subj_reminder_warn(reminder.domain, daysToExpiry)   :
                                    ls.subj_reminder(reminder.domain, daysToExpiry);
 
-            await sendEmail({
-              to: reminder.notify_email ?? reminder.email,
-              subject,
-              html: reminderHtml({
+            const claimed = await sendWithClaim(firing.days, async () => {
+              await sendEmail({
+                to: reminder.notify_email ?? reminder.email,
+                subject,
+                html: reminderHtml({
+                  domain: reminder.domain,
+                  expirationDate: reminder.expiration_date,
+                  daysLeft: daysToExpiry,
+                  cancelToken: reminder.cancel_token,
+                  registrar: reminder.registrar,
+                  creationDate: reminder.creation_date,
+                  nameservers: reminder.nameservers,
+                  siteName,
+                  locale,
+                }),
+              });
+              await recordNotification({
+                email: reminder.email,
+                type: "threshold",
+                title: subject,
                 domain: reminder.domain,
-                expirationDate: reminder.expiration_date,
-                daysLeft: daysToExpiry,
-                cancelToken: reminder.cancel_token,
-                registrar: reminder.registrar,
-                creationDate: reminder.creation_date,
-                nameservers: reminder.nameservers,
-                siteName,
-                locale,
-              }),
+              });
             });
-            await upsertLog(firing.days);
-            await recordNotification({
-              email: reminder.email,
-              type: "threshold",
-              title: subject,
-              domain: reminder.domain,
-            });
-            results.sent++;
-            didSend = true;
+            if (claimed) { results.sent++; didSend = true; }
           }
         }
       } catch (reminderErr: any) {
@@ -568,60 +601,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (daysLeft <= 0) {
           if (stage !== "expired") {
-            await sendEmail({
-              to: mu.email,
-              subject: ms.subj_membership(0),
-              html: membershipRenewHtml({ daysLeft: 0, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
-            });
-            await recordNotification({
-              email: mu.email,
-              type: "membership",
-              title: ms.subj_membership(0),
-              body: ms.mr_expired,
-            });
-            await run(
-              `UPDATE users SET membership_remind_stage = 'expired' WHERE email = $1`,
+            const claimed = await run(
+              `UPDATE users SET membership_remind_stage = 'expired' WHERE email = $1 AND membership_remind_stage IS DISTINCT FROM 'expired'`,
               [mu.email],
             );
-            results.sent++;
+            if (claimed === 1) {
+              await sendEmail({
+                to: mu.email,
+                subject: ms.subj_membership(0),
+                html: membershipRenewHtml({ daysLeft: 0, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+              });
+              await recordNotification({
+                email: mu.email,
+                type: "membership",
+                title: ms.subj_membership(0),
+                body: ms.mr_expired,
+              });
+              results.sent++;
+            }
           }
         } else if (daysLeft <= 1) {
           if (stage === null || stage === "7d") {
-            await sendEmail({
-              to: mu.email,
-              subject: ms.subj_membership(1),
-              html: membershipRenewHtml({ daysLeft: 1, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
-            });
-            await recordNotification({
-              email: mu.email,
-              type: "membership",
-              title: ms.subj_membership(1),
-              body: ms.mr_days_1,
-            });
-            await run(
-              `UPDATE users SET membership_remind_stage = '1d' WHERE email = $1`,
+            const claimed = await run(
+              `UPDATE users SET membership_remind_stage = '1d' WHERE email = $1 AND (membership_remind_stage IS NULL OR membership_remind_stage = '7d')`,
               [mu.email],
             );
-            results.sent++;
+            if (claimed === 1) {
+              await sendEmail({
+                to: mu.email,
+                subject: ms.subj_membership(1),
+                html: membershipRenewHtml({ daysLeft: 1, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+              });
+              await recordNotification({
+                email: mu.email,
+                type: "membership",
+                title: ms.subj_membership(1),
+                body: ms.mr_days_1,
+              });
+              results.sent++;
+            }
           }
         } else if (daysLeft <= 7) {
           if (stage === null) {
-            await sendEmail({
-              to: mu.email,
-              subject: ms.subj_membership(daysLeft),
-              html: membershipRenewHtml({ daysLeft, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
-            });
-            await recordNotification({
-              email: mu.email,
-              type: "membership",
-              title: ms.subj_membership(daysLeft),
-              body: ms.mr_days_7,
-            });
-            await run(
-              `UPDATE users SET membership_remind_stage = '7d' WHERE email = $1`,
+            const claimed = await run(
+              `UPDATE users SET membership_remind_stage = '7d' WHERE email = $1 AND membership_remind_stage IS NULL`,
               [mu.email],
             );
-            results.sent++;
+            if (claimed === 1) {
+              await sendEmail({
+                to: mu.email,
+                subject: ms.subj_membership(daysLeft),
+                html: membershipRenewHtml({ daysLeft, expiresAt: mu.subscription_expires_at, siteName, locale: mLocale }),
+              });
+              await recordNotification({
+                email: mu.email,
+                type: "membership",
+                title: ms.subj_membership(daysLeft),
+                body: ms.mr_days_7,
+              });
+              results.sent++;
+            }
           }
         }
       } catch (memErr) {

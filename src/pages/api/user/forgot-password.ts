@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordResetHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -44,12 +44,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const tokenId = randomBytes(8).toString("hex");
   const rawToken = randomBytes(32).toString("hex");
+  // SECURITY: store only a SHA-256 hash of the token. The raw token is sent in
+  // the reset email and never persisted, so a DB leak alone cannot be used to
+  // reset an account's password (verify against the hash in reset-password).
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000).toISOString();
 
   try {
     await run(
       "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)",
-      [tokenId, user.id, rawToken, expiresAt],
+      [tokenId, user.id, tokenHash, expiresAt],
     );
   } catch (err: any) {
     logger.error("[forgot-password] token insert error:", err.message);

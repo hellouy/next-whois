@@ -513,6 +513,7 @@ const CREATE_INDEXES = [
     sent_at       TIMESTAMPTZ
   )`,
   `CREATE INDEX IF NOT EXISTS idx_email_queue_pending ON email_queue (next_retry_at, created_at) WHERE status = 'pending'`,
+  `ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS processing_at TIMESTAMPTZ`,
   `CREATE TABLE IF NOT EXISTS query_logs (
     id          BIGSERIAL    PRIMARY KEY,
     domain      TEXT         NOT NULL,

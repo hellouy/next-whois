@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getRedisValue, deleteRedisValue } from "@/lib/server/redis";
+import { getRedisValue, deleteRedisValue, incrRedisValue } from "@/lib/server/redis";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("api/user/profile");
@@ -69,6 +69,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: "Verification code expired, please request a new one", code: "CODE_EXPIRED" });
         }
         if (String(emailChangeCode).trim() !== storedCode) {
+          // Per-code brute-force guard: after 5 failed attempts the stored code
+          // is invalidated so the attacker must obtain a fresh code (which
+          // re-enters the per-IP send rate limit). Random() was already
+          // replaced; this closes the trial-and-error window entirely.
+          const attempts = await incrRedisValue(`${storeKey}:attempts`, 600);
+          if (attempts !== null && attempts >= 5) {
+            await deleteRedisValue(storeKey).catch(() => {});
+            return res.status(400).json({ error: "Too many attempts, please request a new code", code: "CODE_EXPIRED" });
+          }
           return res.status(400).json({ error: "Incorrect verification code", code: "CODE_WRONG" });
         }
         const existing = await one("SELECT id FROM users WHERE email = $1", [newEmail]);

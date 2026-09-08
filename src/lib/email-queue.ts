@@ -78,45 +78,69 @@ export async function processEmailQueue(
 ): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, sent: 0, retried: 0, failed: 0, errors: [] };
 
-  // Claim rows atomically with FOR UPDATE SKIP LOCKED so concurrent
-  // triggers (cron + admin panel) can never double-send the same batch.
-  // Rows are locked for the duration of the processing transaction.
-  let claimed: QueuedEmail[] = [];
-  let client: any = null;
+  const { getDbReady } = await import("@/lib/db");
+  const db = await getDbReady();
+  if (!db) return result;
+
+  // Two-phase processing:
+  //   Phase 1 — claim a batch atomically (status='processing' + processing_at).
+  //              COMMIT immediately so the long SMTP loop holds no row locks.
+  //   Phase 2 — send each email, then persist its outcome with individual
+  //              autocommit UPDATEs. A crash mid-batch only re-runs the unclaimed
+  //              rows + possibly the single in-flight one (recovered below).
+
+  // Recover stale 'processing' rows from a previous crashed run first.
   try {
-    const { getDbReady } = await import("@/lib/db");
-    const db = await getDbReady();
-    if (!db) throw new Error("DB not ready");
+    await db.query(
+      `UPDATE email_queue SET status = 'pending', processing_at = NULL
+        WHERE status = 'processing' AND processing_at < NOW() - interval '15 minutes'`,
+    );
+  } catch (err: any) {
+    result.errors.push(`recovery error: ${err.message}`);
+    logger.error("[email-queue] recovery update failed:", err.message);
+  }
+
+  // ── Phase 1: atomically claim up to `limit` rows ───────────────────────────
+  let client: any = null;
+  let claimed: QueuedEmail[] = [];
+  try {
     client = await db.connect();
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `SELECT id, to_email, subject, html, status, attempts, max_attempts,
-              next_retry_at, last_error, created_at, sent_at
-         FROM email_queue
-        WHERE status = 'pending' AND next_retry_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1
-        FOR UPDATE SKIP LOCKED`,
+      `UPDATE email_queue
+          SET status = 'processing', processing_at = NOW()
+        WHERE id IN (
+          SELECT id FROM email_queue
+           WHERE status = 'pending' AND next_retry_at <= NOW()
+           ORDER BY created_at ASC, id ASC
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, to_email, subject, html, status, attempts, max_attempts,
+                  next_retry_at, last_error, created_at, sent_at`,
       [limit],
     );
     claimed = rows;
-    if (claimed.length === 0) {
-      client.release();
-      client = null;
-      return result;
-    }
+    await client.query("COMMIT");
+    client.release();
+    client = null;
   } catch (err: any) {
-    if (client) try { client.release(); } catch {}
+    if (client) try { await client.query("ROLLBACK").catch(() => {}); client.release(); } catch {}
     result.errors.push(`fetch error: ${err.message}`);
+    logger.error("[email-queue] claim error:", err.message);
     return result;
   }
 
+  if (claimed.length === 0) return result;
+
+  // ── Phase 2: send one by one, persisting each outcome immediately ───────────
   for (const row of claimed) {
     result.processed++;
     try {
       await sender(row.to_email, row.subject, row.html);
-      await client.query(
-        `UPDATE email_queue SET status = 'sent', sent_at = NOW() WHERE id = $1`,
+      await db.query(
+        `UPDATE email_queue SET status = 'sent', sent_at = NOW(), processing_at = NULL,
+                last_error = NULL WHERE id = $1`,
         [row.id],
       );
       result.sent++;
@@ -125,13 +149,12 @@ export async function processEmailQueue(
       const errMsg = err?.message || "unknown error";
       const nextAttempt = row.attempts + 1;
 
-      // DB bookkeeping failures must never abort the whole batch loop —
-      // a single flaky UPDATE should not postpone all remaining emails.
+      // Per-row bookkeeping; never abort the whole batch loop.
       try {
         if (nextAttempt >= row.max_attempts) {
-          await client.query(
+          await db.query(
             `UPDATE email_queue
-                SET status = 'failed', attempts = $2, last_error = $3
+                SET status = 'failed', attempts = $2, last_error = $3, processing_at = NULL
               WHERE id = $1`,
             [row.id, nextAttempt, errMsg.slice(0, 500)],
           );
@@ -141,9 +164,10 @@ export async function processEmailQueue(
         } else {
           const delay = retryDelayMinutes(nextAttempt);
           const nextAt = new Date(Date.now() + delay * 60 * 1000);
-          await client.query(
+          await db.query(
             `UPDATE email_queue
-                SET attempts = $2, last_error = $3, next_retry_at = $4
+                SET attempts = $2, last_error = $3, next_retry_at = $4,
+                    status = 'pending', processing_at = NULL
               WHERE id = $1`,
             [row.id, nextAttempt, errMsg.slice(0, 500), nextAt.toISOString()],
           );
@@ -155,15 +179,6 @@ export async function processEmailQueue(
         result.errors.push(`#${row.id} db update failed: ${dbErr.message}`);
       }
     }
-  }
-
-  // Release the transaction: locks are freed, status updates become visible.
-  try {
-    await client.query("COMMIT");
-    client.release();
-  } catch (err: any) {
-    logger.error("[email-queue] commit failed:", err.message);
-    try { client.release(); } catch {}
   }
 
   return result;

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { hash } from "bcryptjs";
+import { createHash } from "crypto";
 import { one, run, isDbReady } from "@/lib/db-query";
 import { sendEmail, passwordChangedHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -29,8 +30,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Hash password first so the atomic claim is instant (not slowed by bcrypt)
   const newHash = await hash(String(password), 12);
 
+  // SECURITY: tokens are stored hashed (see forgot-password), so claims must
+  // hash the submitted token before matching — never compare plaintext.
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+
   // Atomically claim the token — only one concurrent request can succeed.
-  // If used = true OR expires_at is past, zero rows are returned → fail.
+  // Also roll the token into a dead value so a replayed submission that arrives
+  // a moment later cannot double-apply the same reset flow.
   const claimed = await one<{ id: string; user_id: string }>(
     `UPDATE password_reset_tokens
         SET used = true
@@ -38,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         AND used = false
         AND expires_at > NOW()
       RETURNING id, user_id`,
-    [token],
+    [tokenHash],
   );
 
   if (!claimed) {
@@ -46,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // without leaking timing information about valid tokens.
     const exists = await one<{ used: boolean; expires_at: string }>(
       "SELECT used, expires_at FROM password_reset_tokens WHERE token = $1",
-      [token],
+      [tokenHash],
     );
     if (!exists) return res.status(400).json({ error: "Invalid or expired reset link" });
     if (exists.used) return res.status(400).json({ error: "This reset link has already been used, please request a new one" });
