@@ -487,7 +487,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 // They share a stable animation key so intra-page result updates don't
 // trigger the global page-level enter/exit animation.
 const STABLE_KEY_PAGES = new Set([
-  "/",            // homepage — relies on search-box spinner + progress bar for feedback
+  "/",            // homepage — relies on the search-box spinner for feedback
   "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback",
   "/[...query]",  // domain WHOIS results — skeleton handles loading feedback
   "/dashboard",   // user dashboard — full-page layout, instant transition avoids blank flash
@@ -530,54 +530,6 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
     }).catch(() => {});
   }, []);
 
-  // ── Route-change progress bar ──────────────────────────────────────────────
-  // Shown for navigations TO non-stable pages (login, about, etc.) AND for
-  // cross-page navigations TO the result page (homepage → result).
-  // Skipped for result → result shallow navigation (the query page handles it).
-  const [npStatus, setNpStatus] = React.useState<"idle" | "start" | "done">("idle");
-  const npResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track the current pathname so event handlers can know where we came from.
-  const currentPathnameRef = React.useRef(router.pathname);
-  React.useEffect(() => { currentPathnameRef.current = router.pathname; }, [router.pathname]);
-  React.useEffect(() => {
-    const isQueryPagePath = (p: string) =>
-      p !== "/" && !p.startsWith("/admin") && !p.startsWith("/api") && p.split("/").length >= 2;
-    const OTHER_STABLE = new Set(["/", "/dns", "/ip", "/ssl", "/icp", "/tools", "/directory", "/http", "/feedback", "/dashboard"]);
-    const onStart = (url: string) => {
-      // Extract pathname from url (may include query string / hash)
-      const dest = url.split("?")[0].split("#")[0];
-      const destIsQueryPage = isQueryPagePath(dest);
-      const sourceIsQueryPage = currentPathnameRef.current === "/[...query]";
-
-      // result → result: shallow routing — the query page handles its own feedback
-      if (sourceIsQueryPage && destIsQueryPage) return;
-
-      // Navigation TO any result/query page: the query page shows its own
-      // loading state, so no top bar needed.
-      if (destIsQueryPage) return;
-
-      // Other self-contained stable pages (DNS, IP, etc.) manage their own feedback
-      if (OTHER_STABLE.has(dest)) return;
-
-      // Everything else (login, about, register …): show bar
-      if (npResetRef.current) clearTimeout(npResetRef.current);
-      setNpStatus("start");
-    };
-    const onDone = () => {
-      setNpStatus("done");
-      npResetRef.current = setTimeout(() => setNpStatus("idle"), 400);
-    };
-    router.events.on("routeChangeStart",    onStart);
-    router.events.on("routeChangeComplete", onDone);
-    router.events.on("routeChangeError",    onDone);
-    return () => {
-      router.events.off("routeChangeStart",    onStart);
-      router.events.off("routeChangeComplete", onDone);
-      router.events.off("routeChangeError",    onDone);
-      if (npResetRef.current) clearTimeout(npResetRef.current);
-    };
-  }, [router]);
-
   // Pages in STABLE_KEY_PAGES manage their own loading feedback internally
   // (skeleton screens, spinners, etc.) and don't need the global page-level
   // enter/exit animation for intra-page navigations. Every other page gets
@@ -592,27 +544,6 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       <AppHead origin={origin} />
       <AnalyticsScripts />
       <Toaster />
-      {/* Route-change progress bar — only shown client-side (npStatus starts "idle") */}
-      {npStatus !== "idle" && (
-        <div
-          aria-hidden
-          style={{
-            position:        "fixed",
-            top:             0,
-            left:            0,
-            width:           "100%",
-            height:          "2px",
-            zIndex:          9999,
-            pointerEvents:   "none",
-            transformOrigin: "left center",
-            transform:       "scaleX(0)",
-            background:      "hsl(var(--primary))",
-            animation:       npStatus === "done"
-              ? "np-done 0.35s ease forwards"
-              : "np-start 8s ease-out forwards",
-          }}
-        />
-      )}
       <ThemeProvider
         attribute="class"
         defaultTheme="system"

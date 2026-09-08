@@ -302,7 +302,8 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="mt-3"
+              className="relative"
+              style={{ height: "calc(100vh - 22rem)" }}
             >
               <QueryLoadingSkeleton domain={searchingDomain} />
             </motion.div>
@@ -347,7 +348,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="flex-1 overflow-y-auto"
+              className="relative flex-1"
             >
               <QueryLoadingSkeleton domain={searchingDomain} />
             </motion.div>
