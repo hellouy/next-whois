@@ -85,6 +85,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           orderId,
           providerOrderId: captureId ?? paypalOrderId,
           webhookRaw: JSON.stringify(body).slice(0, 2000),
+          ...(capture?.amount?.value != null
+            ? { expectedAmount: Number(capture.amount.value), expectedCurrency: capture.amount.currency_code || undefined }
+            : {}),
         });
         logger.info(`[paypal webhook] Order ${orderId} marked paid — sub=${result.grantsSubscription}`);
       } catch (err: any) {

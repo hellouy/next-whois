@@ -11,7 +11,7 @@ setInterval(() => {
   localCache.forEach((val, key) => {
     if (now > val.resetAt) localCache.delete(key);
   });
-}, 120_000);
+}, 120_000).unref?.();
 
 // ─── Redis backend (preferred for Vercel — survives across function instances) ─
 // Uses atomic INCR to avoid GET→SET race conditions under concurrent requests.

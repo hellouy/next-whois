@@ -93,7 +93,39 @@ export async function markOrderPaid(params: {
   orderId: string;
   providerOrderId?: string;
   webhookRaw?: string;
+  expectedAmount?: number | null;
+  expectedCurrency?: string | null;
 }): Promise<{ alreadyPaid: boolean; userEmail: string; grantsSubscription: boolean }> {
+  // Amount-confusion guard: when the provider callback carries the paid amount
+  // and currency, they must match the DB order within a small tolerance. This
+  // runs BEFORE the paid claim so a mismatched callback can never flip status.
+  if (params.expectedAmount != null && params.expectedCurrency) {
+    const expectedCurrency = params.expectedCurrency.toUpperCase();
+    let expectedAmount = params.expectedAmount;
+    const order = await one<{ amount: number; currency: string }>(
+      `SELECT amount::float AS amount, currency FROM payment_orders WHERE id = $1`,
+      [params.orderId],
+    ).catch(() => null);
+    if (order) {
+      // PayPal settles in USD even when the plan currency was entered as CNY.
+      const orderCurrency = (order.currency === "CNY" ? "USD" : order.currency).toUpperCase();
+      // Caller may report minor integers (cents) or major units (fiat). Normalize
+      // cents to major units when the reported amount is obviously scaled (≥100×).
+      if (expectedAmount >= 100 && Math.abs(order.amount) < 100 && Math.abs(expectedAmount / 100 - order.amount) < Math.abs(expectedAmount - order.amount)) {
+        expectedAmount = expectedAmount / 100;
+      }
+      const currencyMatches = expectedCurrency === orderCurrency;
+      const amountMatches = Number.isFinite(expectedAmount) && Math.abs(expectedAmount - order.amount) <= 0.01;
+      if (!currencyMatches || !amountMatches) {
+        const mismatch = new Error(
+          `Order ${params.orderId} amount mismatch — order=${order.amount} ${orderCurrency}, reported=${expectedAmount} ${expectedCurrency}; NOT marking paid`
+        );
+        logger.error(`[markOrderPaid] ${mismatch.message}`);
+        throw mismatch;
+      }
+    }
+  }
+
   // Atomically claim the "paid" transition. `WHERE status <> 'paid'` makes
   // the whole mark+grant sequence idempotent under concurrent webhook retries
   // (Stripe at-least-once delivery, PayPal page-refresh double capture): the

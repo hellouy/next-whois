@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).send("fail");
   }
 
-  const { trade_status, out_trade_no, trade_no } = body;
+  const { trade_status, out_trade_no, trade_no, total_amount, currency } = body;
 
   if (trade_status !== "TRADE_SUCCESS" && trade_status !== "TRADE_FINISHED") {
     return res.status(200).send("success");
@@ -37,6 +37,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderId: out_trade_no,
       providerOrderId: trade_no,
       webhookRaw: JSON.stringify(body).slice(0, 2000),
+      ...(total_amount != null
+        ? { expectedAmount: Number(total_amount), expectedCurrency: currency || undefined }
+        : {}),
     });
     logger.info(`[alipay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
   } catch (err: any) {

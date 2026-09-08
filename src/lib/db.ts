@@ -415,6 +415,7 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_users_subscription       ON users (subscription_access)`,
   `CREATE INDEX IF NOT EXISTS idx_reminders_email          ON reminders (email)`,
   `CREATE INDEX IF NOT EXISTS idx_reminders_domain         ON reminders (domain)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_reminders_active_domain_email ON reminders (domain, email) WHERE active = true`,
   `CREATE INDEX IF NOT EXISTS idx_stamps_email             ON stamps (email)`,
   `CREATE INDEX IF NOT EXISTS idx_stamps_domain            ON stamps (domain)`,
   // idx_search_history_user supersedes idx_search_history_user_id (covers both user_id lookup + ordering)

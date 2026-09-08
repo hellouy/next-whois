@@ -17,6 +17,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const domain = q.trim().toLowerCase().slice(0, 253);
 
+  // Basic domain format validation so arbitrary strings never reach the lookup
+  // pipeline (which may hit external registry resources).
+  if (
+    !domain.includes(".") ||
+    domain.startsWith(".") ||
+    domain.endsWith(".") ||
+    domain.includes("..")
+  ) {
+    return res.status(400).json({ status: false, error: "Invalid domain format" });
+  }
+
   try {
     const result = await lookupWhoisWithCache(domain);
     if (!result.status || !result.result) {

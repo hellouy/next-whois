@@ -53,6 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderId,
         providerOrderId: sessionId,
         webhookRaw: rawBody.slice(0, 2000),
+        ...(session?.amount_total != null
+          ? { expectedAmount: Number(session.amount_total) / 100, expectedCurrency: session.currency || undefined }
+          : {}),
       });
       logger.info(`[stripe webhook] Order ${orderId} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
     } catch (err: any) {

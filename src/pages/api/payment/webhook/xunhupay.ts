@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ errcode: 1, errmsg: "invalid sign" });
   }
 
-  const { trade_status, out_trade_no, transaction_id } = body;
+  const { trade_status, out_trade_no, transaction_id, total_fee, currency } = body;
 
   if (trade_status !== "TRADE_SUCCESS") {
     return res.json({ errcode: 0, errmsg: "ok" });
@@ -36,6 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderId: out_trade_no,
       providerOrderId: transaction_id,
       webhookRaw: JSON.stringify(body).slice(0, 2000),
+      ...(total_fee != null
+        ? { expectedAmount: Number(total_fee), expectedCurrency: currency || undefined }
+        : {}),
     });
     logger.info(`[xunhupay webhook] Order ${out_trade_no} paid — email=${result.userEmail} sub=${result.grantsSubscription}`);
   } catch (err: any) {

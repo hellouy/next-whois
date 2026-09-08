@@ -29,38 +29,16 @@ export function usePWAInstaller() {
       const installer = getInstallerElement();
       installer?.showDialog(force);
 
-      console.log(
-        `[installer] ${force ? "forced" : "prompted"} installation to:`,
-        installer,
-      );
-
       if (installer && !installer.isListening) {
         // register events
         installer.isListening = true;
 
-        installer.addEventListener("pwa-install-success-event", (e) => {
-          console.log("[installer] installation success:", e);
-        });
-
-        installer.addEventListener("pwa-install-fail-event", (e) => {
-          console.error("[installer] installation failed:", e);
-        });
-
-        installer.addEventListener("pwa-install-available-event", (e) => {
-          console.log("[installer] installation available:", e);
-        });
-
-        installer.addEventListener("pwa-user-choice-result-event", (e) => {
-          console.log("[installer] user choice result:", e);
-        });
-
-        installer.addEventListener("pwa-install-how-to-event", (e) => {
-          console.log("[installer] installation how to:", e);
-        });
-
-        installer.addEventListener("pwa-install-gallery-event", (e) => {
-          console.log("[installer] installation gallery:", e);
-        });
+        installer.addEventListener("pwa-install-success-event", (e) => void e);
+        installer.addEventListener("pwa-install-fail-event", (e) => void e);
+        installer.addEventListener("pwa-install-available-event", (e) => void e);
+        installer.addEventListener("pwa-user-choice-result-event", (e) => void e);
+        installer.addEventListener("pwa-install-how-to-event", (e) => void e);
+        installer.addEventListener("pwa-install-gallery-event", (e) => void e);
       }
     },
   };

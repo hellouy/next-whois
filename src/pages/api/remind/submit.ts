@@ -181,11 +181,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else {
       reminderId = id;
       cancelTok  = cancelToken;
-      await run(
+      const inserted = await run(
         `INSERT INTO reminders (id, domain, email, expiration_date, active, cancel_token, phase_flags, thresholds_json)
-         VALUES ($1, $2, $3, $4, true, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, true, $5, $6, $7)
+         ON CONFLICT (domain, email) WHERE active = true DO NOTHING`,
         [reminderId, cleanDomain, cleanEmail, userExpDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds)],
       );
+      if (inserted !== 1) {
+        // A concurrent request created the same subscription between our
+        // SELECT above and this INSERT — treat it as already subscribed.
+        const concurrent = await one<{ id: string; active: boolean }>(
+          "SELECT id, active FROM reminders WHERE domain = $1 AND email = $2",
+          [cleanDomain, cleanEmail],
+        ).catch(() => null);
+        if (concurrent?.active) {
+          return res.status(409).json({ code: "ALREADY_SUBSCRIBED", error: "Already subscribed" });
+        }
+        // Raced against an inactive row — re-activate that row with this
+        // request's payload and reuse its id/token.
+        if (concurrent) {
+          reminderId = concurrent.id;
+          cancelTok  = cancelToken;
+          await run(
+            `UPDATE reminders
+             SET expiration_date = $1, active = true, cancelled_at = NULL,
+                 cancel_reason = NULL, cancel_token = $2, phase_flags = $3, thresholds_json = $4,
+                 whois_synced_at = NULL, whois_expiry_date = NULL,
+                 hold_notified_at = NULL, reserved_notified_at = NULL
+             WHERE id = $5`,
+            [userExpDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds), reminderId],
+          );
+          await run("DELETE FROM reminder_logs WHERE reminder_id = $1", [reminderId]);
+        }
+      }
     }
   } catch (dbErr: any) {
     logger.error("[remind/submit] DB error:", dbErr);

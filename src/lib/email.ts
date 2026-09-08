@@ -1162,7 +1162,20 @@ type SmtpConfig = {
   secure: string; // "ssl" | "starttls" | "none"
 };
 
+// TTL cache for SMTP / Resend provider settings. These are read for every
+// outbound email; without a cache a reminder batch of N messages pays N DB
+// round-trips per provider setting. Changes made in the admin panel propagate
+// within one TTL window.
+let _smtpCache: SmtpConfig | null | undefined;
+let _smtpCacheAt = 0;
+const SMTP_TTL = 60_000;
+
+let _resendCache: { key: string; from: string } | undefined;
+let _resendCacheAt = 0;
+const RESEND_TTL = 60_000;
+
 async function getSmtpConfig(): Promise<SmtpConfig | null> {
+  if (_smtpCache !== undefined && Date.now() - _smtpCacheAt < SMTP_TTL) return _smtpCache;
   try {
     const rows = await import("@/lib/db-query").then(m =>
       m.many<{ key: string; value: string }>(
@@ -1172,9 +1185,9 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
     );
     const map: Record<string, string> = {};
     for (const r of rows) map[r.key] = r.value;
-    if (map.smtp_enabled !== "1") return null;
-    if (!map.smtp_host || !map.smtp_user || !map.smtp_pass) return null;
-    return {
+    if (map.smtp_enabled !== "1") { _smtpCache = null; return null; }
+    if (!map.smtp_host || !map.smtp_user || !map.smtp_pass) { _smtpCache = null; return null; }
+    _smtpCache = {
       host: map.smtp_host,
       port: parseInt(map.smtp_port || "465"),
       user: map.smtp_user,
@@ -1183,8 +1196,11 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
       secure: map.smtp_secure || "ssl",
     };
   } catch {
-    return null;
+    _smtpCache = null;
+  } finally {
+    _smtpCacheAt = Date.now();
   }
+  return _smtpCache;
 }
 
 function withSenderName(email: string, name: string): string {
@@ -1215,7 +1231,8 @@ async function sendViaSMTP(smtp: SmtpConfig, to: string, subject: string, html: 
   await transporter.sendMail({ from: withSenderName(smtp.from, siteLabel), to, subject, html });
 }
 
-async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
+async function getResendConfig(): Promise<{ key: string; from: string }> {
+  if (_resendCache && Date.now() - _resendCacheAt < RESEND_TTL) return _resendCache;
   let resendKey = "";
   let configuredFrom = "";
   try {
@@ -1232,6 +1249,13 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
     resendKey      = process.env.RESEND_API_KEY    || "";
     configuredFrom = process.env.RESEND_FROM_EMAIL || "";
   }
+  _resendCache = { key: resendKey, from: configuredFrom };
+  _resendCacheAt = Date.now();
+  return _resendCache;
+}
+
+async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
+  const { key: resendKey, from: configuredFrom } = await getResendConfig();
   if (!resendKey) {
     throw new Error("邮件服务未配置：请在管理后台的「邮件」设置中配置 SMTP 或填写 Resend API Key，否则无法发送邮件。");
   }
