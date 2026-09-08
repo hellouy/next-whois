@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { markOrderPaid, paypalGetToken } from "@/lib/payment";
+import { markOrderPaid, paypalGetToken, getPaypalBase } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { createLogger } from "@/lib/logger";
@@ -16,7 +16,8 @@ async function verifyPaypalWebhook(
   if (!webhookId) return false;
   try {
     const token = await paypalGetToken();
-    const verifyRes = await fetch("https://api-m.paypal.com/v1/notifications/verify-webhook-signature", {
+    const base = await getPaypalBase();
+    const verifyRes = await fetch(`${base}/v1/notifications/verify-webhook-signature`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({

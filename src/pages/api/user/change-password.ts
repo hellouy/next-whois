@@ -42,7 +42,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
 
   const newHash = await hash(String(newPassword), 12);
-  await run("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2", [newHash, user.id]);
+  // Bump session_version so every previously issued JWT is invalidated — any
+  // other device still holding a token from before the password change is logged out.
+  await run(
+    "UPDATE users SET password_hash = $1, session_version = session_version + 1, updated_at = NOW() WHERE id = $2",
+    [newHash, user.id],
+  );
 
   const nameRow = await one<{ name: string | null }>("SELECT name FROM users WHERE id = $1", [user.id]);
   getSiteLabel().then(siteName =>

@@ -141,8 +141,9 @@ export const authOptions: NextAuthOptions = {
           disabled: boolean;
           subscription_access: boolean;
           subscription_expires_at: string | null;
+          session_version: number;
         }>(
-          "SELECT id, email, name, password_hash, disabled, subscription_access, subscription_expires_at FROM users WHERE email = $1",
+          "SELECT id, email, name, password_hash, disabled, subscription_access, subscription_expires_at, session_version FROM users WHERE email = $1",
           [email],
         );
 
@@ -173,6 +174,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name ?? null,
           subscriptionAccess,
+          sessionVersion: user.session_version,
           rememberMe: credentials.rememberMe !== "0",
         };
       },
@@ -186,6 +188,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.subscriptionAccess = (user as any).subscriptionAccess ?? false;
+        token.sessionVersion = (user as any).sessionVersion ?? 0;
         // Resolve admin status at sign-in using DB-backed check so the session
         // reflects the correct admin email even if the env var differs from DB.
         token.isAdmin = await isAdminEmail(user.email).catch(() => false);
@@ -232,6 +235,23 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (token && session.user) {
+        // Session-revocation check: the stored session_version is bumped whenever
+        // the account email changes. If the token predates that change it no longer
+        // matches the DB, so the session is dropped and the client is logged out.
+        if (token.id) {
+          try {
+            const row = await one<{ session_version: number }>(
+              "SELECT session_version FROM users WHERE id = $1",
+              [token.id],
+            );
+            if (row && Number(row.session_version) !== Number(token.sessionVersion ?? 0)) {
+              return {} as any;
+            }
+            if (!row) return {} as any;
+          } catch {
+            // DB unavailable: keep the existing session (fail-safe, do not kick users).
+          }
+        }
         (session.user as any).id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;

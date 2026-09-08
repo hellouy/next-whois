@@ -172,7 +172,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `UPDATE reminders
          SET expiration_date = $1, active = true, cancelled_at = NULL,
              cancel_reason = NULL, cancel_token = $2, phase_flags = $3, thresholds_json = $4,
-             whois_synced_at = NULL, whois_expiry_date = NULL
+             whois_synced_at = NULL, whois_expiry_date = NULL,
+             hold_notified_at = NULL, reserved_notified_at = NULL
          WHERE id = $5`,
         [userExpDate, cancelTok, JSON.stringify(flags), JSON.stringify(selectedThresholds), reminderId],
       );

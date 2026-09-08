@@ -107,16 +107,30 @@ async function refreshStaleWhoisDates(
         ? rv.nameServers.map((ns: any) => String(ns).toLowerCase().trim()).filter((ns: string) => ns && ns !== "unknown").slice(0, 6)
         : [];
 
+      // ── 7-day tolerance (mirrors /api/remind/submit) ─────────────────────────
+      // A user-entered date that is genuinely newer than WHOIS (e.g. they just
+      // renewed at the registrar and WHOIS has not caught up) must NOT be
+      // overwritten by a stale WHOIS value. WHOIS wins only when it is within
+      // 7 days of the stored date or strictly later.
+      const storedDate = r.expiration_date ? new Date(r.expiration_date).getTime() : NaN;
+      const whoisDate = dateStr ? new Date(dateStr).getTime() : NaN;
+      const useWhoisDate = !r.expiration_date || (
+        Math.abs(storedDate - whoisDate) / 86_400_000 <= 7 || whoisDate > storedDate
+      );
+      // effectiveDate is never null here: when r.expiration_date is null the
+      // guard above forces useWhoisDate=true, so we always fall back to dateStr.
+      const effectiveDate: string = useWhoisDate ? dateStr : (r.expiration_date as string);
+
       await run(
         `UPDATE reminders
          SET expiration_date = $1, whois_expiry_date = $2, whois_synced_at = NOW(),
              registrar = $3, creation_date = $4, nameservers_json = $5, last_epp_status = $7
          WHERE id = $6`,
-        [dateStr, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id,
+        [effectiveDate, dateStr, registrar, creationDate, nameservers.length ? JSON.stringify(nameservers) : null, r.id,
          epp.length ? JSON.stringify(epp) : null],
       );
-      updated.set(r.id, { date: dateStr, eppStatus: epp, registrar, creationDate, nameservers });
-      logger.info(`[process] WHOIS refreshed ${r.domain} → ${dateStr}`);
+      updated.set(r.id, { date: effectiveDate, eppStatus: epp, registrar, creationDate, nameservers });
+      logger.info(`[process] WHOIS refreshed ${r.domain} → ${effectiveDate}`);
     } catch (err) {
       logger.warn(`[process] WHOIS refresh failed for ${r.domain}:`, err instanceof Error ? err.message : String(err));
     }
@@ -171,7 +185,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `SELECT id, domain, email, expiration_date, cancel_token, phase_flags, thresholds_json,
               whois_synced_at, whois_expiry_date, registrar, creation_date, nameservers_json,
               notify_email, last_epp_status, hold_notified_at, reserved_notified_at
-       FROM reminders WHERE active = true AND paused = false AND expiration_date IS NOT NULL`,
+       FROM reminders WHERE active = true AND paused = false`,
     );
 
     // Batch-fetch user locales so each email can be sent in the user's language

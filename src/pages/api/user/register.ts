@@ -117,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // mid-flight failure never leaves an orphaned user or over-used invite code.
     await withTransaction(async (tx) => {
       await tx.run(
-        "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used, locale) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO users (id, email, password_hash, name, subscription_access, invite_code_used, locale, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, true)",
         [id, cleanEmail, passwordHash, cleanName, subscriptionAccess, cleanInviteCode ?? null, locale],
       );
 

@@ -81,10 +81,12 @@ async function saveTldRule(
        pre_expiry_days        = EXCLUDED.pre_expiry_days,
        scraped_at             = NOW(),
        updated_at             = NOW(),
-       scrape_status          = EXCLUDED.scrape_status,
-       failure_reason         = NULL,
-       needs_admin_review     = EXCLUDED.needs_admin_review,
-       scrape_attempts        = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
+scrape_status          = EXCLUDED.scrape_status,
+        failure_reason         = NULL,
+        needs_admin_review     = EXCLUDED.needs_admin_review,
+        processing_at          = NULL,
+        processing_from        = NULL,
+        scrape_attempts        = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
     [
       tld,
       extracted.grace_period_days,
@@ -112,12 +114,14 @@ async function saveFailure(tld: string, reason: string) {
         needs_admin_review, confidence, scrape_attempts)
      VALUES ($1,30,30,5,'failed',$2,NOW(),NOW(),TRUE,'low',1)
      ON CONFLICT (tld) DO UPDATE SET
-       scrape_status      = 'failed',
-       failure_reason     = $2,
-       scraped_at         = NOW(),
-       updated_at         = NOW(),
-       needs_admin_review = TRUE,
-       scrape_attempts    = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
+scrape_status      = 'failed',
+        failure_reason     = $2,
+        scraped_at         = NOW(),
+        updated_at         = NOW(),
+        needs_admin_review = TRUE,
+        processing_at      = NULL,
+        processing_from    = NULL,
+        scrape_attempts    = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
     [tld, reason.slice(0, 500)]
   ).catch((e: Error) =>
     logger.warn(`[cron/tld-scrape] DB write failure for ${tld}:`, e.message)
@@ -128,33 +132,70 @@ async function markNoData(tld: string, reason: string) {
   await run(
     `UPDATE tld_rules
      SET scrape_status='no_data', needs_admin_review=TRUE,
-         failure_reason=$2, updated_at=NOW()
+         failure_reason=$2, updated_at=NOW(),
+         processing_at=NULL, processing_from=NULL
      WHERE tld=$1`,
     [tld, reason.slice(0, 500)]
   ).catch(() => {});
 }
 
 async function getNextBatch(): Promise<TldQueueRow[]> {
+  // Atomic claim: mark the picked rows as processing in the SAME statement that
+  // selects them. Two overlapping cron runs can therefore never pick the same
+  // TLD — the second run's UPDATE matches no rows still in a queued status.
+  // Returns the pre-claim status per row so the caller keeps its queued-state logic.
   const rows = await many<TldQueueRow>(
-    `SELECT tld, COALESCE(scrape_status,'pending') AS scrape_status,
-            COALESCE(scrape_attempts,0) AS scrape_attempts
-     FROM tld_rules
-     WHERE COALESCE(manually_edited, FALSE) = FALSE
-       AND COALESCE(scrape_status,'pending') IN ('pending','warn_defaults','failed')
-       AND COALESCE(scrape_status,'pending') != 'no_data'
-     ORDER BY
-       CASE COALESCE(scrape_status,'pending')
-         WHEN 'pending'       THEN 1
-         WHEN 'warn_defaults' THEN 2
-         WHEN 'failed'        THEN 3
-         ELSE 4
-       END,
-       COALESCE(scrape_attempts,0) ASC,
-       tld ASC
-     LIMIT $1`,
+    `WITH candidates AS (
+       SELECT tld, COALESCE(scrape_status,'pending') AS scrape_status,
+              COALESCE(scrape_attempts,0) AS scrape_attempts
+       FROM tld_rules
+       WHERE COALESCE(manually_edited, FALSE) = FALSE
+         AND COALESCE(scrape_status,'pending') IN ('pending','warn_defaults','failed')
+         AND COALESCE(scrape_status,'pending') != 'no_data'
+       ORDER BY
+         CASE COALESCE(scrape_status,'pending')
+           WHEN 'pending'       THEN 1
+           WHEN 'warn_defaults' THEN 2
+           WHEN 'failed'        THEN 3
+           ELSE 4
+         END,
+         COALESCE(scrape_attempts,0) ASC,
+         tld ASC
+       LIMIT $1
+     )
+     UPDATE tld_rules t
+     SET    scrape_status = 'processing',
+            processing_at = NOW(),
+            processing_from = c.scrape_status
+     FROM   candidates c
+     WHERE  t.tld = c.tld
+       AND  t.processing_at IS NULL
+       AND  COALESCE(t.scrape_status,'pending') IN ('pending','warn_defaults','failed')
+     RETURNING t.tld,
+               c.scrape_status,
+               c.scrape_attempts`,
     [BATCH_SIZE]
   );
   return rows;
+}
+
+/**
+ * Reclaim rows left in 'processing' by a crashed/overlong run (older than
+ * 30 min). Their original queued status is restored from processing_from so the
+ * next batch can pick them up again instead of being stuck forever.
+ */
+async function reclaimStaleProcessing(): Promise<void> {
+  await run(
+    `UPDATE tld_rules
+     SET scrape_status = COALESCE(processing_from, 'failed'),
+         processing_from = NULL,
+         processing_at = NULL
+     WHERE scrape_status = 'processing'
+       AND processing_at IS NOT NULL
+       AND processing_at < NOW() - INTERVAL '30 minutes'`,
+  ).catch((e: Error) =>
+    logger.warn("[cron/tld-scrape] stale processing reclaim failed:", e.message)
+  );
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -179,6 +220,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const batch = await getNextBatch();
+
+  // Reclaim rows stuck in 'processing' by a crashed earlier run so they rejoin
+  // the queue on subsequent invocations instead of blocking forever.
+  await reclaimStaleProcessing();
 
   // Best-effort maintenance: prune diagnostic failure events older than 90d.
   // Fire-and-forget — never blocks the scrape queue.

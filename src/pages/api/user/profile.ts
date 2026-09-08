@@ -84,6 +84,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (existing) return res.status(409).json({ error: "This email is already in use" });
         updates.push(`email = $${params.length + 1}`);
         params.push(newEmail);
+        // Invalidate all existing JWT sessions that reference the old email.
+        // The session_version column is checked by the next-auth jwt callback,
+        // so any token minted before this change is rejected immediately.
+        updates.push(`session_version = session_version + 1`);
         // Track key for deletion AFTER successful DB update
         emailChangeCodeKey = storeKey;
       }

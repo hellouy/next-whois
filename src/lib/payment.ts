@@ -311,7 +311,7 @@ export function verifyStripeWebhookSignature(
 
 // ── PayPal REST API helpers ────────────────────────────────────────────────
 
-async function getPaypalBase(): Promise<string> {
+export async function getPaypalBase(): Promise<string> {
   try {
     const row = await one<{ value: string }>(
       `SELECT value FROM site_settings WHERE key = 'payment_paypal_env'`

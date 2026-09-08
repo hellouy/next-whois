@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { hash } from "bcryptjs";
 import { createHash } from "crypto";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, isDbReady, withTransaction } from "@/lib/db-query";
 import { sendEmail, passwordChangedHtml, getSiteLabel } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createLogger } from "@/lib/logger";
@@ -34,22 +34,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // hash the submitted token before matching — never compare plaintext.
   const tokenHash = createHash("sha256").update(token).digest("hex");
 
-  // Atomically claim the token — only one concurrent request can succeed.
-  // Also roll the token into a dead value so a replayed submission that arrives
-  // a moment later cannot double-apply the same reset flow.
-  const claimed = await one<{ id: string; user_id: string }>(
-    `UPDATE password_reset_tokens
-        SET used = true
-      WHERE token = $1
-        AND used = false
-        AND expires_at > NOW()
-      RETURNING id, user_id`,
-    [tokenHash],
-  );
+  // Atomic claim + password update in ONE transaction. The token is marked used
+  // in the same transaction that writes the new hash, so a replayed submission
+  // cannot double-apply. Bump session_version so every previously issued JWT is
+  // invalidated (the jwt session callback enforces it) — a stolen session from
+  // before the reset no longer works.
+  let claimedUserId: string | null = null;
+  try {
+    claimedUserId = await withTransaction(async (tx) => {
+      const row = await tx.one<{ id: string; user_id: string }>(
+        `UPDATE password_reset_tokens
+            SET used = true
+          WHERE token = $1
+            AND used = false
+            AND expires_at > NOW()
+          RETURNING id, user_id`,
+        [tokenHash],
+      );
+      if (!row) return null;
+      await tx.run(
+        "UPDATE users SET password_hash = $1, session_version = session_version + 1, updated_at = NOW() WHERE id = $2",
+        [newHash, row.user_id],
+      );
+      return row.user_id;
+    });
+  } catch (err: any) {
+    logger.error("[reset-password] transaction error:", err.message);
+    return res.status(500).json({ error: "Reset failed, please try again" });
+  }
 
-  if (!claimed) {
-    // Distinguish "never existed" from "already used / expired" for UX,
-    // without leaking timing information about valid tokens.
+  if (!claimedUserId) {
+    // Distinguish "never existed" from "already used / expired" for UX.
     const exists = await one<{ used: boolean; expires_at: string }>(
       "SELECT used, expires_at FROM password_reset_tokens WHERE token = $1",
       [tokenHash],
@@ -59,18 +74,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Reset link has expired, please request a new one" });
   }
 
-  try {
-    await run("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, claimed.user_id]);
-  } catch (err: any) {
-    // Roll back the token claim so the user can retry
-    await run("UPDATE password_reset_tokens SET used = false WHERE id = $1", [claimed.id]).catch(() => {});
-    logger.error("[reset-password] update error:", err.message);
-    return res.status(500).json({ error: "Reset failed, please try again" });
-  }
-
   const userRow = await one<{ email: string; name: string | null }>(
     "SELECT email, name FROM users WHERE id = $1",
-    [claimed.user_id]
+    [claimedUserId]
   );
   if (userRow) {
     getSiteLabel().then(siteName =>

@@ -1,8 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, isDbReady, withTransaction } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("api/user/apply-invite-code");
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -49,28 +52,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Invite code has expired" });
   if (preview.use_count >= preview.max_uses) return res.status(400).json({ error: "Invite code usage limit reached" });
 
-  // Atomically increment use_count only when still within limit.
-  // Concurrent requests: only one wins; the rest get null back.
-  const claimed = await one<{ id: string }>(
-    `UPDATE invite_codes
-        SET use_count = use_count + 1
-      WHERE id = $1
-        AND is_active = true
-        AND use_count < max_uses
-        AND (expires_at IS NULL OR expires_at > NOW())
-      RETURNING id`,
-    [preview.id]
-  );
+  // Claim the code and grant access in ONE transaction so a failure mid-way
+  // never consumes the code without granting access (or vice versa).
+  const granted = await withTransaction(async (tx) => {
+    // Atomically increment use_count only when still within limit.
+    // Concurrent requests: only one wins; the rest get null back.
+    const claimed = await tx.one<{ id: string }>(
+      `UPDATE invite_codes
+          SET use_count = use_count + 1
+        WHERE id = $1
+          AND is_active = true
+          AND use_count < max_uses
+          AND (expires_at IS NULL OR expires_at > NOW())
+        RETURNING id`,
+      [preview.id]
+    );
+    if (!claimed) return false;
 
-  if (!claimed) {
-    // Race lost — concurrently exhausted or deactivated between SELECT and UPDATE
+    const updated = await tx.run(
+      "UPDATE users SET subscription_access = TRUE, invite_code_used = $1, updated_at = NOW() WHERE id = $2",
+      [code, user.id]
+    );
+    return updated === 1;
+  }).catch((err: any) => {
+    logger.error("[apply-invite-code] transaction error:", err?.message);
+    return null;
+  });
+
+  if (granted === null) {
+    return res.status(500).json({ error: "Failed to apply invite code, please try again" });
+  }
+  if (!granted) {
+    // Race lost — concurrently exhausted/deactivated between SELECT and UPDATE,
+    // or the user row vanished mid-transaction (rolled back the consume).
     return res.status(400).json({ error: "Invite code limit reached or deactivated" });
   }
-
-  await run(
-    "UPDATE users SET subscription_access = TRUE, invite_code_used = $1, updated_at = NOW() WHERE id = $2",
-    [code, user.id]
-  );
 
   return res.status(200).json({ ok: true });
 }

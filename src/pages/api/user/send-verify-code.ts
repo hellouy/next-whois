@@ -48,8 +48,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const allowReg = !regSetting || regSetting.value === "1";
     if (!allowReg) return res.status(403).json({ error: "Registration is currently disabled, please contact the administrator" });
 
+    // Anti-enumeration: reply uniformly for registered addresses instead of
+    // returning 409. An attacker probing for registered inboxes must otherwise
+    // be able to distinguish "registered" from "not registered" by status code.
     const existing = await one("SELECT id FROM users WHERE email = $1", [cleanEmail]);
-    if (existing) return res.status(409).json({ error: "This email is already registered" });
+    if (existing) return res.status(200).json({ ok: true });
   }
 
   // Per-email rate limit: max 1 code per 60 s (Redis-preferred, DB fallback via checkRateLimit)
