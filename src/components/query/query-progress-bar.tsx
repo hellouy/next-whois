@@ -19,13 +19,13 @@ export function QueryProgressBar({ loading, refreshing }: { loading: boolean; re
       setWidth(0);
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = requestAnimationFrame(() => {
-          setWidth(78);
+          setWidth(70);
         });
       });
     } else if (refreshing) {
       setIsDone(false);
       setVisible(true);
-      setWidth(90);
+      setWidth(96);
     } else {
       // Done: snap to 100% with fast transition, then fade out
       setIsDone(true);
@@ -51,7 +51,9 @@ export function QueryProgressBar({ loading, refreshing }: { loading: boolean; re
             ? "width 0.22s ease-out, opacity 0.25s ease"
             : width === 0
             ? "none"
-            : "width 9s cubic-bezier(0.02, 0.6, 0.18, 1)",
+            : refreshing && !loading
+            ? "width 2s cubic-bezier(0.02, 0.6, 0.18, 1)"
+            : "width 1.2s cubic-bezier(0.02, 0.6, 0.18, 1)",
         }}
       />
     </div>
