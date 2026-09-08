@@ -174,8 +174,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            FROM tld_fallback_stats f
            LEFT JOIN query_logs q
              ON q.tld = f.tld
-             AND NOT q.success
              AND q.created_at >= NOW() - INTERVAL '14 days'
+             AND CASE
+                   WHEN q.success OR COALESCE(q.outcome,'') = 'registered' THEN 'registered'
+                   WHEN q.outcome IS NOT NULL THEN q.outcome
+                   WHEN q.error_code ~* 'not found|no match|no data found|no entries found|no object found|domain not found' THEN 'unregistered'
+                   WHEN q.error_code ~* 'invalid tld|not a valid tld|unknown tld' THEN 'invalid'
+                   ELSE 'error'
+                 END = 'error'
            WHERE f.tld = ANY($1::text[])
            GROUP BY f.tld`,
           [tldList],
@@ -212,37 +218,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // metric fact source. reason_dist / trend / top_failed come from the
       // diagnostic fact source tld_failure_events (R1/R2/R4).
       const wArg = [windowDays] as (string | number)[];
-      const m = await client.query<{ total: string; success: string; fail: string }>(
+      const m = await client.query<{ total: string; registered: string; unregistered: string; invalid: string; error: string }>(
         `SELECT COUNT(*)::text AS total,
-                COUNT(*) FILTER (WHERE success)::text AS success,
-                COUNT(*) FILTER (WHERE NOT success)::text AS fail
-         FROM query_logs
-         WHERE created_at > NOW() - make_interval(days => $1)`,
+                COUNT(*) FILTER (WHERE status_kind = 'registered')::text   AS registered,
+                COUNT(*) FILTER (WHERE status_kind = 'unregistered')::text AS unregistered,
+                COUNT(*) FILTER (WHERE status_kind = 'invalid')::text      AS invalid,
+                COUNT(*) FILTER (WHERE status_kind = 'error')::text        AS error
+         FROM (
+           SELECT CASE
+             WHEN success OR COALESCE(outcome,'') = 'registered' THEN 'registered'
+             WHEN outcome IS NOT NULL THEN outcome
+             WHEN error_code ~* 'not found|no match|no data found|no entries found|no object found|domain not found' THEN 'unregistered'
+             WHEN error_code ~* 'invalid tld|not a valid tld|unknown tld' THEN 'invalid'
+             ELSE 'error'
+           END AS status_kind
+           FROM query_logs
+           WHERE created_at > NOW() - make_interval(days => $1)
+         ) s`,
         wArg,
       );
       const prevAgg = await client.query<{ fail: string }>(
-        `SELECT COUNT(*) FILTER (WHERE NOT success)::text AS fail
-         FROM query_logs
-         WHERE created_at >= NOW() - make_interval(days => $1 * 2)
-           AND created_at <  NOW() - make_interval(days => $1)`,
+        `SELECT COUNT(*) FILTER (WHERE status_kind = 'error')::text AS fail
+         FROM (
+           SELECT CASE
+             WHEN success OR COALESCE(outcome,'') = 'registered' THEN 'registered'
+             WHEN outcome IS NOT NULL THEN outcome
+             WHEN error_code ~* 'not found|no match|no data found|no entries found|no object found|domain not found' THEN 'unregistered'
+             WHEN error_code ~* 'invalid tld|not a valid tld|unknown tld' THEN 'invalid'
+             ELSE 'error'
+           END AS status_kind
+           FROM query_logs
+           WHERE created_at >= NOW() - make_interval(days => $1 * 2)
+             AND created_at <  NOW() - make_interval(days => $1)
+         ) s`,
         [windowDays],
       );
       const mrow  = m.rows[0];
-      const qTotal = parseInt(mrow?.total  ?? "0");
-      const qOk    = parseInt(mrow?.success ?? "0");
-      const qFail  = parseInt(mrow?.fail    ?? "0");
+      const qTotal   = parseInt(mrow?.total   ?? "0");
+      const qReg     = parseInt(mrow?.registered   ?? "0");
+      const qUnreg   = parseInt(mrow?.unregistered ?? "0");
+      const qInvalid = parseInt(mrow?.invalid      ?? "0");
+      const qError   = parseInt(mrow?.error        ?? "0");
       const prevFail = parseInt(prevAgg.rows[0]?.fail ?? "0");
+      // Success rate reflects only genuine service failures: unregistered /
+      // invalid-input outcomes are normal results, not infrastructure errors.
+      const validQueries = qTotal - qUnreg - qInvalid;
       const metrics = {
         window_days: windowDays,
         total_queries: qTotal,
-        success: qOk,
-        fail: qFail,
-        success_rate: qTotal > 0 ? Math.round((qOk / qTotal) * 1000) / 10 : null,
+        registered: qReg,
+        unregistered: qUnreg,
+        invalid: qInvalid,
+        error: qError,
+        // Backwards-compatible alias: "success" keeps meaning "queried OK".
+        success: qReg + qUnreg,
+        fail: qError,
+        success_rate: validQueries > 0 ? Math.round((qReg / validQueries) * 1000) / 10 : null,
         prev_fail: prevFail,
         fail_delta_pct:
           prevFail > 0
-            ? Math.round(((qFail - prevFail) / prevFail) * 1000) / 10
-            : (qFail > 0 ? 100 : 0),
+            ? Math.round(((qError - prevFail) / prevFail) * 1000) / 10
+            : (qError > 0 ? 100 : 0),
       };
 
       const evArg = [windowDays] as (string | number)[];
@@ -278,14 +314,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          )
          SELECT ev.tld, ev.fail_count::text,
                 ev.last_domain, ev.sample_error, ev.last_fail_ts::text, ev.last_reason,
-                COALESCE(q.total, 0)::text  AS total,
-                COALESCE(q.success, 0)::text AS success,
-                (CASE WHEN q.total > 0 THEN ROUND(q.success::numeric / q.total * 100, 1)::text ELSE NULL END) AS success_rate
+                 COALESCE(q.total, 0)::text  AS total,
+                 COALESCE(q.success, 0)::text AS success,
+                 (CASE WHEN q.total > 0 THEN ROUND(q.success::numeric / q.total * 100, 1)::text ELSE NULL END) AS success_rate
          FROM ev
          LEFT JOIN (
-           SELECT tld, COUNT(*)::int AS total, COUNT(*) FILTER (WHERE success)::int AS success
-           FROM query_logs
-           WHERE created_at > NOW() - make_interval(days => $1)
+           SELECT tld, COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE status_kind = 'registered')::int AS success
+           FROM (
+             SELECT tld,
+                    CASE
+                      WHEN success OR COALESCE(outcome,'') = 'registered' THEN 'registered'
+                      WHEN outcome IS NOT NULL THEN outcome
+                      WHEN error_code ~* 'not found|no match|no data found|no entries found|no object found|domain not found' THEN 'unregistered'
+                      WHEN error_code ~* 'invalid tld|not a valid tld|unknown tld' THEN 'invalid'
+                      ELSE 'error'
+                    END AS status_kind
+             FROM query_logs
+             WHERE created_at > NOW() - make_interval(days => $1)
+           ) s
            GROUP BY tld
          ) q ON q.tld = ev.tld
          ORDER BY ev.fail_count DESC, ev.last_fail_ts DESC

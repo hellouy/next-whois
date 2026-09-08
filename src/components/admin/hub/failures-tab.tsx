@@ -57,6 +57,10 @@ const FAILURE_LABELS: Record<string, string> = Object.fromEntries(
 type DashboardMetrics = {
   window_days: number;
   total_queries: number | null;
+  registered: number | null;
+  unregistered: number | null;
+  invalid: number | null;
+  error: number | null;
   success: number | null;
   fail: number | null;
   success_rate: number | null;
@@ -217,11 +221,11 @@ function DashboardSection(props: {
                 <RiErrorWarningLine className="w-3.5 h-3.5" /> 窗口失败事件
               </div>
               <div className="text-2xl font-bold mt-1 tabular-nums">{totalEvents}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">诊断事件明细</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">窗口内诊断事件（含爬虫/历史迁移）</div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <RiCheckboxLine className="w-3.5 h-3.5" /> 查询成功率
+                <RiCheckboxLine className="w-3.5 h-3.5" /> 有效查询成功率
               </div>
               <div className={cn(
                 "text-2xl font-bold mt-1 tabular-nums",
@@ -231,8 +235,12 @@ function DashboardSection(props: {
               )}>
                 {metrics?.success_rate == null ? "—" : `${metrics.success_rate}%`}
               </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                共 {metrics?.total_queries ?? 0} 次 · 失败 {metrics?.fail ?? 0}
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                共 {metrics?.total_queries ?? 0} 次 · 真失败 {metrics?.error ?? 0}
+                <br />
+                <span className="text-muted-foreground/70">
+                  其中未注册 {metrics?.unregistered ?? 0} · 无效输入 {metrics?.invalid ?? 0}
+                </span>
               </div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
@@ -323,7 +331,7 @@ function DashboardSection(props: {
           {topFailed.length > 0 && (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <h4 className="text-xs font-semibold text-muted-foreground px-4 py-3 border-b border-border/60">
-                Top 失败 TLD（含成功率）
+                Top 失败 TLD（成功率为有效查询口径，未注册/无效输入不计失败）
               </h4>
               <div className="divide-y divide-border/50">
                 {topFailed.slice(0, 10).map(t => {
@@ -1165,7 +1173,7 @@ export function FailuresTab() {
         <div className="flex items-start gap-2 bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/50 dark:border-sky-800/30 rounded-xl px-4 py-3">
           <RiInformationLine className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
           <div className="text-xs text-sky-700 dark:text-sky-400 space-y-0.5">
-            <p><strong>本页结构：</strong>顶部仪表盘统计近窗口失败事件（查询成功率来自查询日志，原因/趋势/Top 列表来自诊断事件表）；下方列表为各后缀的服务器配置与修复状态。</p>
+            <p><strong>本页结构：</strong>顶部仪表盘统计近窗口查询（有效查询成功率只把真实基础设施失败计为失败，「未注册」「无效输入」是正常结果不计失败，分别展示数量；原因/趋势/Top 列表来自诊断事件表）；下方列表为各后缀的服务器配置与修复状态。</p>
             <p><strong>批量扫描修复：</strong>自动通过 IANA RDAP 引导、IANA WHOIS 转介、常见 URL 规律、TCP 探测等策略发现服务器并保存。「未查询」扫描 TLD 规则库中从未查询过的后缀。</p>
             <p>「清零」操作删除诊断事件记录，不影响服务器配置与修复状态。手动填写后的条目可用「隐藏手动填写」过滤。</p>
           </div>

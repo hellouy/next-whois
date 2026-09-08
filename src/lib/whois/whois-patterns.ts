@@ -88,6 +88,25 @@ export function isNotRegisteredWhoisResponse(whoisError: string): boolean {
   return WHOIS_NOT_REGISTERED_PATTERNS.some((p) => p.test(whoisError));
 }
 
+/**
+ * Classify a completed query into a stable outcome bucket so the admin
+ * dashboard can separate genuine service failures from normal results
+ * (domain available / invalid input). This is the metric source for
+ * query_logs.outcome — registered queries never reach the error branch.
+ */
+export type QueryOutcome = "registered" | "unregistered" | "invalid" | "error";
+
+export function classifyQueryOutcome(
+  status: boolean,
+  error?: string | null,
+): QueryOutcome {
+  if (status) return "registered";
+  const msg = (error ?? "").toLowerCase();
+  if (/invalid tld|not a valid tld|unknown tld|no such tld/i.test(msg)) return "invalid";
+  if (isNotRegisteredWhoisResponse(error ?? "")) return "unregistered";
+  return "error";
+}
+
 export function isIanaFallback(raw: string): boolean {
   return raw.includes("% IANA WHOIS server");
 }

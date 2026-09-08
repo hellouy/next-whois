@@ -371,6 +371,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS user_id            TEXT`,
   `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS user_email         TEXT`,
   `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS ip                 TEXT`,
+  `ALTER TABLE query_logs    ADD COLUMN IF NOT EXISTS outcome            TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS whois_expiry_date   TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS registrar           TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS creation_date       TEXT`,
@@ -521,6 +522,7 @@ const CREATE_INDEXES = [
     duration_ms INTEGER      NOT NULL DEFAULT 0,
     error_code  TEXT,
     source      TEXT,
+    outcome     TEXT,
     user_id     TEXT,
     user_email  TEXT,
     ip          TEXT,
@@ -810,6 +812,7 @@ export async function logQuery(entry: {
   durationMs: number;
   errorCode?: string | null;
   source?: string | null;
+  outcome?: "registered" | "unregistered" | "invalid" | "error" | null;
   userId?: string | null;
   userEmail?: string | null;
   ip?: string | null;
@@ -820,8 +823,8 @@ export async function logQuery(entry: {
   if (!client) return;
   try {
     await client.query(
-      `INSERT INTO query_logs (domain, tld, success, cached, duration_ms, error_code, source, user_id, user_email, ip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO query_logs (domain, tld, success, cached, duration_ms, error_code, source, outcome, user_id, user_email, ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         entry.domain.slice(0, 253),
         entry.tld.slice(0, 63),
@@ -830,6 +833,7 @@ export async function logQuery(entry: {
         Math.round(entry.durationMs),
         entry.errorCode ?? null,
         entry.source ?? null,
+        entry.outcome ?? null,
         entry.userId ?? null,
         entry.userEmail ? entry.userEmail.slice(0, 255) : null,
         entry.ip ?? null,

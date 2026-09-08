@@ -9,6 +9,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
+import { classifyQueryOutcome } from "@/lib/whois/whois-patterns";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("api/lookup-batch");
@@ -189,6 +190,7 @@ export default async function handler(
         durationMs: Math.round(item.time * 1000),
         errorCode: item.status ? null : (item.error?.slice(0, 60) ?? null),
         source: item.source ?? null,
+        outcome: classifyQueryOutcome(item.status, item.error),
         userId, userEmail, ip,
       }).catch(e => logger.error("[lookup-batch] logQuery failed:", e.message)),
     ];

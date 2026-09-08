@@ -7,6 +7,7 @@ import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
+import { classifyQueryOutcome } from "@/lib/whois/whois-patterns";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
 import { createLogger } from "@/lib/logger";
@@ -132,7 +133,7 @@ export default async function handler(
     await logQuery({
       domain: trimmed, tld, success: true, cached: false,
       durationMs: 0, errorCode: null, source: "whois",
-      userId, userEmail, ip,
+      outcome: "registered", userId, userEmail, ip,
     }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
     await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
       .catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message));
@@ -206,6 +207,7 @@ export default async function handler(
       durationMs: (finalResult.time ?? 0) * 1000,
       errorCode: finalResult.status ? null : (finalResult.error?.slice(0, 60) ?? null),
       source: finalResult.source ?? null,
+      outcome: classifyQueryOutcome(finalResult.status, finalResult.error),
       userId, userEmail, ip,
     }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
 
@@ -232,6 +234,7 @@ export default async function handler(
       await logQuery({
         domain: trimmed, tld, success: false, cached: false,
         durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
+        outcome: classifyQueryOutcome(false, errMsg),
         userId, userEmail, ip,
       }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
     }

@@ -288,7 +288,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         <div className="mb-3">
           <div className="relative group">
             <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
+            <div className="absolute left-4 top-5 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
               <KeyboardShortcut k="/" />
             </div>
           </div>
@@ -335,7 +335,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
         {/* Search box — top of viewport */}
         <div className="relative group mb-3">
           <SearchBox onSearch={handleSearch} loading={isSearching} placeholder={seo.searchPlaceholder || undefined} />
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
+          <div className="absolute left-4 top-5 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-40">
             <KeyboardShortcut k="/" />
           </div>
         </div>

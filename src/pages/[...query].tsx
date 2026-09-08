@@ -71,6 +71,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
+import { humanizeLookupError } from "@/lib/whois/error-messages";
 import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -1087,7 +1088,7 @@ export default function LookupPage({
                 onSearch={handleSearch}
                 loading={loading}
               />
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
+              <div className="absolute left-4 top-5 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
                 <KeyboardShortcut k="/" />
               </div>
             </div>
@@ -1308,10 +1309,10 @@ export default function LookupPage({
                           <span className="text-[11px] text-muted-foreground shrink-0">{isChinese ? "查询目标：" : "Target:"}</span>
                           <span className="font-mono text-[13px] font-semibold truncate">{target}</span>
                         </div>
-                        {/* Error message */}
-                        <p className="text-muted-foreground max-w-sm mx-auto text-sm leading-relaxed">
-                          {error || t("lookup_failed_fallback")}
-                        </p>
+                          {/* Error message */}
+                          <p className="text-muted-foreground max-w-sm mx-auto text-sm leading-relaxed">
+                            {humanizeLookupError(error, isChinese) ?? (error || t("lookup_failed_fallback"))}
+                          </p>
                         {/* Actions */}
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-7 flex-wrap">
                           <Button onClick={handleRefresh} className="gap-2 w-full sm:w-auto">

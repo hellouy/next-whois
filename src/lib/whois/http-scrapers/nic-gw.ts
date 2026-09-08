@@ -147,7 +147,16 @@ export async function lookupNicGw(domain: string): Promise<NicGwResult> {
     };
   }
 
-  const sections = parseFieldsets(html);
+  let sections: Record<string, Record<string, string>>;
+  try {
+    sections = parseFieldsets(html);
+  } catch {
+    return {
+      success: false,
+      blocked: false,
+      reason: "Could not parse WHOIS data from registar.nic.gw",
+    };
+  }
   const general = sections["General data"] || {};
   const registrant = sections["Registrant"] || {};
   const admin = sections["Administrative Contact"] || {};

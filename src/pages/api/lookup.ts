@@ -8,6 +8,7 @@ import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
+import { classifyQueryOutcome } from "@/lib/whois/whois-patterns";
 import { getSetting } from "@/lib/server/site-settings-server";
 import { logQuery } from "@/lib/db";
 import { createLogger } from "@/lib/logger";
@@ -126,7 +127,7 @@ export default async function handler(
     await logQuery({
       domain: trimmed, tld: cnTld, success: true, cached: false,
       durationMs: 0, errorCode: null, source: "whois",
-      userId, userEmail, ip,
+      outcome: "registered", userId, userEmail, ip,
     }).catch(e => logger.error("[lookup] logQuery failed:", e.message));
     await saveSearchRecord(trimmed, syntheticResult, undefined, userId, userEmail)
       .catch(e => logger.error("[lookup] saveSearchRecord failed:", e.message));
@@ -153,6 +154,7 @@ export default async function handler(
     await logQuery({
       domain: trimmed, tld, success: false, cached: false,
       durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null,
+      outcome: classifyQueryOutcome(false, error),
       userId, userEmail, ip,
     }).catch(e => logger.error("[lookup] logQuery failed:", e.message));
     return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
@@ -169,7 +171,7 @@ export default async function handler(
     logQuery({
       domain: trimmed, tld, success: true, cached: cached ?? false,
       durationMs: time * 1000, errorCode: null, source: source ?? null,
-      userId, userEmail, ip,
+      outcome: "registered", userId, userEmail, ip,
     }).catch(e => logger.error("[lookup] logQuery failed:", e.message)),
   ]);
 
