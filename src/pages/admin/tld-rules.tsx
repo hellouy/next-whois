@@ -33,6 +33,8 @@ import {
   RiCheckLine,
   RiSparklingLine,
   RiArrowRightLine,
+  RiArrowUpLine,
+  RiArrowDownLine,
 } from "@remixicon/react";
 import { LIFECYCLE_TABLE } from "@/lib/lifecycle";
 import IANA_TLDS from "@/data/iana-tlds.json";
@@ -97,6 +99,7 @@ type TldRule = {
   fetch_strategy: string | null;
   scrape_attempts: number;
   needs_admin_review: boolean;
+  covered_by_override?: boolean;
 };
 
 type ScrapeStats = {
@@ -1129,6 +1132,9 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
     () => !getCached(CACHE_RULES, TTL_RULES) // show spinner only on cache miss
   );
   const [search, setSearch] = React.useState("");
+  const [rulePage, setRulePage] = React.useState(1);
+  const [rulePerPage, setRulePerPage] = React.useState(50);
+  const [showAllAttention, setShowAllAttention] = React.useState(false);
   const [scraping, setScraping] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({ tld: "", source_url: "", force: false });
@@ -1460,6 +1466,21 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
     return rows;
   }, [rules, search, showOnlyDefaults]);
 
+  const filteredCount = filtered.length;
+  const ruleTotalPages = Math.max(1, Math.ceil(filteredCount / rulePerPage));
+  const currentPage = Math.min(rulePage, ruleTotalPages);
+  const paginatedRows = React.useMemo(() => {
+    const start = (currentPage - 1) * rulePerPage;
+    return filtered.slice(start, start + rulePerPage);
+  }, [filtered, currentPage, rulePerPage]);
+
+  const attentionList = React.useMemo(() =>
+    rules.filter(r => !r.manually_edited && !r.covered_by_override &&
+      (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")),
+  [rules]);
+  const ATTENTION_INITIAL = 8;
+  const attentionVisible = showAllAttention ? attentionList : attentionList.slice(0, ATTENTION_INITIAL);
+
   const filteredCompare = React.useMemo(() => {
     if (!compareData) return [];
     let rows = compareData.rows;
@@ -1773,7 +1794,7 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
         })()}
 
         {/* ── Failed / Warn / No-data records panel (crawl view only) ────── */}
-        {isCrawlView && !loading && rules.filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data")).length > 0 && (
+        {isCrawlView && !loading && attentionList.length > 0 && (
           <div className="border rounded-xl overflow-hidden bg-card">
             <div className="flex items-center gap-3 px-4 py-3 border-b bg-red-50/50 dark:bg-red-950/10">
               <RiErrorWarningLine className="w-4 h-4 text-red-500" />
@@ -1781,7 +1802,7 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                 需要关注的记录
               </span>
               <span className="text-xs text-muted-foreground">
-                — 失败、默认值或已穷尽重试的 TLD，建议手动录入或重置后再次抓取
+                — 失败、默认值或已穷尽重试的 TLD（已在生命周期规则库中手动覆盖的除外），建议手动录入或重置后再次抓取
               </span>
               <div className="flex-1" />
               <button
@@ -1795,9 +1816,7 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
               </button>
             </div>
             <div className="divide-y divide-border">
-              {rules
-                .filter(r => !r.manually_edited && (r.scrape_status === "failed" || r.scrape_status === "warn_defaults" || r.scrape_status === "no_data"))
-                .map(r => (
+              {attentionVisible.map(r => (
                   <div key={r.tld} className={cn(
                     "flex items-start gap-3 px-4 py-3",
                     r.scrape_status === "failed"        && "bg-red-50/30 dark:bg-red-950/10",
@@ -1899,6 +1918,20 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                   </div>
                 ))}
             </div>
+            {attentionList.length > ATTENTION_INITIAL && (
+              <div className="px-4 py-2.5 border-t bg-muted/20">
+                <button
+                  onClick={() => setShowAllAttention(v => !v)}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showAllAttention ? (
+                    <><RiArrowUpLine className="w-3.5 h-3.5" />收起（仅显示 {ATTENTION_INITIAL} 条）</>
+                  ) : (
+                    <><RiArrowDownLine className="w-3.5 h-3.5" />展开全部 {attentionList.length} 条</>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -2243,10 +2276,10 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
           <div className="flex items-center gap-3 px-4 py-3 border-b">
             <RiSearchLine className="w-4 h-4 text-muted-foreground" />
             <Input placeholder="搜索已抓取的 TLD…" value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setRulePage(1); }}
               className="h-8 border-0 shadow-none focus-visible:ring-0 p-0 text-sm" />
             <button
-              onClick={() => setShowOnlyDefaults(v => !v)}
+              onClick={() => { setShowOnlyDefaults(v => !v); setRulePage(1); }}
               title="仅显示使用默认值 (30/30/5) 的条目"
               className={cn(
                 "flex items-center gap-1 text-xs px-2 py-1 rounded-md border whitespace-nowrap transition-colors",
@@ -2288,7 +2321,7 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map(r => {
+                  {paginatedRows.map(r => {
                     const dt = formatDropTime(r);
                     const isEditing = editingTld === r.tld;
                     return (
@@ -2434,11 +2467,35 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                             </td>
                           </tr>
                         )}
-                      </React.Fragment>
+                       </React.Fragment>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {/* Pagination */}
+          {!loading && filteredCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 border-t">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                共 {filteredCount} 条 · 第 {currentPage}/{ruleTotalPages} 页
+              </span>
+              <div className="flex-1" />
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                disabled={currentPage <= 1} onClick={() => setRulePage(currentPage - 1)}>
+                上一页
+              </Button>
+              <select
+                value={rulePerPage}
+                onChange={e => { setRulePerPage(Number(e.target.value)); setRulePage(1); }}
+                className="h-7 rounded border text-xs px-1.5 bg-background text-muted-foreground"
+              >
+                {[20, 50, 100, 200].map(n => <option key={n} value={n}>{n} / 页</option>)}
+              </select>
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                disabled={currentPage >= ruleTotalPages} onClick={() => setRulePage(currentPage + 1)}>
+                下一页
+              </Button>
             </div>
           )}
         </div>

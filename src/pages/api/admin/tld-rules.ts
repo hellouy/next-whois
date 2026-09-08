@@ -687,19 +687,22 @@ export default async function handler(
       scraped_at: string | null; updated_at: string; model_used: string | null;
       ai_reasoning: string | null; manually_edited: boolean;
       scrape_status: string; failure_reason: string | null; fetch_strategy: string | null;
-      scrape_attempts: number;
+      scrape_attempts: number; covered_by_override: boolean;
     }>(
-      `SELECT tld, grace_period_days, redemption_period_days, pending_delete_days,
-              grace_period_days + redemption_period_days + pending_delete_days AS total_release_days,
-              source_url, confidence,
-              drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
-              scraped_at, updated_at, model_used, ai_reasoning,
-              COALESCE(manually_edited, FALSE) AS manually_edited,
-              COALESCE(scrape_status, 'pending') AS scrape_status,
-              COALESCE(needs_admin_review, FALSE) AS needs_admin_review,
-              failure_reason, fetch_strategy,
-              COALESCE(scrape_attempts, 0) AS scrape_attempts
-       FROM tld_rules ORDER BY tld`
+      `SELECT r.tld, r.grace_period_days, r.redemption_period_days, r.pending_delete_days,
+              r.grace_period_days + r.redemption_period_days + r.pending_delete_days AS total_release_days,
+              r.source_url, r.confidence,
+              r.drop_hour, r.drop_minute, r.drop_second, r.drop_timezone, r.pre_expiry_days,
+              r.scraped_at, r.updated_at, r.model_used, r.ai_reasoning,
+              COALESCE(r.manually_edited, FALSE) AS manually_edited,
+              COALESCE(r.scrape_status, 'pending') AS scrape_status,
+              COALESCE(r.needs_admin_review, FALSE) AS needs_admin_review,
+              r.failure_reason, r.fetch_strategy,
+              COALESCE(r.scrape_attempts, 0) AS scrape_attempts,
+              (o.tld IS NOT NULL) AS covered_by_override
+       FROM tld_rules r
+       LEFT JOIN tld_lifecycle_overrides o ON o.tld = r.tld
+       ORDER BY r.tld`
     );
 
     const format = req.query.format as string | undefined;
