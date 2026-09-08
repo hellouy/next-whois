@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { RiGlobalLine } from "@remixicon/react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/lib/i18n";
+import React from "react";
 
 interface QueryLoadingSkeletonProps {
   domain?: string;
@@ -9,13 +10,21 @@ interface QueryLoadingSkeletonProps {
 
 export function QueryLoadingSkeleton({ domain }: QueryLoadingSkeletonProps) {
   const { t } = useTranslation();
+  // Delay the skeleton's fade-in so fast lookups (cached WHOIS / prefetched
+  // RDAP) never flash a loading shell on screen. The shell only becomes fully
+  // visible once a lookup actually takes meaningful time.
+  const [entered, setEntered] = React.useState(false);
+  React.useEffect(() => {
+    const id = setTimeout(() => setEntered(true), 160);
+    return () => clearTimeout(id);
+  }, []);
   return (
     <motion.div
       key="skeleton"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.08, ease: "easeIn" } }}
-      transition={{ duration: 0.1 }}
+      animate={{ opacity: entered ? 1 : 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.18, ease: "easeInOut" } }}
+      transition={{ duration: 0.14 }}
       className="grid grid-cols-1 gap-5"
     >
       <style>{`

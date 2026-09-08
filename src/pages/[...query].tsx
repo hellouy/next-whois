@@ -1166,7 +1166,7 @@ export default function LookupPage({
               key={target}
               initial={{ opacity: 0, y: 3 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             >
             <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
