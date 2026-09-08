@@ -121,7 +121,6 @@ import { NS_BRANDS } from "@/data/query-page/ns-brands";
 import { GLOBE_COUNTRY_COORDS } from "@/data/query-page/globe-coords";
 import { MAINSTREAM_DOMAINS } from "@/data/query-page/mainstream-domains";
 import { OFFICIAL_DOMAIN_DESC } from "@/data/query-page/official-domain-desc";
-import { QueryProgressBar } from "@/components/query/query-progress-bar";
 import { QueryLoadingSkeleton } from "@/components/query/query-loading-skeleton";
 import { CssGlobe } from "@/components/query/css-globe";
 import { ResponsePanel } from "@/components/query/response-panel";
@@ -1095,8 +1094,7 @@ export default function LookupPage({
             <SearchHotkeysText className="hidden sm:flex mt-2 px-1 justify-end" />
           </div>
 
-          <div className={`relative ${loading && !status ? "min-h-[420px]" : ""}`}>
-            <QueryProgressBar loading={loading} refreshing={refreshing} />
+          <div className={`relative ${loading && !status ? "min-h-[260px]" : ""}`}>
             <motion.div
               initial={false}
               animate={{ opacity: 1 }}

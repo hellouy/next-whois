@@ -533,7 +533,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
   // ── Route-change progress bar ──────────────────────────────────────────────
   // Shown for navigations TO non-stable pages (login, about, etc.) AND for
   // cross-page navigations TO the result page (homepage → result).
-  // Skipped for result → result shallow navigation (QueryProgressBar handles it).
+  // Skipped for result → result shallow navigation (the query page handles it).
   const [npStatus, setNpStatus] = React.useState<"idle" | "start" | "done">("idle");
   const npResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the current pathname so event handlers can know where we came from.
@@ -549,12 +549,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       const destIsQueryPage = isQueryPagePath(dest);
       const sourceIsQueryPage = currentPathnameRef.current === "/[...query]";
 
-      // result → result: shallow routing — QueryProgressBar handles this
+      // result → result: shallow routing — the query page handles its own feedback
       if (sourceIsQueryPage && destIsQueryPage) return;
 
-      // Navigation TO any result/query page: the homepage shows an immediate
-      // loading skeleton itself (QueryLoadingSkeleton), so no top bar needed.
-      // result → result: QueryProgressBar handles feedback.
+      // Navigation TO any result/query page: the query page shows its own
+      // loading state, so no top bar needed.
       if (destIsQueryPage) return;
 
       // Other self-contained stable pages (DNS, IP, etc.) manage their own feedback

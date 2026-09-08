@@ -299,8 +299,8 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           {isSearching ? (
             <motion.div
               key="searching"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               className="mt-3"
             >
@@ -344,8 +344,8 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
           {isSearching ? (
             <motion.div
               key="searching"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               className="flex-1 overflow-y-auto"
             >
