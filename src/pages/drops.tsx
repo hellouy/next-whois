@@ -117,26 +117,37 @@ export default function DropsPage() {
 
   const mergedGroups: DropGroup[] = React.useMemo(() => {
     if (!data) return [];
-    const byDate = new Map<string, DropDomain[]>();
-    for (const g of data.drops) {
-      if (!byDate.has(g.date)) byDate.set(g.date, []);
-      byDate.get(g.date)!.push(...g.domains.map(d => ({ domain: d.domain, tld: d.tld })));
-    }
+    // Prefer the user's own subscription entries so a domain that also exists in
+    // the public list keeps its reminder_id marker (drives the "my subscription"
+    // badge). Public entries only fill in domains the user does not follow.
+    const byDomain = new Map<string, DropDomain>();
+    const dateOf = new Map<string, string>();
     for (const g of data.user_drops) {
-      if (!byDate.has(g.date)) byDate.set(g.date, []);
-      byDate.get(g.date)!.push(...g.domains.map(d => ({ domain: d.domain, reminder_id: d.reminder_id })));
+      for (const d of g.domains) {
+        if (!byDomain.has(d.domain)) {
+          byDomain.set(d.domain, { domain: d.domain, reminder_id: d.reminder_id });
+          dateOf.set(d.domain, g.date);
+        }
+      }
+    }
+    for (const g of data.drops) {
+      for (const d of g.domains) {
+        if (!byDomain.has(d.domain)) {
+          byDomain.set(d.domain, { domain: d.domain, tld: d.tld });
+          dateOf.set(d.domain, g.date);
+        }
+      }
+    }
+    const byDate = new Map<string, DropDomain[]>();
+    for (const [domain, info] of byDomain) {
+      const date = dateOf.get(domain);
+      if (!date) continue;
+      if (!byDate.has(date)) byDate.set(date, []);
+      byDate.get(date)!.push(info);
     }
     return [...byDate.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, domains]) => {
-        const seen = new Set<string>();
-        const unique = domains.filter(d => {
-          if (seen.has(d.domain)) return false;
-          seen.add(d.domain);
-          return true;
-        });
-        return { date, domains: unique };
-      });
+      .map(([date, domains]) => ({ date, domains }));
   }, [data]);
 
   const totalCount = mergedGroups.reduce((acc, g) => acc + g.domains.length, 0);
@@ -248,7 +259,14 @@ export default function DropsPage() {
                             <div key={dm.domain} className="flex items-center gap-2 px-4 py-2.5">
                               <RiGlobalLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               <span className="flex-1 min-w-0">
-                                <span className="block text-xs font-medium truncate">{dm.domain}</span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="truncate text-xs font-medium">{dm.domain}</span>
+                                  {isUser && (
+                                    <span className="shrink-0 inline-flex items-center text-[9px] font-semibold text-primary bg-primary/15 rounded-full px-1.5 py-0.5">
+                                      {t("drops.my_subscription")}
+                                    </span>
+                                  )}
+                                </span>
                                 {dm.tld && <span className="block text-[9px] text-muted-foreground/70">{dm.tld}</span>}
                               </span>
                               {monitored ? (

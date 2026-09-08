@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} domaines",
     "load_failed": "Impossible de charger le calendrier des drops",
     "retry": "Réessayer",
-    "back_home": "Retour à l'accueil"
+    "back_home": "Retour à l'accueil",
+    "my_subscription": "Mon abonnement"
   },
   "nav_drops": "Calendrier des drops",
   "nav_drops_desc": "Domaines bientôt libérés"

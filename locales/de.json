@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} Domains",
     "load_failed": "Drop-Kalender konnte nicht geladen werden",
     "retry": "Erneut versuchen",
-    "back_home": "Zurück zur Startseite"
+    "back_home": "Zurück zur Startseite",
+    "my_subscription": "Mein Abonnement"
   },
   "nav_drops": "Drop-Kalender",
   "nav_drops_desc": "Bevorstehende Domain-Drops"

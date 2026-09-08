@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} domains",
     "load_failed": "Failed to load the drop calendar",
     "retry": "Retry",
-    "back_home": "Back to Home"
+    "back_home": "Back to Home",
+    "my_subscription": "My subscription"
   },
   "nav_drops": "Drop Calendar",
   "nav_drops_desc": "Upcoming domain drops"

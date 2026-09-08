@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} 個網域",
     "load_failed": "掉落日曆載入失敗",
     "retry": "重試",
-    "back_home": "返回首頁"
+    "back_home": "返回首頁",
+    "my_subscription": "我的訂閱"
   },
   "nav_drops": "掉落日曆",
   "nav_drops_desc": "即將掉落的網域"

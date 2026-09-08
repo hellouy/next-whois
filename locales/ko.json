@@ -1901,7 +1901,8 @@
     "domains_count": "도메인 {{count}}개",
     "load_failed": "드롭 캘린더를 불러오지 못했습니다",
     "retry": "재시도",
-    "back_home": "홈으로 돌아가기"
+    "back_home": "홈으로 돌아가기",
+    "my_subscription": "내 구독"
   },
   "nav_drops": "드롭 캘린더",
   "nav_drops_desc": "곧 드롭될 도메인"

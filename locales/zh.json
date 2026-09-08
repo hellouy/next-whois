@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} 个域名",
     "load_failed": "掉落日历加载失败",
     "retry": "重试",
-    "back_home": "返回首页"
+    "back_home": "返回首页",
+    "my_subscription": "我的订阅"
   },
   "nav_drops": "掉落日历",
   "nav_drops_desc": "即将掉落的域名"

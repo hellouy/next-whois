@@ -1901,7 +1901,8 @@
     "domains_count": "{{count}} ドメイン",
     "load_failed": "ドロップカレンダーを読み込めませんでした",
     "retry": "再試行",
-    "back_home": "ホームに戻る"
+    "back_home": "ホームに戻る",
+    "my_subscription": "自分の購読"
   },
   "nav_drops": "ドロップカレンダー",
   "nav_drops_desc": "まもなくドロップするドメイン"

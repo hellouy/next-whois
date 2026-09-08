@@ -90,7 +90,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+  // A signed-in response carries the user's own subscriptions (user_drops) which
+  // are personal data — it must never be shared through a public edge cache.
+  // Only fully anonymous payloads may be cached.
+  const cacheControl = email
+    ? "private, no-store"
+    : "public, max-age=300, stale-while-revalidate=600";
+  res.setHeader("Cache-Control", cacheControl);
   return res.json({
     today: todayStr,
     days,
