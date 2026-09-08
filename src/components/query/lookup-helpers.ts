@@ -23,20 +23,22 @@ export function looksLikeDomainQuery(t: string | undefined | null): boolean {
   );
 }
 
+// The whole result area fades in as ONE unit.  No stagger, no per-card
+// delay: a staggered entrance was perceived by users as the page
+// "jumping" / loading twice between the skeleton and the results.
 export const CARD_CONTAINER_VARIANTS = {
-  hidden: { opacity: 1 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.025, delayChildren: 0.03 },
-  },
-};
-
-export const CARD_ITEM_VARIANTS = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
   },
+};
+
+// Children stay fully visible at all times; the container above owns the
+// single fade so cards appear together with no blank gap.
+export const CARD_ITEM_VARIANTS = {
+  hidden: { opacity: 1 },
+  visible: { opacity: 1 },
 };
 
 
