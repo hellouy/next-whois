@@ -1857,6 +1857,10 @@
   },
   "query": {
     "loading_with_domain": "{{domain}} を検索中…",
+    "stage_rdap": "RDAPレジストリをノック中…",
+    "stage_whois": "WHOISの記録を漁っています…",
+    "stage_dns": "DNSサーバーに聞いています…",
+    "stage_verify": "レジストラの回答を確認中…",
     "loading": "検索中…",
     "step_connect": "RDAP サーバーに接続中…",
     "step_whois": "WHOIS データベースを照会中…",

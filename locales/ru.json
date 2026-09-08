@@ -1857,6 +1857,10 @@
   },
   "query": {
     "loading_with_domain": "Запрос {{domain}}…",
+    "stage_rdap": "Стучимся в дверь RDAP-реестра…",
+    "stage_whois": "Копаемся в архивах WHOIS…",
+    "stage_dns": "Спрашиваем DNS-серверы…",
+    "stage_verify": "Сверяем ответ регистратора…",
     "loading": "Запрос…",
     "step_connect": "Подключение к серверу RDAP…",
     "step_whois": "Запрос к базе WHOIS…",

@@ -1857,6 +1857,10 @@
   },
   "query": {
     "loading_with_domain": "正在查詢 {{domain}}…",
+    "stage_rdap": "正在敲響 RDAP 註冊局的大門…",
+    "stage_whois": "翻閱 WHOIS 的檔案櫃…",
+    "stage_dns": "向 DNS 伺服器喊話中…",
+    "stage_verify": "核對註冊局的回執…",
     "loading": "正在查詢…",
     "step_connect": "連線 RDAP 伺服器…",
     "step_whois": "查詢 WHOIS 資料庫…",

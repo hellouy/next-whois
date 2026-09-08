@@ -1857,6 +1857,10 @@
   },
   "query": {
     "loading_with_domain": "{{domain}} 조회 중…",
+    "stage_rdap": "RDAP 레지스트리에 노크하는 중…",
+    "stage_whois": "WHOIS 기록을 뒤지는 중…",
+    "stage_dns": "DNS 서버에 물어보는 중…",
+    "stage_verify": "레지스트라 응답을 확인하는 중…",
     "loading": "조회 중…",
     "step_connect": "RDAP 서버 연결 중…",
     "step_whois": "WHOIS 데이터베이스 조회 중…",

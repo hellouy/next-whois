@@ -1160,21 +1160,7 @@ export default function LookupPage({
               arrives the overlay dissolves straight into the fresh content —
               no hard content swap, no top bar, no scroll jump. */}
           {loading && status && (
-            <motion.div
-              key="search-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.18, ease: "easeInOut" } }}
-              transition={{ duration: 0.18 }}
-              className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-[2px]"
-            >
-              <div className="flex items-center gap-2.5">
-                <RiLoader4Line className="w-4 h-4 animate-spin text-primary" />
-                <p className="text-sm font-medium text-foreground/80 select-none">
-                  {t("query.loading_with_domain", { domain: displayTarget })}
-                </p>
-              </div>
-            </motion.div>
+            <QueryLoadingSkeleton domain={displayTarget} overlay />
           )}
           </AnimatePresence>
 

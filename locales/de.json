@@ -1857,6 +1857,10 @@
   },
   "query": {
     "loading_with_domain": "{{domain}} wird abgefragt…",
+    "stage_rdap": "Klopfen an die RDAP-Registry…",
+    "stage_whois": "Stöbern in den WHOIS-Akten…",
+    "stage_dns": "Fragen die DNS-Server…",
+    "stage_verify": "Prüfen die Antwort des Registrars…",
     "loading": "Wird abgefragt…",
     "step_connect": "Verbindung zum RDAP-Server…",
     "step_whois": "WHOIS-Datenbank wird abgefragt…",
