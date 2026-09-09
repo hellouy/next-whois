@@ -43,7 +43,7 @@ export type BatchItem = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
-import { WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types";
+import { WhoisAnalyzeResult, initialWhoisAnalyzeResult, PremiumCheckResult } from "@/lib/whois/types";
 import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
@@ -34,10 +34,11 @@ type Data = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;
+  premium?: PremiumCheckResult | null;
   registryUrl?: string;
 };
 
@@ -143,7 +144,7 @@ export default async function handler(
   }
 
   const nocache = req.query.nocache === "1";
-  const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl } =
+  const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl, premium } =
     await lookupWhoisWithCache(trimmed, { nocache });
 
   // Extract the TLD (last dot-separated label) for log grouping
@@ -157,7 +158,7 @@ export default async function handler(
       outcome: classifyQueryOutcome(false, error),
       userId, userEmail, ip,
     }).catch(e => logger.error("[lookup] logQuery failed:", e.message));
-    return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
+    return res.status(200).json({ time, status, error, dnsProbe, registryUrl, premium });
   }
 
   // Record every successful lookup — logged-in or anonymous, cached or fresh.
@@ -180,5 +181,5 @@ export default async function handler(
   const sMaxAge = cacheTtl && cacheTtl > 0 ? cacheTtl : 3600;
   const swr     = Math.min(sMaxAge * 4, 86_400);
   res.setHeader("Cache-Control", `s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`);
-  return res.status(200).json({ time, status, result, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl });
+  return res.status(200).json({ time, status, result, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl, premium });
 }

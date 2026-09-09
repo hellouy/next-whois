@@ -90,13 +90,6 @@ export default function StampPage() {
 
   const domain = String(router.query.domain || "");
 
-  React.useEffect(() => {
-    if (authStatus === "unauthenticated" && domain) {
-      const callbackUrl = `/stamp?domain=${encodeURIComponent(domain)}`;
-      router.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-    }
-  }, [authStatus, domain, router]);
-
   const defaultForm = { tagName: "", tagStyle: "personal", cardTheme: "app", link: "", description: "", nickname: "", email: "" };
 
   const [hydrated, setHydrated] = React.useState(false);
@@ -438,8 +431,9 @@ export default function StampPage() {
   // No domain — show landing page
   if (!domain) return <StampLandingPage />;
 
-  // Auth skeleton
-  if (authStatus === "loading" || authStatus === "unauthenticated") {
+  // Wait for the session probe; unauthenticated visitors proceed straight to
+  // the guided claim flow (claiming requires no login).
+  if (authStatus === "loading") {
     return (
       <div className="min-h-[calc(100vh-64px)] bg-background">
         <div className="max-w-lg mx-auto px-4 py-5 pb-10 space-y-4 animate-pulse">

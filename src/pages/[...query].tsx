@@ -604,8 +604,20 @@ export default function LookupPage({
           for (const line of lines) {
             if (!line.trim() || cancelled) continue;
             try {
-              const d = JSON.parse(line) as WhoisResult & { partial?: boolean };
+              const d = JSON.parse(line) as WhoisResult & { partial?: boolean; premiumUpdate?: boolean };
               if (cancelled) break;
+              if (d.premiumUpdate) {
+                // Late premium enrichment: merge only the premium flag into the
+                // already-rendered result — no loading/refreshing/timing side
+                // effects.
+                const prem = d.premium;
+                setData((prev) =>
+                  prev && (prev.status !== undefined || prev.result)
+                    ? { ...prev, premium: prem }
+                    : { ...d, premium: prem, result: d.result ?? { ...initialWhoisAnalyzeResult } },
+                );
+                continue;
+              }
               setData({ ...d, result: d.result ?? { ...initialWhoisAnalyzeResult } });
               if (d.partial) {
                 // First chunk: RDAP data — show result immediately, keep subtle refresh spinner
@@ -989,6 +1001,7 @@ export default function LookupPage({
           const ogParams = new URLSearchParams();
           ogParams.set("query", target);
           ogParams.set("theme", "dark");
+          if (isZhMeta) ogParams.set("lang", "zh");
           if (r && isRegistered) {
             const ok = (v: unknown): v is string =>
               typeof v === "string" && v.length > 0 && v !== "Unknown";
@@ -1060,15 +1073,17 @@ export default function LookupPage({
               <meta property="og:url" content={canonicalUrl} />
               <meta property="og:title" content={ogTitle} />
               <meta property="og:description" content={description} />
-              <meta property="og:image" content={ogImage} />
-              <meta property="og:image:width" content="1200" />
-              <meta property="og:image:height" content="630" />
+              {/* key overrides the AppHead default so the page exposes exactly ONE og:image (this per-domain card), which WeChat/X/Facebook crawl reliably */}
+              <meta key="og:image" property="og:image" content={ogImage} />
+              <meta key="og:image:width" property="og:image:width" content="1200" />
+              <meta key="og:image:height" property="og:image:height" content="630" />
+              <meta key="og:image:type" property="og:image:type" content="image/png" />
               <meta property="og:locale" content={ogLocale} />
 
               <meta name="twitter:card" content="summary_large_image" />
               <meta name="twitter:title" content={twTitle} />
               <meta name="twitter:description" content={description} />
-              <meta name="twitter:image" content={ogImage} />
+              <meta key="twitter:image" name="twitter:image" content={ogImage} />
 
               <script
                 type="application/ld+json"
@@ -1102,7 +1117,36 @@ export default function LookupPage({
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
-          {result && (
+          {/* Premium names take over the aggregate-price row: authoritative
+              registry prices (register/renew) appear exactly where the
+              nazhumi/miqingju tags would otherwise render. */}
+          {result && premium?.isPremium === true && (
+            <div
+              className="hidden sm:flex items-center flex-wrap gap-2 mb-6"
+            >
+              {typeof premium.price === "number" && premium.price > 0 && (
+                <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                  <RiVipCrownLine className="w-3 h-3 shrink-0 text-rose-500" />
+                  <span className="text-[11px] sm:text-xs font-normal text-rose-600 dark:text-rose-400">
+                    {t("register_price")}
+                    {formatRegistrarPrice(premium.price, premium.currency)}
+                  </span>
+                </div>
+              )}
+              {typeof premium.renewalPrice === "number" &&
+                premium.renewalPrice > 0 && (
+                  <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                    <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-rose-500" />
+                    <span className="text-[11px] sm:text-xs font-normal text-rose-600 dark:text-rose-400">
+                      {t("renew_price")}
+                      {formatRegistrarPrice(premium.renewalPrice, premium.currency)}
+                    </span>
+                  </div>
+                )}
+              <div className="flex-grow" />
+            </div>
+          )}
+          {result && premium?.isPremium !== true && (
             <div
               className="hidden sm:flex items-center flex-wrap gap-2 mb-6"
             >
@@ -1136,17 +1180,6 @@ export default function LookupPage({
                     </span>
                   </Link>
                 )}
-              {result.negotiable !== null && (
-                <div className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1">
-                  <RiExchangeDollarFill className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
-                    {t("negotiable")}
-                    <span className={result.negotiable ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}>
-                      {result.negotiable ? t("negotiable_yes") : t("negotiable_no")}
-                    </span>
-                  </span>
-                </div>
-              )}
               <div className="flex-grow" />
             </div>
           )}
@@ -1169,9 +1202,9 @@ export default function LookupPage({
             return (
             <motion.div
               key={target}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: 0 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             >
             <div
               className="grid grid-cols-1 lg:grid-cols-12 gap-6"
@@ -1574,8 +1607,8 @@ export default function LookupPage({
                           className={cn(
                             "sm:hidden flex items-center justify-center w-6 h-6 rounded-full text-xs border transition-all active:scale-[0.93]",
                             (result.remainingDays !== null && result.remainingDays <= 30)
-                              ? "bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
-                              : "bg-muted/50 border-border/50 text-muted-foreground hover:border-sky-400/50 hover:text-sky-500",
+                              ? "animate-breathe breathe-red bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
+                              : "bg-sky-500/5 dark:bg-sky-500/10 border-sky-400/30 text-sky-500/90 hover:border-sky-400/60 hover:text-sky-400",
                           )}
                         >
                           <RiTimerLine className="w-3 h-3" />
@@ -1615,14 +1648,10 @@ export default function LookupPage({
                           <button
                             onClick={() => {
                               const domain = result.domain || target;
-                              if (!session) {
-                                router.push(`/login?callbackUrl=${encodeURIComponent(`/stamp?domain=${encodeURIComponent(domain)}`)}`);
-                                return;
-                              }
                               router.push(`/stamp?domain=${encodeURIComponent(domain)}`);
                             }}
                             title={isChinese ? "认领域名" : "Claim domain"}
-                            className="sm:hidden flex items-center justify-center w-6 h-6 rounded-full text-xs border transition-all active:scale-[0.93] bg-muted/50 border-border/50 text-muted-foreground hover:border-violet-400/50 hover:text-violet-500"
+                            className="sm:hidden flex items-center justify-center w-6 h-6 rounded-full text-xs border transition-all active:scale-[0.93] bg-violet-500/5 dark:bg-violet-500/10 border-violet-400/30 text-violet-500/90 hover:border-violet-400/60 hover:text-violet-400"
                           >
                             <RiShieldCheckLine className="w-3 h-3" />
                           </button>
@@ -1705,25 +1734,57 @@ export default function LookupPage({
                             </span>
                           </div>
                         )}
+                        {premium?.isPremium === true && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5">
+                            <RiVipCrownLine className="w-3 h-3 text-rose-500 shrink-0" />
+                            <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
+                              {isChinese ? "溢价域名" : "Premium"}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
-                        {/* Mobile-only price tags (moved from above on mobile) */}
-                        {result.registerPrice &&
-                          result.registerPrice.new !== -1 &&
-                          result.registerPrice.currency !== "Unknown" && (
-                            <Link
-                              target="_blank"
-                              href={result.registerPrice.externalLink}
-                              className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-                            >
-                              <RiBillLine className="w-3 h-3 shrink-0 text-muted-foreground" />
-                              <span className="text-[11px] font-normal text-muted-foreground">
+                        {/* Mobile-only price tags (moved from above on mobile).
+                            Premium names replace the aggregate tags with the
+                            authoritative register/renew prices in the same spot. */}
+                        {premium?.isPremium === true && (<>
+                          {typeof premium.price === "number" && premium.price > 0 && (
+                            <div className="sm:hidden flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                              <RiVipCrownLine className="w-3 h-3 shrink-0 text-rose-500" />
+                              <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
                                 {t("register_price")}
-                                {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
+                                {formatRegistrarPrice(premium.price, premium.currency)}
                               </span>
-                            </Link>
+                            </div>
                           )}
-                        {result.renewPrice &&
+                          {typeof premium.renewalPrice === "number" &&
+                            premium.renewalPrice > 0 && (
+                              <div className="sm:hidden flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                                <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-rose-500" />
+                                <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
+                                  {t("renew_price")}
+                                  {formatRegistrarPrice(premium.renewalPrice, premium.currency)}
+                                </span>
+                              </div>
+                            )}
+                        </>)}
+                        {premium?.isPremium !== true && (<>
+              {result.registerPrice &&
+                result.registerPrice.new !== -1 &&
+                result.registerPrice.currency !== "Unknown" && (
+                  <Link
+                    target="_blank"
+                    href={result.registerPrice.externalLink}
+                    className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                  >
+                    <RiBillLine className="w-3 h-3 shrink-0 text-muted-foreground" />
+                    <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
+                      {t("register_price")}
+                      {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
+                    </span>
+                  </Link>
+                )}
+              {result.renewPrice &&
                           result.renewPrice.renew !== -1 &&
                           result.renewPrice.currency !== "Unknown" && (
                             <Link
@@ -1738,17 +1799,7 @@ export default function LookupPage({
                               </span>
                             </Link>
                           )}
-                        {result.negotiable !== null && (
-                          <div className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1">
-                            <RiExchangeDollarFill className="w-3 h-3 text-muted-foreground shrink-0" />
-                            <span className="text-[11px] font-normal text-muted-foreground">
-                              {t("negotiable")}
-                              <span className={result.negotiable ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}>
-                                {result.negotiable ? t("negotiable_yes") : t("negotiable_no")}
-                              </span>
-                            </span>
-                          </div>
-                        )}
+                          </>)}
                         {/* Desktop-only Subscribe text button */}
                         {enableRemind && (
                         <button
@@ -1769,8 +1820,8 @@ export default function LookupPage({
                           className={cn(
                             "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-[0.93]",
                             (result.remainingDays !== null && result.remainingDays <= 30)
-                              ? "bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
-                              : "bg-muted/50 border-border/50 text-muted-foreground hover:border-sky-400/50 hover:text-sky-500",
+                              ? "animate-breathe breathe-red bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
+                              : "bg-sky-500/5 dark:bg-sky-500/10 border-sky-400/30 text-sky-500/90 hover:border-sky-400/60 hover:text-sky-400",
                           )}
                         >
                           <RiTimerLine className="w-3 h-3" />
@@ -1811,13 +1862,9 @@ export default function LookupPage({
                           <button
                             onClick={() => {
                               const domain = result.domain || target;
-                              if (!session) {
-                                router.push(`/login?callbackUrl=${encodeURIComponent(`/stamp?domain=${encodeURIComponent(domain)}`)}`);
-                                return;
-                              }
                               router.push(`/stamp?domain=${encodeURIComponent(domain)}`);
                             }}
-                            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-[0.93] bg-muted/50 border-border/50 text-muted-foreground hover:border-violet-400/50 hover:text-violet-500"
+                            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-[0.93] bg-violet-500/5 dark:bg-violet-500/10 border-violet-400/30 text-violet-500/90 hover:border-violet-400/60 hover:text-violet-400"
                           >
                             <RiShieldCheckLine className="w-3 h-3" />
                             {isChinese ? "域名认领" : "Claim"}
@@ -2416,16 +2463,23 @@ export default function LookupPage({
                       isZh={isChinese}
                       userEmail={session?.user?.email ?? ""}
                       registerPriceFmt={
-                        result?.registerPrice && result.registerPrice.new !== -1 && result.registerPrice.currency !== "Unknown"
-                          ? formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)
-                          : undefined
+                        premium?.isPremium === true
+                          ? (typeof premium.price === "number" && premium.price > 0
+                              ? formatRegistrarPrice(premium.price, premium.currency)
+                              : undefined)
+                          : (result?.registerPrice && result.registerPrice.new !== -1 && result.registerPrice.currency !== "Unknown"
+                              ? formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)
+                              : undefined)
                       }
                       renewPriceFmt={
-                        result?.renewPrice && result.renewPrice.renew !== -1 && result.renewPrice.currency !== "Unknown"
-                          ? formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)
-                          : undefined
+                        premium?.isPremium === true
+                          ? (typeof premium.renewalPrice === "number" && premium.renewalPrice > 0
+                              ? formatRegistrarPrice(premium.renewalPrice, premium.currency)
+                              : undefined)
+                          : (result?.renewPrice && result.renewPrice.renew !== -1 && result.renewPrice.currency !== "Unknown"
+                              ? formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)
+                              : undefined)
                       }
-                      isPremium={result?.registerPrice?.isPremium ?? false}
                       eppStatuses={result?.status?.map((s) => s.status) ?? []}
                       regStatusType={result ? getDomainRegistrationStatus(result, locale).type : undefined}
                     />

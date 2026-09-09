@@ -29,12 +29,13 @@ import { WhoisAnalyzeResult } from "@/lib/whois/types";
 function buildOgUrl(
   target: string,
   result?: WhoisAnalyzeResult | undefined,
-  overrides?: { w?: number; h?: number; theme?: string },
+  overrides?: { w?: number; h?: number; theme?: string; lang?: "zh" | "en" },
 ): string {
   const params = new URLSearchParams();
   params.set("query", target);
   if (overrides?.w) params.set("w", String(overrides.w));
   if (overrides?.h) params.set("h", String(overrides.h));
+  if (overrides?.lang === "zh") params.set("lang", "zh");
   const themeVal =
     overrides?.theme ||
     (typeof window !== "undefined" &&
@@ -85,13 +86,32 @@ export function OgImageDialog({
   const [imgWidth, setImgWidth] = React.useState(1200);
   const [imgHeight, setImgHeight] = React.useState(630);
   const [imgTheme, setImgTheme] = React.useState<"light" | "dark">("light");
+  const [imgLang, setImgLang] = React.useState<"zh" | "en">("en");
   const [imgActing, setImgActing] = React.useState<"download" | "copy" | null>(null);
+  const [previewLoaded, setPreviewLoaded] = React.useState(false);
+
+  // Keep the on-screen preview at the exact chosen size: scaling the render
+  // down used to distort the card layout (absolute pixel padding/typography),
+  // which users noticed as "the image changed". Speed now comes from the
+  // long-lived browser cache on the deterministic OG URL + the loading
+  // skeleton below.
+  const previewUrl = buildOgUrl(target, result, {
+    w: imgWidth,
+    h: imgHeight,
+    theme: imgTheme,
+    lang: imgLang,
+  });
+
+  React.useEffect(() => {
+    setPreviewLoaded(false);
+  }, [previewUrl]);
 
   React.useEffect(() => {
     if (open) {
       setImgTheme(
         document.documentElement.classList.contains("dark") ? "dark" : "light",
       );
+      setImgLang(isZh ? "zh" : "en");
     }
   }, [open]);
 
@@ -102,7 +122,7 @@ export function OgImageDialog({
           <DialogTitle>{t("image_preview")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">{t("width")}</Label>
               <Input
@@ -144,16 +164,36 @@ export function OgImageDialog({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isZh ? "语言" : "Language"}</Label>
+              <Select
+                value={imgLang}
+                onValueChange={(v: "zh" | "en") => setImgLang(v)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zh">{isZh ? "中文" : "Chinese"}</SelectItem>
+                  <SelectItem value="en">{isZh ? "英文" : "English"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="rounded-lg border overflow-hidden bg-muted/30">
+          <div className="relative rounded-lg border overflow-hidden bg-muted/30">
+            {!previewLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+                <RiLoader4Line className="w-5 h-5 animate-spin text-muted-foreground/60" />
+              </div>
+            )}
             <img
-              src={buildOgUrl(target, result, {
-                w: imgWidth,
-                h: imgHeight,
-                theme: imgTheme,
-              })}
+              src={previewUrl}
               alt="OG Preview"
-              className="w-full h-auto"
+              onLoad={() => setPreviewLoaded(true)}
+              loading="eager"
+              className={`w-full h-auto transition-opacity duration-300 ${
+                previewLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -165,6 +205,7 @@ export function OgImageDialog({
                   w: imgWidth,
                   h: imgHeight,
                   theme: imgTheme,
+                  lang: imgLang,
                 });
                 setImgActing("download");
                 try {
@@ -198,6 +239,7 @@ export function OgImageDialog({
                   w: imgWidth,
                   h: imgHeight,
                   theme: imgTheme,
+                  lang: imgLang,
                 });
                 setImgActing("copy");
                 try {
@@ -227,6 +269,7 @@ export function OgImageDialog({
                   w: imgWidth,
                   h: imgHeight,
                   theme: imgTheme,
+                  lang: imgLang,
                 });
                 copy(window.location.origin + ogUrl);
               }}

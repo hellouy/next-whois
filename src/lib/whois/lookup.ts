@@ -1,5 +1,6 @@
 import { MAX_WHOIS_FOLLOW, LOOKUP_TIMEOUT } from "@/lib/env";
-import { WhoisResult, WhoisRawResult, WhoisAnalyzeResult } from "@/lib/whois/types";
+import { WhoisResult, WhoisRawResult, WhoisAnalyzeResult, PremiumCheckResult } from "@/lib/whois/types";
+import { getDomainPricing, getDomainTransferNegotiable } from "@/lib/pricing/client";
 import {
   getJsonRedisValueWithTtl,
   setJsonRedisValue,
@@ -39,6 +40,7 @@ import { lookupViaThirdPartyApi, ThirdPartyApiSource } from "./third-party-api";
 // native TCP WHOIS/RDAP always times out from cloud IPs.
 const BUILTIN_SCRAPERS: Record<string, ThirdPartyApiSource> = {
   ph: "ph_web", // whois.dot.ph — TCP:43 times out; RDAP not available
+  tt: "tt_web", // nic.tt — no TCP WHOIS; RDAP ENOTFOUND; web WHOIS at nic.tt/cgi-bin/search.pl
 };
 
 warmupDnsCache([
@@ -273,7 +275,9 @@ export async function lookupWhoisWithCache(
       if (remainingTtl !== null && l1Hit.cacheTtl && remainingTtl < l1Hit.cacheTtl * SWR_THRESHOLD) {
         triggerBackgroundRefresh(domain);
       }
-      return { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+      const r1 = { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+      if (r1.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r1, domain, key);
+      return r1;
     }
     // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
     if (isRedisAvailable()) {
@@ -284,7 +288,9 @@ export async function lookupWhoisWithCache(
         if (l2.remainingTtl !== null && l2.value.cacheTtl && l2.remainingTtl < l2.value.cacheTtl * SWR_THRESHOLD) {
           triggerBackgroundRefresh(domain);
         }
-        return { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+        const r2 = { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+        if (r2.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r2, domain, key);
+        return r2;
       }
     }
     // L3 — PostgreSQL fallback (used when both Redis tiers are unavailable)
@@ -294,7 +300,9 @@ export async function lookupWhoisWithCache(
         try {
           const l3 = JSON.parse(l3Raw) as WhoisResult;
           l1Set(key, l3);
-          return { ...l3, time: 0, cached: true };
+          const r3 = { ...l3, time: 0, cached: true };
+          if (r3.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r3, domain, key);
+          return r3;
         } catch { /* corrupted — fall through to fresh lookup */ }
       }
     }
@@ -349,6 +357,11 @@ export async function lookupWhoisWithCache(
       const retried = await lookupWhois(domain);
       if (retried.status) result = retried;
     }
+    // Attach registry premium detection (Netim → Porkbun) to every answer —
+    // registered or not — so the UI can surface premium pricing (e.g. li.life).
+    // lookupWhois already attaches it on the unregistered paths; this covers the
+    // success/error paths that don't. Bounded by a 4s race + 24h cache.
+    result = await ensurePremium(result, domain);
     if (result.status) {
       const ttl = computeSmartTtl(result);
       const now = Date.now();
@@ -446,6 +459,7 @@ export async function lookupWhoisCacheStreaming(
   domain: string,
   options: { nocache?: boolean } = {},
   onPartialResult?: (partial: WhoisResult) => void,
+  onEnriched?: (enriched: WhoisResult) => void,
 ): Promise<WhoisResult> {
   const cnReserved = getCnReservedSldInfo(domain);
   if (cnReserved) {
@@ -474,12 +488,17 @@ export async function lookupWhoisCacheStreaming(
       if (remainingTtl !== null && l1Hit.cacheTtl && remainingTtl < l1Hit.cacheTtl * SWR_THRESHOLD) {
         triggerBackgroundRefresh(domain);
       }
-      const r = { ...l1Hit, time: 0, cached: true, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+      const r1 = { ...l1Hit, time: 0, cached: true, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
+      if (r1.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) {
+        void enrichWithPremium(r1, domain, key).then((enr) => {
+          if (enr !== r1) onEnriched?.({ ...enr, cached: true, cacheTtl: r1.cacheTtl });
+        });
+      }
       // Cache hits are already complete — do NOT call onPartialResult here.
       // Emitting a partial chunk for a cache hit would cause the streaming
       // endpoint to send partial:true followed by partial:false with identical
       // data, producing a false "refreshing" flash in the UI.
-      return r;
+      return r1;
     }
     // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
     if (isRedisAvailable()) {
@@ -490,9 +509,13 @@ export async function lookupWhoisCacheStreaming(
         if (l2.remainingTtl !== null && l2.value.cacheTtl && l2.remainingTtl < l2.value.cacheTtl * SWR_THRESHOLD) {
           triggerBackgroundRefresh(domain);
         }
-        const r = { ...l2.value, time: 0, cached: true, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
-        // Same reasoning as L1: cache hits skip partial notification.
-        return r;
+        const r2 = { ...l2.value, time: 0, cached: true, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
+        if (r2.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) {
+          void enrichWithPremium(r2, domain, key).then((enr) => {
+            if (enr !== r2) onEnriched?.({ ...enr, cached: true, cacheTtl: r2.cacheTtl });
+          });
+        }
+        return r2;
       }
     }
     // L3 — PostgreSQL fallback (used when both Redis tiers are unavailable)
@@ -502,7 +525,13 @@ export async function lookupWhoisCacheStreaming(
         try {
           const l3 = JSON.parse(l3Raw) as WhoisResult;
           l1Set(key, l3);
-          return { ...l3, time: 0, cached: true };
+          const r3 = { ...l3, time: 0, cached: true };
+          if (r3.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) {
+            void enrichWithPremium(r3, domain, key).then((enr) => {
+              if (enr !== r3) onEnriched?.({ ...enr, cached: true });
+            });
+          }
+          return r3;
         } catch { /* corrupted — fall through to fresh lookup */ }
       }
     }
@@ -555,6 +584,32 @@ export async function lookupWhoisCacheStreaming(
       const retried = await lookupWhois(domain, onPartialResult);
       if (retried.status) result = retried;
     }
+    // Persist the answer immediately instead of blocking on registry-premium
+    // detection. A cold Netim/Porkbun call can take ~4 s; by the time the user
+    // reads the result an onEnriched chunk carrying the premium flag arrives
+    // and is merged into the UI — fastest page render wins.
+    if (result.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) {
+      void ensurePremium(result, domain)
+        .then((enriched) => {
+          if (enriched === result) return;
+          if (result.status) {
+            const ttl = computeSmartTtl(enriched);
+            const now = Date.now();
+            const toStore: WhoisResult = { ...enriched, cachedAt: now, cacheTtl: ttl };
+            l1Set(key, toStore);
+            if (ttl > 0) {
+              if (isRedisAvailable()) {
+                setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+              } else {
+                // Both Redis tiers unavailable — persist to PostgreSQL L3.
+                setWhoisDbCache(key, JSON.stringify(toStore), ttl).catch(() => {});
+              }
+            }
+          }
+          onEnriched?.({ ...enriched, cached: result.cached, cachedAt: result.cachedAt, cacheTtl: result.cacheTtl });
+        })
+        .catch(() => {});
+    }
     if (result.status) {
       const ttl = computeSmartTtl(result);
       const now = Date.now();
@@ -585,6 +640,62 @@ export async function lookupWhoisCacheStreaming(
   }
 }
 
+// Start premium detection without awaiting it. The lookup's other phases
+// (WHOIS/RDAP + DNS) typically take longer than a single Netim/Porkbun call
+// (≤4 s), so starting it up front hides its latency entirely. In-flight dedup
+// inside checkDomainPremium means parallel callers share one request.
+function startPremiumCheck(domain: string): Promise<PremiumCheckResult | null> | null {
+  if (isIPAddress(domain) || isASNumber(domain)) return null;
+  return Promise.race([
+    checkDomainPremium(domain),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+  ]).catch(() => null);
+}
+
+// Pre-warm the TLD pricing cache (nazhumi/miqingju/tianhu) in parallel with the
+// lookup. applyParams reads the same cachedValue keys, which now deduplicate
+// in-flight fetches, so the WHOIS result path never waits on pricing APIs.
+function prewarmPricing(domain: string): void {
+  void Promise.all([
+    getDomainPricing(domain, "new").catch(() => null),
+    getDomainPricing(domain, "renew").catch(() => null),
+    getDomainTransferNegotiable(domain).catch(() => null),
+  ]);
+}
+
+async function ensurePremium(result: WhoisResult, domain: string): Promise<WhoisResult> {
+  if (result.premium !== undefined) return result;
+  if (isIPAddress(domain) || isASNumber(domain)) return result;
+  const premium = await Promise.race([
+    checkDomainPremium(domain),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+  ]);
+  return { ...result, premium };
+}
+
+// Cache entries created before premium detection existed lack the `premium`
+// field. Refresh them in the background and write the enriched copy back to
+// every cache tier, so stale answers eventually carry the same premium signal
+// as fresh lookups — without blocking the response.
+async function enrichWithPremium(r: WhoisResult, domain: string, key: string): Promise<WhoisResult> {
+  if (r.premium !== undefined) return r;
+  if (isIPAddress(domain) || isASNumber(domain)) return r;
+  const enriched = await ensurePremium(r, domain);
+  if (enriched !== r) {
+    const ttl = r.cacheTtl ?? computeSmartTtl(enriched);
+    const toStore: WhoisResult = { ...enriched, cachedAt: Date.now(), cacheTtl: ttl };
+    l1Set(key, toStore);
+    if (ttl > 0) {
+      if (isRedisAvailable()) {
+        setJsonRedisValue<WhoisResult>(key, toStore, ttl).catch(() => {});
+      } else {
+        setWhoisDbCache(key, JSON.stringify(toStore), ttl).catch(() => {});
+      }
+    }
+  }
+  return enriched;
+}
+
 export async function lookupWhois(domain: string, onPartialResult?: (partial: WhoisResult) => void): Promise<WhoisResult> {
   const startTime = performance.now();
   const elapsed = () => (performance.now() - startTime) / 1000;
@@ -597,6 +708,12 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const unconditionalDnsProbe: Promise<import("@/lib/whois/dns-check").DnsProbeResult | undefined> | null =
     isDomainQuery ? probeDomain(domain).catch(() => undefined) : null;
 
+  // T005: Start premium detection and pricing pre-warm in parallel with the
+  // lookup itself. lookupWhois is the hot path every query goes through (cold
+  // misses), so enrichment must never run serially after RDAP/WHOIS completes.
+  const premiumPromise = isDomainQuery ? startPremiumCheck(domain) : null;
+  if (premiumPromise) prewarmPricing(domain);
+
   async function failWithDns(error: string, registryUrl?: string): Promise<WhoisResult> {
     // Cap DNS probe wait at 500 ms — same as getProbeForSuccess() on the success path.
     // Without this cap, checkSsl() (4 s timeout) can delay error responses by up to
@@ -608,6 +725,30 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         ])
       : undefined;
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
+  }
+
+  // Shared "domain is unregistered" result: fills the DNS probe and runs the
+  // premium check (Netim → Porkbun) so the UI can show a premium price when the
+  // registry holds the name at a premium fee. Capped at 4 s and cached 24 h so
+  // it can never meaningfully delay an unregistered-domain answer.
+  async function unregisteredResult(error: string, confidence: "high" | "low"): Promise<WhoisResult> {
+    const dnsProbe = isDomainQuery
+      ? await Promise.race([
+          (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined),
+          new Promise<undefined>((r) => setTimeout(r, 500)),
+        ])
+      : undefined;
+    // Premium is NOT awaited here: return the answer immediately with premium
+    // left undefined, then let the caller's background enrichment push it as a
+    // premiumUpdate chunk (see doLookup) so a cold Netim/Porkbun call (~4 s) can
+    // never delay an unregistered-domain verdict.
+    return {
+      time: elapsed(), status: false, cached: false, error,
+      dnsProbe: dnsProbe ?? {
+        domain, registrationStatus: "unregistered", confidence,
+        signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
+      },
+    };
   }
 
   // ── IP / ASN path ─────────────────────────────────────────────────────────
@@ -756,13 +897,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
           );
           const detectedError = hasRegistryStatus ? null : detectWhoisError(raw);
           if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
-            return {
-              time: elapsed(), status: false, cached: false, error: detectedError,
-              dnsProbe: {
-                domain, registrationStatus: "unregistered", confidence: "high",
-                signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
-              },
-            };
+            return await unregisteredResult(detectedError, "high");
           }
           if (!detectedError && !isEmptyResult(parsed)) {
             if (manualEarly.server) parsed.whoisServer = pickStr(parsed.whoisServer, manualEarly.server);
@@ -898,27 +1033,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // when WHOIS also returned nothing useful.
   const whoisHasData = !!(whoisData?.raw?.trim());
   if (rdapErrorCode === 404 && !whoisHasData) {
-    const dnsProbe = isDomainQuery
-      ? await (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined)
-      : undefined;
-    // Premium check runs in parallel with the DNS probe and is capped so it can
-    // never meaningfully delay an unregistered-domain answer (API timeouts are
-    // already <4 s and results are cached 24 h).
-    const premium = isDomainQuery
-      ? await Promise.race([
-          checkDomainPremium(domain),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-        ])
-      : null;
-    return {
-      time: elapsed(), status: false, cached: false,
-      error: "Domain not found",
-      dnsProbe: dnsProbe ?? {
-        domain, registrationStatus: "unregistered", confidence: "high",
-        signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
-      },
-      premium,
-    };
+    return await unregisteredResult("Domain not found", "high");
   }
 
   // Step 4: Build result — prefer RDAP, optionally enrich with WHOIS raw text,
@@ -993,13 +1108,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       const detectedError = detectWhoisError(whoisRawStr);
       if (detectedError || isEmptyResult(result)) {
         if (detectedError && isNotRegisteredWhoisResponse(detectedError)) {
-          return {
-            time: elapsed(), status: false, cached: false, error: detectedError,
-            dnsProbe: {
-              domain, registrationStatus: "unregistered", confidence: "high",
-              signals: [], nameservers: [], ipv4: [], ipv6: [], mx: [], hasSsl: null,
-            },
-          };
+          return await unregisteredResult(detectedError, "high");
         }
         // DNS-LU style restriction: the server accepted our connection but sent
         // only its usage banner — every data line withheld. This happens when

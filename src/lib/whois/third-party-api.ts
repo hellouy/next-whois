@@ -6,6 +6,7 @@
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "./types";
 import { many } from "@/lib/db-query";
 import { lookupNicPh } from "./http-scrapers/nic-ph";
+import { lookupNicTt } from "./http-scrapers/nic-tt";
 
 // Keep well under Vercel's 10s Hobby-plan function limit.
 const TIMEOUT_MS = 9_000;
@@ -327,9 +328,84 @@ async function lookupViaPhWeb(domain: string): Promise<WhoisResult> {
   };
 }
 
+// ── tt_web adapter (TTNIC web scraper — nic.tt) ────────────────────────────────
+
+async function lookupViaTtWeb(domain: string): Promise<WhoisResult> {
+  const start = Date.now();
+  const r = await lookupNicTt(domain);
+  const elapsed = (Date.now() - start) / 1000;
+
+  if (!r.success) {
+    // "Domain not found or not registered" → forward as definitive not-found
+    if (!r.blocked && r.reason.toLowerCase().includes("not found")) {
+      return {
+        status: false,
+        time: elapsed,
+        error: "Domain not found",
+        source: "whois.nic.tt",
+      };
+    }
+    return {
+      status: false,
+      time: elapsed,
+      error: r.blocked
+        ? "nic.tt 需要人机验证，无法自动查询"
+        : `TTNIC 查询失败: ${r.reason}`,
+      source: "whois.nic.tt",
+    };
+  }
+
+  const expirationDate = r.expiresDate || "Unknown";
+  const creationDate   = r.createdDate || "Unknown";
+
+  const domainResult: WhoisAnalyzeResult = {
+    ...initialWhoisAnalyzeResult,
+    domain,
+    registrar:              "TTNIC — Trinidad and Tobago Network Information Centre",
+    registrarURL:           "https://www.nic.tt/cgi-bin/search.pl",
+    ianaId:                 "N/A",
+    whoisServer:            "whois.nic.tt",
+    updatedDate:            "Unknown",
+    creationDate,
+    expirationDate,
+    nameServers:            r.nameservers,
+    status:                 [{ status: "Active", url: "" }],
+    registrantName:         r.registrant || "Unknown",
+    registrantOrganization: "Unknown",
+    registrantCountry:      "TT",
+    registrantEmail:        "Unknown",
+    dnssec:                 "Unknown",
+    rawWhoisContent:        r.rawWhoisContent,
+    remainingDays: expirationDate !== "Unknown" ? (() => {
+      try { return Math.round((new Date(expirationDate).getTime() - Date.now()) / 86_400_000); } catch { return null; }
+    })() : null,
+    domainAge: creationDate !== "Unknown" ? (() => {
+      try { return Math.round((Date.now() - new Date(creationDate).getTime()) / 86_400_000); } catch { return null; }
+    })() : null,
+    registerPrice: null, renewPrice: null, negotiable: null,
+    cidr: "", inetNum: "", inet6Num: "", netRange: "", netName: "", netType: "", originAS: "",
+    registryDomainId: "Unknown",
+    registrantProvince: "Unknown", registrantCity: "Unknown",
+    registrantAddress: r.registrantAddress || "Unknown", registrantPostalCode: "Unknown",
+    registrantPhone: "Unknown", registrantFax: "Unknown",
+    adminName: "Unknown", adminOrganization: "Unknown",
+    adminCountry: "Unknown", adminEmail: "Unknown", adminPhone: "Unknown",
+    techName: "Unknown", techOrganization: "Unknown",
+    techEmail: "Unknown", techPhone: "Unknown",
+    abuseEmail: "Unknown", abusePhone: "Unknown",
+  };
+
+  return {
+    status: true,
+    time: elapsed,
+    source: "whois.nic.tt",
+    result: domainResult,
+  };
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
-export type ThirdPartyApiSource = "tianhu" | "yisi" | "ph_web";
+export type ThirdPartyApiSource = "tianhu" | "yisi" | "ph_web" | "tt_web";
 
 export async function lookupViaThirdPartyApi(
   domain: string,
@@ -338,5 +414,6 @@ export async function lookupViaThirdPartyApi(
   if (source === "tianhu")  return lookupViaTianhu(domain);
   if (source === "yisi")    return lookupViaYisi(domain);
   if (source === "ph_web")  return lookupViaPhWeb(domain);
+  if (source === "tt_web")  return lookupViaTtWeb(domain);
   return { status: false, time: 0, error: `未知 API 源: ${source}` };
 }

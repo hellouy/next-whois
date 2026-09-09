@@ -15,7 +15,7 @@ export type WhoisResult = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;
@@ -31,10 +31,12 @@ export type WhoisResult = {
  */
 export type PremiumCheckResult = {
   isPremium: boolean;
-  /** Premium price in USD, when the source provided one. */
+  /** Regular (non-promo) registration price in the source currency, when available. */
   price: number | null;
+  /** Renewal price in the source currency, when available. */
+  renewalPrice: number | null;
   currency: string;
-  source: "porkbun" | "namesilo" | "heuristic";
+  source: "porkbun" | "netim";
 };
 
 export type WhoisAnalyzeResult = {

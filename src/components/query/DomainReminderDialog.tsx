@@ -64,7 +64,6 @@ interface DomainReminderDialogProps {
   userEmail?: string;
   registerPriceFmt?: string;
   renewPriceFmt?: string;
-  isPremium?: boolean;
   eppStatuses?: string[];
   regStatusType?: RegistrationStatusType;
 }
@@ -79,7 +78,6 @@ export function DomainReminderDialog({
   userEmail,
   registerPriceFmt,
   renewPriceFmt,
-  isPremium,
   eppStatuses,
   regStatusType,
 }: DomainReminderDialogProps) {
@@ -506,44 +504,25 @@ export function DomainReminderDialog({
                   </div>
                 )}
 
-                {/* ── Pricing + premium row ────────────────────────────── */}
+                {/* ── Pricing row ───────────────────────────────────────── */}
                 {hasPricing && (
-                  <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-border/50 bg-muted/15 overflow-hidden">
+                  <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border/50 bg-muted/15 overflow-hidden">
                     {/* Register price */}
                     <div className="flex flex-col items-center justify-center px-2 py-2.5 gap-0.5">
                       <p className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-widest">
                         {isZh ? "注册" : "Register"}
                       </p>
-                      <p className={cn("text-[13px] font-black tabular-nums leading-none", isPremium ? "text-amber-500" : "text-foreground")}>
+                      <p className="text-[13px] font-black tabular-nums leading-none text-foreground">
                         {registerPriceFmt ?? "—"}
                       </p>
                     </div>
                     {/* Renew price */}
-                    <div className="flex flex-col items-center justify-center px-2 py-2.5 gap-0.5 border-x border-border/40">
+                    <div className="flex flex-col items-center justify-center px-2 py-2.5 gap-0.5 border-l border-border/40">
                       <p className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-widest">
                         {isZh ? "续费" : "Renew"}
                       </p>
-                      <p className={cn("text-[13px] font-black tabular-nums leading-none", isPremium ? "text-amber-500" : "text-foreground")}>
+                      <p className="text-[13px] font-black tabular-nums leading-none text-foreground">
                         {renewPriceFmt ?? "—"}
-                      </p>
-                    </div>
-                    {/* Premium badge */}
-                    <div className={cn(
-                      "flex flex-col items-center justify-center px-2 py-2.5 gap-0.5",
-                      isPremium ? "bg-amber-500/8 dark:bg-amber-500/12" : ""
-                    )}>
-                      <p className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-widest">
-                        {isZh ? "溢价" : "Premium"}
-                      </p>
-                      <p className={cn(
-                        "text-[12px] font-black leading-none",
-                        isPremium
-                          ? "text-amber-500"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        {isPremium
-                          ? (isZh ? "是" : "Yes")
-                          : (isZh ? "否" : "No")}
                       </p>
                     </div>
                   </div>

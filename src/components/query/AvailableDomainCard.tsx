@@ -12,7 +12,6 @@ import {
   RiInformationLine,
   RiExternalLinkLine,
   RiGlobalLine,
-  RiPriceTag3Line,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
@@ -68,7 +67,7 @@ interface AvailableDomainCardProps {
   domain: string;
   locale: string;
   isPremiumByWhois?: boolean;
-  /** Registry-premium detection result (per-domain pricing APIs / heuristic). */
+  /** Registry-premium detection result (authoritative Porkbun/Netim flag + price). */
   premium?: PremiumCheckResult | null;
   /** Optional callback opening the domain-reminder dialog — when provided,
    *  an "alert me when registered" entry point is rendered. */
@@ -93,7 +92,6 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
   const [registrars, setRegistrars] = React.useState<DomainPricing[]>([]);
   const [renewRegistrars, setRenewRegistrars] = React.useState<DomainPricing[]>([]);
   const [loadingPrices, setLoadingPrices] = React.useState(true);
-  const [anyApiPremium, setAnyApiPremium] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const CARD_FALLBACK_RATES: Record<string, number> = {
     AUD: 1.65, CAD: 1.49, CHF: 0.94, CNY: 7.82, DKK: 7.46,
@@ -105,24 +103,22 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
   const confettiRef = React.useRef<ConfettiRef>(null);
 
   React.useEffect(() => {
+    // Registry-premium names show authoritative premium pricing instead of
+    // third-party aggregates — skip the nazhumi/miqingju price call entirely.
+    if (premium?.isPremium === true) {
+      setRawPrices([]);
+      setLoadingPrices(false);
+      return;
+    }
     const tld = domain.substring(domain.lastIndexOf(".") + 1).toLowerCase();
     const ctrl = new AbortController();
     fetch(`/api/pricing?tld=${encodeURIComponent(tld)}&type=new`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((data) => {
-        if (data.anyPremium) setAnyApiPremium(true);
         const prices: DomainPricing[] = (data.price || [])
           .filter((r: { new: unknown }) => typeof r.new === "number")
-          .map((r: { isPremium?: boolean; currencytype?: string; new: number; currency?: string; registrarweb?: string; [key: string]: unknown }) => ({
+          .map((r: DomainPricing) => ({
             ...r,
-            isPremium: r.isPremium ?? (
-              (r.currencytype && r.currencytype.toLowerCase().includes("premium")) ||
-              (typeof r.new === "number" && (() => {
-                const cur = (r.currency || "").toLowerCase();
-                const t: Record<string, number> = { usd: 60, eur: 55, cad: 80, gbp: 50, aud: 90, cny: 420, hkd: 470, sgd: 80, jpy: 9000 };
-                return t[cur] !== undefined && r.new > t[cur];
-              })())
-            ),
             externalLink: `https://www.nazhumi.com/domain/${tld}/new`,
           }));
         setRawPrices(prices);
@@ -130,7 +126,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
       .catch(() => {})
       .finally(() => setLoadingPrices(false));
     return () => ctrl.abort();
-  }, [domain]);
+  }, [domain, premium?.isPremium]);
 
   React.useEffect(() => {
     fetch("https://api.frankfurter.dev/v1/latest")
@@ -147,25 +143,15 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
       return amount / (eurRates[cur] ?? 1);
     };
     const sortedNew = [...rawPrices]
-      .sort((a, b) => {
-        if (anyApiPremium) {
-          if (a.isPremium !== b.isPremium) return a.isPremium ? -1 : 1;
-        } else {
-          if (a.isPremium !== b.isPremium) return a.isPremium ? 1 : -1;
-        }
-        return toEur(a.new as number, a.currency) - toEur(b.new as number, b.currency);
-      })
+      .sort((a, b) => toEur(a.new as number, a.currency) - toEur(b.new as number, b.currency))
       .slice(0, 5);
     setRegistrars(sortedNew);
     const sortedRenew = [...rawPrices]
       .filter((r) => typeof r.renew === "number" && r.renew !== -1)
-      .sort((a, b) => {
-        if (a.isPremium !== b.isPremium) return a.isPremium ? 1 : -1;
-        return toEur(a.renew as number, a.currency) - toEur(b.renew as number, b.currency);
-      })
+      .sort((a, b) => toEur(a.renew as number, a.currency) - toEur(b.renew as number, b.currency))
       .slice(0, 5);
     setRenewRegistrars(sortedRenew);
-  }, [rawPrices, eurRates, anyApiPremium]);
+  }, [rawPrices, eurRates]);
 
   function formatPrice(amount: number, currency: string): string {
     const cur = (currency ?? "").toUpperCase();
@@ -194,30 +180,19 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
 
   const tldForDisplay = domain.substring(domain.lastIndexOf(".")).toLowerCase();
   const sldForDisplay = domain.substring(0, domain.lastIndexOf("."));
-  const isPremium = anyApiPremium || isPremiumByWhois || premium?.isPremium === true || registrars.some((r) => r.isPremium);
-  const premiumRegistrars = registrars.filter((r) => r.isPremium);
-  const bestRegistrar = (isPremium && premiumRegistrars.length > 0)
-    ? premiumRegistrars[0]
-    : (registrars.find((r) => !r.isPremium) ?? registrars[0] ?? null);
+  const isPremium = isPremiumByWhois || premium?.isPremium === true;
+  const bestRegistrar = registrars[0] ?? null;
 
   // ── Label logic ──────────────────────────────────────────────────────────────
   // "高价值域名": only when a registry-level signal marks this domain premium —
   //   either the WHOIS text (isPremiumByWhois) or a per-domain pricing API
-  //   (premium.isPremium). Most reliable.
-  // "高注册费":  price-based detection (API fee threshold / anyApiPremium).
-  //   Accurate description: the registration fee is above average, but it is
-  //   NOT necessarily a "premium" name in the registry-reserved sense.
+  //   (premium.isPremium from Porkbun/Netim). Most reliable.
   // "可注册":    regular available domain.
-  const isPremiumFlagged = isPremiumByWhois || premium?.isPremium === true;
-  const labelType: "available" | "high_value" | "high_fee" =
-    !isPremium ? "available" :
-    isPremiumFlagged ? "high_value" :
-    "high_fee";
+  const labelType: "available" | "high_value" = isPremium ? "high_value" : "available";
 
   const LABELS = {
     available:  { zh: "可注册",    en: "Available" },
-    high_value: { zh: "高价值域名", en: "Premium Name" },
-    high_fee:   { zh: "高注册费",   en: "High Reg. Fee" },
+    high_value: { zh: "溢价域名", en: "Premium" },
   };
   const labelText = isZh ? LABELS[labelType].zh : LABELS[labelType].en;
 
@@ -246,56 +221,46 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
 
   const ICON_MAP = {
     available:  <RiCheckLine  className="w-5 h-5 text-primary" />,
-    high_value: <RiVipCrownLine className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
-    high_fee:   <RiPriceTag3Line className="w-5 h-5 text-orange-500 dark:text-orange-400" />,
+    high_value: <RiVipCrownLine className="w-5 h-5 text-rose-500 dark:text-rose-400" />,
   };
 
   const BADGE_CLASS = {
     available:  "text-primary  bg-primary/8    border-primary/25",
-    high_value: "text-amber-600 dark:text-amber-400 bg-muted/60 border-border/60",
-    high_fee:   "text-orange-600 dark:text-orange-400 bg-muted/60 border-border/60",
+    high_value: "text-rose-600 dark:text-rose-400 bg-muted/60 border-border/60",
   };
 
   const DOT_CLASS = {
     available:  "bg-primary",
-    high_value: "bg-amber-500",
-    high_fee:   "bg-orange-500",
+    high_value: "bg-rose-500",
   };
 
   const ACCENT_CLASS = {
     available:  "bg-gradient-to-r from-primary/60 via-primary to-primary/60",
-    high_value: "bg-gradient-to-r from-amber-400/50 via-amber-500/70 to-amber-400/50",
-    high_fee:   "bg-gradient-to-r from-orange-400/40 via-orange-500/60 to-orange-400/40",
+    high_value: "bg-gradient-to-r from-rose-400/50 via-rose-500/70 to-rose-400/50",
   };
 
   function getDescription(): string {
     if (labelType === "available") {
       return isZh ? "该域名目前可注册，抓紧时间抢注吧！" : "This domain is available. Grab it before someone else does.";
     }
-    if (labelType === "high_value") {
-      if (premium?.isPremium && typeof premium.price === "number" && premium.price > 0) {
-        return isZh
-          ? `该域名为注册局溢价精品域名，注册价约 ${formatPrice(premium.price, premium.currency)}/年起，以注册商实时报价为准。`
-          : `This is a registry-premium name with a registration price around ${formatPrice(premium.price, premium.currency)}/yr. Confirm with your registrar.`;
-      }
+    if (premium?.isPremium && typeof premium.price === "number" && premium.price > 0) {
+      const renewal =
+        typeof premium.renewalPrice === "number" && premium.renewalPrice > 0
+          ? (isZh
+              ? `，续费约 ${formatPrice(premium.renewalPrice, premium.currency)}/年`
+              : `, ~${formatPrice(premium.renewalPrice, premium.currency)}/yr renewal`)
+          : "";
       return isZh
-        ? "该域名为注册局标注的高价值精品域名，注册价格通常显著高于普通域名。"
-        : "This is a registry-level premium name. Registration costs significantly above standard rates.";
-    }
-    // high_fee
-    if (anyApiPremium && premiumRegistrars.length > 0) {
-      return isZh
-        ? `注册费约 ${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/年起，高于该后缀普通注册价，以注册商实时报价为准。`
-        : `Registration fee starts at ~${formatPrice(premiumRegistrars[0].new as number, premiumRegistrars[0].currency)}/yr — above standard rates for this TLD. Confirm with registrar.`;
+        ? `该域名为注册局溢价精品域名，注册价约 ${formatPrice(premium.price, premium.currency)}/年起${renewal}，以注册商实时报价为准。`
+        : `This is a registry-premium name with a registration price around ${formatPrice(premium.price, premium.currency)}/yr${renewal}. Confirm with your registrar.`;
     }
     return isZh
-      ? "该域名注册费高于普通域名，请以注册商实时报价为准。"
-      : "Registration fee is above average for this TLD. Confirm current pricing with your registrar.";
+      ? "该域名为注册局标注的高价值精品域名，注册价格通常显著高于普通域名。"
+      : "This is a registry-level premium name. Registration costs significantly above standard rates.";
   }
 
   function RegistrarRow({ r, idx, priceField, colorFirst }: { r: DomainPricing; idx: number; priceField: "new" | "renew"; colorFirst: boolean }) {
     const faviconDomain = (() => { try { return new URL(r.registrarweb).hostname; } catch { return null; } })();
-    const rowIsPremium = r.isPremium;
     const isFirst = idx === 0;
     const price = r[priceField];
     return (
@@ -316,19 +281,9 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
           <p className={cn("text-sm truncate", isFirst ? "font-semibold text-foreground" : "font-medium text-foreground/70")}>
             {r.registrarname}
           </p>
-          {isFirst && !rowIsPremium && !isPremium && colorFirst && (
+          {isFirst && !isPremium && colorFirst && (
             <span className="shrink-0 text-[9px] font-bold text-primary/80 bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wide">
               {isZh ? "最低价" : "BEST"}
-            </span>
-          )}
-          {rowIsPremium && (
-            <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/8 border border-orange-400/25 px-1.5 py-0.5 rounded uppercase tracking-wide">
-              {isZh ? "高价" : "HIGH"}
-            </span>
-          )}
-          {!rowIsPremium && anyApiPremium && (
-            <span className="shrink-0 text-[9px] font-bold text-muted-foreground/50 bg-muted/50 border border-border/50 px-1.5 py-0.5 rounded uppercase tracking-wide">
-              {isZh ? "参考价" : "STD"}
             </span>
           )}
         </div>
@@ -336,9 +291,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
           <div className="flex items-baseline gap-0.5">
             <span className={cn(
               "font-bold tabular-nums",
-              rowIsPremium
-                ? (isFirst ? "text-base text-orange-600 dark:text-orange-400" : "text-sm text-orange-500/60 dark:text-orange-500/50")
-                : (isFirst && colorFirst ? "text-base text-primary" : "text-sm text-foreground/60"),
+              isFirst && colorFirst ? "text-base text-primary" : "text-sm text-foreground/60",
             )}>
               {typeof price === "number" ? formatPrice(price, r.currency) : "N/A"}
             </span>
@@ -471,7 +424,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
           {onSubscribe && (
             <motion.button
               onClick={onSubscribe}
-              className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/8 hover:bg-amber-500/14 transition-all duration-150 active:scale-[0.97] w-full"
+              className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/8 hover:bg-rose-500/14 transition-all duration-150 active:scale-[0.97] w-full"
               whileTap={{ scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
             >
@@ -560,7 +513,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
 
       {/* ── Price section ── */}
       <div className="border-t border-border/50">
-        {/* High-fee / high-value notice */}
+        {/* Premium notice */}
         {isPremium && !loadingPrices && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
@@ -570,17 +523,9 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
           >
             <RiInformationLine className="w-3.5 h-3.5 text-muted-foreground/60 mt-0.5 shrink-0" />
             <p className="text-[11px] text-muted-foreground leading-snug">
-              {labelType === "high_value"
-                ? (isZh
-                    ? "此域名为注册局高价值精品域名，注册价格以注册商最终报价为准，各家价格可能存在差异。"
-                    : "This is a registry-level premium name. Final pricing may vary across registrars — always confirm before purchasing.")
-                : anyApiPremium && premiumRegistrars.length > 0
-                  ? (isZh
-                      ? "标注「高价」的报价为该域名的实际高价格，其余为该后缀标准参考价，实际以注册商报价为准。"
-                      : "Entries marked \"High\" show the elevated fee for this domain. Others are standard TLD reference prices — confirm with your registrar.")
-                  : (isZh
-                      ? "以下为该后缀标准/参考价，部分域名实际注册价可能更高，以注册商报价为准。"
-                      : "Prices shown are standard/reference rates. Actual cost may be higher — confirm with your registrar.")}
+              {isZh
+                ? "此域名为注册局高价值精品域名，注册价格以注册商最终报价为准，各家价格可能存在差异。"
+                : "This is a registry-level premium name. Final pricing may vary across registrars — always confirm before purchasing."}
             </p>
           </motion.div>
         )}
@@ -591,12 +536,40 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
             <RiShoppingCartLine className="w-3 h-3" />
             {isZh ? "注册价格" : "Registration"}
           </p>
-          {registrars.length > 0 && (
+          {!isPremium && registrars.length > 0 && (
             <span className="text-[10px] text-muted-foreground/40">{isZh ? "以官网为准" : "Reference only"}</span>
           )}
         </div>
 
-        {loadingPrices ? (
+        {isPremium ? (
+          <div className="px-4 sm:px-5 pb-4 pt-1">
+            <div className="flex items-center gap-2 rounded-lg border border-rose-400/30 bg-rose-500/5 dark:bg-rose-500/10 px-3 py-2.5">
+              <RiVipCrownLine className="w-4 h-4 text-rose-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums flex items-baseline gap-x-1.5 flex-wrap">
+                  <span>
+                    {typeof premium?.price === "number" && premium.price > 0
+                      ? `${formatPrice(premium.price, premium.currency)}${isZh ? "/年起" : "/yr"}`
+                      : (isZh ? "需向注册局询价" : "Contact registry")}
+                  </span>
+                  {typeof premium?.renewalPrice === "number" && premium.renewalPrice > 0 && (
+                    <span className="text-rose-600/90 dark:text-rose-400/90">
+                      · {isZh ? "续费 " : "Renew "}
+                      {formatPrice(premium.renewalPrice, premium.currency)}{isZh ? "/年" : "/yr"}
+                    </span>
+                  )}
+                </p>
+                <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                  {premium?.source === "netim"
+                    ? (isZh ? "Netim 注册局报价 · 仅供参考" : "Netim registry quote · Reference only")
+                    : premium?.source === "porkbun"
+                      ? (isZh ? "Porkbun 注册局报价 · 仅供参考" : "Porkbun registry quote · Reference only")
+                      : (isZh ? "注册局报价 · 仅供参考" : "Registry quote · Reference only")}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : loadingPrices ? (
           <div className="px-4 sm:px-5 pb-4 pt-2 space-y-2">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center gap-3 py-1.5">
@@ -655,7 +628,7 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
         )}
 
         {/* Renewal prices */}
-        {!loadingPrices && renewRegistrars.length > 0 && (
+        {!loadingPrices && !isPremium && renewRegistrars.length > 0 && (
           <>
             <div className="border-t border-border/40 px-4 sm:px-5 pt-4 pb-1 flex items-center justify-between">
               <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 font-bold uppercase tracking-wider">

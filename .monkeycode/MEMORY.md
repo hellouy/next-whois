@@ -340,4 +340,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - 定价缓存：src/lib/pricing/client.ts 新增 TLD 级 30 分钟内存缓存(cachedValue 包装 getDomainPricing/getDomainTransferNegotiable/getTopRegistrars) — 消除每次冷查询 6-8 个外部 HTTP 请求(nazhumi/miqingju/tianhu)。
   - lookup-stream.ts 是 streaming 端点，Cache-Control 在 flushHeaders() 后设置是死代码(已移除) — 结果缓存靠服务端 Redis/DB，非 HTTP CDN。
   - 结果页主数据流 effect 增加 AbortController，切换域名时 abort 旧 fetch 释放资源。
-  - batch-scrape.mjs --clear-defaults 会重抓所有 30/30/5 的 ok TLD(真实值恰为默认值的也会被抓) — 属正常设计但耗时长(~40-60min)；AI 对多数 ccTLD 官方政策页(nic.xx)反复抓取仍只能得默认值，这些(如 tl/ar/li)需人工依据注册局政策录入 tld_lifecycle_overrides，而非无限重抓。
+   - batch-scrape.mjs --clear-defaults 会重抓所有 30/30/5 的 ok TLD(真实值恰为默认值的也会被抓) — 属正常设计但耗时长(~40-60min)；AI 对多数 ccTLD 官方政策页(nic.xx)反复抓取仍只能得默认值，这些(如 tl/ar/li)需人工依据注册局政策录入 tld_lifecycle_overrides，而非无限重抓。
+
+[Project Knowledge Summary]
+- Date: 2026-09-08
+- Context: Netim Direct SOAP API 集成（溢价检测第二权威来源，premium-check.ts）
+- Category: Environment Configuration
+- Instructions:
+  - Netim 是 SOAP（RPC/encoded，targetNamespace urn:DRS）；生产端点 https://api.netim.com/2.0/，WSDL /2.0/api.wsdl，沙箱 https://oteapi.netim.com/2.0/api.wsdl；凭据 NETIM_LOGIN/NETIM_PASSWORD 在 .env.local
+  - 认证流程：sessionOpen(idReseller大写, password, "EN") → IDSession，后续方法第一参数是 IDSession；溢价+价格用 queryDomainPrice(IDSession, domain, "") 返回 IsPremium(int 0/1) + Fee4Registration + Fee4Renewal + FeeCurrency(EUR)
+  - 调试陷阱：Python 标准库 ssl 的 TLS 指纹会被 api.netim.com 防火墙限流（TLS handshake EOF / SSLZeroReturnError），curl 与 Node.js fetch(undici) 指纹正常 — 验证 Netim 用 node 脚本，不要用 python urllib/requests
+  - queryDomainPrice 对已注册域名也返回价格（不判断可用性）；Netim session 有服务端数量上限，代码内用模块级缓存复用 session（premium-check.ts）

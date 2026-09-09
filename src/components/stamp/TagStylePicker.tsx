@@ -11,6 +11,7 @@ import {
   RiShakeHandsLine,
   RiCodeSLine,
   RiAlertLine,
+  RiArrowDownSLine,
 } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -62,6 +63,49 @@ export function TagStylePicker({
   const s = (key: StampKey, params?: Record<string, string | number>) =>
     t(`stamp.${key}` as TranslationKey, params);
 
+  const [lockedExpanded, setLockedExpanded] = React.useState(false);
+
+  const freeStyles = TAG_STYLES.filter((ts) => ts.id === "personal");
+  const lockedStyles = TAG_STYLES.filter((ts) => ts.id !== "personal");
+
+  const renderStyleCard = (ts: (typeof TAG_STYLES)[number]) => {
+    const isSelected = selectedStyle === ts.id;
+    const Icon = ts.icon;
+    const isFree = ts.id === "personal";
+    const locked = !isMember && !isFree;
+    return (
+      <button
+        key={ts.id}
+        type="button"
+        onClick={() => {
+          if (locked) { toast.info(s("upgrade_to_unlock")); return; }
+          onSelect(ts.id);
+          onPreviewOpen(ts.id);
+        }}
+        className={cn(
+          "relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
+          locked ? "opacity-50 cursor-not-allowed border-border/30 bg-muted/20"
+            : isSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
+            : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
+        )}
+      >
+        <div className={cn("relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br", ts.accent)}>
+          <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "8px 8px" }} />
+          {locked ? <RiVipCrownLine className="relative h-5 w-5 text-white/80 drop-shadow" /> : <Icon className="relative h-5 w-5 text-white drop-shadow" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={cn("truncate text-xs font-bold", isSelected && !locked ? "text-primary" : "text-foreground")}>
+            {isZh ? ts.zhName : ts.label}
+          </p>
+          <p className="mt-1 truncate text-[10px] text-muted-foreground">
+            {locked ? (isZh ? "会员专属配色" : "Members only") : isSelected ? (isZh ? "当前已选" : "Selected") : (isFree && !isMember ? "FREE" : (isZh ? "点击查看预览" : "Tap to preview"))}
+          </p>
+        </div>
+        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSelected && !locked ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSelected && !locked && <RiCheckLine className="size-3" />}</span>
+      </button>
+    );
+  };
+
   return (
     <>
       <div>
@@ -73,43 +117,52 @@ export function TagStylePicker({
           }
         </div>
         <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-          {TAG_STYLES.map((ts) => {
-            const isSelected = selectedStyle === ts.id;
-            const Icon = ts.icon;
-            const isFree = ts.id === "personal";
-            const locked = !isMember && !isFree;
-            return (
-              <button
-                key={ts.id}
-                type="button"
-                onClick={() => {
-                  if (locked) { toast.info(s("upgrade_to_unlock")); return; }
-                  onSelect(ts.id);
-                  onPreviewOpen(ts.id);
-                }}
-                className={cn(
-                  "relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
-                  locked ? "opacity-50 cursor-not-allowed border-border/30 bg-muted/20"
-                    : isSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
-                    : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
+          {freeStyles.map(renderStyleCard)}
+          {isMember ? (
+            lockedStyles.map(renderStyleCard)
+          ) : (
+            <>
+              <div className="col-span-full">
+                <button
+                  type="button"
+                  onClick={() => setLockedExpanded((v) => !v)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/40 bg-violet-500/5 dark:bg-violet-500/10 px-3 py-2.5 text-left transition-colors hover:border-violet-400/70 hover:bg-violet-500/10"
+                >
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-rose-500">
+                    <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "8px 8px" }} />
+                    <RiVipCrownLine className="relative h-5 w-5 text-white/90 drop-shadow" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-foreground">
+                      {isZh ? "会员专属配色" : "Members-only styles"}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                      {lockedExpanded
+                        ? (isZh ? `共 ${lockedStyles.length} 款 · 点击收起` : `${lockedStyles.length} styles · tap to collapse`)
+                        : (isZh ? `共 ${lockedStyles.length} 款 · 点击预览` : `${lockedStyles.length} styles · tap to preview`)}
+                    </p>
+                  </div>
+                  <RiArrowDownSLine className={cn("h-5 w-5 shrink-0 text-violet-500 transition-transform duration-200", lockedExpanded && "rotate-180")} />
+                </button>
+              </div>
+              <AnimatePresence initial={false}>
+                {lockedExpanded && (
+                  <motion.div
+                    key="locked-styles"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="col-span-full overflow-hidden"
+                  >
+                    <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
+                      {lockedStyles.map(renderStyleCard)}
+                    </div>
+                  </motion.div>
                 )}
-              >
-                <div className={cn("relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br", ts.accent)}>
-                  <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "8px 8px" }} />
-                  {locked ? <RiVipCrownLine className="relative h-5 w-5 text-white/80 drop-shadow" /> : <Icon className="relative h-5 w-5 text-white drop-shadow" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-xs font-bold", isSelected && !locked ? "text-primary" : "text-foreground")}>
-                    {isZh ? ts.zhName : ts.label}
-                  </p>
-                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                    {locked ? (isZh ? "会员专属配色" : "Members only") : isSelected ? (isZh ? "当前已选" : "Selected") : (isFree && !isMember ? "FREE" : (isZh ? "点击查看预览" : "Tap to preview"))}
-                  </p>
-                </div>
-                <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSelected && !locked ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSelected && !locked && <RiCheckLine className="size-3" />}</span>
-              </button>
-            );
-          })}
+              </AnimatePresence>
+            </>
+          )}
         </div>
       </div>
 

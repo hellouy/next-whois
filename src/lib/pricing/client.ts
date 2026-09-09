@@ -15,15 +15,28 @@ const priceCache = new Map<
   string,
   { value: unknown; expiresAt: number }
 >();
+// In-flight dedup: concurrent callers (WHOIS-lookup prewarming + applyParams)
+// share a single network fetch instead of firing duplicate API requests.
+const inflightPrices = new Map<string, Promise<unknown>>();
 
 function cachedValue<T>(key: string, producer: () => Promise<T>): Promise<T> {
   const hit = priceCache.get(key);
   const now = Date.now();
   if (hit && now < hit.expiresAt) return Promise.resolve(hit.value as T);
-  return producer().then((val) => {
-    priceCache.set(key, { value: val, expiresAt: now + PRICE_CACHE_TTL_MS });
-    return val;
-  });
+  let inflight = inflightPrices.get(key);
+  if (!inflight) {
+    inflight = Promise.resolve()
+      .then(producer)
+      .then((val) => {
+        priceCache.set(key, { value: val, expiresAt: now + PRICE_CACHE_TTL_MS });
+        return val;
+      })
+      .finally(() => {
+        inflightPrices.delete(key);
+      });
+    inflightPrices.set(key, inflight);
+  }
+  return inflight as Promise<T>;
 }
 
 type NazhumiOrder = "new" | "renew" | "transfer";
@@ -67,7 +80,6 @@ interface MiqingjuResponse {
 }
 
 export interface DomainPricing extends NazhumiRegistrar {
-  isPremium: boolean;
   externalLink: string;
 }
 
@@ -141,7 +153,7 @@ async function fetchNazhumiData(
     const url = `${NAZHUMI_API_URL}?domain=${encodeURIComponent(tld)}&order=${type}`;
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return [];
     const res = await response.json();
@@ -179,7 +191,7 @@ async function fetchTianhuData(
     const url = `${TIANHU_API_URL}/${encodeURIComponent(tld)}`;
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return [];
     const json = await response.json();
@@ -223,7 +235,7 @@ async function fetchMiqingjuData(
     const url = `${MIQINGJU_API_URL}?tld=${encodeURIComponent(tld)}`;
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return [];
     const json: MiqingjuResponse = await response.json();
@@ -279,22 +291,6 @@ function mergeRegistrars(
   return Array.from(map.values()).filter((r) => typeof r[type] === "number" && (r[type] as number) > 0);
 }
 
-function calcIsPremium(r: NazhumiRegistrar): boolean {
-  // Authoritative: registry/registrar explicitly flags as premium
-  if (r.currencytype && r.currencytype.toLowerCase().includes("premium")) return true;
-  // Price-based heuristic: significantly above typical TLD registration cost
-  // Thresholds per currency chosen to approximate >~$60 USD equivalent
-  if (typeof r.new !== "number") return false;
-  const cur = r.currency.toLowerCase();
-  const thresholds: Record<string, number> = {
-    usd: 60, eur: 55, cad: 80, gbp: 50, aud: 90,
-    cny: 420, hkd: 470, sgd: 80, jpy: 9000,
-  };
-  const threshold = thresholds[cur];
-  if (threshold !== undefined && r.new > threshold) return true;
-  return false;
-}
-
 export async function getDomainPricing(
   domain: string,
   type: NazhumiOrder,
@@ -329,7 +325,6 @@ export async function getDomainPricing(
       const best = merged[0];
       return {
         ...best,
-        isPremium: calcIsPremium(best),
         externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
       };
     } catch (error) {
@@ -372,7 +367,6 @@ export async function getTopRegistrars(
         .slice(0, count)
         .map((r) => ({
           ...r,
-          isPremium: calcIsPremium(r),
           externalLink: `https://www.nazhumi.com/domain/${tld}/${type}`,
         }));
     } catch {

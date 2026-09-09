@@ -2,42 +2,47 @@
  * Premium-domain detection for *unregistered* domains.
  *
  * A "premium" domain is available to register but carries a registry-set price
- * far above the TLD's standard fee (or is held by the registry for sale). The
- * authoritative signal is a registrar API returning a per-domain price; we fall
- * back to Namesilo, then to a conservative heuristic for the cases where no API
- * key is configured.
+ * far above the TLD's standard fee. We rely exclusively on registrar APIs that
+ * return an authoritative per-domain `premium` flag plus a real price:
  *
- * Order of precedence:
- *   1. Porkbun checkDomain  (returns a boolean `premium` flag + price)
- *   2. Namesilo checkRegisterAvailability (price only — compared to TLD base)
- *   3. Heuristic             (short / numeric SLDs only — high-confidence subset)
+ *   1. Netim Direct SOAP    (queryDomainPrice → authoritative IsPremium flag
+ *                            + Fee4Registration / Fee4Renewal, in EUR)
+ *   2. Porkbun checkDomain  (string `premium` "yes"/"no" + regular/renewal price)
  *
- * Results are cached in-memory for 24 h: premium pricing rarely changes within a
- * day, and Porkbun rate-limits checks to ~1/10s per account.
+ * Heuristic and price-ratio guessing were removed: they produced false
+ * positives on short / numeric SLDs and ordinary promotional prices.
+ *
+ * Results are cached in-memory for 24 h: premium pricing rarely changes within
+ * a day, and Porkbun rate-limits checks to ~1/10s per account.
  *
  * This module is intentionally fail-safe: any error or timeout returns `null`
- * (or a heuristic answer) so it can never break or slow the main WHOIS lookup.
+ * so it can never break or slow the main WHOIS lookup.
  */
 import { createLogger } from "@/lib/logger";
-import { getDomainPricing } from "@/lib/pricing/client";
 import type { PremiumCheckResult } from "@/lib/whois/types";
 
 const logger = createLogger("server/premium-check");
 
 const PREMIUM_CACHE_TTL_MS = 24 * 3600 * 1000;
+// A null result usually means "price lookup unavailable" (Netim timed out and
+// Porkbun can't price it) rather than a guaranteed non-premium verdict. Cache
+// it briefly so a real premium name isn't hidden for a full day because of one
+// transient timeout.
+const PREMIUM_NULL_TTL_MS = 10 * 60 * 1000;
 const premiumCache = new Map<
   string,
   { value: PremiumCheckResult | null; expiresAt: number }
 >();
+// In-flight dedup: the parallel WHOIS-lookup path and the post-lookup merge
+// both query the same domain — share a single Netim/Porkbun request.
+const inflightPremium = new Map<string, Promise<PremiumCheckResult | null>>();
 
-// A domain is flagged premium when its per-domain price is at least this many
-// times the TLD's standard registration price.
-const PREMIUM_RATIO = 5;
 const PORKBUN_TIMEOUT_MS = 3500;
-const NAMESILO_TIMEOUT_MS = 3000;
+const NETIM_TIMEOUT_MS = 4000;
 
 const PORKBUN_API = "https://api.porkbun.com/api/json/v3/domain/checkDomain";
-const NAMESILO_API = "https://www.namesilo.com/api/checkRegisterAvailability";
+const NETIM_API = "https://api.netim.com/2.0/";
+const NETIM_SESSION_TTL_MS = 20 * 60 * 1000;
 
 function readCached(domain: string): PremiumCheckResult | null | undefined {
   const hit = premiumCache.get(domain);
@@ -48,7 +53,7 @@ function readCached(domain: string): PremiumCheckResult | null | undefined {
 }
 
 function writeCache(domain: string, value: PremiumCheckResult | null): void {
-  premiumCache.set(domain, { value, expiresAt: Date.now() + PREMIUM_CACHE_TTL_MS });
+  premiumCache.set(domain, { value, expiresAt: Date.now() + (value ? PREMIUM_CACHE_TTL_MS : PREMIUM_NULL_TTL_MS) });
 }
 
 function timeoutSignal(ms: number): AbortSignal {
@@ -75,147 +80,255 @@ function toNumber(v: unknown): number | null {
   return null;
 }
 
-/** Parse a possibly-dollars or pennies price into USD. */
+/** Parse a possibly-pennies price into USD dollars. */
 function toUsd(v: unknown, pennies: boolean): number | null {
   const n = toNumber(v);
   if (n === null) return null;
   return pennies ? n / 100 : n;
 }
 
-/** Extract TLD's standard (non-premium) registration price baseline in USD. */
-async function getTldBasePriceUsd(domain: string): Promise<number | null> {
-  try {
-    const pricing = await getDomainPricing(domain, "new");
-    const raw = pricing?.new;
-    if (typeof raw === "number" && raw > 0) return raw;
-    return null;
-  } catch {
-    return null;
-  }
+/** Porkbun reports `premium` as the string "yes"/"no" (v3) or a boolean. */
+function isTruthyPremium(v: unknown): boolean {
+  return v === true || v === 1 || v === "1" || v === "yes" || v === "true";
 }
 
 // ── Porkbun ─────────────────────────────────────────────────────────────────
+
+/** Parse a Porkbun checkDomain JSON response into a normalized result. */
+export function parsePorkbunResponse(data: unknown): PremiumCheckResult | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  if (d.status !== "SUCCESS") return null;
+
+  // v3 nests the answer under `response`; the older checkHost returned
+  // `premium` / `price` at the top level. Support both shapes.
+  const r = (d.response as Record<string, unknown>) ?? d;
+
+  // Only unregistered domains are in scope: if Porkbun says it is already
+  // taken, there is no "premium registration" to detect.
+  const avail = r.avail;
+  if (avail === "no" || avail === "false") return null;
+
+  // Authoritative premium flag (string "yes"/"no" in v3).
+  const premiumFlag = isTruthyPremium(r.premium ?? r.isPremium ?? r.is_premium);
+
+  // Registration price: prefer the regular (non-promo) price, since `price`
+  // may be a first-year discount that understates the true cost.
+  const priceUsd =
+    toUsd(r.regularPrice, false) ??
+    toUsd(r.price, false) ??
+    toUsd(r.registrationPrice, false) ??
+    toUsd(r.registration, false) ??
+    toUsd(r.cost, true);
+
+  // Renewal price from the nested `additional.renewal` block.
+  const renewal = (r.additional as Record<string, unknown> | undefined)?.renewal as
+    | Record<string, unknown>
+    | undefined;
+  const renewalUsd =
+    toUsd(renewal?.regularPrice, false) ?? toUsd(renewal?.price, false);
+
+  return {
+    isPremium: premiumFlag,
+    price: priceUsd,
+    renewalPrice: renewalUsd,
+    currency: "USD",
+    source: "porkbun",
+  };
+}
+
 async function checkPorkbun(domain: string): Promise<PremiumCheckResult | null> {
   const apikey = process.env.PORKBUN_API_KEY;
   const secret = process.env.PORKBUN_SECRET_KEY;
   if (!apikey || !secret) return null;
 
   try {
-    const data = (await postJson(
+    const data = await postJson(
       `${PORKBUN_API}/${encodeURIComponent(domain)}`,
       { apikey, secretapikey: secret },
       PORKBUN_TIMEOUT_MS,
-    )) as Record<string, unknown> | null;
-
-    if (!data || data.status !== "SUCCESS") return null;
-
-    // v3 nests the answer under `response`; the older checkHost returned
-    // `isPremium` / `price` at the top level. Support both shapes.
-    const r = (data.response as Record<string, unknown>) ?? data;
-
-    const premiumFlag =
-      r.premium === true || r.isPremium === true || r.is_premium === true;
-
-    // Cost can arrive as dollars (price/regPrice/registrationPrice) or pennies
-    // (cost). Prefer explicit dollar strings first.
-    const priceUsd =
-      toUsd(r.price, false) ??
-      toUsd(r.regPrice, false) ??
-      toUsd(r.registrationPrice, false) ??
-      toUsd(r.registration, false) ??
-      toUsd(r.cost, true);
-
-    const base = await getTldBasePriceUsd(domain);
-    const priceImpliesPremium =
-      priceUsd !== null &&
-      base !== null &&
-      priceUsd >= base * PREMIUM_RATIO;
-
-    const isPremium = premiumFlag || priceImpliesPremium;
-
-    return {
-      isPremium,
-      price: priceUsd,
-      currency: "USD",
-      source: "porkbun",
-    };
+    );
+    return parsePorkbunResponse(data);
   } catch (e) {
     logger.error("[premium-check] porkbun failed:", (e as Error).message);
     return null;
   }
 }
 
-// ── Namesilo ────────────────────────────────────────────────────────────────
-async function checkNamesilo(domain: string): Promise<PremiumCheckResult | null> {
-  const key = process.env.NAMESILO_API_KEY;
-  if (!key) return null;
+// ── Netim ───────────────────────────────────────────────────────────────────
+
+const NETIM_NS = "urn:DRS";
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/** Extract the text of the first `<tag>value</tag>` element in a SOAP reply. */
+function xmlValue(xml: string, tag: string): string | null {
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
+  return m ? m[1].trim() : null;
+}
+
+function soapEnvelope(body: string): string {
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<SOAP-ENV:Envelope ' +
+    'xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" ' +
+    `xmlns:ns1="${NETIM_NS}" ` +
+    'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ' +
+    'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' +
+    'xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" ' +
+    'SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">' +
+    "<SOAP-ENV:Body>" +
+    body +
+    "</SOAP-ENV:Body>" +
+    "</SOAP-ENV:Envelope>"
+  );
+}
+
+async function netimCall(action: string, body: string, ms: number): Promise<string | null> {
+  const res = await fetch(NETIM_API, {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: action },
+    body: soapEnvelope(body),
+    signal: timeoutSignal(ms),
+  });
+  if (!res.ok) return null;
+  return res.text();
+}
+
+// Netim sessions are server-side and capped; reuse a fresh one across calls
+// within this process instead of opening one per lookup.
+let netimSession: { id: string; at: number } | null = null;
+
+async function netimSessionOpen(login: string, password: string): Promise<string | null> {
+  const body =
+    `<ns1:sessionOpen>` +
+    `<idReseller xsi:type="xsd:string">${escapeXml(login.toUpperCase())}</idReseller>` +
+    `<password xsi:type="xsd:string">${escapeXml(password)}</password>` +
+    `<language xsi:type="xsd:string">EN</language>` +
+    `</ns1:sessionOpen>`;
+  const xml = await netimCall("sessionOpenAction", body, NETIM_TIMEOUT_MS);
+  return xmlValue(xml ?? "", "IDSession");
+}
+
+async function netimQueryPrice(sid: string, domain: string): Promise<string | null> {
+  const body =
+    `<ns1:queryDomainPrice>` +
+    `<IDSession xsi:type="xsd:string">${escapeXml(sid)}</IDSession>` +
+    `<domain xsi:type="xsd:string">${escapeXml(domain)}</domain>` +
+    `<authID xsi:type="xsd:string"></authID>` +
+    `</ns1:queryDomainPrice>`;
+  return netimCall("queryDomainPriceAction", body, NETIM_TIMEOUT_MS);
+}
+
+/**
+ * Parse a Netim `queryDomainPrice` SOAP reply into a normalized result.
+ *
+ * StructQueryDomainPrice carries `IsPremium` (0/1), `Fee4Registration`,
+ * `Fee4Renewal` and `FeeCurrency` (e.g. "EUR"). Prices are strings.
+ */
+export function parseNetimResponse(xml: string): PremiumCheckResult | null {
+  if (!xml) return null;
+  if (xml.includes("Fault")) return null;
+
+  const premium = xmlValue(xml, "IsPremium");
+  if (premium === null) return null;
+
+  const currency = xmlValue(xml, "FeeCurrency") || "EUR";
+  const price = toNumber(xmlValue(xml, "Fee4Registration"));
+  const renewalPrice = toNumber(xmlValue(xml, "Fee4Renewal"));
+
+  return {
+    isPremium: premium === "1",
+    price,
+    renewalPrice,
+    currency,
+    source: "netim",
+  };
+}
+
+async function checkNetim(domain: string): Promise<PremiumCheckResult | null> {
+  const login = process.env.NETIM_LOGIN;
+  const password = process.env.NETIM_PASSWORD;
+  if (!login || !password) return null;
 
   try {
-    const url = `${NAMESILO_API}?version=1&type=json&key=${encodeURIComponent(key)}&domain=${encodeURIComponent(domain)}`;
-    const res = await fetch(url, { signal: timeoutSignal(NAMESILO_TIMEOUT_MS) });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      reply?: { available?: { domain?: string; price?: string } };
-    };
-    const avail = data.reply?.available;
-    if (!avail || avail.domain !== "yes") return null;
+    let sid =
+      netimSession && Date.now() - netimSession.at < NETIM_SESSION_TTL_MS
+        ? netimSession.id
+        : null;
+    if (!sid) {
+      sid = await netimSessionOpen(login, password);
+      if (!sid) return null;
+      netimSession = { id: sid, at: Date.now() };
+    }
 
-    const priceUsd = toNumber(avail.price);
-    const base = await getTldBasePriceUsd(domain);
-    const isPremium =
-      priceUsd !== null && base !== null && priceUsd >= base * PREMIUM_RATIO;
+    let xml = await netimQueryPrice(sid, domain);
 
-    return {
-      isPremium,
-      price: priceUsd,
-      currency: "USD",
-      source: "namesilo",
-    };
+    // A stale session faults; re-open once and retry.
+    if (!xml || xml.includes("Fault")) {
+      sid = await netimSessionOpen(login, password);
+      if (!sid) return null;
+      netimSession = { id: sid, at: Date.now() };
+      xml = await netimQueryPrice(sid, domain);
+    }
+
+    return parseNetimResponse(xml ?? "");
   } catch (e) {
-    logger.error("[premium-check] namesilo failed:", (e as Error).message);
+    logger.error("[premium-check] netim failed:", (e as Error).message);
     return null;
   }
 }
 
-// ── Heuristic ───────────────────────────────────────────────────────────────
-/**
- * Conservative heuristic for when no registrar API key is configured. Only
- * flags the high-confidence subset: short SLDs (≤3 chars) and all-numeric SLDs,
- * which are premium/reserved across the overwhelming majority of TLDs.
- */
-export function heuristicPremium(domain: string): PremiumCheckResult | null {
-  const sld = domain.split(".")[0]?.toLowerCase() ?? "";
-  if (sld.length <= 3) {
-    return { isPremium: true, price: null, currency: "USD", source: "heuristic" };
-  }
-  if (/^\d+$/.test(sld)) {
-    return { isPremium: true, price: null, currency: "USD", source: "heuristic" };
-  }
-  return null;
-}
-
 // ── Entry point ─────────────────────────────────────────────────────────────
-export async function checkDomainPremium(domain: string): Promise<PremiumCheckResult | null> {
+export function checkDomainPremium(domain: string): Promise<PremiumCheckResult | null> {
   const cached = readCached(domain);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return Promise.resolve(cached);
 
-  // Try authoritative APIs in order; the first definitive answer wins.
-  const fromPorkbun = await checkPorkbun(domain);
-  if (fromPorkbun) {
-    writeCache(domain, fromPorkbun);
-    return fromPorkbun;
+  let inflight = inflightPremium.get(domain);
+  if (!inflight) {
+    inflight = (async (): Promise<PremiumCheckResult | null> => {
+      // Netim is the primary source (authoritative IsPremium flag). A Netim
+      // "premium = true" verdict wins outright.
+      const fromNetim = await checkNetim(domain);
+      if (fromNetim && fromNetim.isPremium) {
+        writeCache(domain, fromNetim);
+        return fromNetim;
+      }
+
+      // Cross-check with Porkbun when Netim says "premium = false" or had no
+      // quote: the two registries price different premium lists, so a Porkbun
+      // "premium = yes" improves recall without sacrificing Netim's authority.
+      const fromPorkbun = await checkPorkbun(domain);
+      if (fromPorkbun && fromPorkbun.isPremium) {
+        writeCache(domain, fromPorkbun);
+        return fromPorkbun;
+      }
+
+      // Neither source reports premium: fall back to the Netim quote (even a
+      // non-premium verdict) so we still show real registration/renewal fees.
+      if (fromNetim) {
+        writeCache(domain, fromNetim);
+        return fromNetim;
+      }
+
+      if (fromPorkbun) {
+        writeCache(domain, fromPorkbun);
+        return fromPorkbun;
+      }
+
+      return null;
+    })();
+    inflightPremium.set(domain, inflight);
+    void inflight.finally(() => {
+      inflightPremium.delete(domain);
+    });
   }
-
-  const fromNamesilo = await checkNamesilo(domain);
-  if (fromNamesilo) {
-    writeCache(domain, fromNamesilo);
-    return fromNamesilo;
-  }
-
-  // Fall back to the heuristic when APIs are unavailable / unconfigured.
-  const heuristic = heuristicPremium(domain);
-  // Cache heuristic "premium" answers too; but don't cache a null (no signal)
-  // aggressively — a null may flip once an API key is configured later.
-  if (heuristic) writeCache(domain, heuristic);
-  return heuristic;
+  return inflight;
 }

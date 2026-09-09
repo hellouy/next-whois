@@ -13,7 +13,7 @@ function detectType(q: string): string {
   return "DOMAIN";
 }
 
-function getRelativeTime(dateStr: string): string {
+function getRelativeTime(dateStr: string, zh: boolean = false): string {
   if (!dateStr || dateStr === "Unknown") return "";
   try {
     const date = new Date(dateStr);
@@ -24,14 +24,20 @@ function getRelativeTime(dateStr: string): string {
     );
     if (diffDays < 0) {
       const abs = Math.abs(diffDays);
+      if (zh) {
+        if (abs < 30) return `${abs} 天后`;
+        if (abs < 365) return `${Math.floor(abs / 30)} 个月后`;
+        return `${Math.floor(abs / 365)} 年后`;
+      }
       if (abs < 30) return `in ${abs}d`;
       if (abs < 365) return `in ${Math.floor(abs / 30)}mo`;
       return `in ${Math.floor(abs / 365)}y`;
     }
-    if (diffDays < 1) return "today";
-    if (diffDays < 30) return `${diffDays}d ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-    return `${Math.floor(diffDays / 365)}y ago`;
+    if (diffDays < 1) return zh ? "今天" : "today";
+    if (diffDays < 30) return zh ? `${diffDays} 天前` : `${diffDays}d ago`;
+    if (diffDays < 365)
+      return zh ? `${Math.floor(diffDays / 30)} 个月前` : `${Math.floor(diffDays / 30)}mo ago`;
+    return zh ? `${Math.floor(diffDays / 365)} 年前` : `${Math.floor(diffDays / 365)}y ago`;
   } catch {
     return "";
   }
@@ -85,6 +91,42 @@ export default async function handler(req: NextRequest) {
   const theme = searchParams.get("theme") === "dark" ? "dark" : "light";
   const styleParam = searchParams.get("style");
   const preview = searchParams.get("preview") === "1";
+  const zh = searchParams.get("lang") === "zh";
+
+  const T = {
+    created:       zh ? "创建时间" : "CREATED",
+    expires:       zh ? "到期时间" : "EXPIRES",
+    updated:       zh ? "更新时间" : "UPDATED",
+    status:        zh ? "状态" : "STATUS",
+    nameservers:   zh ? "DNS 服务器" : "NAMESERVERS",
+    whoisServer:   zh ? "WHOIS 服务器" : "WHOIS SERVER",
+    country:       zh ? "国家/地区" : "COUNTRY",
+    domainName:    zh ? "域名" : "DOMAIN NAME",
+    queryTarget:   zh ? "查询目标" : "QUERY_TARGET",
+    lookup:        zh ? "查询" : "LOOKUP",
+    online:        zh ? "在线" : "ONLINE",
+    protocol:      zh ? "协议" : "protocol",
+    domainIntelligence:    zh ? "域名情报" : "Domain Intelligence",
+    siteSlug:              zh ? "域名情报平台" : "Domain Intelligence Platform",
+    overviewLabel:         "RDAP+WHOIS",
+    lookupSystem:          zh ? "域名查询系统" : "DOMAIN LOOKUP SYSTEM",
+    support:               zh ? "NIC.RW 提供支持" : "NIC.RW 提供支持",
+    supportShort:          zh ? "NIC.RW 提供支持" : "NIC.RW",
+    domainScope:           zh ? "域名 · IPv4 · IPv6 · ASN · CIDR" : "{T.domainScope}",
+    domainScopeUpper:      zh ? "域名 · IPv4 · IPv6 · ASN · CIDR" : "DOMAIN · IPV4 · IPV6 · ASN · CIDR",
+    whoisLookupDefault:    zh ? "WHOIS 查询" : "WHOIS Lookup",
+    whoisLookupToolDefault: zh ? "WHOIS 查询工具" : "WHOIS Lookup Tool",
+    statusNa:      zh ? "无数据" : "N/A",
+    statusActive:  zh ? "正常" : "ACTIVE",
+    statusExpiring: zh ? "即将到期" : "EXPIRING SOON",
+    statusExpired: zh ? "已过期" : "EXPIRED",
+    expiredPlain:  zh ? "已过期" : "Expired",
+    remaining:     (n: number) => (zh ? `剩余 ${n} 天` : `${n}d remaining`),
+    years:         (n: number) => {
+      if (!zh) return `${n} ${Math.abs(n) === 1 ? "year" : "years"}`;
+      return `${n} 年`;
+    },
+  };
 
   const isDark = theme === "dark";
   const bg = isDark ? "#09090b" : "#fafafa";
@@ -268,23 +310,23 @@ export default async function handler(req: NextRequest) {
           : greenColor;
   const statusLabel =
     remainingDays === null
-      ? "N/A"
+      ? T.statusNa
       : remainingDays <= 0
-        ? "EXPIRED"
+        ? T.statusExpired
         : remainingDays <= 60
-          ? "EXPIRING SOON"
-          : "ACTIVE";
+          ? T.statusExpiring
+          : T.statusActive;
 
-  const createdRelative = created ? getRelativeTime(created) : "";
+  const createdRelative = created ? getRelativeTime(created, zh) : "";
   const expiresRelative =
     remainingDays !== null
       ? remainingDays > 0
-        ? `${remainingDays}d remaining`
-        : "Expired"
+        ? T.remaining(remainingDays)
+        : T.expiredPlain
       : expires
-        ? getRelativeTime(expires)
+        ? getRelativeTime(expires, zh)
         : "";
-  const updatedRelative = updated ? getRelativeTime(updated) : "";
+  const updatedRelative = updated ? getRelativeTime(updated, zh) : "";
 
   const domainFontSize = Math.min(
     84,
@@ -402,7 +444,7 @@ export default async function handler(req: NextRequest) {
                       display: "flex",
                     }}
                   >
-                    {`${age} ${parseInt(age) === 1 ? "year" : "years"}`}
+                    {T.years(parseInt(age))}
                   </div>
                 )}
               </div>
@@ -522,7 +564,7 @@ export default async function handler(req: NextRequest) {
                     display: "flex",
                   }}
                 >
-                  CREATED
+                  {T.created}
                 </span>
                 <span
                   style={{
@@ -566,7 +608,7 @@ export default async function handler(req: NextRequest) {
                     display: "flex",
                   }}
                 >
-                  EXPIRES
+                  {T.expires}
                 </span>
                 <span
                   style={{
@@ -613,7 +655,7 @@ export default async function handler(req: NextRequest) {
                     display: "flex",
                   }}
                 >
-                  UPDATED
+                  {T.updated}
                 </span>
                 <span
                   style={{
@@ -658,7 +700,7 @@ export default async function handler(req: NextRequest) {
                     display: "flex",
                   }}
                 >
-                  COUNTRY
+                  {T.country}
                 </span>
                 <span
                   style={{
@@ -701,7 +743,7 @@ export default async function handler(req: NextRequest) {
                       display: "flex",
                     }}
                   >
-                    STATUS
+                    {T.status}
                   </span>
                   <div
                     style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}
@@ -743,7 +785,7 @@ export default async function handler(req: NextRequest) {
                       display: "flex",
                     }}
                   >
-                    NAMESERVERS
+                    {T.nameservers}
                   </span>
                   <div
                     style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}
@@ -785,7 +827,7 @@ export default async function handler(req: NextRequest) {
                       display: "flex",
                     }}
                   >
-                    WHOIS SERVER
+                    {T.whoisServer}
                   </span>
                   <span
                     style={{
@@ -933,7 +975,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              Domain Intelligence
+              {T.domainIntelligence}
             </span>
           </div>
         </div>
@@ -962,7 +1004,7 @@ export default async function handler(req: NextRequest) {
                 wordBreak: "break-all",
               }}
             >
-              {query || "WHOIS Lookup"}
+              {query || T.whoisLookupDefault}
             </span>
             <span
               style={{
@@ -1002,7 +1044,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              NIC.RW 提供支持
+              {T.support}
             </span>
           </div>
         </div>
@@ -1089,7 +1131,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              DOMAIN NAME
+              {T.domainName}
             </span>
             <span
               style={{
@@ -1103,7 +1145,7 @@ export default async function handler(req: NextRequest) {
                 wordBreak: "break-all",
               }}
             >
-              {query || "WHOIS Lookup"}
+              {query || T.whoisLookupDefault}
             </span>
           </div>
           <div
@@ -1147,7 +1189,7 @@ export default async function handler(req: NextRequest) {
                   display: "flex",
                 }}
               >
-                LOOKUP
+                {T.lookup}
               </span>
             </div>
           </div>
@@ -1271,7 +1313,7 @@ export default async function handler(req: NextRequest) {
               wordBreak: "break-all",
             }}
           >
-            {query || "WHOIS Lookup Tool"}
+            {query || T.whoisLookupToolDefault}
           </span>
           <div
             style={{
@@ -1291,7 +1333,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              Domain · IPv4 · IPv6 · ASN · CIDR
+              {T.domainScope}
             </span>
           )}
         </div>
@@ -1316,7 +1358,7 @@ export default async function handler(req: NextRequest) {
               display: "flex",
             }}
           >
-            {siteHost} · Domain Intelligence
+            {siteHost} · {T.domainIntelligence}
           </span>
           <span
             style={{
@@ -1326,7 +1368,7 @@ export default async function handler(req: NextRequest) {
               display: "flex",
             }}
           >
-            NIC.RW 提供支持
+            {T.support}
           </span>
         </div>
       </div>
@@ -1369,7 +1411,7 @@ export default async function handler(req: NextRequest) {
               wordBreak: "break-all",
             }}
           >
-            {query || "WHOIS Lookup Tool"}
+            {query || T.whoisLookupToolDefault}
           </span>
           <div
             style={{ display: "flex", alignItems: "center", gap: "12px" }}
@@ -1391,7 +1433,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              {query ? `${queryType} LOOKUP` : "DOMAIN · IPV4 · IPV6 · ASN · CIDR"}
+              {query ? `${queryType} ${T.lookup}` : T.domainScopeUpper}
             </span>
             <div
               style={{
@@ -1555,7 +1597,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              {`${brandName} · DOMAIN LOOKUP SYSTEM`}
+              {`${brandName} · ${T.lookupSystem}`}
             </span>
             <div
               style={{
@@ -1565,7 +1607,7 @@ export default async function handler(req: NextRequest) {
               }}
             >
               <div style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: cyan, display: "flex" }} />
-              <span style={{ fontSize: "10px", color: cyan, fontFamily: "monospace", letterSpacing: "0.1em", display: "flex" }}>ONLINE</span>
+              <span style={{ fontSize: "10px", color: cyan, fontFamily: "monospace", letterSpacing: "0.1em", display: "flex" }}>{T.online}</span>
             </div>
           </div>
 
@@ -1589,7 +1631,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              QUERY_TARGET
+              {T.queryTarget}
             </span>
             <span
               style={{
@@ -1636,7 +1678,7 @@ export default async function handler(req: NextRequest) {
                   display: "flex",
                 }}
               >
-                {`protocol: ${brandName}`}
+                {`${T.protocol}: ${brandName}`}
               </span>
             </div>
           </div>
@@ -1732,7 +1774,7 @@ export default async function handler(req: NextRequest) {
                   display: "flex",
                 }}
               >
-                {queryType} LOOKUP
+                {queryType} {T.lookup}
               </span>
               <div
                 style={{
@@ -1779,7 +1821,7 @@ export default async function handler(req: NextRequest) {
                 wordBreak: "break-all",
               }}
             >
-              {(query || "WHOIS LOOKUP TOOL").toUpperCase()}
+              {(query || T.whoisLookupToolDefault).toUpperCase()}
             </span>
           </div>
 
@@ -1800,7 +1842,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              DOMAIN INTELLIGENCE PLATFORM
+              {T.siteSlug}
             </span>
             <span
               style={{
@@ -1811,7 +1853,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              NIC.RW
+              {T.supportShort}
             </span>
           </div>
         </div>
@@ -1867,7 +1909,7 @@ export default async function handler(req: NextRequest) {
               wordBreak: "break-all",
             }}
           >
-            {query || "WHOIS Lookup Tool"}
+            {query || T.whoisLookupToolDefault}
           </span>
           <div
             style={{
@@ -1906,7 +1948,7 @@ export default async function handler(req: NextRequest) {
                   display: "flex",
                 }}
               >
-                Domain · IPv4 · IPv6 · ASN · CIDR
+                {T.domainScope}
               </span>
             )}
           </div>
@@ -1928,7 +1970,7 @@ export default async function handler(req: NextRequest) {
               display: "flex",
             }}
           >
-            Domain Intelligence · NIC.RW 提供支持
+            {T.domainIntelligence} · {T.support}
           </span>
           <span
             style={{
@@ -1997,7 +2039,7 @@ export default async function handler(req: NextRequest) {
               wordBreak: "break-all",
             }}
           >
-            {query || "WHOIS Lookup Tool"}
+            {query || T.whoisLookupToolDefault}
           </span>
           {query ? (
             <div
@@ -2013,7 +2055,7 @@ export default async function handler(req: NextRequest) {
                 alignItems: "center",
               }}
             >
-              {`${queryType} LOOKUP`}
+              {`${queryType} ${T.lookup}`}
             </div>
           ) : (
             <span
@@ -2024,7 +2066,7 @@ export default async function handler(req: NextRequest) {
                 display: "flex",
               }}
             >
-              Domain · IPv4 · IPv6 · ASN · CIDR
+              {T.domainScope}
             </span>
           )}
         </div>
@@ -2046,7 +2088,7 @@ export default async function handler(req: NextRequest) {
               display: "flex",
             }}
           >
-            {siteHost} · Domain Intelligence Platform
+            {siteHost} · {T.siteSlug}
           </span>
           <span
             style={{
@@ -2056,19 +2098,24 @@ export default async function handler(req: NextRequest) {
               display: "flex",
             }}
           >
-            NIC.RW 提供支持
+            {T.support}
           </span>
         </div>
       </div>
     );
   }
 
-  const cacheSeconds = preview ? 300 : 3600;
+  // The full URL (query + every WHOIS field + theme + w/h) is deterministic, so
+  // the same PNG can be served from the browser cache on repeat previews. Setting
+  // both max-age (private/browser) and s-maxage (shared/CDN) is what makes the
+  // "share → image preview" dialog pop in instantly instead of re-rendering on
+  // every open.
+  const cacheSeconds = preview ? 86400 : 3600;
   return new ImageResponse(content, {
     width: w,
     height: h,
     headers: {
-      "Cache-Control": `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`,
+      "Cache-Control": `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`,
     },
   });
 }

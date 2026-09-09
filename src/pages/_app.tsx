@@ -10,7 +10,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { siteTitle, siteDescription, siteKeywords } from "@/lib/seo";
 import { Navbar } from "@/components/navbar";
 import { useRouter } from "next/router";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { SessionProvider, useSession } from "next-auth/react";
 import { LocaleProvider, LOCALES, type Locale } from "@/lib/locale-context";
 import { SiteSettingsProvider, useSiteSettings } from "@/lib/site-settings";
@@ -550,6 +550,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
         enableSystem
         disableTransitionOnChange
       >
+        <MotionConfig reducedMotion="user">
         <div className="fixed inset-0 -z-10">
           <div className="absolute inset-0 bg-dot-pattern opacity-[0.055]" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background" />
@@ -570,6 +571,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
               // exit animation actually changes something — a no-op exit (opacity stays
               // at 1) never fires it, so the incoming page would never mount.
               // A stable `key` ensures React unmounts the old page on navigation.
+              // (No entry fade here: a first-paint opacity:0 would flash the SSR
+              // page and make navigation feel slower, not smoother.)
               <ErrorBoundary key={router.pathname}>
                 <Component {...pageProps} />
               </ErrorBoundary>
@@ -593,6 +596,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
           </main>
         </div>
         </MaintenanceGate>
+        </MotionConfig>
       </ThemeProvider>
     </SiteSettingsProvider>
     </LocaleProvider>

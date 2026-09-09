@@ -236,6 +236,28 @@ button {
 .stagger-4 { animation-delay: 0.16s; }
 .stagger-5 { animation-delay: 0.20s; }
 
+@keyframes breathe-glow {
+  0%, 100% {
+    box-shadow: 0 0 0px 0px hsl(var(--breathe-c) / 0.10),
+                inset 0 0 2px 0px hsl(var(--breathe-c) / 0.06);
+  }
+  50% {
+    box-shadow: 0 0 11px 2px hsl(var(--breathe-c) / 0.45),
+                inset 0 0 6px 0px hsl(var(--breathe-c) / 0.20);
+  }
+}
+
+.breathe-red { --breathe-c: 0 84% 60%; }
+
+.animate-breathe {
+  animation: breathe-glow 3s ease-in-out infinite;
+  will-change: box-shadow;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-breathe { animation: none; }
+}
+
 @keyframes text-shimmer {
   0% { background-position: 100% center; }
   100% { background-position: 0% center; }

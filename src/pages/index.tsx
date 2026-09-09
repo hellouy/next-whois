@@ -252,14 +252,16 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
       <meta property="og:site_name" content={seo.ogSiteName} />
       <meta property="og:title" content={seo.ogTitle} />
       <meta property="og:description" content={seo.description} />
-      <meta property="og:image" content={ogImage} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      {/* key overrides the AppHead default so the homepage exposes exactly ONE og:image */}
+      <meta key="og:image" property="og:image" content={ogImage} />
+      <meta key="og:image:width" property="og:image:width" content="1200" />
+      <meta key="og:image:height" property="og:image:height" content="630" />
+      <meta key="og:image:type" property="og:image:type" content="image/png" />
 
       <meta name="twitter:card" content={seo.twitterCard || "summary_large_image"} />
       <meta name="twitter:title" content={seo.ogTitle} />
       <meta name="twitter:description" content={seo.description} />
-      <meta name="twitter:image" content={ogImage} />
+      <meta key="twitter:image" name="twitter:image" content={ogImage} />
 
       <script
         type="application/ld+json"

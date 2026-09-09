@@ -5,6 +5,7 @@ import {
   RiCloseLine,
   RiVipCrownLine,
   RiCheckboxCircleLine,
+  RiArrowDownSLine,
 } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -66,6 +67,54 @@ export function CardThemePicker({
   const s = (key: StampKey, params?: Record<string, string | number>) =>
     t(`stamp.${key}` as TranslationKey, params);
 
+  const [lockedExpanded, setLockedExpanded] = React.useState(false);
+
+  const renderThemeCard = (themeId: string) => {
+    const th = STAMP_CARD_THEMES[themeId];
+    if (!th) return null;
+    const isSpecialSelected = selectedTheme === themeId;
+    const locked = !isMember;
+    return (
+      <button
+        key={themeId}
+        type="button"
+        onClick={() => {
+          if (locked) { toast.info(isZh ? "升级会员解锁特殊排版" : "Upgrade to unlock special layouts"); return; }
+          if (isSpecialSelected) {
+            onSpecialDeselect();
+          } else {
+            onThemeSelect(themeId);
+            onPreviewOpen(themeId);
+          }
+        }}
+        className={cn(
+          "group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
+          locked ? "opacity-55 cursor-not-allowed border-border/30 bg-muted/20"
+            : isSpecialSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
+            : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
+        )}
+      >
+        <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl shadow-inner", th.hero)}>
+          {locked
+            ? <RiVipCrownLine className="h-5 w-5 text-white/80 drop-shadow" />
+            : isSpecialSelected
+              ? <RiCheckLine className="h-5 w-5 text-white drop-shadow" />
+              : <span className="text-xl">{th.special || "*"}</span>
+          }
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={cn("truncate text-xs font-bold", isSpecialSelected ? "text-primary" : "text-foreground")}>
+            {th.special} {th.label}
+          </p>
+          <p className="mt-1 truncate text-[10px] text-muted-foreground">
+            {locked ? (isZh ? "会员专属排版" : "Members only") : isSpecialSelected ? (isZh ? "当前已选" : "Selected") : (isZh ? "点击查看预览" : "Tap to preview")}
+          </p>
+        </div>
+        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSpecialSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSpecialSelected && <RiCheckLine className="size-3" />}</span>
+      </button>
+    );
+  };
+
   return (
     <>
       <div>
@@ -85,51 +134,50 @@ export function CardThemePicker({
           )}
         </div>
         <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-          {(SPECIAL_THEME_IDS as readonly string[]).map((themeId) => {
-            const th = STAMP_CARD_THEMES[themeId];
-            if (!th) return null;
-            const isSpecialSelected = selectedTheme === themeId;
-            const locked = !isMember;
-            return (
-              <button
-                key={themeId}
-                type="button"
-                onClick={() => {
-                  if (locked) { toast.info(isZh ? "升级会员解锁特殊排版" : "Upgrade to unlock special layouts"); return; }
-                  if (isSpecialSelected) {
-                    onSpecialDeselect();
-                  } else {
-                    onThemeSelect(themeId);
-                    onPreviewOpen(themeId);
-                  }
-                }}
-                className={cn(
-                  "group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
-                  locked ? "opacity-55 cursor-not-allowed border-border/30 bg-muted/20"
-                    : isSpecialSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
-                    : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
-                )}
-              >
-                <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl shadow-inner", th.hero)}>
-                  {locked
-                    ? <RiVipCrownLine className="h-5 w-5 text-white/80 drop-shadow" />
-                    : isSpecialSelected
-                      ? <RiCheckLine className="h-5 w-5 text-white drop-shadow" />
-                      : <span className="text-xl">{th.special || "*"}</span>
-                  }
+          {isMember
+            ? (SPECIAL_THEME_IDS as readonly string[]).map(renderThemeCard)
+            : (
+              <>
+                <div className="col-span-full">
+                  <button
+                    type="button"
+                    onClick={() => setLockedExpanded((v) => !v)}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/40 bg-violet-500/5 dark:bg-violet-500/10 px-3 py-2.5 text-left transition-colors hover:border-violet-400/70 hover:bg-violet-500/10"
+                  >
+                    <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-rose-500 shadow-inner")}>
+                      <RiVipCrownLine className="h-5 w-5 text-white/90 drop-shadow" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-foreground">
+                        {isZh ? "会员专属特殊排版" : "Members-only card layouts"}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                        {lockedExpanded
+                          ? (isZh ? `共 ${SPECIAL_THEME_IDS.length} 款 · 点击收起` : `${SPECIAL_THEME_IDS.length} layouts · tap to collapse`)
+                          : (isZh ? `共 ${SPECIAL_THEME_IDS.length} 款 · 点击预览` : `${SPECIAL_THEME_IDS.length} layouts · tap to preview`)}
+                      </p>
+                    </div>
+                    <RiArrowDownSLine className={cn("h-5 w-5 shrink-0 text-violet-500 transition-transform duration-200", lockedExpanded && "rotate-180")} />
+                  </button>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-xs font-bold", isSpecialSelected ? "text-primary" : "text-foreground")}>
-                    {th.special} {th.label}
-                  </p>
-                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                    {locked ? (isZh ? "会员专属排版" : "Members only") : isSpecialSelected ? (isZh ? "当前已选" : "Selected") : (isZh ? "点击查看预览" : "Tap to preview")}
-                  </p>
-                </div>
-                <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSpecialSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSpecialSelected && <RiCheckLine className="size-3" />}</span>
-              </button>
-            );
-          })}
+                <AnimatePresence initial={false}>
+                  {lockedExpanded && (
+                    <motion.div
+                      key="locked-themes"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="col-span-full overflow-hidden"
+                    >
+                      <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
+                        {(SPECIAL_THEME_IDS as readonly string[]).map(renderThemeCard)}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
         </div>
         {(SPECIAL_THEME_IDS as readonly string[]).includes(selectedTheme) && (
           <p className="text-[9.5px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">

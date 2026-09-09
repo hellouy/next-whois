@@ -156,13 +156,24 @@ export default async function handler(
   let partialSent = false;
   let finalSent   = false;
 
-  function writeChunk(data: WhoisResult & { partial: boolean }) {
+  function writeChunk(data: WhoisResult & { partial: boolean; premiumUpdate?: boolean }) {
     try {
       res.write(JSON.stringify(data) + "\n");
     } catch {
       // Client disconnected
     }
   }
+
+  // Resolves when the async premium enrichment fires (or a short timeout elapses
+  // so the stream always closes even when the premium API is extremely slow).
+  // The window (5 s) intentionally exceeds the premium race cap (4 s): Next.js
+  // dev flushes buffered chunks only on res.end(), so holding the stream open
+  // until the enrichment lands means the premium flag + answer arrive together.
+  let resolveEnrichedDone: (() => void) | undefined;
+  const enrichedDone = new Promise<void>((r) => {
+    const timeout = setTimeout(r, 5000);
+    resolveEnrichedDone = () => { clearTimeout(timeout); r(); };
+  });
 
   // Partial results (typically the fast RDAP answer arriving before the full
   // WHOIS fallback completes) stream out as soon as they land. cnReserved was
@@ -176,6 +187,18 @@ export default async function handler(
         partialSent = true;
         writeChunk({ ...p, result: p.result ?? { ...initialWhoisAnalyzeResult }, partial: true });
       }
+    },
+    // Premium enrichment arrives asynchronously (a cold Netim/Porkbun call can
+    // take ~4 s). Push it as a dedicated chunk so the page renders the answer
+    // immediately and merges the premium flag in when it lands.
+    (enriched) => {
+      resolveEnrichedDone?.();
+      writeChunk({
+        ...enriched,
+        result: enriched.result ?? { ...initialWhoisAnalyzeResult },
+        partial: false,
+        premiumUpdate: true,
+      });
     },
   );
 
@@ -219,6 +242,15 @@ export default async function handler(
         userId,
         userEmail,
       ).catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message));
+    }
+
+    // Give the asynchronous premium enrichment a short grace window to land its
+    // premiumUpdate chunk before we close the stream. The page already rendered
+    // (final chunk sent), so draining the connection costs nothing visible; if
+    // the premium API is slow, the stream just closes and the enriched record
+    // is already cached for the next query.
+    if (finalResult.premium === undefined) {
+      await enrichedDone;
     }
   } catch (err) {
     if (!finalSent) {

@@ -28,12 +28,13 @@ import { WhoisAnalyzeResult } from "@/lib/whois/types";
 function buildOgUrl(
   target: string,
   result?: WhoisAnalyzeResult | undefined,
-  overrides?: { w?: number; h?: number; theme?: string },
+  overrides?: { w?: number; h?: number; theme?: string; lang?: "zh" | "en" },
 ): string {
   const params = new URLSearchParams();
   params.set("query", target);
   if (overrides?.w) params.set("w", String(overrides.w));
   if (overrides?.h) params.set("h", String(overrides.h));
+  if (overrides?.lang === "zh") params.set("lang", "zh");
   const themeVal =
     overrides?.theme ||
     (typeof window !== "undefined" &&
@@ -132,7 +133,7 @@ export function SharePanel({
         </DropdownMenuLabel>
         <DropdownMenuItem
           onClick={async () => {
-            const ogUrl = buildOgUrl(target, result);
+            const ogUrl = buildOgUrl(target, result, { lang: isZh ? "zh" : "en" });
             const tid = toast.loading(isZh ? "正在生成图片…" : "Generating image…");
             try {
               const res = await fetch(ogUrl);
@@ -153,7 +154,7 @@ export function SharePanel({
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={async () => {
-            const ogUrl = buildOgUrl(target, result);
+            const ogUrl = buildOgUrl(target, result, { lang: isZh ? "zh" : "en" });
             const tid = toast.loading(isZh ? "正在生成图片…" : "Generating image…");
             try {
               const res = await fetch(ogUrl);

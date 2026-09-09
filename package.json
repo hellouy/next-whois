@@ -11,7 +11,8 @@
     "prettier": "prettier --write src/**/*.{ts,tsx,js,jsx,json,md}",
     "test": "vitest run",
     "update:rdap-bootstrap": "node scripts/update-rdap-bootstrap.js",
-    "check:i18n": "node scripts/check-locale-keys.mjs"
+    "check:i18n": "node scripts/check-locale-keys.mjs",
+    "prewarm": "node scripts/prewarm.mjs"
   },
   "dependencies": {
     "@khmyznikov/pwa-install": "^0.4.8",
