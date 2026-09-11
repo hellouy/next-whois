@@ -3,8 +3,13 @@ import { isRedisAvailable, incrRedisValue } from "@/lib/server/redis";
 
 const DEFAULT_WINDOW_MS = 60_000;
 
-// Local in-memory fallback (within same warm lambda instance only)
-const localCache = new Map<string, { count: number; resetAt: number }>();
+// Local in-memory cache (within same warm lambda instance only).
+// Holds either a REJECT marker copied from Redis (rejected=true, used as a
+// zero-network fast-path 429) or a count+resetAt for the Redis-less fallback.
+type LocalRateEntry =
+  | { resetAt: number; rejected: true }
+  | { resetAt: number; rejected: false; count: number };
+const localCache = new Map<string, LocalRateEntry>();
 
 setInterval(() => {
   const now = Date.now();
@@ -76,20 +81,25 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const now = Date.now();
 
-  // L1: local in-memory (fastest — zero latency within same warm instance)
+  // L1: fast-path REJECT cache only. Populated exclusively when the shared
+  // Redis source reports the current window exhausted — subsequent requests
+  // from the same warm instance get a zero-network 429 without re-touching
+  // Redis. NEVER serves "allowed" decisions: positive counts always go to
+  // Redis so the counter stays shared across function instances.
   const local = localCache.get(ip);
-  if (local && now <= local.resetAt) {
-    if (local.count >= maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, local.resetAt - now) };
-    local.count += 1;
-    return { ok: true, remaining: maxRequests - local.count, resetMs: Math.max(0, local.resetAt - now) };
+  if (local && now <= local.resetAt && local.rejected) {
+    return { ok: false, remaining: 0, resetMs: Math.max(0, local.resetAt - now) };
   }
 
-  // L2: Redis
+  // L2: Redis shared counter — consulted on EVERY request. Redis owns the
+  // absolute window key (floor(now/windowMs)); caching positive counts here
+  // previously skipped Redis INCRs (letting a multi-instance fleet multiply
+  // the quota) and used a relative window (now+windowMs) that drifted from
+  // Redis's absolute window edge, mis-limiting users at window boundaries.
   const redisResult = await checkRedisRateLimit(ip, maxRequests, windowMs);
   if (redisResult !== null) {
-    if (redisResult.ok) {
-      const used = maxRequests - redisResult.remaining;
-      localCache.set(ip, { count: used, resetAt: now + windowMs });
+    if (!redisResult.ok) {
+      localCache.set(ip, { rejected: true, resetAt: Date.now() + redisResult.resetMs });
     }
     return redisResult;
   }
@@ -102,11 +112,12 @@ export async function checkRateLimit(
   // of truth when it is available under L2.
   const entry = localCache.get(ip);
   if (!entry || now > entry.resetAt) {
-    localCache.set(ip, { count: 1, resetAt: now + windowMs });
+    localCache.set(ip, { count: 1, resetAt: now + windowMs, rejected: false });
     // Async stats write for the admin dashboard (never awaited).
     void writeDbRateStats(ip, windowMs, 1);
     return { ok: true, remaining: maxRequests - 1, resetMs: windowMs };
   }
+  if (entry.rejected) return { ok: false, remaining: 0, resetMs: Math.max(0, entry.resetAt - now) };
   if (entry.count >= maxRequests) return { ok: false, remaining: 0, resetMs: Math.max(0, entry.resetAt - now) };
   entry.count += 1;
   return { ok: true, remaining: maxRequests - entry.count, resetMs: Math.max(0, entry.resetAt - now) };

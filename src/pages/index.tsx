@@ -280,7 +280,7 @@ export default function HomePage({ seo: seoProp }: { seo?: HomeSeo }) {
               },
               "query-input": "required name=search_term_string",
             },
-          }),
+          }).replace(/</g, "\\u003c"),
         }}
       />
     </Head>

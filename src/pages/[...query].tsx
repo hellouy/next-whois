@@ -1049,7 +1049,11 @@ export default function LookupPage({
                 { "@type": "ListItem", "position": 3, "name": displayTarget, "item": canonicalUrl },
               ],
             },
-          });
+          })
+          // Escape "</" so a malicious value (domain, registrar, NS) can never
+          // close this <script> tag and inject HTML — JSON.stringify does not
+          // escape it, but "\u003c" is valid JSON that JSON.parse restores.
+          .replace(/</g, "\\u003c");
 
           const metaTitle = isZhMeta
             ? `${displayTarget} WHOIS 查询 · 注册信息 · 到期时间`
