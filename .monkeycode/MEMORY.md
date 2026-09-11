@@ -351,3 +351,16 @@ Entries discovered by the Agent during task execution should follow this format:
   - 认证流程：sessionOpen(idReseller大写, password, "EN") → IDSession，后续方法第一参数是 IDSession；溢价+价格用 queryDomainPrice(IDSession, domain, "") 返回 IsPremium(int 0/1) + Fee4Registration + Fee4Renewal + FeeCurrency(EUR)
   - 调试陷阱：Python 标准库 ssl 的 TLS 指纹会被 api.netim.com 防火墙限流（TLS handshake EOF / SSLZeroReturnError），curl 与 Node.js fetch(undici) 指纹正常 — 验证 Netim 用 node 脚本，不要用 python urllib/requests
   - queryDomainPrice 对已注册域名也返回价格（不判断可用性）；Netim session 有服务端数量上限，代码内用模块级缓存复用 session（premium-check.ts）
+
+[Project Knowledge Summary]
+- Date: 2026-09-10
+- Context: Discovered while implementing query-tools-deepening (DNS/IP/SSL/ICP/HTTP 五工具增强)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 沙箱网络限制（2026-09-10 实测）：crt.sh、公网 DNS UDP 直连（8.8.8.8/1.1.1.1）超时不可达（http_code 000 / timeout）；ocsp.sectigo.com、sectigo/crt 之外的 HTTPS 上游可用。所有外部探测必须 Promise.allSettled 降级，任一上游失败只影响对应区块。
+  - undici v7 的 `request()` 返回值没有 `timings` 字段，且 headers 是普通对象（`headers.get` 不存在）——不要用它拆 HTTP 分阶段计时。改用 http/https 模块 + socket 事件打点（lookup/connect/secureConnect/response 事件记录时间戳）。
+  - Node 22 `crypto.X509Certificate.infoAccess` 是字符串属性（含 `"OCSP - URI:http://..."`），Node 23+ 才变成方法——提取 OCSP responder URL 用 `String((cert as any).infoAccess)` + 正则，跨版本安全。
+  - `tls.connect` 探测 TLS 版本：minVersion/maxVersion 各 2.5s 超时，`getPeerCertificate().subject?.CN` 和 `valid_to` 可能是 string[]（Node 22）——用 `Array.isArray` 规范化再返回，否则前端 tsc 报类型错误。
+  - ocsp npm 包是纯 JS（无原生构建），不需要登记 pnpm-workspace.yaml allowBuilds；用 `ocsp.request.generate(certRawBuffer, issuerRawBuffer)` + 手动 POST + `ocsp.utils.parseResponse` 解析 good/revoked/unknown。
+  - vitest 4：`vi.spyOn(require("crypto"),"X509Certificate")` mock 构造函数必须用 class 形式；模块 mock 工厂引用外部变量需 `vi.hoisted`。
+  - ICP batch 拆分/聚合逻辑抽到纯函数库 src/lib/icp-batch.ts（splitSearchTerms 支持中英文逗号/换行/空格、去重、上限 20）；前端 CSV 导出用 `\uFEFF` BOM + 每字段加引号转义。

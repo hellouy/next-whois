@@ -30,6 +30,9 @@ export type DnsSignal = {
 
 const DNS_TIMEOUT_MS = 5000;
 
+/** Shorter timeout for the batch fast-probe path (see probeDomainFast). */
+const DNS_FAST_TIMEOUT_MS = 2500;
+
 /**
  * Authoritative nameserver suffixes of well-known domain parking / aftermarket
  * listing platforms. A domain whose NS points to one of these is very likely
@@ -87,6 +90,15 @@ export function detectParkingProvider(nameservers: string[]): string | null {
  * is unregistered, the latter means we have no information.
  */
 function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | null> {
+  return withDnsTimeoutMs(promise, DNS_TIMEOUT_MS);
+}
+
+/**
+ * Same semantics as withDnsTimeout but with a configurable timeout budget.
+ * Used by probeDomainFast so the batch path can finish faster than the
+ * single-query probe (which also runs an SSL handshake that we skip here).
+ */
+function withDnsTimeoutMs<T extends unknown[]>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
   return Promise.race([
     promise.catch((e) => {
       const code = (e as NodeJS.ErrnoException)?.code ?? "";
@@ -102,7 +114,7 @@ function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | n
       // ECONNREFUSED, etc.) → treat as no info, never as a definitive answer.
       return null;
     }),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), DNS_TIMEOUT_MS)),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
   ]);
 }
 
@@ -226,5 +238,144 @@ export async function probeDomain(input: string): Promise<DnsProbeResult> {
       isParked: parkingProvider !== null,
       provider: parkingProvider,
     },
+  };
+}
+
+/**
+ * Lightweight DNS probe result used by the batch availability path
+ * (`lookupBatchAvailability`). Unlike `DnsProbeResult` it omits the SSL
+ * handshake (slow, unreliable on bulk queries) and the per-signal breakdown,
+ * but adds the wildcard-A verdict used to avoid mistaking an unregistered
+ * domain that the registry answers with a wildcard record for a registered one.
+ */
+export type FastProbeResult = {
+  domain: string;
+  registrationStatus: "registered" | "unregistered" | "unknown";
+  confidence: "high" | "medium" | "low";
+  nameservers: string[];
+  ipv4: string[];
+  ipv6: string[];
+  mx: string[];
+  /** True when the registry answers arbitrary subdomains with the same A/AAAA records. */
+  isWildcardA: boolean;
+  /** NS points to a known parking / aftermarket platform. */
+  parked: boolean;
+  parkingProvider: string | null;
+  allTimedOut: boolean;
+};
+
+/**
+ * Detect whether the TLD registry answers ANY subdomain with the same A/AAAA
+ * records as the queried domain (wildcard DNS). This is the tell-tale sign of
+ * a registry that synthesizes answers for unregistered names — a domain whose
+ * NS is empty but whose A record is really a wildcard must NOT be treated as
+ * "registered" based on that A record alone.
+ *
+ * We resolve a random subdomain `{random}.{domain}` and compare its A/AAAA
+ * addresses against the target's. If they overlap non-empty, the TLD is
+ * serving wildcard answers. Returns false on timeout / resolver errors / when
+ * the random subdomain has no records — in all those cases we simply have no
+ * wildcard evidence.
+ */
+export async function detectWildcardA(domain: string): Promise<boolean> {
+  const randomLabel = `w${Math.random().toString(36).slice(2, 10)}`;
+  const probeSub = toAsciiForDns(`${randomLabel}.${extractDomain(domain) || domain}`);
+
+  const [target4, target6] = await Promise.all([
+    withDnsTimeoutMs(dns.resolve4(domain), DNS_FAST_TIMEOUT_MS),
+    withDnsTimeoutMs(dns.resolve6(domain), DNS_FAST_TIMEOUT_MS),
+  ]);
+  const t4 = (target4 ?? []).filter(Boolean);
+  const t6 = (target6 ?? []).filter(Boolean);
+  if (t4.length === 0 && t6.length === 0) return false;
+
+  const [sub4, sub6] = await Promise.all([
+    withDnsTimeoutMs(dns.resolve4(probeSub), DNS_FAST_TIMEOUT_MS),
+    withDnsTimeoutMs(dns.resolve6(probeSub), DNS_FAST_TIMEOUT_MS),
+  ]);
+  const s4 = (sub4 ?? []).filter(Boolean);
+  const s6 = (sub6 ?? []).filter(Boolean);
+
+  // Overlap check: the random subdomain must answer with at least one address
+  // that the target also has. Identical sets → classic wildcard. Partial
+  // overlap also counts (some registries rotate a pool of wildcard IPs).
+  const overlap4 = s4.length > 0 && t4.some((ip) => s4.includes(ip));
+  const overlap6 = s6.length > 0 && t6.some((ip) => s6.includes(ip));
+  return overlap4 || overlap6;
+}
+
+/**
+ * Fast DNS probe for the batch availability path. Parallel NS/A/AAAA/MX with a
+ * 2.5s timeout (vs 5s + SSL for the single-query `probeDomain`). The caller
+ * combines its verdict with RDAP/WHOIS fallback (see lookupBatchAvailability).
+ */
+export async function probeDomainFast(input: string): Promise<FastProbeResult> {
+  const extracted = extractDomain(input) || input;
+  const domain = toAsciiForDns(extracted);
+
+  const [nsResult, aResult, aaaaResult, mxResult] = await Promise.all([
+    withDnsTimeoutMs(dns.resolveNs(domain), DNS_FAST_TIMEOUT_MS),
+    withDnsTimeoutMs(dns.resolve4(domain), DNS_FAST_TIMEOUT_MS),
+    withDnsTimeoutMs(dns.resolve6(domain), DNS_FAST_TIMEOUT_MS),
+    withDnsTimeoutMs(dns.resolveMx(domain), DNS_FAST_TIMEOUT_MS),
+  ]);
+
+  const nsTimedOut   = nsResult   === null;
+  const aTimedOut    = aResult    === null;
+  const aaaaTimedOut = aaaaResult === null;
+  const mxTimedOut   = mxResult   === null;
+  const allTimedOut  = nsTimedOut && aTimedOut && aaaaTimedOut && mxTimedOut;
+
+  const nameservers = nsResult ?? [];
+  const ipv4 = aResult ?? [];
+  const ipv6 = aaaaResult ?? [];
+  const mx = mxResult ? mxResult.map((r) => r.exchange) : [];
+
+  const hasNs = nameservers.length > 0;
+  const hasAOrAaaa = ipv4.length > 0 || ipv6.length > 0;
+  const hasMx = mx.length > 0;
+  const hasAny = hasNs || hasAOrAaaa || hasMx;
+
+  // A/AAAA/MX without any NS is ambiguous: it could be a live registered site
+  // whose NS lookup failed, or — far more common on bulk checks — a wildcard
+  // answer from a registry that synthesizes records for unregistered names.
+  let isWildcardA = false;
+  if (!hasNs && hasAOrAaaa) {
+    isWildcardA = await detectWildcardA(domain).catch(() => false);
+  }
+
+  let registrationStatus: FastProbeResult["registrationStatus"] = "unknown";
+  let confidence: FastProbeResult["confidence"] = "low";
+
+  if (hasNs) {
+    // NS records are the most authoritative signal: domain is definitely registered
+    registrationStatus = "registered";
+    confidence = "high";
+  } else if (!isWildcardA && (hasAOrAaaa || hasMx)) {
+    // Real A/AAAA/MX with no wildcard evidence → domain appears active.
+    registrationStatus = "registered";
+    confidence = "medium";
+  } else if (!allTimedOut) {
+    // At least one lookup returned a real answer (empty = NXDOMAIN / ENODATA),
+    // or the records we saw are wildcard noise → no evidence of registration.
+    registrationStatus = "unregistered";
+    confidence = isWildcardA ? "low" : "medium";
+  }
+  // If allTimedOut: no information — keep "unknown".
+
+  const parkingProvider = detectParkingProvider(nameservers);
+
+  return {
+    domain,
+    registrationStatus,
+    confidence,
+    nameservers,
+    ipv4,
+    ipv6,
+    mx,
+    isWildcardA,
+    parked: parkingProvider !== null,
+    parkingProvider,
+    allTimedOut,
   };
 }

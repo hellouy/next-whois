@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getRedisValue, setRedisValue } from "@/lib/server/redis";
 import { createLogger } from "@/lib/logger";
+import { checkDnsbl } from "@/lib/dnsbl";
+import { checkRdns } from "@/lib/rdns";
 
 const logger = createLogger("api/ip/lookup");
 
@@ -216,6 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const isIpv4 = IP_RE.test(ip);
     const [ipData, rdap] = await Promise.allSettled([
       fetchIpApi(ip),
       fetchRdapIp(ip),
@@ -228,6 +231,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (geo?.status === "fail") {
       return res.status(400).json({ error: geo.message || "IP lookup failed" });
     }
+
+    const [dnsblData, rdnsData] = isIpv4
+      ? await Promise.allSettled([checkDnsbl(ip), checkRdns(ip)])
+      : [null, null];
 
     const flagEmoji = geo?.countryCode
       ? geo.countryCode.toUpperCase().split("").map((c: string) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
@@ -258,6 +265,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       proxy: geo?.proxy ?? null,
       hosting: geo?.hosting ?? null,
       rdap: rdapInfo,
+      dnsbl: dnsblData?.status === "fulfilled" && dnsblData.value
+        ? { tested: dnsblData.value.length, listed: dnsblData.value.filter(r => r.listed).length, results: dnsblData.value }
+        : null,
+      rdns: rdnsData?.status === "fulfilled" ? rdnsData.value : null,
     };
     void saveToCache(cacheKey, payload);
     return res.json(payload);

@@ -1,17 +1,14 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import {
   RiCheckLine,
-  RiFileCopyLine,
-  RiSearchLine,
-  RiNotification3Line,
   RiShoppingCartLine,
   RiLoopLeftLine,
   RiVipCrownLine,
   RiInformationLine,
   RiExternalLinkLine,
   RiGlobalLine,
+  RiArrowDownSLine,
 } from "@remixicon/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
@@ -69,9 +66,6 @@ interface AvailableDomainCardProps {
   isPremiumByWhois?: boolean;
   /** Registry-premium detection result (authoritative Porkbun/Netim flag + price). */
   premium?: PremiumCheckResult | null;
-  /** Optional callback opening the domain-reminder dialog — when provided,
-   *  an "alert me when registered" entry point is rendered. */
-  onSubscribe?: () => void;
 }
 
 const cardVariants = {
@@ -87,12 +81,12 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, premium = null, onSubscribe }: AvailableDomainCardProps) {
+export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, premium = null }: AvailableDomainCardProps) {
   const [rawPrices, setRawPrices] = React.useState<DomainPricing[]>([]);
   const [registrars, setRegistrars] = React.useState<DomainPricing[]>([]);
   const [renewRegistrars, setRenewRegistrars] = React.useState<DomainPricing[]>([]);
   const [loadingPrices, setLoadingPrices] = React.useState(true);
-  const [copied, setCopied] = React.useState(false);
+  const [showAllPrices, setShowAllPrices] = React.useState(false);
   const CARD_FALLBACK_RATES: Record<string, number> = {
     AUD: 1.65, CAD: 1.49, CHF: 0.94, CNY: 7.82, DKK: 7.46,
     GBP: 0.85, HKD: 8.50, JPY: 162, KRW: 1520, NOK: 11.7,
@@ -171,17 +165,9 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
     return `${sym}${amount.toFixed(decimals)}`;
   }
 
-  function handleCopy() {
-    navigator.clipboard.writeText(domain).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
-  }
-
   const tldForDisplay = domain.substring(domain.lastIndexOf(".")).toLowerCase();
   const sldForDisplay = domain.substring(0, domain.lastIndexOf("."));
   const isPremium = isPremiumByWhois || premium?.isPremium === true;
-  const bestRegistrar = registrars[0] ?? null;
 
   // ── Label logic ──────────────────────────────────────────────────────────────
   // "高价值域名": only when a registry-level signal marks this domain premium —
@@ -331,38 +317,40 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
         initial="hidden"
         animate="visible"
         variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
-        className="px-5 sm:px-7 pt-5 pb-5"
+        className="px-5 sm:px-7 pt-6 pb-5 text-center"
       >
-        {/* Row 1: Icon + Domain name (domain is the hero) */}
-        <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
-          {/* Status icon */}
-          <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border bg-muted/50 border-border/60">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={labelType}
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ duration: 0.22 }}
-              >
-                {ICON_MAP[labelType]}
-              </motion.span>
-            </AnimatePresence>
-          </div>
-
-          {/* Domain name — prominent, full remaining width */}
-          <h1 className="flex-1 min-w-0 text-2xl sm:text-3xl font-bold tracking-tight leading-tight break-all">
-            <span className="text-foreground">{sldForDisplay}</span>
-            <span className="text-primary">{tldForDisplay}</span>
-          </h1>
+        {/* Status icon */}
+        <motion.div
+          variants={fadeUp}
+          className="mx-auto w-10 h-10 rounded-xl flex items-center justify-center border bg-muted/50 border-border/60 mb-3"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={labelType}
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              {ICON_MAP[labelType]}
+            </motion.span>
+          </AnimatePresence>
         </motion.div>
 
-        {/* Row 2: Status badge + description */}
-        <motion.div variants={fadeUp} className="pl-[52px]">
-          {/* Badge */}
+        {/* Domain name — centered hero */}
+        <motion.h1
+          variants={fadeUp}
+          className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight break-all mb-3"
+        >
+          <span className="text-foreground">{sldForDisplay}</span>
+          <span className="text-primary">{tldForDisplay}</span>
+        </motion.h1>
+
+        {/* Status badge + description */}
+        <motion.div variants={fadeUp} className="flex flex-col items-center gap-2">
           <motion.span
             className={cn(
-              "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border mb-2",
+              "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border",
               BADGE_CLASS[labelType]
             )}
             initial={{ opacity: 0, scale: 0.9 }}
@@ -392,92 +380,6 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
             </AnimatePresence>
           </p>
         </motion.div>
-      </motion.div>
-
-      {/* ── Action buttons ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18, duration: 0.28 }}
-        className="px-5 sm:px-7 pb-4 border-t border-border/40 pt-4"
-      >
-        <div className="flex flex-col gap-2">
-          {loadingPrices ? (
-            <div className="h-9 rounded-lg bg-muted/40 animate-pulse" />
-          ) : bestRegistrar ? (
-            <motion.a
-              href={bestRegistrar.registrarweb}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-lg border border-primary/30 text-primary bg-primary/8 hover:bg-primary/14 transition-colors duration-200 active:scale-[0.97] w-full"
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-              <RiShoppingCartLine className="w-4 h-4 shrink-0" />
-              <span>
-                {isZh
-                  ? `${labelType === "available" ? "立即注册" : "查看价格"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/首年起`
-                  : `${labelType === "available" ? "Register Now" : "Check Price"} · ${formatPrice(bestRegistrar.new as number, bestRegistrar.currency)}/yr`}
-              </span>
-            </motion.a>
-          ) : null}
-          {onSubscribe && (
-            <motion.button
-              onClick={onSubscribe}
-              className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/8 hover:bg-rose-500/14 transition-all duration-150 active:scale-[0.97] w-full"
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-              <RiNotification3Line className="w-4 h-4 shrink-0" />
-              <span>
-                {isZh ? "订阅注册提醒 · 被他人抢注时通知我" : "Get notified if someone registers it"}
-              </span>
-            </motion.button>
-          )}
-          <div className="flex gap-2">
-            <motion.button
-              onClick={handleCopy}
-              className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border/60 text-foreground/70 hover:bg-muted/50 hover:text-foreground transition-all duration-150 active:scale-[0.97]"
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {copied ? (
-                  <motion.span
-                    key="copied"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.1 }}
-                    className="inline-flex items-center gap-2"
-                  >
-                    <RiCheckLine className="w-4 h-4 shrink-0 text-primary" />
-                    {isZh ? "已复制" : "Copied!"}
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="copy"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.1 }}
-                    className="inline-flex items-center gap-2"
-                  >
-                    <RiFileCopyLine className="w-4 h-4 shrink-0" />
-                    {isZh ? "复制域名" : "Copy Domain"}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-            <Link
-              href="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border/60 text-foreground/70 hover:bg-muted/50 hover:text-foreground transition-all duration-150"
-            >
-              <RiSearchLine className="w-4 h-4 shrink-0" />
-              {isZh ? "新查询" : "New Search"}
-            </Link>
-          </div>
-        </div>
       </motion.div>
 
       {/* ── Registration tips ── */}
@@ -530,17 +432,6 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
           </motion.div>
         )}
 
-        {/* Registration prices */}
-        <div className="px-4 sm:px-5 pt-4 pb-1 flex items-center justify-between">
-          <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 font-bold uppercase tracking-wider">
-            <RiShoppingCartLine className="w-3 h-3" />
-            {isZh ? "注册价格" : "Registration"}
-          </p>
-          {!isPremium && registrars.length > 0 && (
-            <span className="text-[10px] text-muted-foreground/40">{isZh ? "以官网为准" : "Reference only"}</span>
-          )}
-        </div>
-
         {isPremium ? (
           <div className="px-4 sm:px-5 pb-4 pt-1">
             <div className="flex items-center gap-2 rounded-lg border border-rose-400/30 bg-rose-500/5 dark:bg-rose-500/10 px-3 py-2.5">
@@ -580,16 +471,65 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
             ))}
           </div>
         ) : registrars.length > 0 ? (
-          <motion.div
-            className="pb-1"
-            initial="hidden"
-            animate="visible"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
-          >
-            {registrars.map((r, idx) => (
-              <RegistrarRow key={r.registrar} r={r} idx={idx} priceField="new" colorFirst={true} />
-            ))}
-          </motion.div>
+          <>
+            {/* Toggle: full price comparison is one tap away — keeps the hero
+                and primary CTA (which already shows the best price) on focus. */}
+            <motion.button
+              type="button"
+              onClick={() => setShowAllPrices((v) => !v)}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.32, duration: 0.28 }}
+              className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 group"
+            >
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+                <RiShoppingCartLine className="w-3.5 h-3.5" />
+                {isZh ? `价格对比 · ${registrars.length} 家注册商` : `Compare · ${registrars.length} registrars`}
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary/80 group-hover:text-primary transition-colors">
+                {showAllPrices ? (isZh ? "收起" : "Hide") : (isZh ? "展开" : "Show")}
+                <RiArrowDownSLine
+                  className={cn("w-4 h-4 transition-transform duration-200", showAllPrices && "rotate-180")}
+                />
+              </span>
+            </motion.button>
+            {showAllPrices && (
+              <>
+                <motion.div
+                  className="pb-1"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+                >
+                  {registrars.map((r, idx) => (
+                    <RegistrarRow key={r.registrar} r={r} idx={idx} priceField="new" colorFirst={true} />
+                  ))}
+                </motion.div>
+
+                {/* Renewal prices */}
+                {renewRegistrars.length > 0 && (
+                  <>
+                    <div className="border-t border-border/40 px-4 sm:px-5 pt-4 pb-1 flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 font-bold uppercase tracking-wider">
+                        <RiLoopLeftLine className="w-3 h-3" />
+                        {isZh ? "续费价格" : "Renewal"}
+                      </p>
+                    </div>
+                    <div className="pb-1">
+                      {renewRegistrars.map((r, idx) => (
+                        <RegistrarRow key={`renew-${r.registrar}`} r={r} idx={idx} priceField="renew" colorFirst={false} />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Footer note */}
+                <p className="text-[10px] text-muted-foreground/30 px-4 sm:px-5 pt-2.5 pb-3">
+                  {isZh ? "数据来源：nazhumi.com & miqingju.com · 价格仅供参考" : "Source: nazhumi.com & miqingju.com · Reference only"}
+                </p>
+              </>
+            )}
+          </>
         ) : (
           <div className="px-4 sm:px-5 pb-4 pt-1">
             <p className="text-[10px] text-muted-foreground/40 mb-3 text-center">
@@ -625,30 +565,6 @@ export function AvailableDomainCard({ domain, locale, isPremiumByWhois = false, 
               ))}
             </div>
           </div>
-        )}
-
-        {/* Renewal prices */}
-        {!loadingPrices && !isPremium && renewRegistrars.length > 0 && (
-          <>
-            <div className="border-t border-border/40 px-4 sm:px-5 pt-4 pb-1 flex items-center justify-between">
-              <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 font-bold uppercase tracking-wider">
-                <RiLoopLeftLine className="w-3 h-3" />
-                {isZh ? "续费价格" : "Renewal"}
-              </p>
-            </div>
-            <div className="pb-1">
-              {renewRegistrars.map((r, idx) => (
-                <RegistrarRow key={`renew-${r.registrar}`} r={r} idx={idx} priceField="renew" colorFirst={false} />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Footer note */}
-        {!loadingPrices && registrars.length > 0 && (
-          <p className="text-[10px] text-muted-foreground/30 px-4 sm:px-5 pt-2.5 pb-3">
-            {isZh ? "数据来源：nazhumi.com & miqingju.com · 价格仅供参考" : "Source: nazhumi.com & miqingju.com · Reference only"}
-          </p>
         )}
       </div>
     </motion.div>

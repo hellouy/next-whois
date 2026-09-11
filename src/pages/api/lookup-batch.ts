@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { lookupWhoisWithCache } from "@/lib/whois/lookup";
-import { WhoisAnalyzeResult } from "@/lib/whois/types";
-import { DnsProbeResult } from "@/lib/whois/dns-check";
+import { lookupBatchAvailability } from "@/lib/whois/lookup";
+import type { WhoisAnalyzeResult } from "@/lib/whois/types";
+import type { FastProbeResult } from "@/lib/whois/dns-check";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
@@ -43,10 +43,13 @@ export type BatchItem = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt";
+  source?: "dns" | "rdap" | "whois" | "mixed" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt" | "whois.nic.gm" | "whois.telecoms.gov.bb";
   result?: WhoisAnalyzeResult;
   error?: string;
-  dnsProbe?: DnsProbeResult;
+  dnsProbe?: FastProbeResult;
+  /** Normalized availability verdict (DNS-first). */
+  availability?: "available" | "registered" | "reserved" | "premium" | "unknown";
+  confidence?: "high" | "medium" | "low";
 };
 
 type Data =
@@ -156,20 +159,33 @@ export default async function handler(
   // This avoids hammering upstream WHOIS servers while still being fast.
   // Cache hits are returned instantly, so effective throughput is much higher.
   const batchStart = Date.now();
-  const tasks = queryList.map(domain => () => lookupWhoisWithCache(domain));
+  const tasks = queryList.map(domain => () => lookupBatchAvailability(domain));
   const settled = await runWithConcurrency(tasks, CONCURRENCY);
 
   const items: BatchItem[] = settled.map((result, i) => {
     const domain = queryList[i];
     if (result.status === "fulfilled") {
-      const { status, time, cached, cachedAt, cacheTtl, source, result: r, error, dnsProbe } = result.value;
-      return { domain, status, time, cached, cachedAt, cacheTtl, source, result: r, error, dnsProbe };
+      const a = result.value;
+      return {
+        domain,
+        status: a.registration !== "unknown" && a.registration !== undefined,
+        time: 0,
+        cached: undefined,
+        source: a.source,
+        result: a.result,
+        error: a.error,
+        dnsProbe: a.dnsProbe,
+        availability: a.registration,
+        confidence: a.confidence,
+      };
     }
     return {
       domain,
       status: false,
       time: 0,
       error: result.reason instanceof Error ? result.reason.message : "Unknown error",
+      availability: "unknown",
+      confidence: "low",
     };
   });
 
@@ -190,7 +206,11 @@ export default async function handler(
         durationMs: Math.round(item.time * 1000),
         errorCode: item.status ? null : (item.error?.slice(0, 60) ?? null),
         source: item.source ?? null,
-        outcome: classifyQueryOutcome(item.status, item.error),
+        outcome: item.availability === "available"
+          ? "unregistered"
+          : item.availability === "registered" || item.availability === "reserved" || item.availability === "premium"
+            ? "registered"
+            : classifyQueryOutcome(item.status, item.error),
         userId, userEmail, ip,
       }).catch(e => logger.error("[lookup-batch] logQuery failed:", e.message)),
     ];

@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import tls from "tls";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isBlockedHost } from "@/lib/ssrf-guard";
+import { fetchCtLogs, type CtResult } from "@/lib/ct-crt-sh";
+import { checkOcsp, type OcspResult } from "@/lib/ocsp";
 
 export const config = { maxDuration: 20 };
 
@@ -26,6 +28,7 @@ type CertResult = {
   protocol: string | null;
   cipher: string | null;
   cipherBits: number | null;
+  cipherVersion: string | null;
   subject: Record<string, string>;
   issuer: Record<string, string>;
   valid_from: string;
@@ -41,6 +44,8 @@ type CertResult = {
   sans: SanEntry[];
   chain: CertChainEntry[];
   latencyMs: number;
+  certRaw?: string;
+  issuerRaw?: string;
 };
 
 function parseSans(altname: string): SanEntry[] {
@@ -129,6 +134,7 @@ async function fetchCert(hostname: string, port: number): Promise<CertResult> {
           protocol,
           cipher: cipherInfo?.name ?? null,
           cipherBits: (cipherInfo as any)?.secretKeyLength ?? null,
+          cipherVersion: (cipherInfo as any)?.version ?? null,
           subject: (cert.subject || {}) as Record<string, string>,
           issuer: (cert.issuer || {}) as Record<string, string>,
           valid_from: cert.valid_from || "",
@@ -144,6 +150,8 @@ async function fetchCert(hostname: string, port: number): Promise<CertResult> {
           sans: parseSans(cert.subjectaltname || ""),
           chain: buildChain(cert),
           latencyMs: Date.now() - t0,
+          certRaw: cert.raw ? Buffer.from(cert.raw).toString("base64") : undefined,
+          issuerRaw: cert.issuerCertificate?.raw ? Buffer.from(cert.issuerCertificate.raw).toString("base64") : undefined,
         };
         resolve(result);
       } catch (e) {
@@ -174,9 +182,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const port = Math.min(Math.max(parseInt(String(req.query.port || "443")), 1), 65535) || 443;
 
   try {
-    const result = await fetchCert(hostname, port);
+    const [cert, ct] = await Promise.allSettled([
+      fetchCert(hostname, port),
+      fetchCtLogs(hostname),
+      // OCSP reuses the cert/issuer raw bytes already fetched above — no
+      // second TLS handshake just to get a duplicate copy of the leaf chain.
+    ]);
+
+    if (cert.status !== "fulfilled") {
+      const e: any = cert.reason;
+      const msg = e?.message || "Unknown error";
+      const isRefused = msg.includes("ECONNREFUSED") || msg.includes("connect");
+      const isTimeout = msg.toLowerCase().includes("timeout");
+      const isNoCert = msg.includes("No certificate");
+      const errorCode = isRefused ? "err_refused" : isTimeout ? "err_timeout" : isNoCert ? "err_no_cert" : "err_unknown";
+      return res.status(200).json({
+        ok: false,
+        hostname,
+        port,
+        errorCode,
+        error: msg,
+      });
+    }
+
+    const result = cert.value;
+    const tlsVersions = await probeTlsVersions(hostname, port);
+    const tlsRating = computeTlsRating(tlsVersions);
+    const ctData = ct.status === "fulfilled" ? ct.value : ({ available: false } as CtResult);
+    const ocspData = result.certRaw && result.issuerRaw
+      ? await checkOcsp(Buffer.from(result.certRaw, "base64"), Buffer.from(result.issuerRaw, "base64"))
+      : ({ status: "unknown", responder: null, latencyMs: 0, reason: "no_raw_cert" } as OcspResult);
+
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({ ok: true, ...result });
+    return res.status(200).json({
+      ok: true,
+      ...result,
+      ct: ctData,
+      ocsp: ocspData,
+      tlsVersions,
+      tlsRating,
+    });
   } catch (e: any) {
     const msg = e?.message || "Unknown error";
     const isRefused = msg.includes("ECONNREFUSED") || msg.includes("connect");
@@ -191,4 +236,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: msg,
     });
   }
+}
+
+const TLS_PROBE_VERSIONS: { key: string; min: string; max: string }[] = [
+  { key: "1.0", min: "TLSv1", max: "TLSv1" },
+  { key: "1.1", min: "TLSv1.1", max: "TLSv1.1" },
+  { key: "1.2", min: "TLSv1.2", max: "TLSv1.2" },
+  { key: "1.3", min: "TLSv1.3", max: "TLSv1.3" },
+];
+
+async function probeTlsVersion(hostname: string, port: number, v: { key: string; min: string; max: string }): Promise<[string, boolean]> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const socket = tls.connect({
+      host: hostname,
+      port,
+      servername: hostname,
+      rejectUnauthorized: false,
+      minVersion: v.min as tls.SecureVersion,
+      maxVersion: v.max as tls.SecureVersion,
+    });
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; socket.destroy(); resolve([v.key, false]); }
+    }, 2500);
+    socket.once("secureConnect", () => {
+      if (!settled) { settled = true; clearTimeout(timer); socket.end(); resolve([v.key, true]); }
+    });
+    socket.once("error", () => {
+      if (!settled) { settled = true; clearTimeout(timer); resolve([v.key, false]); }
+    });
+  });
+}
+
+async function probeTlsVersions(hostname: string, port: number): Promise<Record<string, boolean>> {
+  const settled = await Promise.allSettled(TLS_PROBE_VERSIONS.map(v => probeTlsVersion(hostname, port, v)));
+  const result: Record<string, boolean> = { "1.0": false, "1.1": false, "1.2": false, "1.3": false };
+  settled.forEach((s) => {
+    if (s.status === "fulfilled") {
+      const [key, ok] = s.value;
+      result[key] = ok;
+    }
+  });
+  return result;
+}
+
+function computeTlsRating(versions: Record<string, boolean>): "secure" | "needs_attention" | "insecure" {
+  if (versions["1.0"] || versions["1.1"]) return "insecure";
+  if (versions["1.2"] && versions["1.3"]) return "secure";
+  if (versions["1.2"] || versions["1.3"]) return "needs_attention";
+  return "needs_attention";
 }

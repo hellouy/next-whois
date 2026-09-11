@@ -13,9 +13,23 @@ import { useTranslation } from "@/lib/i18n";
 import {
   RiArrowLeftSLine, RiSearchLine, RiLoader4Line,
   RiGlobalLine, RiMapPinLine, RiWifiLine, RiTimeLine,
-  RiShieldLine, RiServerLine, RiFileCopyLine, RiCheckLine,
+  RiShieldLine, RiShieldCheckLine, RiServerLine, RiFileCopyLine, RiCheckLine,
   RiAlertLine, RiExternalLinkLine,
 } from "@remixicon/react";
+
+type DnsblResult = {
+  zone: string;
+  listed: boolean;
+  returnCode: string | null;
+  type: string | null;
+  latencyMs: number;
+};
+
+type RdnsRecord = {
+  resolver: string;
+  hostname: string | null;
+  latencyMs: number;
+};
 
 type IpResult = {
   type: "ipv4" | "ipv6" | "asn";
@@ -42,6 +56,8 @@ type IpResult = {
   proxy: boolean | null;
   hosting: boolean | null;
   rdap: Record<string, string>;
+  dnsbl: { tested: number; listed: number; results: DnsblResult[] } | null;
+  rdns: { consistent: boolean; records: RdnsRecord[] } | null;
   asn?: number;
   error?: string;
 };
@@ -163,7 +179,7 @@ export default function IpPage() {
           </div>
 
           <form onSubmit={e => { e.preventDefault(); doQuery(); }} className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <RiGlobalLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
               <Input
                 value={query}
@@ -223,7 +239,7 @@ export default function IpPage() {
                     </div>
                     {Object.keys(result!.rdap).length > 0 && (
                       <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                           <RiServerLine className="w-3.5 h-3.5 text-muted-foreground" />
                           <h3 className="text-sm font-bold">{t("ip.rdap_asn_section")}</h3>
                         </div>
@@ -275,7 +291,7 @@ export default function IpPage() {
                     </div>
 
                     <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                         <RiMapPinLine className="w-3.5 h-3.5 text-muted-foreground" />
                         <h3 className="text-sm font-bold">{t("ip.geo_section")}</h3>
                         {result!.lat !== null && result!.lon !== null && (
@@ -333,7 +349,7 @@ export default function IpPage() {
                     )}
 
                     <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                         <RiWifiLine className="w-3.5 h-3.5 text-muted-foreground" />
                         <h3 className="text-sm font-bold">{t("ip.net_section")}</h3>
                       </div>
@@ -348,6 +364,81 @@ export default function IpPage() {
                         )}
                       </div>
                     </div>
+
+                    {result!.dnsbl && result!.type === "ipv4" && (
+                      <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+                          <RiShieldCheckLine className="w-3.5 h-3.5 text-muted-foreground" />
+                          <h3 className="text-sm font-bold">{t("ip.dnsbl_section")}</h3>
+                          <span className={cn(
+                            "ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                            result!.dnsbl.listed > 0
+                              ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800"
+                              : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                          )}>
+                            {result!.dnsbl.listed > 0
+                              ? t("ip.dnsbl_listed", { n: result!.dnsbl.listed })
+                              : t("ip.dnsbl_clean", { n: result!.dnsbl.tested })}
+                          </span>
+                        </div>
+                        <div className="px-5 py-3 space-y-2">
+                          {result!.dnsbl.listed === 0 && (
+                            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                              <RiCheckLine className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                              <span>{t("ip.dnsbl_clean_desc")}</span>
+                            </div>
+                          )}
+                          {result!.dnsbl.results.filter(r => r.listed).map(r => (
+                            <div key={r.zone} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                              <RiAlertLine className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                              <span className="text-[11px] font-mono font-semibold text-red-700 dark:text-red-400">{r.zone}</span>
+                              <span className="text-[10px] text-muted-foreground ml-auto">{r.returnCode}{r.type ? ` · ${r.type}` : ""}</span>
+                              <span className="text-[10px] text-muted-foreground/60">{r.latencyMs}ms</span>
+                            </div>
+                          ))}
+                          {result!.dnsbl.results.filter(r => !r.listed).map(r => (
+                            <div key={r.zone} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-muted-foreground/70">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 shrink-0" />
+                              <span className="font-mono">{r.zone}</span>
+                              <span className="ml-auto text-[10px]">{r.latencyMs}ms</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {result!.rdns && result!.type === "ipv4" && (
+                      <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+                          <RiGlobalLine className="w-3.5 h-3.5 text-muted-foreground" />
+                          <h3 className="text-sm font-bold">{t("ip.rdns_section")}</h3>
+                          {result!.rdns.consistent ? (
+                            <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                              <RiCheckLine className="w-3 h-3" />{t("ip.rdns_consistent")}
+                            </span>
+                          ) : (
+                            <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                              <RiAlertLine className="w-3 h-3" />{t("ip.rdns_mismatch")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="px-5 py-3 space-y-2">
+                          {result!.rdns.records.map(r => (
+                            <div key={r.resolver} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-border/60">
+                              <span className="text-[11px] font-mono font-semibold text-foreground/80 shrink-0">{r.resolver}</span>
+                              <span className="text-[11px] font-mono break-all text-muted-foreground">{r.hostname || "—"}</span>
+                              <span className="text-[10px] text-muted-foreground/60 ml-auto shrink-0">{r.latencyMs}ms</span>
+                            </div>
+                          ))}
+                          {result!.rdns.records.every(r => !r.hostname) && (
+                            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                              <RiAlertLine className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                              <span>{t("ip.rdns_not_found")}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {result!.rdap?.abuse_email && (
                       <div className="glass-panel border border-red-200 dark:border-red-900/60 rounded-2xl overflow-hidden">
@@ -364,7 +455,7 @@ export default function IpPage() {
 
                     {result!.timezone && (
                       <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                           <RiTimeLine className="w-3.5 h-3.5 text-muted-foreground" />
                           <h3 className="text-sm font-bold">{t("ip.tz_section")}</h3>
                         </div>
@@ -398,7 +489,7 @@ export default function IpPage() {
 
                     {result!.rdap && Object.keys(result!.rdap).length > 0 && (
                       <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                           <RiServerLine className="w-3.5 h-3.5 text-muted-foreground" />
                           <h3 className="text-sm font-bold">{t("ip.rdap_net_section")}</h3>
                         </div>
@@ -418,7 +509,7 @@ export default function IpPage() {
 
                     {/* External lookup links */}
                     <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                         <RiExternalLinkLine className="w-3.5 h-3.5 text-muted-foreground" />
                         <h3 className="text-sm font-bold">{t("ip.links_section")}</h3>
                       </div>

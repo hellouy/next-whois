@@ -17,7 +17,8 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
 import { toast } from "sonner";
-import type { HttpCheckResult, SecurityHeader } from "@/pages/api/http/check";
+import type { HttpCheckResult, SecurityHeader, HttpTlsSummary } from "@/pages/api/http/check";
+import type { HttpTiming, CookieInfo } from "@/lib/http-timing";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = React.useState(false);
@@ -111,6 +112,146 @@ function SecurityHeaderRow({ h }: { h: SecurityHeader }) {
   );
 }
 
+// ── New enhancement cards ─────────────────────────────────────────────────────
+
+function TimingBar({ label, value, suffix = "ms" }: { label: string; value: number | null; suffix?: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
+      <span className="text-xs text-muted-foreground w-24 shrink-0 leading-tight">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden min-w-0">
+        {value !== null && (
+          <div className="h-full rounded-full bg-blue-500/60 transition-all" style={{ width: `${Math.min(100, (value / 1000) * 100)}%` }} />
+        )}
+      </div>
+      <span className={cn("text-xs tabular-nums w-20 text-right shrink-0", value === null ? "text-muted-foreground/40" : "font-medium")}>
+        {value === null ? "—" : `${value}${suffix}`}
+      </span>
+    </div>
+  );
+}
+
+function TimingCard({ timing }: { timing: HttpTiming }) {
+  const { t } = useTranslation();
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiTimeLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <h3 className="text-sm font-bold">{t("http.section_timing")}</h3>
+        <span className="ml-auto text-xs text-muted-foreground">{t("http.timing_note")}</span>
+      </div>
+      <div className="px-4 py-1">
+        <TimingBar label={t("http.timing_dns")} value={timing.dnsMs} />
+        <TimingBar label={t("http.timing_connect")} value={timing.connectMs} />
+        <TimingBar label={t("http.timing_tls")} value={timing.tlsMs} />
+        <TimingBar label={t("http.timing_ttfb")} value={timing.ttfbMs} />
+        <TimingBar label={t("http.timing_total")} value={timing.totalMs} />
+      </div>
+    </div>
+  );
+}
+
+function CookieBadge({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span className={cn(
+      "text-[9px] px-1.5 py-0.5 rounded-md font-semibold border",
+      ok
+        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+        : "bg-muted/40 text-muted-foreground/60 border-border"
+    )}>
+      {ok && <RiCheckLine className="w-2.5 h-2.5 inline mr-0.5" />}
+      {label}
+    </span>
+  );
+}
+
+function CookieRow({ cookie }: { cookie: CookieInfo }) {
+  const { t } = useTranslation();
+  return (
+    <div className="border-b border-border/30 last:border-0 py-2.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-mono font-semibold">{cookie.name}</span>
+        {cookie.issues.length > 0 && (
+          <span className="flex items-center gap-0.5 text-[9px] text-red-500 font-semibold">
+            <RiAlertLine className="w-3 h-3" />{t("http.cookie_issues", { n: String(cookie.issues.length) })}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-1">
+          <CookieBadge ok={cookie.secure} label="Secure" />
+          <CookieBadge ok={cookie.httpOnly} label="HttpOnly" />
+          <CookieBadge ok={!!cookie.sameSite} label={cookie.sameSite ? `SameSite:${cookie.sameSite}` : "SameSite"} />
+        </span>
+      </div>
+      {(cookie.domain || cookie.path) && (
+        <p className="text-[10px] text-muted-foreground/70 mt-1 font-mono break-all">
+          {[cookie.domain && `Domain=${cookie.domain}`, cookie.path && `Path=${cookie.path}`].filter(Boolean).join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CookieCard({ cookies, rating }: { cookies: CookieInfo[]; rating: "secure" | "needs_attention" | "insecure" }) {
+  const { t } = useTranslation();
+  const color = rating === "secure"
+    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+    : rating === "insecure"
+    ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiShieldCheckLine className="w-3.5 h-3.5 text-muted-foreground" />
+        <h3 className="text-sm font-bold">{t("http.section_cookies")}</h3>
+        <span className={cn("ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold border", color)}>
+          {t(`http.cookie_rating_${rating}`)}
+        </span>
+      </div>
+      {cookies.length === 0 ? (
+        <p className="px-4 py-4 text-xs text-muted-foreground">{t("http.cookie_none")}</p>
+      ) : (
+        <div className="px-4 py-1">
+          {cookies.map((c, i) => <CookieRow key={i} cookie={c} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TlsCard({ tls }: { tls: HttpTlsSummary }) {
+  const { t } = useTranslation();
+  const cert = tls.certificate;
+  const certValid = cert && !cert.expired && cert.trusted;
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiLockLine className="w-3.5 h-3.5 text-muted-foreground" />
+        <h3 className="text-sm font-bold">{t("http.section_tls")}</h3>
+        {cert && (
+          <span className={cn(
+            "ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold border",
+            certValid
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+          )}>
+            {cert.expired ? t("http.tls_expired") : cert.trusted ? t("http.tls_trusted") : t("http.tls_untrusted")}
+          </span>
+        )}
+      </div>
+      <div className="px-4 py-1">
+        <InfoRow label={t("http.tls_protocol")} value={tls.protocol} mono />
+        <InfoRow label={t("http.tls_cipher")} value={tls.cipher} mono />
+        {cert && (
+          <>
+            <InfoRow label={t("http.tls_cn")} value={cert.cn} mono />
+            <InfoRow label={t("http.tls_sans")} value={cert.sans.length > 0 ? `${cert.sans.length} SAN${cert.sans.length > 1 ? "s" : ""} · ${cert.sans.slice(0, 3).join(", ")}${cert.sans.length > 3 ? "…" : ""}` : undefined} mono />
+            <InfoRow label={t("http.tls_valid_to")} value={cert.validTo} mono />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const FADE = { duration: 0.18, ease: "easeOut" as const };
 
 const EXAMPLES = ["https://google.com", "https://github.com", "https://cloudflare.com"];
@@ -184,7 +325,7 @@ export default function HttpCheckPage() {
           </div>
 
           <form onSubmit={e => { e.preventDefault(); runCheck(); }} className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <RiLink className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
               <Input
                 value={input}
@@ -260,7 +401,7 @@ export default function HttpCheckPage() {
 
                 {/* Response Details */}
                 <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                  <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                     <RiServerLine className="w-3.5 h-3.5 text-muted-foreground" />
                     <h3 className="text-sm font-bold">{t("http.section_details")}</h3>
                     {result.finalUrl && (
@@ -286,7 +427,7 @@ export default function HttpCheckPage() {
                 {/* Redirect chain */}
                 {result.redirectChain.length > 0 && (
                   <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                    <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                       <RiArrowRightLine className="w-3.5 h-3.5 text-muted-foreground" />
                       <h3 className="text-sm font-bold">{t("http.redirect_chain")}</h3>
                       <span className="ml-auto text-xs text-muted-foreground">{result.redirectChain.length} {t("http.redirect_hops")}</span>
@@ -308,10 +449,25 @@ export default function HttpCheckPage() {
                   </div>
                 )}
 
+                {/* Timing breakdown */}
+                {result.timing && (
+                  <TimingCard timing={result.timing} />
+                )}
+
+                {/* Cookie analysis */}
+                {result.cookies && result.cookieRating && (
+                  <CookieCard cookies={result.cookies} rating={result.cookieRating} />
+                )}
+
+                {/* TLS / certificate summary */}
+                {result.tls && (
+                  <TlsCard tls={result.tls} />
+                )}
+
                 {/* Security Headers */}
                 {hasSecurityData && (
                   <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+                    <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
                       <RiShieldCheckLine className="w-3.5 h-3.5 text-muted-foreground" />
                       <h3 className="text-sm font-bold">{t("http.section_security")}</h3>
                       <span className="ml-2 text-xs text-muted-foreground">{presentCount}/{totalCount} {t("http.security_present")}</span>

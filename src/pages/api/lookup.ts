@@ -34,7 +34,7 @@ type Data = {
   cached?: boolean;
   cachedAt?: number;
   cacheTtl?: number;
-  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt";
+  source?: "rdap" | "whois" | "tian.hu" | "YISI.YUN" | "whois.ph" | "whois.nic.tt" | "whois.nic.gm" | "whois.telecoms.gov.bb";
   result?: WhoisAnalyzeResult;
   error?: string;
   dnsProbe?: DnsProbeResult;

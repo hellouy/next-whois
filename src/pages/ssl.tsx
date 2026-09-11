@@ -19,6 +19,9 @@ import {
 
 type SanEntry = { type: string; value: string };
 type CertChain = { subject: Record<string, string>; issuer: Record<string, string>; valid_from: string; valid_to: string; fingerprint256: string; serialNumber: string };
+type CtLogEntry = { name_value: string; not_before: string; not_after: string; id: number };
+type CtResult = { available: boolean; total?: number; entries?: CtLogEntry[] };
+type OcspResult = { status: "good" | "revoked" | "unknown"; responder: string | null; latencyMs: number; reason?: string };
 
 type SslResult = {
   ok: boolean;
@@ -29,6 +32,11 @@ type SslResult = {
   protocol: string | null;
   cipher: string | null;
   cipherBits: number | null;
+  cipherVersion: string | null;
+  ct?: CtResult;
+  ocsp?: OcspResult;
+  tlsVersions?: Record<string, boolean>;
+  tlsRating?: "secure" | "needs_attention" | "insecure";
   subject: Record<string, string>;
   issuer: Record<string, string>;
   valid_from: string;
@@ -103,6 +111,130 @@ function ValidityBar({ daysRemaining, validFrom, validTo }: { daysRemaining: num
 
 function subjectStr(s: Record<string, string>): string {
   return [s.CN && `CN=${s.CN}`, s.O && `O=${s.O}`, s.C && `C=${s.C}`].filter(Boolean).join(", ");
+}
+
+type TFunc = ReturnType<typeof useTranslation>["t"];
+
+function TlsDetailCard({ result, t }: { result: SslResult; t: TFunc }) {
+  const versions = result.tlsVersions;
+  const order = ["1.0", "1.1", "1.2", "1.3"];
+  const rating = result.tlsRating;
+  const ratingColor = rating === "secure" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+    : rating === "insecure" ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiShieldCheckLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <h3 className="text-sm font-bold">{t("ssl.tls_section")}</h3>
+        {rating && (
+          <span className={cn("ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold border", ratingColor)}>
+            {t(`ssl.tls_rating_${rating}`)}
+          </span>
+        )}
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {order.map(v => {
+            const enabled = versions ? versions[v] : false;
+            const color = enabled
+              ? v === "1.0" || v === "1.1"
+                ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+              : "bg-muted/50 text-muted-foreground/50 border-border";
+            return (
+              <div key={v} className={cn("rounded-xl border px-2 py-2 text-center min-w-0", color)}>
+                <p className="text-xs font-bold font-mono">TLS {v}</p>
+                <p className="text-[10px] mt-0.5 opacity-80">{enabled ? t("ssl.tls_on") : t("ssl.tls_off")}</p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="space-y-1.5">
+          <InfoRow label={t("ssl.protocol_row")} value={[result.protocol, result.cipherVersion].filter(Boolean).join(" · ")} mono copyLabel={t("ssl.copy")} />
+          {result.cipher && <InfoRow label={t("ssl.cipher")} value={result.cipherBits ? `${result.cipher} (${result.cipherBits} bits)` : result.cipher} mono copyLabel={t("ssl.copy")} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OcspCard({ result, t }: { result: SslResult; t: TFunc }) {
+  const ocsp = result.ocsp;
+  if (!ocsp) return null;
+  const statusColor = ocsp.status === "good"
+    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+    : ocsp.status === "revoked"
+    ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+    : "bg-muted/50 text-muted-foreground/50 border-border";
+  const Icon = ocsp.status === "good" ? RiShieldCheckLine : ocsp.status === "revoked" ? RiShieldLine : RiTimeLine;
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiTimeLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <h3 className="text-sm font-bold">{t("ssl.ocsp_section")}</h3>
+        <span className={cn("ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1", statusColor)}>
+          <Icon className="w-3 h-3" />
+          {t(`ssl.ocsp_${ocsp.status}`)}
+        </span>
+      </div>
+      <div className="px-5 py-1">
+        <InfoRow label={t("ssl.ocsp_responder")} value={ocsp.responder || "—"} mono copyLabel={t("ssl.copy")} />
+        <InfoRow label={t("ssl.ocsp_latency")} value={`${ocsp.latencyMs}ms`} copyLabel={t("ssl.copy")} />
+        {ocsp.reason && <InfoRow label={t("ssl.ocsp_reason")} value={ocsp.reason} mono copyLabel={t("ssl.copy")} />}
+      </div>
+    </div>
+  );
+}
+
+function CtCard({ result, t }: { result: SslResult; t: TFunc }) {
+  const ct = result.ct;
+  if (!ct) return null;
+  if (!ct.available) {
+    return (
+      <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+          <RiTimeLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <h3 className="text-sm font-bold">{t("ssl.ct_section")}</h3>
+          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground/60 border border-border font-semibold">{t("ssl.ct_unavailable")}</span>
+        </div>
+        <p className="px-5 py-4 text-xs text-muted-foreground">{t("ssl.ct_unavailable_note")}</p>
+      </div>
+    );
+  }
+  const entries = ct.entries ?? [];
+  const shown = entries.slice(0, 10);
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+        <RiLinkM className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <h3 className="text-sm font-bold">{t("ssl.ct_section")}</h3>
+        <a
+          href={`https://crt.sh/?q=${encodeURIComponent(result.hostname)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto flex items-center gap-1 text-[10px] text-primary hover:underline shrink-0"
+        >
+          {t("ssl.ct_view_crtsh")} <RiExternalLinkLine className="w-2.5 h-2.5" />
+        </a>
+      </div>
+      <div className="px-5 py-1">
+        <InfoRow label={t("ssl.ct_total")} value={String(ct.total ?? entries.length)} copyLabel={t("ssl.copy")} />
+      </div>
+      <div className="px-5 pb-4 space-y-1.5 max-h-56 overflow-y-auto">
+        {shown.map(e => (
+          <div key={e.id} className="flex items-start gap-2 text-xs border border-border/50 rounded-lg px-3 py-2 min-w-0">
+            <span className="font-mono text-[11px] truncate flex-1 min-w-0">{e.name_value}</span>
+            <span className="text-[10px] text-muted-foreground shrink-0">{e.not_before?.slice(0, 10)}</span>
+          </div>
+        ))}
+        {entries.length > 10 && (
+          <p className="text-[10px] text-muted-foreground pt-1">{t("ssl.ct_more").replace("{{n}}", String(entries.length - 10))}</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const FADE = { duration: 0.18, ease: "easeOut" as const };
@@ -181,7 +313,7 @@ export default function SslPage() {
           </div>
 
           <form onSubmit={e => { e.preventDefault(); doQuery(); }} className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <RiLockLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
               <Input
                 value={hostname}
@@ -289,8 +421,8 @@ export default function SslPage() {
                     </div>
 
                     <div className="glass-panel border border-border rounded-2xl overflow-hidden">
-                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
-                        <RiLinkM className="w-3.5 h-3.5 text-muted-foreground" />
+                      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2 flex-wrap">
+                        <RiLinkM className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                         <h3 className="text-sm font-bold">{t("ssl.cert_section")}</h3>
                         <a
                           href={`https://crt.sh/?q=${encodeURIComponent(result!.hostname)}`}
@@ -340,7 +472,7 @@ export default function SslPage() {
                         <div className="p-4">
                           <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                             {result!.sans.map((san, i) => (
-                              <span key={i} className="text-xs font-mono px-2 py-0.5 rounded-lg bg-muted border border-border hover:bg-muted/80 transition-colors">
+                              <span key={i} className="text-xs font-mono px-2 py-0.5 rounded-lg bg-muted border border-border hover:bg-muted/80 transition-colors break-all max-w-full">
                                 {san.type !== "DNS" && <span className="text-muted-foreground">{san.type}:</span>}
                                 {san.value}
                               </span>
@@ -377,6 +509,10 @@ export default function SslPage() {
                         </div>
                       </div>
                     )}
+
+                    <TlsDetailCard result={result!} t={t} />
+                    <OcspCard result={result!} t={t} />
+                    <CtCard result={result!} t={t} />
                   </>
                 )}
               </motion.div>

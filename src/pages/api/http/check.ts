@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import http from "http";
+import https from "https";
+import tls from "tls";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isBlockedHost } from "@/lib/ssrf-guard";
+import { computeTiming, parseCookieHeader, analyzeCookie, computeCookieRating, type HttpTiming, type CookieInfo } from "@/lib/http-timing";
 
 export const config = { maxDuration: 15 };
 
@@ -14,6 +18,18 @@ export type SecurityHeader = {
   present: boolean;
   severity: "critical" | "high" | "medium" | "info";
   description: string;
+};
+
+export type HttpTlsSummary = {
+  protocol: string | null;
+  cipher: string | null;
+  certificate: {
+    cn: string | null;
+    sans: string[];
+    validTo: string | null;
+    expired: boolean | null;
+    trusted: boolean;
+  } | null;
 };
 
 export type HttpCheckResult = {
@@ -40,6 +56,11 @@ export type HttpCheckResult = {
   xXssProtection: string | null;
   securityScore: number;
   securityHeaders: SecurityHeader[];
+  // Enhanced (optional)
+  timing?: HttpTiming;
+  cookies?: CookieInfo[];
+  cookieRating?: "secure" | "needs_attention" | "insecure";
+  tls?: HttpTlsSummary | null;
   error?: string;
 };
 
@@ -135,6 +156,87 @@ function computeSecurityHeaders(headers: Headers, isHttps: boolean): { score: nu
   };
 }
 
+type RawHopResult = {
+  statusCode: number | null;
+  statusText: string;
+  headers: http.IncomingHttpHeaders;
+  marks: { start: number; dnsEnd: number | null; connectEnd: number | null; tlsEnd: number | null; headersEnd: number | null };
+};
+
+// Manual http/https request that records per-phase timing via socket events.
+function rawRequest(url: string, ua: string, timeoutMs: number): Promise<RawHopResult> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === "https:" ? https : http;
+    const marks = { start: Date.now(), dnsEnd: null as number | null, connectEnd: null as number | null, tlsEnd: null as number | null, headersEnd: null as number | null };
+    const req = lib.request(u, {
+      method: "GET",
+      headers: { "User-Agent": ua, Accept: "text/html,*/*" },
+      timeout: timeoutMs,
+    });
+    req.on("socket", socket => {
+      socket.on("lookup", () => { marks.dnsEnd = Date.now(); });
+      socket.on("connect", () => { marks.connectEnd = Date.now(); });
+      socket.on("secureConnect", () => { marks.tlsEnd = Date.now(); });
+    });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("response", res => {
+      marks.headersEnd = Date.now();
+      // We only need headers — destroy the stream to release the connection.
+      res.destroy();
+      resolve({
+        statusCode: res.statusCode ?? null,
+        statusText: res.statusMessage ?? "",
+        headers: res.headers,
+        marks,
+      });
+    });
+    req.on("error", err => reject(err));
+    req.end();
+  });
+}
+
+function parseCookies(headers: http.IncomingHttpHeaders): CookieInfo[] {
+  const raw = headers["set-cookie"];
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list.filter(Boolean).map(h => analyzeCookie(parseCookieHeader(h)));
+}
+
+function hdr(headers: http.IncomingHttpHeaders, name: string): string | null {
+  const v = headers[name];
+  if (v === undefined || v === null) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+function getTlsSummary(hostname: string, port: number, timeoutMs: number): Promise<HttpTlsSummary | null> {
+  return new Promise(resolve => {
+    let settled = false;
+    const done = (v: HttpTlsSummary | null) => { if (!settled) { settled = true; resolve(v); } };
+    const timer = setTimeout(() => { socket.destroy(); done(null); }, timeoutMs);
+    const socket = tls.connect({ host: hostname, port, servername: hostname, rejectUnauthorized: false });
+    socket.once("secureConnect", () => {
+      const cert = socket.getPeerCertificate();
+      const protocol = socket.getProtocol();
+      const cipher = (socket as any).getCipher?.();
+      const trusted = socket.authorized;
+      socket.end();
+      const validTo = cert.valid_to ? String(cert.valid_to) : null;
+      const sans = (cert.subjectaltname ?? "").split(", ").map(s => s.replace(/^DNS:/, "")).filter(Boolean);
+      const cnRaw = cert.subject?.CN;
+      const cn = cnRaw ? (Array.isArray(cnRaw) ? cnRaw.join(", ") : String(cnRaw)) : null;
+      const expired = validTo ? new Date(validTo).getTime() < Date.now() : null;
+      clearTimeout(timer);
+      done({
+        protocol: protocol ?? null,
+        cipher: typeof cipher === "object" && cipher ? (cipher.name ?? null) : null,
+        certificate: { cn, sans, validTo, expired, trusted },
+      });
+    });
+    socket.once("error", () => { clearTimeout(timer); done(null); });
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse<HttpCheckResult>) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -196,36 +298,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   const redirectChain: { url: string; status: number }[] = [];
   let currentUrl = rawUrl;
-  let lastRes: Response | null = null;
+  let lastHop: RawHopResult | null = null;
   const t0 = Date.now();
 
   try {
     for (let i = 0; i <= MAX_REDIRECTS; i++) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const hop = await rawRequest(currentUrl, UA, TIMEOUT_MS);
 
-      let r: Response;
-      try {
-        // Use GET (not HEAD) so security headers injected by middleware are always returned.
-        // We abort the body stream immediately after headers arrive to keep it cheap.
-        r = await fetch(currentUrl, {
-          method: "GET",
-          redirect: "manual",
-          signal: controller.signal,
-          headers: { "User-Agent": UA, Accept: "text/html,*/*" },
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      lastHop = hop;
 
-      // Abort body download immediately — we only need headers
-      try { r.body?.cancel(); } catch {}
-
-      lastRes = r;
-
-      if (r.status >= 300 && r.status < 400) {
-        const location = r.headers.get("location") || "";
-        redirectChain.push({ url: currentUrl, status: r.status });
+      if (hop.statusCode !== null && hop.statusCode >= 300 && hop.statusCode < 400) {
+        const location = hdr(hop.headers, "location") || "";
+        redirectChain.push({ url: currentUrl, status: hop.statusCode });
         if (!location) break;
         try { currentUrl = new URL(location, currentUrl).href; } catch { break; }
         // Re-check every redirect hop: a public URL redirecting into private
@@ -249,15 +333,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     }
 
     const latencyMs = Date.now() - t0;
-    if (!lastRes) throw new Error("No response received");
+    if (!lastHop) throw new Error("No response received");
 
-    const statusCode = lastRes.status;
-    const isOk = statusCode >= 200 && statusCode < 400;
+    // Loop above only exits early on a non-redirect status; if the final hop
+    // is still a redirect we exhausted MAX_REDIRECTS and must not report it
+    // as a success (a redirect is never the terminal response).
+    if (lastHop.statusCode !== null && lastHop.statusCode >= 300 && lastHop.statusCode < 400) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({
+        ok: false,
+        url: rawUrl,
+        finalUrl: currentUrl,
+        statusCode: lastHop.statusCode,
+        statusText: lastHop.statusText || null,
+        latencyMs: Date.now() - t0,
+        server: null, contentType: null, contentLength: null,
+        xPoweredBy: null, cacheControl: null, via: null,
+        redirectChain, hsts: null, csp: null, xFrameOptions: null,
+        xContentTypeOptions: null, referrerPolicy: null, permissionsPolicy: null,
+        xXssProtection: null, securityScore: 0, securityHeaders: [],
+        error: `Too many redirects (exceeded ${MAX_REDIRECTS})`,
+      });
+    }
+
+    const statusCode = lastHop.statusCode;
+    const isOk = statusCode !== null && statusCode >= 200 && statusCode < 400;
     const isHttps = currentUrl.startsWith("https://");
 
-    const { score, headers: secHeaders, parsed: secParsed } = computeSecurityHeaders(lastRes.headers, isHttps);
+    // Timing breakdown from socket events
+    const timing = computeTiming({
+      start: lastHop.marks.start,
+      dnsEnd: lastHop.marks.dnsEnd,
+      connectEnd: lastHop.marks.connectEnd,
+      tlsEnd: lastHop.marks.tlsEnd,
+      headersEnd: lastHop.marks.headersEnd,
+      end: lastHop.marks.headersEnd ?? Date.now(),
+    });
 
-    const clRaw = lastRes.headers.get("content-length");
+    // Cookie analysis
+    const cookies = parseCookies(lastHop.headers);
+    const cookieRating = computeCookieRating(cookies);
+
+    // TLS / certificate summary for HTTPS targets
+    let tlsSummary: HttpTlsSummary | null = null;
+    if (isHttps) {
+      const u = new URL(currentUrl);
+      tlsSummary = await getTlsSummary(u.hostname, u.port ? parseInt(u.port) : 443, 5000);
+    }
+
+    const h = lastHop.headers;
+    const { score, headers: secHeaders, parsed: secParsed } = computeSecurityHeaders(new Headers({
+      ...Object.fromEntries(Object.entries(h).filter(([, v]) => v !== undefined).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : v as string])),
+    }), isHttps);
+
+    const clRaw = hdr(h, "content-length");
     const contentLength = clRaw ? parseInt(clRaw) : null;
 
     res.setHeader("Cache-Control", "no-store");
@@ -266,14 +395,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       url: rawUrl,
       finalUrl: currentUrl,
       statusCode,
-      statusText: lastRes.statusText || null,
+      statusText: lastHop.statusText || null,
       latencyMs,
-      server: lastRes.headers.get("server") || null,
-      contentType: lastRes.headers.get("content-type")?.split(";")[0].trim() || null,
+      server: hdr(h, "server"),
+      contentType: hdr(h, "content-type")?.split(";")[0].trim() || null,
       contentLength: Number.isFinite(contentLength) ? contentLength : null,
-      xPoweredBy: lastRes.headers.get("x-powered-by") || null,
-      cacheControl: lastRes.headers.get("cache-control") || null,
-      via: lastRes.headers.get("via") || null,
+      xPoweredBy: hdr(h, "x-powered-by"),
+      cacheControl: hdr(h, "cache-control"),
+      via: hdr(h, "via"),
       redirectChain,
       hsts: secParsed.hsts,
       csp: secParsed.csp,
@@ -284,12 +413,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       xXssProtection: secParsed.xXssProtection,
       securityScore: score,
       securityHeaders: secHeaders,
+      timing,
+      cookies,
+      cookieRating,
+      tls: tlsSummary,
     });
   } catch (err: unknown) {
     const latencyMs = Date.now() - t0;
     const msg = err instanceof Error ? err.message : "unknown";
-    const isTimeout = msg.includes("abort") || msg.includes("timeout") || msg.includes("AbortError");
-    const isNoConn = msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("network");
+    const isTimeout = msg.includes("abort") || msg.includes("timeout") || msg.includes("TimeoutError") || msg.includes("timed out");
+    const isNoConn = msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("ENETUNREACH") || msg.includes("EHOSTUNREACH") || msg.includes("network");
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({

@@ -10,14 +10,16 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation } from "@/lib/i18n";
+import { parseSpf, parseDmarc } from "@/lib/dns-email";
+import type { SpfAnalysis, DmarcAnalysis } from "@/lib/dns-email";
 import {
   RiArrowLeftSLine, RiSearchLine, RiLoader4Line, RiCheckLine,
   RiErrorWarningLine, RiTimeLine, RiRefreshLine, RiFileCopyLine,
-  RiShieldCheckLine, RiMailLine, RiServerLine, RiGlobalLine,
-  RiKeyLine, RiSpeedUpLine, RiAlertLine,
+  RiShieldCheckLine, RiShieldLine, RiMailLine, RiServerLine, RiGlobalLine,
+  RiKeyLine, RiSpeedUpLine, RiAlertLine, RiAppsLine,
 } from "@remixicon/react";
 
-type RecordType = "A" | "AAAA" | "MX" | "NS" | "CNAME" | "TXT" | "SOA" | "CAA" | "PTR" | "SRV" | "HTTPS";
+type RecordType = "A" | "AAAA" | "MX" | "NS" | "CNAME" | "TXT" | "SOA" | "CAA" | "PTR" | "SRV" | "HTTPS" | "DS" | "DNSKEY" | "NSEC" | "NSEC3" | "NAPTR" | "TLSA" | "SMIMEA";
 
 const RECORD_TYPES: { type: RecordType; color: string; bg: string }[] = [
   { type: "A",     color: "text-blue-600 dark:text-blue-400",     bg: "bg-blue-500/8 border-blue-500/30" },
@@ -31,6 +33,13 @@ const RECORD_TYPES: { type: RecordType; color: string; bg: string }[] = [
   { type: "PTR",   color: "text-cyan-600 dark:text-cyan-400",     bg: "bg-cyan-500/8 border-cyan-500/30" },
   { type: "SRV",   color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/8 border-purple-500/30" },
   { type: "HTTPS", color: "text-pink-600 dark:text-pink-400",     bg: "bg-pink-500/8 border-pink-500/30" },
+  { type: "DS",    color: "text-sky-600 dark:text-sky-400",       bg: "bg-sky-500/8 border-sky-500/30" },
+  { type: "DNSKEY",color: "text-cyan-600 dark:text-cyan-400",     bg: "bg-cyan-500/8 border-cyan-500/30" },
+  { type: "NSEC",  color: "text-lime-600 dark:text-lime-400",     bg: "bg-lime-500/8 border-lime-500/30" },
+  { type: "NSEC3", color: "text-lime-600 dark:text-lime-400",     bg: "bg-lime-500/8 border-lime-500/30" },
+  { type: "NAPTR", color: "text-amber-600 dark:text-amber-400",   bg: "bg-amber-500/8 border-amber-500/30" },
+  { type: "TLSA",  color: "text-fuchsia-600 dark:text-fuchsia-400", bg: "bg-fuchsia-500/8 border-fuchsia-500/30" },
+  { type: "SMIMEA",color: "text-fuchsia-600 dark:text-fuchsia-400", bg: "bg-fuchsia-500/8 border-fuchsia-500/30" },
 ];
 
 type ResolverResult = {
@@ -38,9 +47,15 @@ type ResolverResult = {
   records: any[]; flat: string[]; latencyMs: number; error?: string;
 };
 
+type Propagation = {
+  consistent: boolean;
+  differing: { resolver: string; missing: string[]; extra: string[] }[];
+};
+
 type DnsResult = {
   name: string; type: RecordType; found: boolean;
   records: any[]; flat: string[]; ttls?: number[]; resolvers: ResolverResult[]; latencyMs: number; error?: string;
+  propagation?: Propagation;
   _label?: string;
 };
 
@@ -91,6 +106,49 @@ function RecordTypeBadge({ type }: { type: RecordType }) {
     <span className={cn("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border bg-muted/50", meta?.color)}>
       {type}
     </span>
+  );
+}
+
+function PropagationView({ propagation, consistentLabel, inconsistentLabel, resolverLabel }: {
+  propagation: Propagation;
+  consistentLabel: string;
+  inconsistentLabel: string;
+  resolverLabel: string;
+}) {
+  if (!propagation) return null;
+  return (
+    <div className="px-4 py-2 border-t border-border/40 bg-muted/10 flex flex-wrap items-center gap-2 text-[10px]">
+      {propagation.consistent ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+          <RiCheckLine className="w-3 h-3" />
+          {consistentLabel}
+        </span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-semibold">
+            <RiAlertLine className="w-3 h-3" />
+            {inconsistentLabel}
+          </span>
+          <span className="flex flex-col gap-0.5 min-w-0">
+            {propagation.differing.map((d, i) => (
+              <span key={i} className="text-muted-foreground">
+                <span className="font-semibold text-foreground/80">{resolverLabel}: {d.resolver}</span>
+                {d.missing.length > 0 && (
+                  <span className="ml-1 text-red-500/80">
+                    − {d.missing.join(", ")}
+                  </span>
+                )}
+                {d.extra.length > 0 && (
+                  <span className="ml-1 text-emerald-600/80">
+                    + {d.extra.join(", ")}
+                  </span>
+                )}
+              </span>
+            ))}
+          </span>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -176,7 +234,7 @@ function CopyAllButton({ flats, copyAllLabel }: { flats: string[]; copyAllLabel:
 }
 
 function ResultCard({
-  result, noRecordLabel, hasRecordTemplate, copyLabel, copyAllLabel, soaLabels,
+  result, noRecordLabel, hasRecordTemplate, copyLabel, copyAllLabel, soaLabels, propagationLabels,
 }: {
   result: DnsResult;
   noRecordLabel: string;
@@ -184,6 +242,7 @@ function ResultCard({
   copyLabel: string;
   copyAllLabel: string;
   soaLabels: { primaryNs: string; adminEmail: string; serial: string; refresh: string; retry: string; expire: string };
+  propagationLabels: { consistent: string; inconsistent: string; resolver: string };
 }) {
   if (!result.found) {
     return (
@@ -191,7 +250,7 @@ function ResultCard({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.18 }}
-        className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border/60 bg-muted/5"
+        className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border/60 bg-muted/5 flex-wrap"
       >
         <RecordTypeBadge type={result.type} />
         {result._label && <span className="text-xs font-mono text-muted-foreground/60 truncate">{result._label}</span>}
@@ -209,7 +268,7 @@ function ResultCard({
       transition={{ duration: 0.18 }}
       className="glass-panel border border-border rounded-2xl overflow-hidden"
     >
-      <div className="flex items-center gap-2.5 px-4 py-2 border-b border-border/50 bg-muted/20">
+      <div className="flex items-center gap-2.5 px-4 py-2 border-b border-border/50 bg-muted/20 flex-wrap">
         <RecordTypeBadge type={result.type} />
         {result._label && (
           <span className="text-[11px] font-mono text-muted-foreground truncate">{result._label}</span>
@@ -243,13 +302,19 @@ function ResultCard({
                 )}
                 {isMx  ? <MxRow flat={flat} />  :
                  isSrv ? <SrvRow flat={flat} /> :
-                 <span className="text-sm font-mono break-all flex-1 leading-relaxed">{flat}</span>}
+                 <span className="text-sm font-mono break-all flex-1 min-w-0 leading-relaxed">{flat}</span>}
                 <TtlBadge ttl={ttl} />
                 <CopyButton text={flat} copyLabel={copyLabel} />
               </div>
             );
           })}
         </div>
+      )}
+      {result.propagation && result.found && (
+        <PropagationView propagation={result.propagation}
+          consistentLabel={propagationLabels.consistent}
+          inconsistentLabel={propagationLabels.inconsistent}
+          resolverLabel={propagationLabels.resolver} />
       )}
     </motion.div>
   );
@@ -271,62 +336,17 @@ function toPtrName(nameOrIp: string, type: RecordType): string {
 
 async function fetchDns(name: string, type: RecordType, label?: string): Promise<DnsResult> {
   const r = await fetch(`/api/dns/records?name=${encodeURIComponent(name)}&type=${type}`);
-  const data: DnsResult = await r.json();
+  const data = await r.json().catch(() => ({})) as DnsResult & { error?: string };
+  if (!r.ok || !("found" in data)) {
+    const err = new Error(data.error || `HTTP ${r.status}`);
+    (err as Error & { status?: number }).status = r.status;
+    throw err;
+  }
   if (label) data._label = label;
   return data;
 }
 
 const COMMON_DKIM_SELECTORS = ["google", "dkim", "k1", "k2", "s1", "s2", "mail", "smtp", "default", "selector1", "selector2", "protonmail", "pm", "key1", "key2", "mx"];
-
-// SPF record parser
-type SpfAnalysis = {
-  mechanisms: { type: string; value?: string; qualifier: string }[];
-  allDirective: string | null;
-  dnsLookupCount: number;
-  tooManyLookups: boolean;
-  raw: string;
-};
-function parseSpf(raw: string): SpfAnalysis {
-  const parts = raw.split(/\s+/).filter(Boolean);
-  const DNS_LOOKUP_TYPES = ["include", "a", "mx", "exists", "redirect"];
-  const mechanisms: SpfAnalysis["mechanisms"] = [];
-  let allDirective: string | null = null;
-  let dnsLookupCount = 0;
-
-  for (const part of parts) {
-    if (/^v=spf1$/i.test(part)) continue;
-    const match = part.match(/^([+\-~?]?)(\w+)(?::(.+))?$/);
-    if (!match) continue;
-    const [, qualifier, type, value] = match;
-    if (type.toLowerCase() === "all") { allDirective = (qualifier || "+") + "all"; continue; }
-    if (type.toLowerCase() === "redirect") { dnsLookupCount++; }
-    else if (DNS_LOOKUP_TYPES.includes(type.toLowerCase())) dnsLookupCount++;
-    mechanisms.push({ type: type.toLowerCase(), value, qualifier: qualifier || "+" });
-  }
-  return { mechanisms, allDirective, dnsLookupCount, tooManyLookups: dnsLookupCount > 10, raw };
-}
-
-// DMARC record parser
-type DmarcAnalysis = {
-  p: string | null; sp: string | null; pct: string | null;
-  rua: string[]; ruf: string[];
-  adkim: string | null; aspf: string | null;
-  raw: string;
-};
-function parseDmarc(raw: string): DmarcAnalysis {
-  const tags: Record<string, string> = {};
-  for (const part of raw.split(";")) {
-    const [k, v] = part.trim().split("=", 2);
-    if (k && v !== undefined) tags[k.trim().toLowerCase()] = v.trim();
-  }
-  return {
-    p: tags["p"] || null, sp: tags["sp"] || null, pct: tags["pct"] || null,
-    rua: tags["rua"] ? tags["rua"].split(",").map(s => s.trim().replace(/^mailto:/, "")) : [],
-    ruf: tags["ruf"] ? tags["ruf"].split(",").map(s => s.trim().replace(/^mailto:/, "")) : [],
-    adkim: tags["adkim"] || null, aspf: tags["aspf"] || null,
-    raw,
-  };
-}
 
 function policyColor(p: string | null): string {
   if (p === "reject")     return "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800";
@@ -358,6 +378,7 @@ export default function DnsPage() {
   const [dkimResult, setDkimResult] = React.useState<DnsResult | null>(null);
   const [dkimLoading, setDkimLoading] = React.useState(false);
   const [totalMs, setTotalMs] = React.useState<number | null>(null);
+  const [dnssecEnabled, setDnssecEnabled] = React.useState<boolean | null>(null);
 
   React.useEffect(() => {
     if (!router.isReady) return;
@@ -382,6 +403,7 @@ export default function DnsPage() {
     setResults([]);
     setDkimResult(null);
     setTotalMs(null);
+    setDnssecEnabled(null);
     setIsEmailPreset(isEmail);
 
     router.replace({ pathname: "/dns", query: { q: name, type: qTypes.join(",") } }, undefined, { locale: false, shallow: true });
@@ -390,6 +412,8 @@ export default function DnsPage() {
     try {
       const jobs: Promise<DnsResult>[] = qTypes.map(type => fetchDns(toPtrName(name, type), type));
       if (isEmail) jobs.push(fetchDns(`_dmarc.${name}`, "TXT", `_dmarc.${name}`));
+      const dnssecDs = fetchDns(name, "DS").catch(() => null);
+      const dnssecKey = fetchDns(name, "DNSKEY").catch(() => null);
 
       const settled = await Promise.allSettled(jobs);
       const all: DnsResult[] = settled.map((s, i) => {
@@ -397,6 +421,10 @@ export default function DnsPage() {
         const type = i < qTypes.length ? qTypes[i] : "TXT";
         return { name: i < qTypes.length ? name : `_dmarc.${name}`, type, found: false, records: [], flat: [], resolvers: [], latencyMs: 0, error: t("dns.err_req_failed") };
       });
+
+      const [dsRes, keyRes] = await Promise.all([dnssecDs, dnssecKey]);
+      if (dsRes && keyRes && dsRes.found && keyRes.found) setDnssecEnabled(true);
+      else if (dsRes || keyRes) setDnssecEnabled(false);
 
       setResults(all);
       setTotalMs(Date.now() - t0);
@@ -434,6 +462,17 @@ export default function DnsPage() {
       const found = settled
         .filter((s): s is PromiseFulfilledResult<DnsResult> => s.status === "fulfilled" && s.value.found)
         .map(s => s.value);
+      const rateLimited = settled.some(
+        (s): s is PromiseRejectedResult =>
+          s.status === "rejected" &&
+          ((s.reason as { status?: number })?.status === 429 ||
+            /too many|rate limit/i.test(String(s.reason?.message ?? s.reason)))
+      );
+      if (found.length === 0 && rateLimited) {
+        toast.error(t("dns.dkim_auto_rate_limited"));
+        setDkimResult(null);
+        return;
+      }
       if (found.length === 0) {
         toast(t("dns.dkim_not_found"));
         setDkimResult({ name: queried, type: "TXT", found: false, records: [], flat: [], resolvers: [], latencyMs: 0, _label: "auto-detect" });
@@ -492,9 +531,15 @@ export default function DnsPage() {
     copyLabel,
     copyAllLabel: t("dns.copy_all"),
     soaLabels,
+    propagationLabels: {
+      consistent: t("dns.propagation_consistent"),
+      inconsistent: t("dns.propagation_inconsistent"),
+      resolver: t("dns.propagation_resolver"),
+    },
   };
 
   const PRESETS = [
+    { label: t("dns.preset_all"), icon: RiAppsLine, types: RECORD_TYPES.map(r => r.type) as RecordType[] },
     { label: t("dns.preset_basic"), icon: RiGlobalLine, types: ["A", "AAAA", "CNAME"] as RecordType[] },
     { label: t("dns.preset_email"), icon: RiMailLine,   types: ["MX", "TXT"] as RecordType[], email: true },
     { label: t("dns.preset_ns"),    icon: RiServerLine, types: ["NS", "SOA"] as RecordType[] },
@@ -511,20 +556,20 @@ export default function DnsPage() {
             <Link href="/" className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground touch-manipulation">
               <RiArrowLeftSLine className="w-5 h-5" />
             </Link>
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
                 <RiServerLine className="w-5 h-5" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold leading-none">{t("dns.title")}</h1>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t("dns.subtitle")}</p>
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold leading-none truncate">{t("dns.title")}</h1>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{t("dns.subtitle")}</p>
               </div>
             </div>
           </div>
 
           <div className="glass-panel border border-border rounded-2xl p-4 space-y-3">
             <form onSubmit={e => { e.preventDefault(); doQuery(); }} className="flex gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <RiGlobalLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
                 <Input
                   value={domain}
@@ -630,6 +675,18 @@ export default function DnsPage() {
                   </div>
                 )}
 
+                {dnssecEnabled !== null && (
+                  <div className={cn(
+                    "flex items-center gap-2 text-[11px] px-3 py-2 rounded-lg border",
+                    dnssecEnabled
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                      : "bg-muted/40 text-muted-foreground border-border"
+                  )}>
+                    {dnssecEnabled ? <RiShieldCheckLine className="w-3.5 h-3.5" /> : <RiShieldLine className="w-3.5 h-3.5" />}
+                    {dnssecEnabled ? t("dns.dnssec_enabled") : t("dns.dnssec_disabled")}
+                  </div>
+                )}
+
                 {mainResults.map((r, i) => (
                   <ResultCard key={r.type + r.name} result={r} {...resultCardProps} />
                 ))}
@@ -658,7 +715,7 @@ export default function DnsPage() {
                         { k: "DKIM",  found: !!hasDKIM, desc: dkimResult ? dkimSelector || t("dns.dkim_detected") : t("dns.dkim_pending") },
                       ] as const).map(({ k, found, desc }) => (
                         <div key={k} className={cn(
-                          "flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold",
+                          "flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold min-w-0",
                           found
                             ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
                             : "bg-muted border-border text-muted-foreground opacity-60"
@@ -667,8 +724,8 @@ export default function DnsPage() {
                             ? <RiCheckLine className="w-3.5 h-3.5 shrink-0" />
                             : <RiErrorWarningLine className="w-3.5 h-3.5 shrink-0" />
                           }
-                          <span>{k}</span>
-                          <span className="text-[10px] font-normal ml-auto opacity-70">{desc}</span>
+                          <span className="shrink-0">{k}</span>
+                          <span className="text-[10px] font-normal ml-auto opacity-70 truncate min-w-0">{desc}</span>
                         </div>
                       ))}
                     </div>
@@ -690,9 +747,9 @@ export default function DnsPage() {
                           </div>
                           <div className="flex items-start gap-2 col-span-2 mt-1">
                             <span className="text-muted-foreground shrink-0 w-24">{t("dns.spf_mechanisms")}</span>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 min-w-0">
                               {spfAnalysis.mechanisms.map((m, i) => (
-                                <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-foreground/70">
+                                <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-foreground/70 break-all max-w-full">
                                   {m.qualifier !== "+" ? m.qualifier : ""}{m.type}{m.value ? `:${m.value}` : ""}
                                 </span>
                               ))}
@@ -714,10 +771,20 @@ export default function DnsPage() {
                       <div className="pt-1 border-t border-border/40 space-y-2">
                         <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-2">
                           <RiShieldCheckLine className="w-3 h-3" />{t("dns.dmarc_analysis")}
+                          <span className={cn(
+                            "text-[9px] font-bold px-1.5 py-0.5 rounded border",
+                            dmarcAnalysis.strength === "strong" ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                              : dmarcAnalysis.strength === "weak" ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                              : "bg-muted text-muted-foreground border-border"
+                          )}>
+                            {dmarcAnalysis.strength === "strong" ? t("dns.dmarc_strength_strong")
+                              : dmarcAnalysis.strength === "weak" ? t("dns.dmarc_strength_weak")
+                              : t("dns.dmarc_strength_none")}
+                          </span>
                         </p>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                           {dmarcAnalysis.p && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_policy")}</span>
                               <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", policyColor(dmarcAnalysis.p))}>
                                 {dmarcAnalysis.p}
@@ -725,7 +792,7 @@ export default function DnsPage() {
                             </div>
                           )}
                           {dmarcAnalysis.sp && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_subdomain")}</span>
                               <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", policyColor(dmarcAnalysis.sp))}>
                                 {dmarcAnalysis.sp}
@@ -733,19 +800,19 @@ export default function DnsPage() {
                             </div>
                           )}
                           {(dmarcAnalysis.pct !== null) && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_pct")}</span>
                               <span className="font-mono">{dmarcAnalysis.pct ?? "100"}%</span>
                             </div>
                           )}
                           {dmarcAnalysis.adkim && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_adkim")}</span>
                               <span className="font-mono">{dmarcAnalysis.adkim === "s" ? "strict" : "relaxed"}</span>
                             </div>
                           )}
                           {dmarcAnalysis.aspf && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="text-muted-foreground w-24 shrink-0">{t("dns.dmarc_aspf")}</span>
                               <span className="font-mono">{dmarcAnalysis.aspf === "s" ? "strict" : "relaxed"}</span>
                             </div>
@@ -775,12 +842,12 @@ export default function DnsPage() {
                         <RiKeyLine className="w-3 h-3" />{t("dns.dkim_section")}
                         <span className="text-muted-foreground/50">{t("dns.dkim_hint")}</span>
                       </p>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Input
                           value={dkimSelector}
                           onChange={e => setDkimSelector(e.target.value)}
                           placeholder={t("dns.dkim_placeholder")}
-                          className="h-8 text-xs rounded-lg font-mono flex-1"
+                          className="h-8 text-xs rounded-lg font-mono flex-1 min-w-[120px]"
                           onKeyDown={e => e.key === "Enter" && queryDkim()}
                         />
                         <Button size="sm" variant="outline" onClick={() => queryDkim()}

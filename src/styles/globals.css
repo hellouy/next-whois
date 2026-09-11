@@ -470,3 +470,14 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Radix ScrollArea wraps children in a display:table shim whose shrink-to-fit
+   width is driven by the content's max-content size. On narrow viewports that
+   lets a max-width content column (e.g. max-w-2xl) exceed the viewport and get
+   clipped by the scroll area's hidden overflow. Force the shim to match the
+   viewport width so page content never overflows horizontally. */
+[data-radix-scroll-area-viewport] > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+}

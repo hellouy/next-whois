@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { queryMiitIcp, type MiitIcpPage } from "@/lib/server/icp-miit";
+import { splitSearchTerms, countBatchFailed, ICP_BATCH_CONCURRENCY, type IcpBatchItem } from "@/lib/icp-batch";
 
 export const config = { maxDuration: 15 };
 
@@ -44,6 +45,15 @@ export type IcpResponse = {
   list: IcpRecord[];
   error?: string;
   source?: string;
+};
+
+export type IcpBatchResponse = {
+  ok: boolean;
+  batch: true;
+  type: IcpType;
+  results: IcpBatchItem[];
+  failed: number;
+  elapsedMs: number;
 };
 
 function stripHtml(text: string): string {
@@ -135,7 +145,7 @@ async function fetchLegacyUpstream(
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<IcpResponse>,
+  res: NextApiResponse<IcpResponse | IcpBatchResponse>,
 ) {
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET");
@@ -156,18 +166,63 @@ export default async function handler(
   }
 
   const type = (req.query.type as string | undefined)?.trim() as IcpType | undefined;
-  const search = (req.query.search as string | undefined)?.trim() ?? "";
+  const rawSearch = (req.query.search as string | undefined) ?? "";
   const pageNum  = Math.max(1, parseInt((req.query.pageNum  as string) || "1",  10) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize as string) || "10", 10) || 10));
+  const batch = req.query.batch === "1" || req.query.batch === "true";
 
   if (!type || !VALID_TYPES.includes(type)) {
     return res.status(400).json({
-      ok: false, type: "web", search, pageNum, pageSize,
+      ok: false, type: "web", search: rawSearch, pageNum, pageSize,
       total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
       error: `无效的查询类型，支持: ${VALID_TYPES.join(", ")}`,
     });
   }
 
+  res.setHeader("Cache-Control", "no-store");
+
+  if (batch) {
+    const terms = splitSearchTerms(rawSearch);
+    if (terms.length === 0) {
+      return res.status(400).json({
+        ok: false, type, search: rawSearch, pageNum, pageSize,
+        total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
+        error: "search 参数不能为空",
+      });
+    }
+    const t0 = Date.now();
+    const results: IcpBatchItem[] = new Array(terms.length);
+    let cursor = 0;
+    const workerCount = Math.min(ICP_BATCH_CONCURRENCY, terms.length);
+    const workers = Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= terms.length) return;
+        const r = await queryOne(type, terms[i], pageNum, pageSize);
+        const item: IcpBatchItem = {
+          search: terms[i],
+          ok: r.ok,
+          total: r.total,
+          pages: r.pages,
+          list: r.list,
+          ...(r.source ? { source: r.source } : {}),
+          ...(r.error ? { error: r.error } : {}),
+        };
+        results[i] = item;
+      }
+    });
+    await Promise.all(workers);
+    return res.status(200).json({
+      ok: true,
+      batch: true,
+      type,
+      results,
+      failed: countBatchFailed(results),
+      elapsedMs: Date.now() - t0,
+    });
+  }
+
+  const search = rawSearch.trim();
   if (!search) {
     return res.status(400).json({
       ok: false, type, search, pageNum, pageSize,
@@ -176,13 +231,17 @@ export default async function handler(
     });
   }
 
-  res.setHeader("Cache-Control", "no-store");
+  // ── Single mode: keep existing response shape ─────────────────────────────
+  const result = await queryOne(type, search, pageNum, pageSize);
+  return res.status(result.ok ? 200 : 502).json(result);
+}
 
-  // ── Primary: direct MIIT ICP API ─────────────────────────────────────────
+// Shared single-term lookup: MIIT primary + legacy fallback.
+async function queryOne(type: IcpType, search: string, pageNum: number, pageSize: number): Promise<IcpResponse> {
   const miitResult = await queryMiitIcp({ type, search, pageNum, pageSize, timeoutMs: 12_000 });
 
   if (miitResult.ok) {
-    return res.status(200).json(pageToResponse(miitResult.data, type, search));
+    return pageToResponse(miitResult.data, type, search);
   }
 
   // Transient MIIT errors (server down, timeout, token issue) → try legacy fallback
@@ -193,7 +252,7 @@ export default async function handler(
   if (miitTransient) {
     const legacy = await fetchLegacyUpstream(type, search, pageNum, pageSize);
     if (legacy) {
-      return res.status(200).json(legacy);
+      return legacy;
     }
   }
 
@@ -203,9 +262,9 @@ export default async function handler(
     ? miitErr + (hasCustomBase ? "" : "。如有自建代理，请设置 ICP_API_BASE 环境变量")
     : miitErr;
 
-  return res.status(502).json({
+  return {
     ok: false, type, search, pageNum, pageSize,
     total: 0, pages: 0, hasNextPage: false, hasPreviousPage: false, list: [],
     error: finalError,
-  });
+  };
 }

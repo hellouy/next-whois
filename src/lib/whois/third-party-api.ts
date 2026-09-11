@@ -5,8 +5,11 @@
  */
 import { WhoisResult, WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "./types";
 import { many } from "@/lib/db-query";
+import { analyzeWhois } from "./common_parser";
 import { lookupNicPh } from "./http-scrapers/nic-ph";
 import { lookupNicTt } from "./http-scrapers/nic-tt";
+import { lookupNicGm } from "./http-scrapers/nic-gm";
+import { lookupNicBb } from "./http-scrapers/nic-bb";
 
 // Keep well under Vercel's 10s Hobby-plan function limit.
 const TIMEOUT_MS = 9_000;
@@ -403,9 +406,130 @@ async function lookupViaTtWeb(domain: string): Promise<WhoisResult> {
   };
 }
 
+// ── gm_web adapter (GM-NIC web scraper — nic.gm) ──────────────────────────────
+
+async function lookupViaGmWeb(domain: string): Promise<WhoisResult> {
+  const start = Date.now();
+  const r = await lookupNicGm(domain);
+  const elapsed = (Date.now() - start) / 1000;
+
+  if (!r.success) {
+    // "Domain not found or not registered" → forward as definitive not-found
+    if (!r.blocked && r.reason.toLowerCase().includes("not found")) {
+      return {
+        status: false,
+        time: elapsed,
+        error: "Domain not found",
+        source: "whois.nic.gm",
+      };
+    }
+    return {
+      status: false,
+      time: elapsed,
+      error: r.blocked
+        ? "nic.gm 暂时无法访问，无法自动查询"
+        : `GM-NIC 查询失败: ${r.reason}`,
+      source: "whois.nic.gm",
+    };
+  }
+
+  const registrationDate = r.registrationDate || "Unknown";
+  const domainResult: WhoisAnalyzeResult = {
+    ...initialWhoisAnalyzeResult,
+    domain,
+    registrar:              r.reserved ? "Unknown" : "GM-NIC (CYPDOM) — Gambia ccTLD Registry",
+    registrarURL:           "https://www.nic.gm/NIC2/search.html",
+    ianaId:                 "N/A",
+    whoisServer:            "whois.nic.gm",
+    updatedDate:            "Unknown",
+    creationDate:           registrationDate,
+    expirationDate:         "Unknown",
+    nameServers:            r.nameservers,
+    status:                 r.reserved
+      ? [{ status: "registry-reserved", url: "" }]
+      : [{ status: "Active", url: "" }],
+    registrantName:         "Unknown",
+    registrantOrganization: "Unknown",
+    registrantCountry:      "GM",
+    registrantEmail:        "Unknown",
+    dnssec:                 "Unknown",
+    rawWhoisContent:        r.rawWhoisContent,
+    remainingDays: null,
+    domainAge: registrationDate !== "Unknown" ? (() => {
+      try { return Math.round((Date.now() - new Date(registrationDate).getTime()) / 86_400_000); } catch { return null; }
+    })() : null,
+    registerPrice: null, renewPrice: null, negotiable: null,
+    cidr: "", inetNum: "", inet6Num: "", netRange: "", netName: "", netType: "", originAS: "",
+    registryDomainId: "Unknown",
+    registrantProvince: "Unknown", registrantCity: "Unknown",
+    registrantAddress: "Unknown", registrantPostalCode: "Unknown",
+    registrantPhone: "Unknown", registrantFax: "Unknown",
+    adminName: "Unknown", adminOrganization: "Unknown",
+    adminCountry: "Unknown", adminEmail: "Unknown", adminPhone: "Unknown",
+    techName: "Unknown", techOrganization: "Unknown",
+    techEmail: "Unknown", techPhone: "Unknown",
+    abuseEmail: "Unknown", abusePhone: "Unknown",
+  };
+
+  return {
+    status: true,
+    time: elapsed,
+    source: "whois.nic.gm",
+    result: domainResult,
+  };
+}
+
+// ── bb_web adapter (BB registry web WHOIS — whois.telecoms.gov.bb) ─────────────
+
+async function lookupViaBbWeb(domain: string): Promise<WhoisResult> {
+  const start = Date.now();
+  const r = await lookupNicBb(domain);
+  const elapsed = (Date.now() - start) / 1000;
+
+  if (!r.success) {
+    if (!r.blocked && r.reason.toLowerCase().includes("not found")) {
+      return {
+        status: false,
+        time: elapsed,
+        error: "Domain not found",
+        source: "whois.telecoms.gov.bb",
+      };
+    }
+    return {
+      status: false,
+      time: elapsed,
+      error: r.blocked
+        ? "bb WHOIS 暂时无法访问，无法自动查询"
+        : `BB 注册局查询失败: ${r.reason}`,
+      source: "whois.telecoms.gov.bb",
+    };
+  }
+
+  // The <pre> block is standard WHOIS text — run it through the generic parser
+  // so registrar/dates/nameservers/statuses are structured exactly like a TCP
+  // WHOIS response.
+  let parsed: WhoisAnalyzeResult;
+  try {
+    parsed = await analyzeWhois(r.rawWhoisContent);
+  } catch {
+    parsed = { ...initialWhoisAnalyzeResult };
+  }
+  const result: WhoisAnalyzeResult = {
+    ...parsed,
+    domain,
+    whoisServer: "whois.telecoms.gov.bb",
+    registrar: parsed.registrar || "Unknown",
+    registrarURL: "https://www.telecoms.gov.bb",
+    rawWhoisContent: r.rawWhoisContent,
+    registrantCountry: parsed.registrantCountry === "Unknown" ? "BB" : parsed.registrantCountry,
+  };
+
+  return { status: true, time: elapsed, source: "whois.telecoms.gov.bb", result };
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
-export type ThirdPartyApiSource = "tianhu" | "yisi" | "ph_web" | "tt_web";
+export type ThirdPartyApiSource = "tianhu" | "yisi" | "ph_web" | "tt_web" | "gm_web" | "bb_web";
 
 export async function lookupViaThirdPartyApi(
   domain: string,
@@ -415,5 +539,7 @@ export async function lookupViaThirdPartyApi(
   if (source === "yisi")    return lookupViaYisi(domain);
   if (source === "ph_web")  return lookupViaPhWeb(domain);
   if (source === "tt_web")  return lookupViaTtWeb(domain);
+  if (source === "gm_web")  return lookupViaGmWeb(domain);
+  if (source === "bb_web")  return lookupViaBbWeb(domain);
   return { status: false, time: 0, error: `未知 API 源: ${source}` };
 }

@@ -676,14 +676,44 @@ export function getDomainRegistrationStatus(
     rawContent.includes("ihtilaf") ||
     rawContent.includes("tahkim");
 
-  // ── GUARD: A domain with registrar + creation + expiration date is definitively
-  // registered. Reserved/prohibited domains have no registrar or dates.
+  // ── GUARD: A domain with ANY concrete registration evidence — registrar,
+  // creation/expiration date, or name servers — is definitively registered.
   // Without this guard, WHOIS boilerplate text (e.g. RegistrarSafe privacy
   // notice containing "withheld") triggers false reserved/prohibited positives.
+  // Some registries (e.g. .tn, .ro) return full registration data for a domain
+  // alongside a free-text line like "reserved"/"restricted"; in that case the
+  // signal describes a registry-level hold on an EXISTING registration, not an
+  // unregistered name — so it must not override the registration evidence.
+  const hasRegistrar =
+    typeof result.registrar === "string" &&
+    result.registrar !== "Unknown" &&
+    result.registrar.length > 0;
+  const hasCreationDate =
+    typeof result.creationDate === "string" &&
+    result.creationDate !== "Unknown" &&
+    result.creationDate.length > 0;
+  const hasExpirationDate =
+    typeof result.expirationDate === "string" &&
+    result.expirationDate !== "Unknown" &&
+    result.expirationDate.length > 0;
+  const hasNameServers =
+    Array.isArray(result.nameServers) && result.nameServers.length > 0;
+
+  // Registrar alone is a WEAK signal — some adapters/registries put a registry
+  // operator name there even for held/reserved domains.  A registry-reserved
+  // signal therefore only defers to registration evidence when there are
+  // concrete dates or name servers.  Otherwise the reserved status stands.
+  const hasStrongRegistrationEvidence =
+    hasCreationDate || hasExpirationDate || hasNameServers;
+  const hasReservedSignal =
+    allStatusText.includes("registry-reserved") ||
+    allStatusText.includes("registryreserved") ||
+    allStatusText.includes("registry-premium") ||
+    rawHasReserved;
+
   const isDefinitelyRegistered =
-    result.registrar && result.registrar !== "Unknown" &&
-    result.creationDate && result.creationDate !== "Unknown" &&
-    result.expirationDate && result.expirationDate !== "Unknown";
+    hasStrongRegistrationEvidence ||
+    (hasRegistrar && !hasReservedSignal);
 
   const isProhibited =
     !isDefinitelyRegistered &&

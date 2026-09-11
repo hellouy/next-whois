@@ -1323,7 +1323,6 @@ export default function LookupPage({
                     locale={locale}
                     isPremiumByWhois={result ? getDomainRegistrationStatus(result, locale).isPremiumReserved : false}
                     premium={premium ?? null}
-                    onSubscribe={enableRemind ? openReminderWithGate : undefined}
                   />
                 ) : (
                   <>
@@ -1877,19 +1876,23 @@ export default function LookupPage({
                           {data.source && (
                             <>
                               {" · "}
-                              {(data.source === "tian.hu" || data.source === "YISI.YUN") ? (
-                                <a
-                                  href={data.source === "tian.hu" ? "https://tian.hu" : "https://yisi.yun"}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title={isChinese ? "通过第三方 API 获取" : "Via third-party API"}
-                                  className="text-amber-500/80 hover:text-amber-500 hover:underline transition-colors"
-                                >
-                                  {data.source}
-                                </a>
-                              ) : (
-                                data.source
-                              )}
+                              {(() => {
+                                const label = data.source === "rdap" ? "rdap" : "whois";
+                                if (data.source === "tian.hu" || data.source === "YISI.YUN") {
+                                  return (
+                                    <a
+                                      href={data.source === "tian.hu" ? "https://tian.hu" : "https://yisi.yun"}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={isChinese ? "通过第三方 API 获取" : "Via third-party API"}
+                                      className="text-amber-500/80 hover:text-amber-500 hover:underline transition-colors"
+                                    >
+                                      {label}
+                                    </a>
+                                  );
+                                }
+                                return label;
+                              })()}
                             </>
                           )}
                         </span>

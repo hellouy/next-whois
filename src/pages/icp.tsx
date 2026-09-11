@@ -16,8 +16,9 @@ import {
   RiGlobalLine, RiSmartphoneLine, RiAppsLine, RiThunderstormsLine,
   RiRefreshLine, RiWifiLine, RiWifiOffLine,
 } from "@remixicon/react";
-import type { IcpRecord, IcpResponse } from "@/pages/api/icp/query";
+import type { IcpRecord, IcpResponse, IcpBatchResponse } from "@/pages/api/icp/query";
 import type { IcpHealthResponse } from "@/pages/api/icp/health";
+import { splitSearchTerms, type IcpBatchItem } from "@/lib/icp-batch";
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
 
@@ -92,6 +93,93 @@ function BlackListBadge({ level }: { level?: string | number | null }) {
   );
 }
 
+// ── Batch + CSV helpers ───────────────────────────────────────────────────────
+
+function buildIcpCsv(batch: IcpBatchResponse): string {
+  const header = ["查询词", "单位名称", "备案号", "服务名称", "更新时间", "性质"];
+  const rows: string[][] = [header];
+  for (const item of batch.results) {
+    if (!item.ok) continue;
+    for (const rec of item.list as IcpRecord[]) {
+      rows.push([
+        item.search,
+        rec.unitName ?? "",
+        rec.serviceLicence ?? "",
+        rec.serviceName ?? "",
+        rec.updateRecordTime ?? "",
+        rec.natureName ?? "",
+      ]);
+    }
+  }
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, "\"\"")}"`;
+  return "\uFEFF" + rows.map(r => r.map(esc).join(",")).join("\r\n");
+}
+
+function downloadCsv(batch: IcpBatchResponse, filename: string) {
+  const blob = new Blob([buildIcpCsv(batch)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function BatchItemCard({ item, isBlacklist, retrying, onRetry }: {
+  item: IcpBatchItem; isBlacklist: boolean; retrying: boolean; onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 flex-wrap">
+        <span className="font-mono text-xs font-semibold break-all min-w-0">{item.search}</span>
+        {item.ok ? (
+          <Badge className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 shrink-0">
+            {t("icp.batch_success")}
+          </Badge>
+        ) : (
+          <Badge className="text-[9px] bg-red-500/10 text-red-500 border-0 shrink-0">
+            {t("icp.batch_failed")}
+          </Badge>
+        )}
+        {item.source === "legacy" && (
+          <Badge variant="outline" className="text-[9px] text-muted-foreground shrink-0">{t("icp.source_legacy")}</Badge>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {item.ok ? t("icp.results_count", { count: String(item.total) }) : ""}
+        </span>
+        {!item.ok && (
+          <button
+            onClick={onRetry}
+            disabled={retrying}
+            className="text-[10px] px-2 py-0.5 rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            {retrying ? <RiLoader4Line className="w-3 h-3 animate-spin" /> : <RiRefreshLine className="w-3 h-3" />}
+            {t("icp.batch_retry")}
+          </button>
+        )}
+      </div>
+      {item.ok && item.list.length > 0 ? (
+        <div className="p-4 space-y-3">
+          {(item.list as IcpRecord[]).map((record, i) => (
+            <RecordCard key={i} record={record} isBlacklist={isBlacklist} index={i} />
+          ))}
+        </div>
+      ) : item.ok ? (
+        <div className="px-4 py-5 text-center">
+          <p className="text-sm font-medium">{t("icp.no_data")}</p>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">{item.search}</p>
+        </div>
+      ) : (
+        <div className="px-4 py-5 text-center">
+          <RiAlertLine className="w-6 h-6 text-red-400 mx-auto mb-2" />
+          <p className="text-xs text-red-600 dark:text-red-400 break-all">{item.error || t("icp.no_data_hint")}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RecordCard({ record, isBlacklist, index }: {
   record: IcpRecord; isBlacklist: boolean; index: number;
 }) {
@@ -107,7 +195,7 @@ function RecordCard({ record, isBlacklist, index }: {
       <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {record.domain && (
-            <span className="font-mono font-semibold text-sm">{record.domain}</span>
+            <span className="font-mono font-semibold text-sm break-all min-w-0">{record.domain}</span>
           )}
           {record.serviceName && record.serviceName !== record.domain && (
             <span className="text-sm font-medium">{record.serviceName}</span>
@@ -204,9 +292,11 @@ function useApiHealth() {
     } finally {
       setChecking(false);
     }
-  }, [t]);
+  }, []);
 
-  React.useEffect(() => { check(); }, [check]);
+  // Run exactly once on mount. The manual refresh button calls `check()`;
+  // adding it to the deps would re-run on every render since `t` churns.
+  React.useEffect(() => { check(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return { status, latency, error, checking, check };
 }
 
@@ -262,6 +352,8 @@ export default function IcpPage() {
   const [selectedType, setSelectedType] = React.useState<IcpTypeId>("web");
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<IcpResponse | null>(null);
+  const [batchResult, setBatchResult] = React.useState<IcpBatchResponse | null>(null);
+  const [retrying, setRetrying] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const { status: apiStatus, latency: apiLatency, error: apiError, checking: apiChecking, check: recheckApi } = useApiHealth();
@@ -284,23 +376,77 @@ export default function IcpPage() {
     const tp = type ?? selectedType;
     if (!q) { toast.error(t("icp.search_placeholder")); inputRef.current?.focus(); return; }
 
+    const terms = splitSearchTerms(q);
+    const isBatch = terms.length > 1;
+
     setLoading(true);
     setCurrentPage(page);
+    setResult(null);
+    setBatchResult(null);
     router.replace({ pathname: "/icp", query: { q, type: tp } }, undefined, { shallow: true });
 
     try {
-      const url = `/api/icp/query?type=${encodeURIComponent(tp)}&search=${encodeURIComponent(q)}&pageNum=${page}&pageSize=10`;
-      const res = await fetch(url);
-      const data: IcpResponse = await res.json();
-      setResult(data);
-      if (!data.ok) toast.error(data.error || t("icp.no_data"));
+      if (isBatch) {
+        const url = `/api/icp/query?type=${encodeURIComponent(tp)}&search=${encodeURIComponent(q)}&pageNum=${page}&pageSize=10&batch=1`;
+        const res = await fetch(url);
+        const data: IcpBatchResponse = await res.json();
+        if (data.batch) {
+          setBatchResult(data);
+          const fail = data.failed;
+          const ok = data.results.length - fail;
+          if (fail > 0) {
+            toast.error(t("icp.batch_done_fail", { ok: String(ok), fail: String(fail) }));
+          } else {
+            toast.success(t("icp.batch_done_ok", { ok: String(ok), fail: String(fail) }));
+          }
+        } else {
+          const single = data as unknown as IcpResponse;
+          setResult(single);
+          if (!single.ok) toast.error(single.error || t("icp.no_data"));
+        }
+      } else {
+        const url = `/api/icp/query?type=${encodeURIComponent(tp)}&search=${encodeURIComponent(q)}&pageNum=${page}&pageSize=10`;
+        const res = await fetch(url);
+        const data: IcpResponse = await res.json();
+        setResult(data);
+        if (!data.ok) toast.error(data.error || t("icp.no_data"));
+      }
     } catch {
       toast.error(t("icp.offline_desc"));
       setResult(null);
+      setBatchResult(null);
     } finally {
       setLoading(false);
     }
   }, [query, selectedType, router, t]);
+
+  const handleRetryTerm = async (term: string) => {
+    setRetrying(term);
+    try {
+      const url = `/api/icp/query?type=${encodeURIComponent(selectedType)}&search=${encodeURIComponent(term)}&pageNum=1&pageSize=10`;
+      const res = await fetch(url);
+      const data: IcpResponse = await res.json();
+      setBatchResult(prev => {
+        if (!prev) return prev;
+        const results = prev.results.map(it => it.search === term
+          ? {
+              search: term,
+              ok: data.ok,
+              total: data.total,
+              pages: data.pages,
+              list: data.list as unknown[],
+              ...(data.source ? { source: data.source } : {}),
+              ...(data.error ? { error: data.error } : {}),
+            }
+          : it);
+        return { ...prev, results, failed: results.filter(r => !r.ok).length };
+      });
+    } catch {
+      toast.error(t("icp.offline_desc"));
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const handlePage = (p: number) => {
     handleSearch(query, selectedType, p);
@@ -314,7 +460,7 @@ export default function IcpPage() {
 
   const typeInfo = ICP_TYPES.find(x => x.id === selectedType)!;
   const isBlacklist = typeInfo.blacklist;
-  const hasResult = !!result?.ok && result.list.length > 0;
+  const hasResult = (!!result?.ok && result.list.length > 0) || (!!batchResult?.ok && batchResult.results.length > 0);
 
   return (
     <>
@@ -412,7 +558,7 @@ export default function IcpPage() {
             onSubmit={e => { e.preventDefault(); handleSearch(); }}
             className="flex gap-2 mb-5"
           >
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
                 ref={inputRef}
@@ -429,6 +575,10 @@ export default function IcpPage() {
               <span className="hidden sm:inline">{t("search")}</span>
             </Button>
           </form>
+          <p className="flex items-center gap-1.5 -mt-3 mb-4 text-[11px] text-muted-foreground/70">
+            <RiAlertLine className="w-3.5 h-3.5 shrink-0" />
+            {t("icp.multi_query_hint")}
+          </p>
 
           {/* Example hints — always rendered, opacity transition only */}
           <div
@@ -477,7 +627,7 @@ export default function IcpPage() {
               </div>
             )}
 
-            {/* Empty state */}
+            {/* Empty state (single mode) */}
             {!loading && result?.ok && result.list.length === 0 && (
               <div className="rounded-xl border border-border/50 p-10 text-center">
                 <RiFileList2Line className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
@@ -488,7 +638,45 @@ export default function IcpPage() {
               </div>
             )}
 
-            {/* Results list */}
+            {/* Batch results */}
+            {!loading && batchResult && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-[9px]">
+                      {t("icp.batch_mode")} · {t("icp.results_count", { count: String(batchResult.results.length) })}
+                    </Badge>
+                    {batchResult.failed > 0 && (
+                      <Badge className="text-[9px] bg-red-500/10 text-red-500 border-0">
+                        {t("icp.batch_failed")}: {batchResult.failed}
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadCsv(batchResult, `icp-${Date.now()}.csv`)}
+                    className="shrink-0 gap-1.5 h-8 text-xs"
+                  >
+                    <RiFileCopyLine className="w-3.5 h-3.5" />
+                    {t("icp.export_csv")}
+                  </Button>
+                </div>
+
+                {batchResult.results.map(item => (
+                  <BatchItemCard
+                    key={item.search}
+                    item={item}
+                    isBlacklist={isBlacklist}
+                    retrying={retrying === item.search}
+                    onRetry={() => handleRetryTerm(item.search)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Results list (single mode) */}
             {result?.ok && result.list.length > 0 && (
               <div className="space-y-3">
                 {/* Summary bar */}

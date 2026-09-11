@@ -2,7 +2,6 @@ import React, { useCallback, useRef, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,6 +25,7 @@ import {
   RiLoginBoxLine,
 } from "@remixicon/react";
 import type { BatchItem } from "./api/lookup-batch";
+import { buildDomainMatrix, parseDomainParts } from "@/lib/batch-domain-matrix";
 
 // ── Popular TLDs preset ───────────────────────────────────────────────────────
 const POPULAR_TLDS = [
@@ -42,6 +42,14 @@ type RowStatus = "available" | "registered" | "reserved" | "premium" | "error" |
 
 function getDomainStatus(item: BatchItem): RowStatus {
   if (!item.status) return "error";
+  // DNS-first availability verdict takes priority (set by lookup-batch).
+  if (item.availability) {
+    if (item.availability === "available") return "available";
+    if (item.availability === "reserved") return "reserved";
+    if (item.availability === "premium") return "premium";
+    if (item.availability === "unknown") return "error";
+    return "registered";
+  }
   const r = item.result;
   if (!r || r.status.length === 0) return "available";
   const codes = r.status.map(s => s.status.toLowerCase());
@@ -68,6 +76,22 @@ function StatusBadge({ status }: { status: RowStatus; }) {
   );
 }
 
+/** Tiny verification-source badge (DNS / RDAP / WHOIS / mixed). */
+function SourceBadge({ source }: { source?: BatchItem["source"] }) {
+  if (!source) return null;
+  const label = source.toUpperCase();
+  const cls =
+    source === "dns" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+    : source === "rdap" ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20"
+    : source === "mixed" ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+    : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20";
+  return (
+    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border", cls)} title={`Verification source: ${source}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function BatchCheckPage() {
   const { t } = useTranslation();
   const settings = useSiteSettings();
@@ -85,6 +109,7 @@ export default function BatchCheckPage() {
   const stopRef = useRef(false);
 
   const MAX_ANON = 10;
+  const MAX_TOTAL = 500; // hard cap for logged-in users, mirrors the API batch limit
   const CHUNK_SIZE = 20; // domains per API call
 
   // ── TLD list derivation ───────────────────────────────────────────────────
@@ -116,38 +141,44 @@ export default function BatchCheckPage() {
 
   // ── Run check ────────────────────────────────────────────────────────────
   const handleCheck = async () => {
-    const cleanPrefix = prefix.trim().toLowerCase().replace(/^[\s.]+|[\s.]+$/g, "");
-    if (!cleanPrefix) { toast.error(t("batch_check.err_no_prefix")); return; }
+    const prefixes = parseDomainParts(prefix);
+    if (prefixes.length === 0) { toast.error(t("batch_check.err_no_prefix")); return; }
 
-    const tldList = await getTldList();
-    if (tldList.length === 0) { toast.error(t("batch_check.err_no_tlds")); return; }
+    const groupTlds = await getTldList();
+    const customList = parseDomainParts(customTlds);
+    const tlds = Array.from(new Set([...groupTlds, ...customList]));
+    if (tlds.length === 0) { toast.error(t("batch_check.err_no_tlds")); return; }
 
-    const effectiveTlds = isLoggedIn ? tldList : tldList.slice(0, MAX_ANON);
+    const domains = buildDomainMatrix(prefixes, tlds);
 
-    if (!isLoggedIn && tldList.length > MAX_ANON) {
-      toast.warning(t("batch_check.warn_anon_limit", { max: MAX_ANON }));
-    } else if (effectiveTlds.length > 50) {
+    // R1-AC5: hard-block oversized combinations instead of silently truncating.
+    const maxTotal = isLoggedIn ? MAX_TOTAL : MAX_ANON;
+    if (domains.length > maxTotal) {
+      toast.error(t("batch_check.err_too_many", { count: domains.length, max: maxTotal }));
+      return;
+    }
+    const effectiveTlds = domains;
+
+    if (effectiveTlds.length > 50) {
       toast.info(t("batch_check.warn_large_batch", { count: effectiveTlds.length }));
     }
 
-    const domains = effectiveTlds.map(tld => `${cleanPrefix}.${tld}`);
-
     setResults(new Map());
-    setProgress({ done: 0, total: domains.length });
+    setProgress({ done: 0, total: effectiveTlds.length });
     setChecking(true);
     stopRef.current = false;
 
     // Insert "checking" placeholders immediately for visual feedback
     const placeholders = new Map<string, BatchItem>();
-    for (const d of domains) {
+    for (const d of effectiveTlds) {
       placeholders.set(d, { domain: d, status: false, time: 0, error: "checking" });
     }
     setResults(new Map(placeholders));
 
     // Process in chunks sequentially
-    for (let i = 0; i < domains.length; i += CHUNK_SIZE) {
+    for (let i = 0; i < effectiveTlds.length; i += CHUNK_SIZE) {
       if (stopRef.current) break;
-      const chunk = domains.slice(i, i + CHUNK_SIZE);
+      const chunk = effectiveTlds.slice(i, i + CHUNK_SIZE);
 
       try {
         const res = await fetch("/api/lookup-batch", {
@@ -195,7 +226,7 @@ export default function BatchCheckPage() {
 
   // ── Export / Copy ─────────────────────────────────────────────────────────
   const exportCsv = () => {
-    const rows = [["Domain", "Status", "Registrar", "Expires", "Cached"]];
+    const rows = [["Domain", "Status", "Registrar", "Expires", "Cached", "Verification Source"]];
     for (const item of results.values()) {
       const st = item.error === "checking" ? "checking" : getDomainStatus(item);
       rows.push([
@@ -204,13 +235,15 @@ export default function BatchCheckPage() {
         item.result?.registrar ?? "",
         item.result?.expirationDate ?? "",
         item.cached ? "yes" : "no",
+        item.source ?? (item.dnsProbe ? "mixed" : ""),
       ]);
     }
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    // Prepend UTF-8 BOM so Excel opens the file without mojibake.
+    const csv = "\uFEFF" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `batch-check-${prefix || "result"}.csv`; a.click();
+    a.href = url; a.download = `batch-check-${prefix.slice(0, 20) || "result"}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -236,6 +269,14 @@ export default function BatchCheckPage() {
   const countAvail = allItems.filter(i => i.error !== "checking" && (getDomainStatus(i) === "available" || getDomainStatus(i) === "premium")).length;
   const countReg   = allItems.filter(i => i.error !== "checking" && (getDomainStatus(i) === "registered" || getDomainStatus(i) === "reserved")).length;
   const hasResults = results.size > 0;
+
+  // Live preview of the cartesian product size before running.
+  const previewPrefixes = parseDomainParts(prefix);
+  const previewTlds = Array.from(new Set([
+    ...(preset === "popular" ? POPULAR_TLDS : []),
+    ...parseDomainParts(customTlds),
+  ]));
+  const previewTotal = previewPrefixes.length * previewTlds.length;
 
   const FADE = { duration: 0.15 };
 
@@ -278,17 +319,17 @@ export default function BatchCheckPage() {
           {/* Input card */}
           <div className="rounded-2xl border border-border bg-card p-5 mb-4 space-y-4">
 
-            {/* Prefix input */}
+            {/* Prefix input — supports multiple prefixes (comma / newline / space separated) */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {t("batch_check.input_label")}
               </label>
-              <Input
+              <TextArea
                 value={prefix}
                 onChange={e => setPrefix(e.target.value)}
                 placeholder={t("batch_check.input_placeholder")}
-                className="font-mono"
-                onKeyDown={e => { if (e.key === "Enter" && !checking) handleCheck(); }}
+                rows={2}
+                className="font-mono text-xs resize-none"
                 disabled={checking}
               />
             </div>
@@ -326,16 +367,19 @@ export default function BatchCheckPage() {
                 </div>
               )}
 
-              {/* Custom TLD textarea */}
-              {preset === "custom" && (
+              {/* Additional custom TLDs — merged with the selected group */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] text-muted-foreground">
+                  {t("batch_check.custom_tld_label")}
+                </label>
                 <TextArea
                   value={customTlds}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCustomTlds(e.target.value)}
                   placeholder={t("batch_check.custom_tld_placeholder")}
-                  rows={3}
+                  rows={2}
                   className="font-mono text-xs resize-none"
                 />
-              )}
+              </div>
             </div>
 
             {/* Login notice */}
@@ -352,30 +396,37 @@ export default function BatchCheckPage() {
             )}
 
             {/* Action buttons */}
-            <div className="flex gap-2">
-              {!checking ? (
-                <Button
-                  onClick={handleCheck}
-                  className="flex-1 gap-2"
-                  disabled={!prefix.trim()}
-                >
-                  <RiSearchLine className="w-4 h-4" />
-                  {t("batch_check.btn_check")}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleStop}
-                  variant="destructive"
-                  className="flex-1 gap-2"
-                >
-                  <RiStopCircleLine className="w-4 h-4" />
-                  {t("batch_check.btn_stop")}
-                </Button>
-              )}
-              {hasResults && !checking && (
-                <Button variant="outline" size="icon" onClick={handleClear} title={t("batch_check.btn_clear")}>
-                  <RiDeleteBinLine className="w-4 h-4" />
-                </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                {!checking ? (
+                  <Button
+                    onClick={handleCheck}
+                    className="flex-1 gap-2"
+                    disabled={!prefix.trim()}
+                  >
+                    <RiSearchLine className="w-4 h-4" />
+                    {t("batch_check.btn_check")}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStop}
+                    variant="destructive"
+                    className="flex-1 gap-2"
+                  >
+                    <RiStopCircleLine className="w-4 h-4" />
+                    {t("batch_check.btn_stop")}
+                  </Button>
+                )}
+                {hasResults && !checking && (
+                  <Button variant="outline" size="icon" onClick={handleClear} title={t("batch_check.btn_clear")}>
+                    <RiDeleteBinLine className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {previewTotal > 0 && !checking && (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("batch_check.preview_count", { count: previewTotal })}
+                </p>
               )}
             </div>
           </div>
@@ -494,10 +545,11 @@ export default function BatchCheckPage() {
                         </div>
 
                         {/* Status badge */}
-                        <div className="shrink-0 flex items-center gap-2">
+                        <div className="shrink-0 flex items-center gap-1.5">
                           {item.cached && !isChecking && (
                             <span className="text-[9px] text-muted-foreground/50 font-mono uppercase tracking-wide">cached</span>
                           )}
+                          {!isChecking && <SourceBadge source={item.source} />}
                           <StatusBadge status={st} />
                         </div>
                       </div>

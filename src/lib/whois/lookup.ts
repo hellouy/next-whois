@@ -14,7 +14,7 @@ import { analyzeWhois } from "@/lib/whois/common_parser";
 import { extractDomain } from "@/lib/utils";
 import { lookupRdap, convertRdapToWhoisResult, RdapResponse, RDAP_OUTER_TIMEOUT_MS } from "@/lib/whois/rdap_client";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
-import { probeDomain } from "@/lib/whois/dns-check";
+import { probeDomain, probeDomainFast } from "@/lib/whois/dns-check";
 import { checkDomainPremium } from "@/lib/server/premium-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
 import {
@@ -41,6 +41,8 @@ import { lookupViaThirdPartyApi, ThirdPartyApiSource } from "./third-party-api";
 const BUILTIN_SCRAPERS: Record<string, ThirdPartyApiSource> = {
   ph: "ph_web", // whois.dot.ph — TCP:43 times out; RDAP not available
   tt: "tt_web", // nic.tt — no TCP WHOIS; RDAP ENOTFOUND; web WHOIS at nic.tt/cgi-bin/search.pl
+  gm: "gm_web", // nic.gm — TCP:43 silent; whois.nic.gm unresolvable; no RDAP; tri-state web WHOIS
+  bb: "bb_web", // .bb — no TCP WHOIS/RDAP; web WHOIS at whois.telecoms.gov.bb/status/<domain>
 };
 
 warmupDnsCache([
@@ -321,7 +323,7 @@ export async function lookupWhoisWithCache(
     const parts = domain.toLowerCase().split(".");
     const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
     if (tld) {
-      const apiSrc = (await getTldApiSource(tld).catch(() => null)) ?? BUILTIN_SCRAPERS[tld] ?? null;
+      const apiSrc = BUILTIN_SCRAPERS[tld] ?? (await getTldApiSource(tld).catch(() => null)) ?? null;
       if (apiSrc) {
         const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
         if (r.status) {
@@ -548,7 +550,7 @@ export async function lookupWhoisCacheStreaming(
     const parts = domain.toLowerCase().split(".");
     const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
     if (tld) {
-      const apiSrc = (await getTldApiSource(tld).catch(() => null)) ?? BUILTIN_SCRAPERS[tld] ?? null;
+      const apiSrc = BUILTIN_SCRAPERS[tld] ?? (await getTldApiSource(tld).catch(() => null)) ?? null;
       if (apiSrc) {
         const r = await lookupViaThirdPartyApi(domain, apiSrc as ThirdPartyApiSource);
         if (r.status) {
@@ -1157,4 +1159,244 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     : whoisMsg || rdapMsg || "Unknown error occurred";
   recordFailure(reason, errMsg);
   return failWithDns(errMsg, scraperRegistryUrl);
+}
+
+
+// ── Batch availability path (DNS-first) ───────────────────────────────────────
+// Two-stage probe used by /api/lookup-batch. DNS decides first (fast,
+// milliseconds); RDAP/WHOIS only run when DNS has no deterministic verdict or
+// when a "possibly available" DNS result needs registry confirmation.
+
+export type BatchAvailabilityRegistration = "available" | "registered" | "reserved" | "premium" | "unknown";
+
+export type BatchAvailabilitySource = "dns" | "rdap" | "whois" | "mixed";
+
+export type BatchAvailability = {
+  registration: BatchAvailabilityRegistration;
+  confidence: "high" | "medium" | "low";
+  source: BatchAvailabilitySource;
+  dnsProbe?: import("@/lib/whois/dns-check").FastProbeResult;
+  result?: WhoisAnalyzeResult;
+  error?: string;
+};
+
+/** Short TTL for DNS-derived availability verdicts — availability can change
+ *  the moment someone registers the name, so we never cache it for long. */
+const BATCH_DNS_TTL_S = 15;
+
+function batchDnsKey(domain: string): string {
+  return `batchdns:${toAsciiDomain(domain) || domain}`;
+}
+
+/**
+ * Map a parsed WhoisAnalyzeResult's status codes into the batch row status.
+ * Mirrors the frontend `getDomainStatus` classification (batch-check.tsx),
+ * extended to also catch the bare "reserved" / "serverHold" RDAP status
+ * strings that registries return for held names.
+ */
+function classifyResultStatus(result: WhoisAnalyzeResult): BatchAvailabilityRegistration {
+  const codes = (result.status || []).map((s) => s.status?.toLowerCase() ?? "");
+  if (codes.some((c) => c.includes("registry-reserved") || c.includes("registry-hold") || c === "reserved" || c.includes("reserved by registrar"))) return "reserved";
+  if (codes.some((c) => c.includes("registry-premium"))) return "premium";
+  if (codes.some((c) => c.includes("prohibited") || c.includes("blocked"))) return "reserved";
+  return "registered";
+}
+
+// ── batchdns: short-TTL cache (reuses L1/L2/L3 infrastructure) ───────────────
+// Verdicts are only valid for BATCH_DNS_TTL_S, so L1 hits must re-check the
+// embedded cachedAt/cacheTtl — the generic 60 s L1 window would otherwise keep
+// an availability verdict live four times longer than declared.
+function cacheReadBatchDns(key: string): Promise<BatchAvailability | null> {
+  const l1 = l1Get(key);
+  if (l1) {
+    const r = l1 as unknown as BatchAvailability & { cachedAt?: number; cacheTtl?: number };
+    if (r.cachedAt && r.cacheTtl && Date.now() - r.cachedAt < r.cacheTtl * 1000) {
+      return Promise.resolve(l1 as unknown as BatchAvailability);
+    }
+    l1Delete(key);
+  }
+  return (async () => {
+    if (isRedisAvailable()) {
+      const l2 = await getJsonRedisValueWithTtl<BatchAvailability>(key);
+      if (l2) {
+        l1Set(key, l2.value as unknown as WhoisResult);
+        return l2.value;
+      }
+    } else {
+      const l3Raw = await getWhoisDbCache(key);
+      if (l3Raw) {
+        try {
+          const l3 = JSON.parse(l3Raw) as BatchAvailability;
+          l1Set(key, l3 as unknown as WhoisResult);
+          return l3;
+        } catch { /* corrupted — fall through */ }
+      }
+    }
+    return null;
+  })();
+}
+
+function l1Delete(key: string): void {
+  _memCache.delete(key);
+}
+
+function cacheWriteBatchDns(key: string, value: BatchAvailability): void {
+  const now = Date.now();
+  const toStore = { ...value, cachedAt: now, cacheTtl: BATCH_DNS_TTL_S };
+  l1Set(key, toStore as unknown as WhoisResult);
+  if (isRedisAvailable()) {
+    setJsonRedisValue(key, toStore, BATCH_DNS_TTL_S).catch(() => {});
+  } else {
+    setWhoisDbCache(key, JSON.stringify(toStore), BATCH_DNS_TTL_S).catch(() => {});
+  }
+}
+
+/**
+ * DNS-first availability check for the batch path.
+ *
+ * Stage A — fast DNS probe (probeDomainFast):
+ *   • NS records present (incl. parked NS) → registered, source=dns (no RDAP/WHOIS).
+ *   • No NS but A/AAAA/MX → detect wildcard A:
+ *       - wildcard (registry answers any subdomain) → treat as unregistered
+ *         candidate (must confirm — a synthesized record is NOT registration).
+ *       - real A/AAAA → registered (medium confidence).
+ *   • NXDOMAIN / empty answers for all types → unregistered candidate.
+ *   • All timeouts / ESERVFAIL → no info → full fallback (Stage B).
+ *
+ * Stage B — confirmation / fallback:
+ *   • Unregistered candidate → RDAP confirm. RDAP 404 = available;
+ *     RDAP data → classify reserved/premium/registered. TLD with no RDAP
+ *     service → WHOIS guard (lookupWhoisWithCache).
+ *   • Unknown → full lookupWhoisWithCache fallback (reuses ALL existing
+ *     verdicts: built-in scrapers, .cn reserved words, isNotRegisteredWhoisResponse,
+ *     registry-reserved/premium, NO_SERVER_TLDS DNS synthesis).
+ */
+export async function lookupBatchAvailability(domain: string): Promise<BatchAvailability> {
+  const key = batchDnsKey(domain);
+  const cached = await cacheReadBatchDns(key);
+  if (cached) return cached;
+
+  const probe = await probeDomainFast(domain);
+
+  // Strong DNS registration evidence (authoritative NS) — skip WHOIS/RDAP.
+  if (probe.registrationStatus === "registered" && probe.nameservers.length > 0) {
+    return cacheAndReturn(key, {
+      registration: "registered",
+      confidence: "high",
+      source: "dns",
+      dnsProbe: probe,
+    });
+  }
+
+  // No usable DNS signal — hand everything to the full lookup fallback.
+  if (probe.registrationStatus === "unknown") {
+    return fullFallback(key, domain, probe);
+  }
+
+  // DNS says unregistered (NXDOMAIN / empty) or wildcard-ambiguous.
+  // Confirm via RDAP before declaring availability so we never report a
+  // registered-but-unprovisioned name, or a reserved/premium name, as available.
+  return confirmCandidate(key, domain, probe);
+}
+
+async function confirmCandidate(
+  key: string,
+  domain: string,
+  probe: import("@/lib/whois/dns-check").FastProbeResult,
+): Promise<BatchAvailability> {
+  // RDAP confirm. lookupRdap returns a domain object on success, an object
+  // with errorCode 404 when the registry says "not found", and throws when the
+  // TLD has no RDAP service at all (IANA bootstrap / local override miss).
+  let rdap: RdapResponse | { errorCode: number } | null = null;
+  try {
+    const res = await withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS);
+    rdap = res && !("errorCode" in (res as object))
+      ? (res as RdapResponse)
+      : (res as { errorCode: number });
+  } catch {
+    rdap = null;
+  }
+
+  const errorCode = rdap && "errorCode" in rdap ? (rdap as { errorCode: number }).errorCode : null;
+
+  if (errorCode === 404) {
+    // Registry authoritatively says "not found" → genuinely available.
+    return cacheAndReturn(key, {
+      registration: "available",
+      confidence: "high",
+      source: "rdap",
+      dnsProbe: probe,
+    });
+  }
+
+  if (rdap && errorCode === null) {
+    try {
+      const converted = await convertRdapToWhoisResult(rdap as RdapResponse, domain);
+      const reg = classifyResultStatus(converted);
+      // Only retain the rich result when it's not a plain "available" —
+      // an RDAP hit for a queried name always means registered/reserved/premium.
+      return cacheAndReturn(key, {
+        registration: reg,
+        confidence: "high",
+        source: "rdap",
+        dnsProbe: probe,
+        result: converted,
+      });
+    } catch {
+      // conversion failed → WHOIS guard
+    }
+  }
+
+  // No RDAP service / non-404 RDAP error / conversion failure → WHOIS guard.
+  return fullFallback(key, domain, probe);
+}
+
+async function fullFallback(
+  key: string,
+  domain: string,
+  probe: import("@/lib/whois/dns-check").FastProbeResult,
+): Promise<BatchAvailability> {
+  const r = await lookupWhoisWithCache(domain);
+
+  // Successful lookup → registered / reserved / premium via status codes.
+  if (r.status && r.result) {
+    const reg = classifyResultStatus(r.result);
+    return cacheAndReturn(key, {
+      registration: reg,
+      confidence: "high",
+      source: r.source === "rdap" ? "rdap" : "whois",
+      dnsProbe: probe,
+      result: r.result,
+    });
+  }
+
+  // lookupWhois's unregistered verdicts: RDAP 404, WHOIS "not registered"
+  // text, NO_SERVER_TLDS with synthesized unregistered DNS.
+  const unregisteredVerdict =
+    r.dnsProbe?.registrationStatus === "unregistered" ||
+    /domain not found/i.test(r.error ?? "") ||
+    /no match/i.test(r.error ?? "");
+  if (!r.status && unregisteredVerdict) {
+    return cacheAndReturn(key, {
+      registration: "available",
+      confidence: r.dnsProbe?.registrationStatus === "unregistered" ? "medium" : "high",
+      source: r.source === "rdap" ? "rdap" : "mixed",
+      dnsProbe: probe,
+      error: r.error,
+    });
+  }
+
+  // Genuine failure / no verdict — do NOT cache, do NOT mark available.
+  return {
+    registration: "unknown",
+    confidence: "low",
+    source: "whois",
+    dnsProbe: probe,
+    error: r.error ?? "Unknown error",
+  };
+}
+
+function cacheAndReturn(key: string, value: BatchAvailability): BatchAvailability {
+  cacheWriteBatchDns(key, value);
+  return value;
 }

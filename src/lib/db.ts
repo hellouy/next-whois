@@ -585,6 +585,15 @@ function deriveTransactionModeUrl(sessionUrl: string): string | null {
 }
 
 function getConnectionString(): { url: string; source: string } | null {
+  // 0. Explicit SUPABASE_DATABASE_URL takes priority — the project's canonical
+  //    database is Supabase. Vercel's POSTGRES_URL (integration) is only used
+  //    as a fallback when Supabase is not configured.
+  if (process.env.SUPABASE_DATABASE_URL) {
+    const txUrl = deriveTransactionModeUrl(process.env.SUPABASE_DATABASE_URL);
+    if (txUrl) return { url: txUrl, source: "SUPABASE_DATABASE_URL→TX" };
+    return { url: process.env.SUPABASE_DATABASE_URL, source: "SUPABASE_DATABASE_URL" };
+  }
+
   // 1. Explicit POSTGRES_URL — only use if it's on the correct region/host.
   //    Check that it matches the NON_POOLING host (same Supabase project).
   const explicitUrl = process.env.POSTGRES_URL;
@@ -612,11 +621,6 @@ function getConnectionString(): { url: string; source: string } | null {
     return { url: nonPoolingUrl, source: "POSTGRES_URL_NON_POOLING" };
   }
 
-  if (process.env.SUPABASE_DATABASE_URL) {
-    const txUrl = deriveTransactionModeUrl(process.env.SUPABASE_DATABASE_URL);
-    if (txUrl) return { url: txUrl, source: "SUPABASE_DATABASE_URL→TX" };
-    return { url: process.env.SUPABASE_DATABASE_URL, source: "SUPABASE_DATABASE_URL" };
-  }
   if (process.env.DATABASE_URL) {
     const txUrl = deriveTransactionModeUrl(process.env.DATABASE_URL);
     if (txUrl) return { url: txUrl, source: "DATABASE_URL→TX" };

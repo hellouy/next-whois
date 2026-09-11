@@ -6,7 +6,6 @@ import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { checkHotPrefix } from "@/lib/server/hot-prefix-cache";
 import { analyzeDomainWithAi } from "@/lib/server/domain-value-ai";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
-import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("server/save-search-record");
@@ -21,7 +20,7 @@ export function detectQueryType(query: string): "domain" | "ipv4" | "ipv6" | "as
 
 export function deriveRegStatus(
   result: WhoisAnalyzeResult,
-  dnsProbe?: DnsProbeResult,
+  dnsProbe?: { registrationStatus?: "registered" | "unregistered" | "unknown" },
 ): string | null {
   if (result.expirationDate && result.expirationDate !== "Unknown") return "registered";
   if (result.registrar && result.registrar !== "Unknown") return "registered";
@@ -146,7 +145,7 @@ function isValidQuery(q: string): boolean {
 export async function saveSearchRecord(
   query: string,
   result: WhoisAnalyzeResult,
-  dnsProbe?: DnsProbeResult,
+  dnsProbe?: { registrationStatus?: "registered" | "unregistered" | "unknown" },
   userId?: string | null,
   checkedByEmail?: string | null,
 ): Promise<void> {
