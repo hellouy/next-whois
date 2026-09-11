@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/cron/ping",
-      "schedule": "0 0 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/remind/process",
