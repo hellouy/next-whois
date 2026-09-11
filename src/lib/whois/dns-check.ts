@@ -99,6 +99,10 @@ function withDnsTimeout<T extends unknown[]>(promise: Promise<T>): Promise<T | n
  * single-query probe (which also runs an SSL handshake that we skip here).
  */
 function withDnsTimeoutMs<T extends unknown[]>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
   return Promise.race([
     promise.catch((e) => {
       const code = (e as NodeJS.ErrnoException)?.code ?? "";
@@ -114,8 +118,10 @@ function withDnsTimeoutMs<T extends unknown[]>(promise: Promise<T>, timeoutMs: n
       // ECONNREFUSED, etc.) → treat as no info, never as a definitive answer.
       return null;
     }),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-  ]);
+    timeoutPromise,
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 async function checkSsl(domain: string): Promise<boolean> {

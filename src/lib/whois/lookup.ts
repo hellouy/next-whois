@@ -189,6 +189,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * Race `promise` against a timer that resolves `fallback` after `ms` ms.
+ * Unlike `withTimeout` (which rejects on timeout), the timer here produces a
+ * value so the caller gets a non-throwing "give up" answer. The timer is
+ * cleared when `promise` settles first — otherwise each race leaks a live
+ * timer until it fires, which piles up on long-running (self-hosted) processes.
+ */
+function raceWithFallback<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 // ── Transient-failure detection ───────────────────────────────────────────────
 // Returns true when a failed lookup result is worth retrying (network blip,
 // empty response, timeout) vs. a definitive failure that retrying cannot fix.
@@ -648,10 +665,7 @@ export async function lookupWhoisCacheStreaming(
 // inside checkDomainPremium means parallel callers share one request.
 function startPremiumCheck(domain: string): Promise<PremiumCheckResult | null> | null {
   if (isIPAddress(domain) || isASNumber(domain)) return null;
-  return Promise.race([
-    checkDomainPremium(domain),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-  ]).catch(() => null);
+  return raceWithFallback(checkDomainPremium(domain), 4000, null).catch(() => null);
 }
 
 // Pre-warm the TLD pricing cache (nazhumi/miqingju/tianhu) in parallel with the
@@ -668,10 +682,7 @@ function prewarmPricing(domain: string): void {
 async function ensurePremium(result: WhoisResult, domain: string): Promise<WhoisResult> {
   if (result.premium !== undefined) return result;
   if (isIPAddress(domain) || isASNumber(domain)) return result;
-  const premium = await Promise.race([
-    checkDomainPremium(domain),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-  ]);
+  const premium = await raceWithFallback(checkDomainPremium(domain), 4000, null);
   return { ...result, premium };
 }
 
@@ -721,10 +732,11 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     // Without this cap, checkSsl() (4 s timeout) can delay error responses by up to
     // 4 s when the failed domain still has A/AAAA records in DNS.
     const dnsProbe = isDomainQuery
-      ? await Promise.race([
+      ? await raceWithFallback(
           (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined),
-          new Promise<undefined>((r) => setTimeout(r, 500)),
-        ])
+          500,
+          undefined,
+        )
       : undefined;
     return { time: elapsed(), status: false, cached: false, error, dnsProbe, registryUrl };
   }
@@ -735,10 +747,11 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // it can never meaningfully delay an unregistered-domain answer.
   async function unregisteredResult(error: string, confidence: "high" | "low"): Promise<WhoisResult> {
     const dnsProbe = isDomainQuery
-      ? await Promise.race([
+      ? await raceWithFallback(
           (unconditionalDnsProbe ?? probeDomain(domain)).catch(() => undefined),
-          new Promise<undefined>((r) => setTimeout(r, 500)),
-        ])
+          500,
+          undefined,
+        )
       : undefined;
     // Premium is NOT awaited here: return the answer immediately with premium
     // left undefined, then let the caller's background enrichment push it as a
@@ -906,7 +919,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
             parsed.rawWhoisContent = raw;
             clearTldFailureStats(tldSuffix).catch(() => {});
             const dnsProbe = isDomainQuery && unconditionalDnsProbe
-              ? await Promise.race([unconditionalDnsProbe, new Promise<undefined>(r => setTimeout(r, 500))])
+              ? await raceWithFallback(unconditionalDnsProbe, 500, undefined)
               : undefined;
             return { time: elapsed(), status: true, cached: false, source: "whois", result: parsed, dnsProbe };
           }
@@ -967,14 +980,13 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         } catch { /* ignore — final result will include RDAP data */ }
       }
       // Give WHOIS a short grace window to add enrichment data
-      const whoisGraceResult = await Promise.race([
+      const whoisGraceResult = await raceWithFallback(
         whoisPromise
           .then(v  => ({ status: "fulfilled" as const, value: v }))
           .catch(e  => ({ status: "rejected"  as const, reason: e })),
-        new Promise<{ status: "rejected"; reason: Error }>(res =>
-          setTimeout(() => res({ status: "rejected", reason: new Error("whois-grace-timeout") }), RDAP_WIN_WHOIS_GRACE_MS)
-        ),
-      ]);
+        RDAP_WIN_WHOIS_GRACE_MS,
+        { status: "rejected", reason: new Error("whois-grace-timeout") } as const,
+      );
       rdapSettled  = { status: "fulfilled", value: rdapVal };
       whoisSettled = whoisGraceResult;
     } else {
@@ -994,14 +1006,13 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       // WHOIS returned real data → cap RDAP wait at WHOIS_WIN_RDAP_GRACE_MS.
       // Previously Promise.allSettled waited up to RDAP_OUTER_TIMEOUT_MS (12 s)
       // even when WHOIS already had everything we needed.
-      const rdapGraceResult = await Promise.race([
+      const rdapGraceResult = await raceWithFallback(
         rdapPromise
           .then(v  => ({ status: "fulfilled" as const, value: v }))
           .catch(e  => ({ status: "rejected"  as const, reason: e })),
-        new Promise<{ status: "rejected"; reason: Error }>(res =>
-          setTimeout(() => res({ status: "rejected", reason: new Error("rdap-grace-timeout") }), WHOIS_WIN_RDAP_GRACE_MS)
-        ),
-      ]);
+        WHOIS_WIN_RDAP_GRACE_MS,
+        { status: "rejected", reason: new Error("rdap-grace-timeout") } as const,
+      );
       rdapSettled = rdapGraceResult;
     } else {
       // WHOIS returned null/empty (rate-limited, no-server, etc.) — RDAP is our
@@ -1047,7 +1058,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // since DNS (<500 ms) is almost always faster than RDAP/WHOIS (1-12 s).
   // We cap the wait at 500 ms to prevent a slow DNS server from delaying results.
   const getProbeForSuccess = () => isDomainQuery && unconditionalDnsProbe
-    ? Promise.race([unconditionalDnsProbe, new Promise<undefined>(r => setTimeout(r, 500))])
+    ? raceWithFallback(unconditionalDnsProbe, 500, undefined)
     : Promise.resolve(undefined);
 
   if (rdapData) {
