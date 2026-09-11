@@ -7,12 +7,14 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Check each warm endpoint
+      - name: Check secrets & endpoints
         run: |
           BASE="${{ secrets.PROD_BASE_URL }}"
+          echo "GH CRON_SECRET length: $(printf '%s' "${{ secrets.CRON_SECRET }}" | wc -c)"
+          echo "GH PROD_BASE_URL length: $(printf '%s' "$BASE" | wc -c)"
           code() {
             curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$@"
           }
-          echo "page        : $(code "$BASE/")"
-          echo "lookup-stream: $(code -H "Origin: $BASE" "$BASE/api/lookup-stream?query=nic.cn")"
-          echo "cron/ping   : $(code -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/cron/ping")"
+          echo "page code: $(code "$BASE/")"
+          echo "lookup-stream code: $(code -H "Origin: $BASE" "$BASE/api/lookup-stream?query=nic.cn")"
+          echo "cronping code: $(code -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/cron/ping")"
