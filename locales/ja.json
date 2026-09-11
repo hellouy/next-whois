@@ -89,6 +89,8 @@
   "registry_lookup": "レジストリで調べる",
   "registered_no_whois": "登録済み",
   "registered_no_whois_desc": "このドメインは登録されていますが、レジストリが公開のWHOIS/RDAPクエリサービスを提供していないため、詳細な登録情報を取得できません。",
+  "registered_query_failed": "登録済み",
+  "registered_query_failed_desc": "このドメインは登録されています（DNS レコードで確認）。ただし、レジストリへの照会が一時的に失敗しました（タイムアウトまたはレート制限）。しばらくしてから再試行してください。",
   "new_search": "新しい検索",
   "common_issues": "よくある問題",
   "issue_invalid_tld": "無効なTLD",

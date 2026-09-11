@@ -1203,6 +1203,13 @@ export default function LookupPage({
 
           {!loading && !status && (() => {
             const hasErrorRaw = !!(result && (result.rawWhoisContent || result.rawRdapContent));
+            // "Registered, registry offers no public WHOIS" is only claimed for
+            // definitive no-server answers. Timeout / rate-limit / network
+            // failures on TLDs that DO have a public service (e.g. c.xyz behind
+            // a network blip) get a retry-oriented message instead — the old
+            // catch-all wrongly told users the registry provides no WHOIS.
+            const definitiveNoServer = typeof error === "string" &&
+              /no whois\/rdap server available|not available for this tld|not supported|no rdap server/i.test(error);
             return (
             <motion.div
               key={target}
@@ -1286,7 +1293,7 @@ export default function LookupPage({
                             {displayTarget}
                           </h2>
                           <p className="text-muted-foreground text-sm mt-2 max-w-sm leading-relaxed">
-                            {t("registered_no_whois_desc")}
+                            {definitiveNoServer ? t("registered_no_whois_desc") : t("registered_query_failed_desc")}
                           </p>
                         </div>
                         <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
@@ -1295,7 +1302,7 @@ export default function LookupPage({
                             className="text-emerald-600 border-emerald-400/50 bg-emerald-50 dark:bg-emerald-950/30 font-medium"
                           >
                             <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
-                            {t("registered_no_whois")}
+                            {definitiveNoServer ? t("registered_no_whois") : t("registered_query_failed")}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground font-mono">
                             {displayTime.toFixed(2)}s

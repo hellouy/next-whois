@@ -90,6 +90,8 @@
   "registry_lookup": "Consulter le registre",
   "registered_no_whois": "Enregistré",
   "registered_no_whois_desc": "Ce domaine est enregistré, mais le registre ne propose pas de service de recherche WHOIS/RDAP public, donc les informations détaillées d'enregistrement ne sont pas disponibles.",
+  "registered_query_failed": "Enregistré",
+  "registered_query_failed_desc": "Ce domaine est enregistré (confirmé par ses enregistrements DNS), mais la consultation du registre a échoué temporairement (délai dépassé ou limite de débit). Veuillez réessayer sous peu.",
   "new_search": "Nouvelle recherche",
   "common_issues": "Problèmes courants",
   "issue_invalid_tld": "TLD invalide",

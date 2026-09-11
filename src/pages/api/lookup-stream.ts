@@ -18,6 +18,26 @@ export const config = {
   maxDuration: 30,
 };
 
+/**
+ * Await a bookkeeping promise but never let it hold the response stream open
+ * for long. In dev/preview Next.js buffers all chunks until res.end(), so a
+ * hung DB write directly delays the moment the user sees their result — the
+ * main cause of "server reported 1-5 s but the page took 10-20 s" reports.
+ * The write still continues in the background; we just stop waiting on it.
+ */
+async function awaitWithDeadline<T>(p: Promise<T>, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([p, new Promise<never>((_, rej) => {
+      timer = setTimeout(() => rej(new Error("deadline")), ms);
+    })]);
+  } catch {
+    // Deadline hit or write failed — bookkeeping must never break the lookup.
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // Tiered rate limits per 60 s per IP — mirrors /api/lookup.ts tiers so
 // authenticated and subscribed users get the same higher quotas on both endpoints.
 const RATE_LIMIT_ANON   = 40;   // unauthenticated / external API-key users
@@ -221,9 +241,10 @@ export default async function handler(
       partial: false,
     });
 
-    // Record writes are AWAITED before res.end() (in the finally below) so the
-    // lambda cannot freeze and drop them — accurate admin stats depend on this.
-    await logQuery({
+    // Record writes: bounded so a slow DB cannot keep the stream open. The
+    // promises continue in the background — in production (Vercel) they have
+    // the lambda's remaining lifetime to finish; in dev they are best-effort.
+    await awaitWithDeadline(logQuery({
       domain: trimmed, tld,
       success: finalResult.status,
       cached: finalResult.cached ?? false,
@@ -232,16 +253,16 @@ export default async function handler(
       source: finalResult.source ?? null,
       outcome: classifyQueryOutcome(finalResult.status, finalResult.error),
       userId, userEmail, ip,
-    }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
+    }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message)), 2_000);
 
     if (finalResult.status) {
-      await saveSearchRecord(
+      await awaitWithDeadline(saveSearchRecord(
         trimmed,
         finalResult.result ?? { ...initialWhoisAnalyzeResult },
         finalResult.dnsProbe,
         userId,
         userEmail,
-      ).catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message));
+      ).catch(e => logger.error("[lookup-stream] saveSearchRecord failed:", e.message)), 2_000);
     }
 
     // Give the asynchronous premium enrichment a short grace window to land its
@@ -263,12 +284,12 @@ export default async function handler(
         partial: false,
         result: { ...initialWhoisAnalyzeResult },
       });
-      await logQuery({
+      await awaitWithDeadline(logQuery({
         domain: trimmed, tld, success: false, cached: false,
         durationMs: 0, errorCode: errMsg.slice(0, 60), source: null,
         outcome: classifyQueryOutcome(false, errMsg),
         userId, userEmail, ip,
-      }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message));
+      }).catch(e => logger.error("[lookup-stream] logQuery failed:", e.message)), 2_000);
     }
   } finally {
     res.end();

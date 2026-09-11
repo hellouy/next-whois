@@ -368,13 +368,21 @@ export async function lookupWhoisWithCache(
   const doLookup = async (): Promise<WhoisResult> => {
     let result = await lookupWhois(domain);
     // Retry once on transient failures (e.g., intermittent connectivity to
-    // slow ccTLD WHOIS servers like whois.nic.hu from cloud infrastructure).
-    // Use jitter (400–800ms) to avoid thundering herd on concurrent retries.
+    // fast-failing WHOIS servers). Use jitter (400–800ms) to avoid thundering
+    // herd on concurrent retries.
     if (isTransientLookupFailure(result)) {
-      const jitter = 400 + Math.floor(Math.random() * 400);
-      await new Promise((r) => setTimeout(r, jitter));
-      const retried = await lookupWhois(domain);
-      if (retried.status) result = retried;
+      // Only retry fast failures. A result that already burned its whole
+      // timeout budget (elapsed ≥ 5 s — slow/unreachable registry, packet-loss
+      // network) rarely succeeds on a second full pass, and the retry doubles
+      // the user's wait (e.g. 77 s nic.bn lookups: slow WHOIS timeout + full
+      // retry + premium cap). Quick failures (instant ENOTFOUND/ECONNREFUSED,
+      // empty reply) are genuine transient blips where one retry pays off.
+      if ((result.time ?? 0) < 5) {
+        const jitter = 400 + Math.floor(Math.random() * 400);
+        await new Promise((r) => setTimeout(r, jitter));
+        const retried = await lookupWhois(domain);
+        if (retried.status) result = retried;
+      }
     }
     // Attach registry premium detection (Netim → Porkbun) to every answer —
     // registered or not — so the UI can surface premium pricing (e.g. li.life).

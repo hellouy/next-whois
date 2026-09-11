@@ -90,6 +90,8 @@
   "registry_lookup": "在注册局查询",
   "registered_no_whois": "已注册",
   "registered_no_whois_desc": "该域名已注册，但注册机构未提供公开的 WHOIS/RDAP 查询服务，无法获取详细注册信息。",
+  "registered_query_failed": "已注册",
+  "registered_query_failed_desc": "该域名已注册（已通过 DNS 记录确认），但注册局查询暂时失败（超时或限流），请稍后重试。",
   "new_search": "新搜索",
   "common_issues": "常见问题",
   "issue_invalid_tld": "无效的顶级域",

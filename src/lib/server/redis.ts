@@ -127,11 +127,21 @@ function createIoredisConn(): import("ioredis").Redis | undefined {
     commandTimeout:       5_000,
     lazyConnect:          false,
     enableReadyCheck:     true,    // confirm server is fully ready before marking available
-    enableOfflineQueue:   true,    // queue commands during brief reconnect windows
+    // Fail fast while disconnected. With the offline queue enabled, commands
+    // issued during a reconnect window (~30 s of retryStrategy attempts) sit
+    // pending and every caller blocks that long — a Redis blip used to turn
+    // into 30-70 s lookups because several queued reads stack up serially in
+    // the hot path (rate limit → settings → WHOIS rate-limit flag → cache).
+    // All call sites already degrade gracefully on rejection (fail-open), so
+    // an instant error is strictly better than a 30 s stall.
+    enableOfflineQueue:   false,
     keepAlive:            15_000,  // send TCP keepalive every 15 s to prevent idle drops
     retryStrategy(times: number) {
-      if (times > 6) return null;  // give up after 6 attempts (~30 s total)
-      return Math.min(times * 1_000, 5_000);
+      // Cap total reconnect churn at ~5 s. The old 6-attempt (~30 s) window
+      // kept clients half-alive and the offline queue backed up; a quick
+      // disconnect/reconnect cycle keeps latency bounded instead.
+      if (times > 3) return null;
+      return Math.min(times * 500, 2_000);
     },
     ...tlsOpts,
   } as const;

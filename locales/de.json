@@ -90,6 +90,8 @@
   "registry_lookup": "In der Registry nachschlagen",
   "registered_no_whois": "Registriert",
   "registered_no_whois_desc": "Diese Domain ist registriert, aber die Registry stellt keinen öffentlichen WHOIS/RDAP-Abfragedienst bereit, sodass keine detaillierten Registrierungsinformationen verfügbar sind.",
+  "registered_query_failed": "Registriert",
+  "registered_query_failed_desc": "Diese Domain ist registriert (über DNS-Einträge bestätigt), die Registry-Abfrage ist jedoch vorübergehend fehlgeschlagen (Timeout oder Rate-Limit). Bitte versuchen Sie es gleich erneut.",
   "new_search": "Neue Suche",
   "common_issues": "Häufige Probleme",
   "issue_invalid_tld": "Ungültige TLD",

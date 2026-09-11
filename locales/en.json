@@ -90,6 +90,8 @@
   "registry_lookup": "Look up at Registry",
   "registered_no_whois": "Registered",
   "registered_no_whois_desc": "This domain is registered, but the registry does not provide a public WHOIS/RDAP lookup service, so detailed registration information is unavailable.",
+  "registered_query_failed": "Registered",
+  "registered_query_failed_desc": "This domain is registered (confirmed via its DNS records), but the registry lookup failed temporarily — likely a timeout or rate limit. Please try again shortly.",
   "new_search": "New Search",
   "common_issues": "Common Issues",
   "issue_invalid_tld": "Invalid TLD",

@@ -90,6 +90,8 @@
   "registry_lookup": "在注冊局查詢",
   "registered_no_whois": "已注冊",
   "registered_no_whois_desc": "此域名已注冊，但注冊機構未提供公開的 WHOIS/RDAP 查詢服務，無法獲取詳細注冊資訊。",
+  "registered_query_failed": "已註冊",
+  "registered_query_failed_desc": "該域名已註冊（已透過 DNS 記錄確認），但註冊局查詢暫時失敗（超時或限流），請稍後重試。",
   "new_search": "新搜尋",
   "common_issues": "常見問題",
   "issue_invalid_tld": "無效的頂級域名",
