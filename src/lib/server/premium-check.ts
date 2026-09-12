@@ -23,6 +23,24 @@ import type { PremiumCheckResult } from "@/lib/whois/types";
 
 const logger = createLogger("server/premium-check");
 
+// Warn loudly once per process when the premium sources are unconfigured.
+// Missing Netim/Porkbun keys silently disable all premium detection — the UI
+// then falls back to ordinary aggregate prices with no visible error, which is
+// exactly how this regressed in production. The logger name lets ops grep for
+// it; fail-safe behaviour (null verdict) is unchanged.
+function warnIfSourcesUnconfigured(): void {
+  const hasNetim = Boolean(process.env.NETIM_LOGIN) && Boolean(process.env.NETIM_PASSWORD);
+  const hasPorkbun = Boolean(process.env.PORKBUN_API_KEY) && Boolean(process.env.PORKBUN_SECRET_KEY);
+  if (!hasNetim && !hasPorkbun) {
+    logger.warn(
+      "[premium-check] Netim (NETIM_LOGIN/NETIM_PASSWORD) and Porkbun " +
+      "(PORKBUN_API_KEY/PORKBUN_SECRET_KEY) are both unconfigured — premium " +
+      "detection is disabled and will silently return null on every lookup. " +
+      "Set all four keys in the deploy environment (see .env.example).",
+    );
+  }
+}
+
 const PREMIUM_CACHE_TTL_MS = 24 * 3600 * 1000;
 // A null result usually means "price lookup unavailable" (Netim timed out and
 // Porkbun can't price it) rather than a guaranteed non-premium verdict. Cache
@@ -287,6 +305,8 @@ async function checkNetim(domain: string): Promise<PremiumCheckResult | null> {
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
+warnIfSourcesUnconfigured();
+
 export function checkDomainPremium(domain: string): Promise<PremiumCheckResult | null> {
   const cached = readCached(domain);
   if (cached !== undefined) return Promise.resolve(cached);
