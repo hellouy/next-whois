@@ -565,6 +565,56 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_fev_created     ON tld_failure_events (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_fev_reason      ON tld_failure_events (fail_reason)`,
   `CREATE INDEX IF NOT EXISTS idx_acl_created     ON ai_call_log (created_at DESC)`,
+  // ── Domain drop sniping ────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS snipe_targets (
+    id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain          TEXT          NOT NULL UNIQUE,
+    tld             TEXT          NOT NULL DEFAULT '',
+    status          TEXT          NOT NULL DEFAULT 'watching',
+    -- watching | armed | blocked_balance | sniping | succeeded | failed | cancelled | paused
+    max_price       NUMERIC(10,2),
+    est_price       NUMERIC(10,2),
+    is_premium      BOOLEAN,
+    expiration_date DATE,
+    drop_eta        DATE,
+    hunt_start      TIMESTAMPTZ,
+    hunt_end        TIMESTAMPTZ,
+    last_epp        TEXT,
+    last_whois_at   TIMESTAMPTZ,
+    whois_fails     INT           NOT NULL DEFAULT 0,
+    probe_lock_at   TIMESTAMPTZ,
+    registered_at   TIMESTAMPTZ,
+    netim_ope_id    TEXT,
+    final_price     NUMERIC(10,2),
+    fail_reason     TEXT,
+    notes           TEXT,
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_snipe_targets_status ON snipe_targets (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_snipe_targets_hunt   ON snipe_targets (hunt_start, hunt_end) WHERE status IN ('armed','blocked_balance')`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS recharge_alerted_at TIMESTAMPTZ`,
+  `CREATE TABLE IF NOT EXISTS snipe_probes (
+    id          BIGSERIAL   PRIMARY KEY,
+    target_id   UUID        NOT NULL REFERENCES snipe_targets(id),
+    channel     TEXT        NOT NULL,   -- whois | netim_check | netim_create
+    result      TEXT        NOT NULL,   -- registered | maybe_free | available | not_available | error
+    detail      TEXT,
+    latency_ms  INT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_snipe_probes_target ON snipe_probes (target_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS snipe_attempts (
+    id              BIGSERIAL    PRIMARY KEY,
+    target_id       UUID         NOT NULL REFERENCES snipe_targets(id),
+    check_available BOOLEAN,
+    params_snapshot TEXT,                    -- JSON: 默认联系人/DNS 快照
+    netim_response  TEXT,                    -- 原始 XML（已脱敏，无凭证）
+    ope_id          TEXT,
+    outcome         TEXT         NOT NULL,   -- succeeded | failed_permanent | failed_transient | unknown_pending
+    price           NUMERIC(10,2),
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 /**

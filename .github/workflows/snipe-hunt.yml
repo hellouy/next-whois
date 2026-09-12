@@ -1,0 +1,53 @@
+# Domain-drop snipe hunt runner.
+#
+# Fires every minute around the clock; each run loops 3 probe passes (20s
+# apart) against the production cron endpoint so the drop window is scanned at
+# high frequency without needing a server process to stay alive.
+#
+# Privacy: this repo is public, so NOTHING identifying ever leaves the server.
+# The workflow only posts to /api/cron/snipe-probe?mode=hunt and logs enum
+# results — domains, credentials and parameters stay server-side.
+#
+# Required repo secrets:
+#   SNIPE_ENDPOINT   production URL, e.g. https://your-app.vercel.app
+#   SNIPE_TOKEN      same value as the CRON_SECRET env var in production
+
+name: snipe-hunt
+
+on:
+  schedule:
+    - cron: "*/1 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: snipe-hunt
+  cancel-in-progress: true
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe hunt window (3 passes)
+        shell: bash
+        env:
+          SNIPE_ENDPOINT: ${{ secrets.SNIPE_ENDPOINT }}
+          SNIPE_TOKEN: ${{ secrets.SNIPE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SNIPE_ENDPOINT}" ] || [ -z "${SNIPE_TOKEN}" ]; then
+            echo "SNIPE_ENDPOINT / SNIPE_TOKEN not configured — skipping."
+            exit 0
+          fi
+          for i in 1 2 3; do
+            code=$(curl -sS -o /tmp/snipe-out.json -w '%{http_code}' \
+              -X POST "${SNIPE_ENDPOINT}/api/cron/snipe-probe?mode=hunt" \
+              -H "Authorization: Bearer ${SNIPE_TOKEN}")
+            if [ "${code}" = "200" ]; then
+              checked=$(node -e "try{const d=JSON.parse(require('fs').readFileSync('/tmp/snipe-out.json','utf8'));console.log(d.checked??0)}catch(e){console.log(0)}")
+              echo "pass ${i}: HTTP ${code} checked=${checked}"
+            else
+              echo "pass ${i}: HTTP ${code} (probe skipped)"
+            fi
+            if [ "${i}" -lt 3 ]; then sleep 20; fi
+          done

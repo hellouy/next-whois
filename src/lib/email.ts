@@ -800,6 +800,30 @@ export function adminNotifyHtml({ subject, body, siteName = "WHOIS" }: {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 7b. Domain-drop snipe notifications (admin-only — fixed Chinese copy)
+// ──────────────────────────────────────────────────────────────────────────────
+export function snipeNotifyHtml(tone: "success" | "danger" | "warning", p: {
+  title: string;
+  domain: string;
+  lines: Array<[string, string]>;
+  siteName?: string;
+}): string {
+  const t = TONES[tone];
+  const rows = p.lines.map(([label, value]) =>
+    kvRow(label, label === "域名" || label === "原因" ? domainBadge(value) : value)
+  );
+  return emailLayout(`
+    ${brandHeader(tone, "Snipe Alert", p.title, "", { titleStyle: `color:${t.deep}` })}
+    ${section(`
+      ${noteBox(`目标域名 <span style="font-family:${MONO};font-weight:700">${p.domain}</span>`, tone, { html: true })}
+      <table cellpadding="0" cellspacing="0" style="width:100%;margin-top:6px">
+        ${rows.join("")}
+      </table>
+    `)}
+  `, p.siteName ?? "WHOIS");
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 8. Feedback notification email (sent to admin — stays in Chinese)
 // ──────────────────────────────────────────────────────────────────────────────
 export function feedbackHtml({

@@ -20,6 +20,10 @@
  */
 import { createLogger } from "@/lib/logger";
 import type { PremiumCheckResult } from "@/lib/whois/types";
+import {
+  netimQueryDomainPrice,
+  parseNetimPriceResponse as netimParsePrice,
+} from "@/lib/server/netim-client";
 
 const logger = createLogger("server/premium-check");
 
@@ -56,11 +60,8 @@ const premiumCache = new Map<
 const inflightPremium = new Map<string, Promise<PremiumCheckResult | null>>();
 
 const PORKBUN_TIMEOUT_MS = 3500;
-const NETIM_TIMEOUT_MS = 4000;
 
 const PORKBUN_API = "https://api.porkbun.com/api/json/v3/domain/checkDomain";
-const NETIM_API = "https://api.netim.com/2.0/";
-const NETIM_SESSION_TTL_MS = 20 * 60 * 1000;
 
 function readCached(domain: string): PremiumCheckResult | null | undefined {
   const hit = premiumCache.get(domain);
@@ -175,98 +176,24 @@ async function checkPorkbun(domain: string): Promise<PremiumCheckResult | null> 
 
 // ── Netim ───────────────────────────────────────────────────────────────────
 
-const NETIM_NS = "urn:DRS";
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-/** Extract the text of the first `<tag>value</tag>` element in a SOAP reply. */
-function xmlValue(xml: string, tag: string): string | null {
-  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
-  return m ? m[1].trim() : null;
-}
-
-function soapEnvelope(body: string): string {
-  return (
-    '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<SOAP-ENV:Envelope ' +
-    'xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" ' +
-    `xmlns:ns1="${NETIM_NS}" ` +
-    'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ' +
-    'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' +
-    'xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" ' +
-    'SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">' +
-    "<SOAP-ENV:Body>" +
-    body +
-    "</SOAP-ENV:Body>" +
-    "</SOAP-ENV:Envelope>"
-  );
-}
-
-async function netimCall(action: string, body: string, ms: number): Promise<string | null> {
-  const res = await fetch(NETIM_API, {
-    method: "POST",
-    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: action },
-    body: soapEnvelope(body),
-    signal: timeoutSignal(ms),
-  });
-  if (!res.ok) return null;
-  return res.text();
-}
-
-// Netim sessions are server-side and capped; reuse a fresh one across calls
-// within this process instead of opening one per lookup.
-let netimSession: { id: string; at: number } | null = null;
-
-async function netimSessionOpen(login: string, password: string): Promise<string | null> {
-  const body =
-    `<ns1:sessionOpen>` +
-    `<idReseller xsi:type="xsd:string">${escapeXml(login.toUpperCase())}</idReseller>` +
-    `<password xsi:type="xsd:string">${escapeXml(password)}</password>` +
-    `<language xsi:type="xsd:string">EN</language>` +
-    `</ns1:sessionOpen>`;
-  const xml = await netimCall("sessionOpenAction", body, NETIM_TIMEOUT_MS);
-  return xmlValue(xml ?? "", "IDSession");
-}
-
-async function netimQueryPrice(sid: string, domain: string): Promise<string | null> {
-  const body =
-    `<ns1:queryDomainPrice>` +
-    `<IDSession xsi:type="xsd:string">${escapeXml(sid)}</IDSession>` +
-    `<domain xsi:type="xsd:string">${escapeXml(domain)}</domain>` +
-    `<authID xsi:type="xsd:string"></authID>` +
-    `</ns1:queryDomainPrice>`;
-  return netimCall("queryDomainPriceAction", body, NETIM_TIMEOUT_MS);
-}
+// The SOAP transport (envelope builder, XML escaping, session caching with
+// stale-session reopen) lives in netim-client.ts and is shared with the
+// domain-drop snipe engine. This module only maps Netim's price reply onto
+// the whois PremiumCheckResult shape.
 
 /**
  * Parse a Netim `queryDomainPrice` SOAP reply into a normalized result.
- *
  * StructQueryDomainPrice carries `IsPremium` (0/1), `Fee4Registration`,
  * `Fee4Renewal` and `FeeCurrency` (e.g. "EUR"). Prices are strings.
  */
 export function parseNetimResponse(xml: string): PremiumCheckResult | null {
-  if (!xml) return null;
-  if (xml.includes("Fault")) return null;
-
-  const premium = xmlValue(xml, "IsPremium");
-  if (premium === null) return null;
-
-  const currency = xmlValue(xml, "FeeCurrency") || "EUR";
-  const price = toNumber(xmlValue(xml, "Fee4Registration"));
-  const renewalPrice = toNumber(xmlValue(xml, "Fee4Renewal"));
-
+  const parsed = netimParsePrice(xml);
+  if (!parsed) return null;
   return {
-    isPremium: premium === "1",
-    price,
-    renewalPrice,
-    currency,
+    isPremium: parsed.isPremium,
+    price: parsed.price,
+    renewalPrice: parsed.renewalPrice,
+    currency: parsed.currency,
     source: "netim",
   };
 }
@@ -277,27 +204,15 @@ async function checkNetim(domain: string): Promise<PremiumCheckResult | null> {
   if (!login || !password) return null;
 
   try {
-    let sid =
-      netimSession && Date.now() - netimSession.at < NETIM_SESSION_TTL_MS
-        ? netimSession.id
-        : null;
-    if (!sid) {
-      sid = await netimSessionOpen(login, password);
-      if (!sid) return null;
-      netimSession = { id: sid, at: Date.now() };
-    }
-
-    let xml = await netimQueryPrice(sid, domain);
-
-    // A stale session faults; re-open once and retry.
-    if (!xml || xml.includes("Fault")) {
-      sid = await netimSessionOpen(login, password);
-      if (!sid) return null;
-      netimSession = { id: sid, at: Date.now() };
-      xml = await netimQueryPrice(sid, domain);
-    }
-
-    return parseNetimResponse(xml ?? "");
+    const parsed = await netimQueryDomainPrice(domain);
+    if (!parsed) return null;
+    return {
+      isPremium: parsed.isPremium,
+      price: parsed.price,
+      renewalPrice: parsed.renewalPrice,
+      currency: parsed.currency,
+      source: "netim",
+    };
   } catch (e) {
     logger.error("[premium-check] netim failed:", (e as Error).message);
     return null;
