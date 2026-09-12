@@ -10,33 +10,36 @@ import { createLogger } from "@/lib/logger";
 const logger = createLogger("email");
 
 // ── Design tokens ────────────────────────────────────────────────────────────
-// Mirror the site language: zinc/slate neutrals + violet-600 brand accent.
-const PRIMARY    = "#7c3aed";   // violet-600 — brand accent
-const PRIMARY_LT = "#8b5cf6";   // violet-500
-const INDIGO     = "#4f46e5";   // indigo-600
-const DARK       = "#0f172a";   // slate-900 — dark header band
+// Mirror the site's monochrome minimalism (see src/styles/globals.css): the
+// brand accent is near-black, text is slate-neutral, cards use hairline borders
+// on a white canvas. No colour bands, no saturated pills, no emoji — the same
+// restraint as the homepage. Tones survive only as accent text + a 4px accent
+// bar on the header, never as filled backgrounds.
+const PRIMARY    = "#18181b";   // near-black — brand accent (site --primary)
+const PRIMARY_LT = "#3f3f46";   // zinc-700 — secondary accent
+const DARK       = "#18181b";   // near-black header band / strong surfaces
 
-const INK       = "#0f172a";    // headings / strong text
-const TEXT      = "#475569";    // body text
-const MUTED     = "#94a3b8";    // secondary / card labels
-const FAINT     = "#cbd5e1";    // tertiary text (footer)
-const PANEL     = "#f8fafc";    // inset panel background
-const BORDER    = "#e2e8f0";    // card borders
-const HAIR      = "#f1f5f9";    // dividers
-const BG        = "#f1f5f9";    // email canvas
+const INK       = "#18181b";    // headings / strong text
+const TEXT      = "#52525b";    // body text
+const MUTED     = "#a1a1aa";    // secondary / card labels
+const FAINT     = "#d4d4d8";    // tertiary text (footer)
+const PANEL     = "#fafafa";    // inset panel background
+const BORDER    = "#e4e4e7";    // card borders
+const HAIR      = "#f4f4f5";    // dividers
+const BG        = "#fafafa";    // email canvas
 
 const FONT = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 const MONO = "ui-monospace,'Fira Code',Consolas,monospace";
 
-/** Semantic status palette used across every template. */
+/** Semantic status palette — accents only (text + hairline + header bar). */
 type Tone = "dark" | "brand" | "success" | "warning" | "danger" | "info";
 const TONES: Record<Tone, { fg: string; bg: string; border: string; deep: string }> = {
-  dark:    { fg: "#0f172a", bg: "#f1f5f9", border: "#e2e8f0", deep: "#0f172a" },
-  brand:   { fg: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", deep: "#5b21b6" },
-  success: { fg: "#059669", bg: "#ecfdf5", border: "#a7f3d0", deep: "#047857" },
-  warning: { fg: "#d97706", bg: "#fffbeb", border: "#fde68a", deep: "#b45309" },
-  danger:  { fg: "#dc2626", bg: "#fef2f2", border: "#fecaca", deep: "#b91c1c" },
-  info:    { fg: "#0284c7", bg: "#f0f9ff", border: "#bae6fd", deep: "#0369a1" },
+  dark:    { fg: "#52525b", bg: "#fafafa", border: "#e4e4e7", deep: "#18181b" },
+  brand:   { fg: "#52525b", bg: "#fafafa", border: "#e4e4e7", deep: "#18181b" },
+  success: { fg: "#15803d", bg: "#fafafa", border: "#e4e4e7", deep: "#166534" },
+  warning: { fg: "#b45309", bg: "#fafafa", border: "#e4e4e7", deep: "#92400e" },
+  danger:  { fg: "#b91c1c", bg: "#fafafa", border: "#e4e4e7", deep: "#991b1b" },
+  info:    { fg: "#0369a1", bg: "#fafafa", border: "#e4e4e7", deep: "#075985" },
 };
 // ── Server-side base URL (cached, reads og_url from DB) ──────────────────────
 // BASE_URL() is called synchronously inside template functions; this cache is
@@ -106,31 +109,31 @@ function emailLayout(body: string, siteName = "WHOIS", opts?: { langCode?: strin
   <title>${siteName}</title>
 </head>
 <body style="margin:0;padding:0;background:${BG};font-family:${FONT}">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;background:${BG}">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;background:${BG}">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:540px">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
 
         <!-- Logo -->
         <tr>
-          <td style="padding-bottom:20px;text-align:center">
+          <td style="padding-bottom:18px;text-align:center">
             <a href="${BASE_URL()}" style="text-decoration:none">
-              <span style="font-size:18px;font-weight:800;letter-spacing:-0.5px;color:${DARK}">${logoHtml}</span>
+              <span style="font-size:17px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:${INK}">${logoHtml}</span>
             </a>
           </td>
         </tr>
 
         <!-- Card -->
         <tr>
-          <td style="background:#ffffff;border-radius:16px;border:1px solid ${BORDER};overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.07)">
+          <td style="background:#ffffff;border-radius:12px;border:1px solid ${BORDER};overflow:hidden">
             ${body}
           </td>
         </tr>
 
         <!-- Footer -->
         <tr>
-          <td style="padding:24px 8px 0;text-align:center">
+          <td style="padding:20px 8px 0;text-align:center">
             <p style="margin:0 0 4px;font-size:11px;color:${MUTED};line-height:1.9">
-              ${autoSent.replace(siteName, `<a href="${BASE_URL()}" style="color:${PRIMARY};text-decoration:none">${siteName}</a>`)}
+              ${autoSent.replace(siteName, `<a href="${BASE_URL()}" style="color:${MUTED};text-decoration:none">${siteName}</a>`)}
             </p>
             <p style="margin:0;font-size:11px;color:${FAINT}">
               © ${year} ${siteName}
@@ -151,18 +154,18 @@ function emailLayout(body: string, siteName = "WHOIS", opts?: { langCode?: strin
 
 /** Domain name displayed monospace */
 function domainBadge(domain: string) {
-  return `<span style="font-family:${MONO};font-size:inherit;font-weight:800;letter-spacing:-0.3px">${domain}</span>`;
+  return `<span style="font-family:${MONO};font-size:inherit;font-weight:700;letter-spacing:-0.3px">${domain}</span>`;
 }
 
 /** Coloured pill tag */
-function pill(text: string, bg = "#ede9fe", color = "#5b21b6") {
-  return `<span style="display:inline-block;background:${bg};color:${color};padding:3px 11px;border-radius:999px;font-size:12px;font-weight:600;margin:3px 3px 3px 0">${text}</span>`;
+function pill(text: string, bg = "#ffffff", color = "#52525b") {
+  return `<span style="display:inline-block;background:${bg};color:${color};border:1px solid ${BORDER};padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;margin:3px 3px 3px 0">${text}</span>`;
 }
 
 /** Pill using a semantic tone */
 function tonePill(text: string, tone: Tone): string {
   const t = TONES[tone];
-  return pill(text, t.bg, t.deep);
+  return pill(text, "#ffffff", t.deep);
 }
 
 /** Key-value row inside a table */
@@ -184,18 +187,16 @@ function divider() {
 }
 
 // ── Header band (unified across every template) ──────────────────────────────
-/** Coloured header band. `dark` uses slate-900, other tones use the tone's deep
- *  hue. Always ends with the brand violet→indigo underline so each email shares
- *  the same site accent. */
+/** Minimal header: white canvas, near-black title, a 4px accent bar on the
+ *  left and a hairline underline — mirrors the homepage's monochrome restraint.
+ *  The tone only tints the accent bar + eyebrow label; no filled colour band. */
 function brandHeader(tone: Tone, label: string, title: string, sub = "", opts?: { titleStyle?: string }): string {
-  const t  = TONES[tone];
-  const bg = tone === "dark" ? DARK : t.deep;
-  return `<div style="background:${bg};padding:30px 32px 26px;position:relative">
-    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.55);text-transform:uppercase">${label}</p>
-    <h1 style="margin:10px 0 ${sub ? "8px" : "0"};font-size:22px;font-weight:800;color:#fff;line-height:1.3;${opts?.titleStyle ?? ""}">${title}</h1>
-    ${sub ? `<p style="margin:0;font-size:13px;color:rgba(255,255,255,.72);line-height:1.6">${sub}</p>` : ""}
-    <div style="position:absolute;top:0;right:0;width:110px;height:100%;background:linear-gradient(115deg,transparent 10%,rgba(139,92,246,.4) 100%);pointer-events:none"></div>
-    <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${PRIMARY},${INDIGO})"></div>
+  const t = TONES[tone];
+  return `<div style="padding:28px 32px 24px;border-bottom:1px solid ${HAIR};position:relative">
+    <div style="position:absolute;top:0;bottom:0;left:0;width:4px;background:${t.deep}"></div>
+    <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:2px;color:${MUTED};text-transform:uppercase">${label}</p>
+    <h1 style="margin:8px 0 ${sub ? "6px" : "0"};font-size:22px;font-weight:700;color:${INK};line-height:1.3;letter-spacing:-0.3px;${opts?.titleStyle ?? ""}">${title}</h1>
+    ${sub ? `<p style="margin:0;font-size:13px;color:${MUTED};line-height:1.6">${sub}</p>` : ""}
   </div>`;
 }
 
@@ -204,17 +205,17 @@ function card(body: string, opts?: { style?: string }): string {
   return `<div style="border:1px solid ${BORDER};border-radius:12px;overflow:hidden;${opts?.style ?? ""}">${body}</div>`;
 }
 function cardHead(label: string, opts?: { style?: string }): string {
-  return `<div style="padding:13px 18px;border-bottom:1px solid ${HAIR};${opts?.style ?? ""}">
+  return `<div style="padding:12px 18px;border-bottom:1px solid ${HAIR};${opts?.style ?? ""}">
     <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${label}</p>
   </div>`;
 }
 function cardValue(value: string, opts?: { style?: string }): string {
-  return `<p style="margin:0;font-size:22px;font-weight:800;color:${INK};font-family:${MONO};line-height:1.2;${opts?.style ?? ""}">${value}</p>`;
+  return `<p style="margin:0;font-size:20px;font-weight:700;color:${INK};font-family:${MONO};line-height:1.2;letter-spacing:-0.3px;${opts?.style ?? ""}">${value}</p>`;
 }
 function cardRow(label: string, value: string, opts?: { style?: string; valueStyle?: string }): string {
   return `<div style="padding:11px 18px;border-top:1px solid ${HAIR};${opts?.style ?? ""}">
     <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${label}</p>
-    <p style="margin:6px 0 0;font-size:13px;font-weight:700;color:${INK};${opts?.valueStyle ?? ""}">${value}</p>
+    <p style="margin:6px 0 0;font-size:13px;font-weight:600;color:${INK};${opts?.valueStyle ?? ""}">${value}</p>
   </div>`;
 }
 /** Padded block used inside a card when no label header is needed */
@@ -222,25 +223,26 @@ function cardBlock(body: string, opts?: { style?: string }): string {
   return `<div style="padding:12px 18px;${opts?.style ?? ""}">${body}</div>`;
 }
 
-/** Callout box with a semantic tone (tips, notices, urgency) */
+/** Callout box with a semantic tone (tips, notices, urgency) — monochrome
+ *  panel + hairline border; only the text carries the tone accent. */
 function noteBox(text: string, tone: Tone = "info", opts?: { bold?: boolean; style?: string; html?: boolean }): string {
   const t = TONES[tone];
   const inner = opts?.html
     ? text
-    : `<p style="margin:0;font-size:12px;color:${t.deep};line-height:1.7;${opts?.bold ? "font-weight:700;" : ""}">${text}</p>`;
-  return `<div style="background:${t.bg};border:1px solid ${t.border};border-radius:10px;padding:12px 16px;${opts?.style ?? ""}">${inner}</div>`;
+    : `<p style="margin:0;font-size:12px;color:${t.deep};line-height:1.7;${opts?.bold ? "font-weight:600;" : ""}">${text}</p>`;
+  return `<div style="background:${PANEL};border:1px solid ${BORDER};border-left:3px solid ${t.deep};border-radius:6px;padding:12px 16px;${opts?.style ?? ""}">${inner}</div>`;
 }
 
-/** Large centered code / value display */
+/** Large centered code / value display — hairline box, near-black mono text. */
 function codeBox(text: string, opts?: { size?: string; letterSpacing?: string }): string {
-  return `<div style="text-align:center;padding:28px 20px;background:#f5f3ff;border:2px dashed #c4b5fd;border-radius:14px">
-    <p style="margin:0;font-size:${opts?.size ?? "46px"};font-weight:900;letter-spacing:${opts?.letterSpacing ?? "10px"};color:#5b21b6;font-family:${MONO};line-height:1">${text}</p>
+  return `<div style="text-align:center;padding:26px 20px;background:${PANEL};border:1px dashed ${FAINT};border-radius:10px">
+    <p style="margin:0;font-size:${opts?.size ?? "42px"};font-weight:700;letter-spacing:${opts?.letterSpacing ?? "8px"};color:${INK};font-family:${MONO};line-height:1">${text}</p>
   </div>`;
 }
 
 /** Primary CTA button */
 function ctaBtn(href: string, label: string, color = PRIMARY) {
-  return `<a href="${href}" style="display:inline-block;background:${color};color:#fff;font-size:13px;font-weight:700;padding:12px 26px;border-radius:10px;text-decoration:none;letter-spacing:0.1px;box-shadow:0 2px 8px ${color}44">${label} →</a>`;
+  return `<a href="${href}" style="display:inline-block;background:${color};color:#fff;font-size:13px;font-weight:600;padding:11px 24px;border-radius:8px;text-decoration:none;letter-spacing:0.1px">${label} →</a>`;
 }
 
 /** Ghost / cancel link */
@@ -278,9 +280,9 @@ export function welcomeHtml({ name, email, siteName = "WHOIS", locale }: {
 
       <!-- Features grid -->
       <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:24px">
-        ${s.w_features.map(([icon, title, desc]) => `
+        ${s.w_features.map(([, title, desc]) => `
           <tr>
-            <td style="width:42px;padding:10px 12px 10px 0;vertical-align:top;font-size:20px;line-height:1">${icon}</td>
+            <td style="width:28px;padding:10px 8px 10px 0;vertical-align:top;color:${MUTED};font-weight:600;font-size:14px;line-height:1.6">›</td>
             <td style="padding:10px 0;border-bottom:1px solid ${HAIR}">
               <p style="margin:0;font-size:13px;font-weight:700;color:${INK}">${title}</p>
               <p style="margin:3px 0 0;font-size:12px;color:${MUTED};line-height:1.6">${desc}</p>
@@ -290,11 +292,11 @@ export function welcomeHtml({ name, email, siteName = "WHOIS", locale }: {
       </table>
 
       <!-- Getting started steps -->
-      <div style="background:${TONES.brand.bg};border:1px solid ${TONES.brand.border};border-radius:12px;padding:18px 20px;margin-bottom:22px">
+      <div style="background:${PANEL};border:1px solid ${BORDER};border-radius:12px;padding:18px 20px;margin-bottom:22px">
         <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:1px;color:${PRIMARY};text-transform:uppercase">${s.w_gs_label}</p>
         ${[s.w_gs_step1, s.w_gs_step2, s.w_gs_step3].map((step, i) => `
           <div style="display:flex;align-items:flex-start;gap:12px;${i < 2 ? "margin-bottom:12px" : ""}">
-            <span style="flex-shrink:0;width:22px;height:22px;background:${PRIMARY};color:#fff;border-radius:50%;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1">${i + 1}</span>
+            <span style="flex-shrink:0;width:22px;height:22px;background:${PRIMARY};color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1">${i + 1}</span>
             <span style="font-size:12px;color:${TEXT};line-height:1.7;padding-top:2px">${step}</span>
           </div>
         `).join("")}
@@ -351,13 +353,13 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
       ${section(`
         ${card(`
           ${cardBlock(`
-            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${TONES[statusTone].deep};text-transform:uppercase">${s.sc_current_status} · ${statusLabel}</p>
+            <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${TONES[statusTone].deep};text-transform:uppercase">${s.sc_current_status} · ${statusLabel}</p>
             <p style="margin:6px 0 0;font-size:12px;color:${TEXT};line-height:1.7">${statusDesc}</p>
-          `, { style: `background:${TONES[statusTone].bg}` })}
+          `)}
           ${cardBlock(`
-            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${TONES.info.deep};text-transform:uppercase">${s.sc_subscribed}</p>
-            <p style="margin:6px 0 0;font-size:13px;font-weight:700;color:#0c4a6e">✓ ${s.sc_subscribed_desc}</p>
-          `, { style: `background:${TONES.info.bg}` })}
+            <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${TONES.info.deep};text-transform:uppercase">${s.sc_subscribed}</p>
+            <p style="margin:6px 0 0;font-size:13px;font-weight:600;color:${TEXT}">${s.sc_subscribed_desc}</p>
+          `)}
         `, { style: "margin-bottom:20px" })}
       `)}
 
@@ -390,11 +392,10 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
 
     ${section(`
       <!-- Active monitoring banner -->
-      <div style="background:${TONES.success.bg};border:1px solid ${TONES.success.border};border-radius:10px;padding:11px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:15px">✅</span>
+      <div style="background:${PANEL};border:1px solid ${BORDER};border-left:3px solid ${TONES.success.deep};border-radius:6px;padding:11px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px">
         <div>
-          <p style="margin:0;font-size:12px;font-weight:700;color:#065f46">${s.sc_subscribed}</p>
-          <p style="margin:2px 0 0;font-size:11px;color:#047857">${s.sc_subscribed_desc}</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:${INK}">${s.sc_subscribed}</p>
+          <p style="margin:2px 0 0;font-size:11px;color:${MUTED}">${s.sc_subscribed_desc}</p>
         </div>
       </div>
 
@@ -403,9 +404,9 @@ export function subscriptionConfirmHtml(p: SubscriptionEmailParams & { siteName?
         ${cardHead(s.sc_expiry_date)}
         ${cardBlock(cardValue(expiryStr), { style: "padding-top:14px" })}
         ${cardBlock(`
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${phaseC.deep};text-transform:uppercase">${s.sc_current_status} · ${phaseI18n.label}</p>
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${phaseC.deep};text-transform:uppercase">${s.sc_current_status} · ${phaseI18n.label}</p>
           <p style="margin:6px 0 0;font-size:12px;color:${TEXT};line-height:1.7">${phaseI18n.desc}</p>
-        `, { style: `background:${phaseC.bg}` })}
+        `)}
       `, { style: "margin-bottom:20px" })}
 
       <!-- Thresholds -->
@@ -444,9 +445,9 @@ export function reminderHtml({
   const urgent = daysLeft <= 5;
   const warn   = daysLeft <= 15;
   const tone: Tone = urgent ? "danger" : warn ? "warning" : "dark";
-  const accent   = tone === "dark" ? PRIMARY : TONES[tone].fg;
+  const accent   = TONES[tone].deep;
   const hdrLabel = urgent ? s.r_urgent_label : s.r_label;
-  const btnColor = urgent ? "#dc2626" : warn ? "#d97706" : PRIMARY;
+  const btnColor = PRIMARY;
 
   const bodyText = urgent ? s.r_urgent_body(daysLeft) : s.r_normal_body;
 
@@ -466,7 +467,7 @@ export function reminderHtml({
     ${section(`
       <!-- Large countdown display -->
       <div style="text-align:center;padding:8px 0 18px">
-        <p style="margin:0;font-size:72px;font-weight:900;color:${accent};line-height:1;font-family:${MONO}">${daysLeft}</p>
+        <p style="margin:0;font-size:72px;font-weight:700;color:${accent};line-height:1;font-family:${MONO}">${daysLeft}</p>
         <p style="margin:4px 0 0;font-size:12px;font-weight:600;color:${MUTED};text-transform:uppercase;letter-spacing:1px">${s.r_expiry_date.toLowerCase()}</p>
       </div>
 
@@ -479,7 +480,7 @@ export function reminderHtml({
       <p style="margin:0 0 14px;font-size:13px;color:${TEXT};line-height:1.8">${bodyText}</p>
 
       <!-- Renewal tip -->
-      ${noteBox(`💡 ${s.r_renewal_tip}`, "brand")}
+      ${noteBox(s.r_renewal_tip, "dark")}
     `)}
 
     ${actionFooter(`${BASE_URL()}/${domain}`, s.r_cta, { cancelHref: cancelUrl, btnColor, unsubLabel: s.unsubscribe })}
@@ -547,8 +548,8 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
         ${cardHead(s.pe_orig_expiry)}
         ${cardBlock(`<p style="margin:0;font-size:16px;font-weight:700;color:${INK};font-family:${MONO}">${expiryStr}</p>`)}
         ${cardBlock(`
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${ct.deep};text-transform:uppercase">${s.pe_current_status} · ${cfg.badge}</p>
-        `, { style: `background:${ct.bg}` })}
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${ct.deep};text-transform:uppercase">${s.pe_current_status} · ${cfg.badge}</p>
+        `)}
         ${cfg.nextDate ? cardRow(cfg.nextLabel, cfg.nextDate, { valueStyle: `color:${ct.deep}` }) : ""}
         ${(creationStr || p.registrar) ? `
         <div style="padding:8px 18px 10px;border-top:1px solid ${HAIR}">
@@ -562,21 +563,21 @@ export function phaseEventHtml(p: PhaseEventEmailParams & { siteName?: string; l
       <p style="margin:0 0 14px;font-size:13px;color:${TEXT};line-height:1.8">${cfg.body}</p>
 
       <!-- Urgency notice -->
-      ${noteBox(`⚠️ ${cfg.urgency}`, cfg.tone, { bold: true, style: "margin-bottom:16px" })}
+      ${noteBox(cfg.urgency, cfg.tone, { bold: true, style: "margin-bottom:16px" })}
 
       <!-- Action items -->
       ${card(`
         ${cardHead(s.pe_action_label, { style: "background:" + PANEL })}
         ${cfg.actions.map((action: string, i: number) => `
           <div style="padding:10px 18px;border-bottom:${i < cfg.actions.length - 1 ? "1px solid " + HAIR : "none"};display:flex;align-items:flex-start;gap:12px">
-            <span style="flex-shrink:0;width:20px;height:20px;background:${ct.deep};color:#fff;border-radius:50%;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1;margin-top:1px">${i + 1}</span>
+            <span style="flex-shrink:0;width:20px;height:20px;border:1px solid ${BORDER};color:${ct.deep};border-radius:50%;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;margin-top:1px">${i + 1}</span>
             <span style="font-size:12px;color:${TEXT};line-height:1.7">${action}</span>
           </div>
         `).join("")}
       `)}
     `)}
 
-    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.pe_cta, { cancelHref: cancelUrl, btnColor: ct.deep, unsubLabel: s.unsubscribe })}
+    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.pe_cta, { cancelHref: cancelUrl, btnColor: PRIMARY, unsubLabel: s.unsubscribe })}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
@@ -606,27 +607,27 @@ export function dropApproachingHtml(p: DropApproachingParams & { siteName?: stri
         ${cardHead(s.da_orig_expiry)}
         ${cardBlock(`<p style="margin:0;font-size:16px;font-weight:700;color:${INK};font-family:${MONO}">${expiryStr}</p>`)}
         ${cardBlock(`
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1px;color:${PRIMARY};text-transform:uppercase">${s.da_avail_date}</p>
-          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:${PRIMARY};font-family:${MONO}">${p.dropDate}</p>
-        `, { style: `background:${TONES.brand.bg}` })}
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${s.da_avail_date}</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:700;color:${INK};font-family:${MONO}">${p.dropDate}</p>
+        `)}
         ${cardBlock(`<p style="margin:0;font-size:13px;color:${TEXT};line-height:1.7">${s.da_body}</p>`)}
       `, { style: "margin-bottom:18px" })}
 
-      ${noteBox(`⚡ ${urgency}`, "brand", { bold: true, style: "margin-bottom:16px" })}
+      ${noteBox(urgency, "brand", { bold: true, style: "margin-bottom:16px" })}
 
       <!-- Registration services -->
-      <div style="border:1px solid ${BORDER};border-radius:10px;padding:14px 18px">
-        <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${s.pe_action_label}</p>
+      <div style="border:1px solid ${BORDER};border-radius:8px;padding:14px 18px">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${s.pe_action_label}</p>
         ${[s.pe_pending_action1, s.pe_pending_action2].map((action, i) => `
           <div style="${i > 0 ? "margin-top:8px;" : ""}display:flex;align-items:flex-start;gap:10px">
-            <span style="color:${PRIMARY};font-weight:700;font-size:14px;flex-shrink:0">→</span>
+            <span style="color:${MUTED};font-weight:600;font-size:14px;flex-shrink:0">→</span>
             <span style="font-size:12px;color:${TEXT};line-height:1.7">${action}</span>
           </div>
         `).join("")}
       </div>
     `)}
 
-    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.da_cta, { cancelHref: cancelUrl, btnColor: "#7c3aed", unsubLabel: s.unsubscribe })}
+    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.da_cta, { cancelHref: cancelUrl, btnColor: PRIMARY, unsubLabel: s.unsubscribe })}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
@@ -650,20 +651,19 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
     ${section(`
       <!-- Available banner -->
       <div style="text-align:center;padding:8px 0 16px">
-        <div style="display:inline-block;background:${TONES.success.bg};border:2px solid ${TONES.success.border};border-radius:16px;padding:14px 28px">
-          <p style="margin:0;font-size:36px;line-height:1">✅</p>
-          <p style="margin:6px 0 0;font-size:14px;font-weight:800;color:#065f46">${s.dd_available}</p>
+        <div style="display:inline-block;background:${PANEL};border:1px solid ${BORDER};border-left:3px solid ${TONES.success.deep};border-radius:8px;padding:14px 28px">
+          <p style="margin:0;font-size:14px;font-weight:700;color:${TONES.success.deep};letter-spacing:0.12em;text-transform:uppercase">${s.dd_available}</p>
         </div>
       </div>
 
       ${card(`
         ${cardHead(s.dd_orig_expiry)}
         ${cardBlock(`<p style="margin:0;font-size:16px;font-weight:700;color:${INK};font-family:${MONO}">${expiryStr}</p>`)}
-        ${cardBlock(`<p style="margin:0;font-size:12px;color:#047857;line-height:1.7">${s.dd_note}</p>`, { style: `background:${TONES.success.bg}` })}
+        ${cardBlock(`<p style="margin:0;font-size:12px;color:${TEXT};line-height:1.7">${s.dd_note}</p>`)}
       `, { style: "margin-bottom:18px" })}
 
       <!-- Registration tip -->
-      ${noteBox(`🏁 ${s.dd_register_tip}`, "success", { style: "margin-bottom:16px" })}
+      ${noteBox(s.dd_register_tip, "success", { style: "margin-bottom:16px" })}
 
       <!-- Registrar links -->
       ${card(`
@@ -674,16 +674,16 @@ export function domainDroppedHtml(p: DomainDroppedParams & { siteName?: string; 
           { name: "Porkbun",   url: `https://porkbun.com/checkout/search?q=${p.domain}` },
         ].map(r => `
           <div style="padding:11px 18px;border-bottom:1px solid ${HAIR}">
-            <a href="${r.url}" style="font-size:13px;font-weight:600;color:${TONES.success.fg};text-decoration:none">${r.name} →</a>
+            <a href="${r.url}" style="font-size:13px;font-weight:600;color:${INK};text-decoration:none">${r.name} →</a>
           </div>
         `).join("")}
         <div style="padding:11px 18px">
-          <a href="https://www.namesilo.com/domain/search-domains?query=${encodeURIComponent(p.domain)}" style="font-size:13px;font-weight:600;color:${TONES.success.fg};text-decoration:none">NameSilo →</a>
+          <a href="https://www.namesilo.com/domain/search-domains?query=${encodeURIComponent(p.domain)}" style="font-size:13px;font-weight:600;color:${INK};text-decoration:none">NameSilo →</a>
         </div>
       `)}
     `)}
 
-    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.dd_cta, { cancelHref: cancelUrl, btnColor: "#059669", unsubLabel: s.unsubscribe })}
+    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.dd_cta, { cancelHref: cancelUrl, btnColor: PRIMARY, unsubLabel: s.unsubscribe })}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
@@ -719,10 +719,10 @@ export function domainHoldHtml(p: DomainHoldParams & { siteName?: string; locale
         `, { style: "background:" + PANEL })}
       `, { style: "margin-bottom:18px" })}
 
-      ${noteBox(`⚠️ ${s.hd_note}`, "warning")}
+      ${noteBox(s.hd_note, "warning")}
     `)}
 
-    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.hd_cta, { cancelHref: cancelUrl, btnColor: "#d97706", unsubLabel: s.unsubscribe })}
+    ${actionFooter(`${BASE_URL()}/${p.domain}`, s.hd_cta, { cancelHref: cancelUrl, unsubLabel: s.unsubscribe })}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
@@ -752,7 +752,7 @@ export function reservedDomainHtml(p: ReservedDomainParams & { siteName?: string
         ${cardBlock(`<p style="margin:0;font-size:16px;font-weight:700;color:${INK};font-family:${MONO}">${expiryStr}</p>`)}
       `, { style: "margin-bottom:18px" })}
 
-      ${noteBox(`ℹ️ ${s.rv_note}`, "info")}
+      ${noteBox(s.rv_note, "info")}
     `)}
 
     ${actionFooter(`${BASE_URL()}/${p.domain}`, s.rv_cta, { cancelHref: cancelUrl, btnColor: "#0369a1", unsubLabel: s.unsubscribe })}
@@ -857,79 +857,77 @@ export interface HighValueAlertParams {
 
 export function highValueAlertHtml(p: HighValueAlertParams & { siteName?: string }): string {
   const siteName = p.siteName || "WHOIS";
-  const tone: Tone = p.score >= 80 ? "danger" : p.score >= 60 ? "warning" : "brand";
+  const tone: Tone = p.score >= 80 ? "danger" : p.score >= 60 ? "warning" : "dark";
   const t = TONES[tone];
   const ALERT_COLOR = t.deep;
-  const tierBg      = t.bg;
-  const tierColor   = t.deep;
   const LOOKUP_URL  = `${BASE_URL()}/${p.domain}`;
 
   const labelRow = (l: string, v: string) =>
     `<tr><td style="padding:8px 0;font-size:12px;color:${MUTED};font-weight:500;width:90px;vertical-align:top;border-bottom:1px solid ${HAIR}">${l}</td><td style="padding:8px 0;font-size:13px;color:${INK};font-weight:600;border-bottom:1px solid ${HAIR}">${v}</td></tr>`;
 
-  const scoreBar = (label: string, val: number, max: number, color: string) => {
+  const scoreBar = (label: string, val: number, max: number) => {
     const pct = Math.round((val / max) * 100);
     return `<div style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;color:${TEXT}">${label}</span>
-        <span style="font-size:11px;font-weight:700;color:${color}">${val}/${max}</span>
+        <span style="font-size:11px;font-weight:600;color:${MUTED}">${val}/${max}</span>
       </div>
-      <div style="height:6px;background:${HAIR};border-radius:999px;overflow:hidden">
-        <div style="height:6px;width:${pct}%;background:${color};border-radius:999px"></div>
+      <div style="height:4px;background:${HAIR};border-radius:999px;overflow:hidden">
+        <div style="height:4px;width:${pct}%;background:${INK};border-radius:999px"></div>
       </div>
     </div>`;
   };
 
   return emailLayout(`
-    ${brandHeader(tone, p.isAlertKeyword ? "⚡ 特殊关键词可用告警" : "💎 高价值域名可用告警", p.domain,
+    ${brandHeader(tone, p.isAlertKeyword ? "特殊关键词可用告警" : "高价值域名可用告警", p.domain,
       "该域名当前未被注册，请及时评估并决定是否注册",
-      { titleStyle: `font-size:26px;font-weight:900;font-family:${MONO};letter-spacing:-0.5px` })}
+      { titleStyle: `font-size:26px;font-weight:700;font-family:${MONO};letter-spacing:-0.5px` })}
 
     ${section(`
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap">
-        <div style="background:${tierBg};border:2px solid ${ALERT_COLOR}22;border-radius:16px;padding:14px 20px;text-align:center;min-width:90px">
-          <p style="margin:0;font-size:32px;font-weight:900;color:${ALERT_COLOR};line-height:1">${p.score}</p>
-          <p style="margin:4px 0 0;font-size:10px;font-weight:700;letter-spacing:1px;color:${tierColor};text-transform:uppercase">价值评分</p>
+        <div style="border:1px solid ${BORDER};border-left:3px solid ${ALERT_COLOR};border-radius:8px;padding:14px 20px;text-align:center;min-width:90px">
+          <p style="margin:0;font-size:32px;font-weight:700;color:${ALERT_COLOR};line-height:1;font-family:${MONO}">${p.score}</p>
+          <p style="margin:4px 0 0;font-size:10px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">价值评分</p>
         </div>
         <div>
-          <div style="display:inline-block;background:${tierBg};border:1px solid ${ALERT_COLOR}44;color:${tierColor};padding:4px 14px;border-radius:999px;font-size:13px;font-weight:700;margin-bottom:8px">
+          <div style="display:inline-block;border:1px solid ${BORDER};color:${ALERT_COLOR};padding:3px 12px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:8px">
             ${p.tier}价值
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${p.reasons.map(r => pill(r, tierBg, tierColor)).join("")}
-            ${p.isAlertKeyword ? pill("⚡ 特殊关键词", "#fef3c7", "#92400e") : ""}
-            ${p.isNumericOnly  ? pill("🔢 纯数字", TONES.success.bg, TONES.success.deep) : ""}
-            ${p.hotPrefix      ? pill(`🔥 热门前缀: ${p.hotPrefix.prefix}`, "#fff7ed", "#c2410c") : ""}
+            ${p.reasons.map(r => pill(r)).join("")}
+            ${p.isAlertKeyword ? pill("特殊关键词") : ""}
+            ${p.isNumericOnly  ? pill("纯数字") : ""}
+            ${p.hotPrefix      ? pill(`热门前缀: ${p.hotPrefix.prefix}`) : ""}
           </div>
         </div>
       </div>
 
-      ${p.hotPrefix ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px;margin-bottom:20px">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1px;color:#c2410c;text-transform:uppercase">🔥 热门前缀监控命中</p>
+      ${p.hotPrefix ? `<div style="border:1px solid ${BORDER};border-radius:8px;padding:16px;margin-bottom:20px">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">热门前缀监控命中</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-          <span style="font-family:${MONO};font-size:16px;font-weight:800;color:#c2410c;background:#fed7aa;padding:4px 12px;border-radius:8px">${p.hotPrefix.prefix}</span>
-          <span style="font-size:12px;color:#78350f">分类：${p.hotPrefix.category} &nbsp;·&nbsp; 权重：${p.hotPrefix.weight} &nbsp;·&nbsp; 匹配：${p.hotPrefix.matchType === "exact" ? "精确" : "前缀"}</span>
+          <span style="font-family:${MONO};font-size:16px;font-weight:700;color:${INK};border:1px solid ${BORDER};background:${PANEL};padding:4px 12px;border-radius:6px">${p.hotPrefix.prefix}</span>
+          <span style="font-size:12px;color:${MUTED}">分类：${p.hotPrefix.category} &nbsp;·&nbsp; 权重：${p.hotPrefix.weight} &nbsp;·&nbsp; 匹配：${p.hotPrefix.matchType === "exact" ? "精确" : "前缀"}</span>
         </div>
-        ${p.hotPrefix.notes ? `<p style="margin:8px 0 0;font-size:12px;color:#92400e">${p.hotPrefix.notes}</p>` : ""}
-        ${p.hotPrefix.saleExamples ? `<p style="margin:6px 0 0;font-size:11px;color:#b45309;font-style:italic">参考成交：${p.hotPrefix.saleExamples}</p>` : ""}
+        ${p.hotPrefix.notes ? `<p style="margin:8px 0 0;font-size:12px;color:${TEXT}">${p.hotPrefix.notes}</p>` : ""}
+        ${p.hotPrefix.saleExamples ? `<p style="margin:6px 0 0;font-size:11px;color:${MUTED}">参考成交：${p.hotPrefix.saleExamples}</p>` : ""}
       </div>` : ""}
 
-      <div style="background:${PANEL};border-radius:12px;padding:16px;margin-bottom:20px">
-        <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:${MUTED};text-transform:uppercase">评分明细</p>
-        ${scoreBar("名称长度", p.breakdown.lengthScore, 30, "#3b82f6")}
-        ${scoreBar("后缀价值", p.breakdown.tldScore, 20, PRIMARY_LT)}
-        ${scoreBar("热词匹配", p.breakdown.keywordScore, 25, "#f59e0b")}
-        ${scoreBar("特征加分", p.breakdown.patternScore, 15, "#10b981")}
+      <div style="border:1px solid ${BORDER};border-radius:8px;padding:16px;margin-bottom:20px">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">评分明细</p>
+        ${scoreBar("名称长度", p.breakdown.lengthScore, 30)}
+        ${scoreBar("后缀价值", p.breakdown.tldScore, 20)}
+        ${scoreBar("热词匹配", p.breakdown.keywordScore, 25)}
+        ${scoreBar("特征加分", p.breakdown.patternScore, 15)}
       </div>
 
       ${p.aiSummary ? `${noteBox(`
-        <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1px;color:${TONES.brand.deep};text-transform:uppercase">🤖 AI 快速评估</p>
-        <p style="margin:0;font-size:13px;color:${TONES.brand.deep};line-height:1.6">${p.aiSummary}</p>
-      `, "brand", { html: true, style: "margin-bottom:20px" })}` : ""}
+        <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">AI 快速评估</p>
+        <p style="margin:0;font-size:13px;color:${TEXT};line-height:1.6">${p.aiSummary}</p>
+      `, "dark", { html: true, style: "margin-bottom:20px" })}` : ""}
 
       <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:20px">
         ${labelRow("域名", `<span style="font-family:${MONO};font-size:15px;color:${INK}">${p.domain}</span>`)}
-        ${labelRow("状态", `<span style="color:${TONES.success.fg};font-weight:700">✓ 可注册（未被注册）</span>`)}
+        ${labelRow("状态", `<span style="color:${INK};font-weight:600">可注册（未被注册）</span>`)}
         ${p.checkedBy ? labelRow("查询者", p.checkedBy) : ""}
         ${labelRow("检测时间", new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }) + "（北京时间）")}
       </table>
@@ -937,9 +935,9 @@ export function highValueAlertHtml(p: HighValueAlertParams & { siteName?: string
 
     ${divider()}
     <div style="padding:20px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      ${ctaBtn(LOOKUP_URL, "立即查看域名详情", ALERT_COLOR)}
+      ${ctaBtn(LOOKUP_URL, "立即查看域名详情")}
       <a href="https://www.namesilo.com/domain/search-domains?query=${encodeURIComponent(p.domain)}"
-         style="font-size:12px;color:${PRIMARY};text-decoration:underline;text-underline-offset:3px">
+         style="font-size:12px;color:${MUTED};text-decoration:underline;text-underline-offset:3px">
         前往 NameSilo 注册 →
       </a>
     </div>
@@ -965,7 +963,7 @@ export function stampVerifyTimeoutHtml({
         ${cardHead(s.sv_step1_title)}
         ${cardBlock(`
           <p style="margin:0;font-size:13px;color:${INK}">${s.sv_step1_body}</p>
-          <p style="margin:6px 0 0;font-family:${MONO};font-size:12px;color:${PRIMARY};background:${TONES.brand.bg};padding:8px 12px;border-radius:6px;word-break:break-all">
+          <p style="margin:6px 0 0;font-family:${MONO};font-size:12px;color:${PRIMARY};background:${PANEL};padding:8px 12px;border-radius:6px;word-break:break-all">
             /.well-known/next-whois-verify.txt
           </p>
         `)}
@@ -979,7 +977,7 @@ export function stampVerifyTimeoutHtml({
         `)}
       `, { style: "margin-bottom:18px" })}
 
-      ${ctaBtn(verifyUrl, s.sv_cta, TONES.danger.fg)}
+      ${ctaBtn(verifyUrl, s.sv_cta)}
       <p style="margin:16px 0 0;font-size:11px;color:${MUTED}">${s.sv_retry}</p>
     `)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
@@ -1005,16 +1003,16 @@ export function passwordChangedHtml({ siteName = "WHOIS", locale, changedAt, nam
         ${cardBlock(`
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${s.pc_time_label}</p>
           <p style="margin:5px 0 0;font-size:14px;font-weight:700;color:${INK};font-family:${MONO}">${ts}</p>
-        `, { style: "background:" + TONES.danger.bg })}
-        ${cardBlock(`<p style="margin:0;font-size:12px;color:${TONES.danger.fg}">🔒 ${s.pc_sub}</p>`, { style: "background:#fff5f5" })}
+        `)}
+        ${cardBlock(`<p style="margin:0;font-size:12px;color:${TEXT}">${s.pc_sub}</p>`)}
       `, { style: "margin-bottom:18px" })}
 
-      ${ctaBtn(baseUrl + "/account", s.pc_cta, TONES.danger.fg)}
+      ${ctaBtn(baseUrl + "/account", s.pc_cta)}
 
       <!-- Didn't change section -->
       ${noteBox(`
-        <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:${TONES.danger.deep}">⚠️ ${s.pc_not_you}</p>
-        <p style="margin:0;font-size:12px;color:#7f1d1d;line-height:1.7">${s.pc_not_you_body(siteName)}</p>
+        <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:${TONES.danger.deep}">${s.pc_not_you}</p>
+        <p style="margin:0;font-size:12px;color:${TEXT};line-height:1.7">${s.pc_not_you_body(siteName)}</p>
       `, "danger", { html: true, style: "margin-top:18px" })}
     `)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
@@ -1037,7 +1035,7 @@ export function verifyCodeHtml({ code, siteName = "WHOIS", locale, email }: {
       ${codeBox(code)}
 
       <!-- Expiry info -->
-      ${noteBox(`⏱️ ${s.vc_expires}`, "warning", { style: "margin:22px 0 14px" })}
+      ${noteBox(s.vc_expires, "warning", { style: "margin:22px 0 14px" })}
 
       <p style="margin:0;font-size:11px;color:${MUTED};line-height:1.7;text-align:center">${s.vc_security}</p>
     `)}
@@ -1072,12 +1070,14 @@ export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency
   const planDisp = planName || plan || "—";
   const amtStr   = amount != null ? String(amount) : null;
   return emailLayout(`
-    ${brandHeader("success", s.pay_label, s.pay_title, s.pay_sub)}
+    ${brandHeader("success", s.pay_label, s.pay_title)}
 
     ${section(`
       <!-- Success banner -->
       <div style="text-align:center;padding:8px 0 20px">
-        <div style="display:inline-block;background:${TONES.success.bg};border:2px solid ${TONES.success.border};border-radius:50%;width:56px;height:56px;line-height:56px;font-size:28px">✅</div>
+        <div style="display:inline-block;background:${PANEL};border:1px solid ${BORDER};border-left:3px solid ${TONES.success.deep};border-radius:8px;padding:10px 22px">
+          <p style="margin:0;font-size:13px;font-weight:700;color:${TONES.success.deep};letter-spacing:0.12em;text-transform:uppercase">${s.pay_sub}</p>
+        </div>
       </div>
 
       <p style="margin:0 0 20px;font-size:13px;color:${TEXT};line-height:1.8;text-align:center">${s.pay_body}</p>
@@ -1087,12 +1087,12 @@ export function paymentConfirmHtml({ plan, planName, expiresAt, amount, currency
         ${cardRow(s.pay_plan_label, planDisp, { valueStyle: "font-size:16px" })}
         ${orderId ? cardRow("Order ID", orderId, { valueStyle: `font-size:12px;font-weight:600;color:${TEXT};font-family:${MONO}` }) : ""}
         ${expiresAt ? cardRow(s.pay_expires_label, expiresAt, { valueStyle: `font-size:14px;font-family:${MONO}` }) : ""}
-        ${amtStr ? cardRow(s.pay_amount_label, `${currency} ${amtStr}`, { style: "background:" + TONES.success.bg, valueStyle: `font-size:18px;font-weight:800;color:${TONES.success.fg}` }) : ""}
+        ${amtStr ? cardRow(s.pay_amount_label, `${currency} ${amtStr}`, { valueStyle: `font-size:18px;font-weight:700` }) : ""}
       `, { style: "margin-bottom:18px" })}
 
       <p style="margin:0 0 18px;font-size:11px;color:${MUTED};line-height:1.7">${s.pay_receipt}</p>
 
-      ${ctaBtn(BASE_URL() + "/account", s.pay_cta, TONES.success.fg)}
+      ${ctaBtn(BASE_URL() + "/account", s.pay_cta)}
     `)}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
@@ -1113,21 +1113,21 @@ export function membershipRenewHtml({ daysLeft, expiresAt, siteName = "WHOIS", l
       ? s.mr_days_1
       : s.mr_days_7;
   const tone: Tone = daysLeft <= 1 ? "danger" : "warning";
-  const color = TONES[tone].fg;
+  const accent = TONES[tone].deep;
 
   return emailLayout(`
-    ${brandHeader(tone, s.mr_label, "⏰", s.mr_sub)}
+    ${brandHeader(tone, s.mr_label, s.mr_sub)}
 
     ${section(`
       ${noteBox(s.mr_body, tone, { style: "margin-bottom:18px" })}
 
       ${card(`
         ${cardRow(s.pay_expires_label, expiresAt ? fmtEmailDate(expiresAt, s) : "—")}
-        ${cardBlock(`<p style="margin:0;font-size:13px;font-weight:700;color:${color}">${urgency}</p>`, { style: `background:${TONES[tone].bg}` })}
+        ${cardBlock(`<p style="margin:0;font-size:13px;font-weight:600;color:${accent}">${urgency}</p>`)}
       `, { style: "margin-bottom:18px" })}
     `)}
 
-    ${actionFooter(BASE_URL() + "/payment/checkout", s.mr_cta, { cancelHref: BASE_URL() + "/dashboard", btnColor: color, unsubLabel: s.unsubscribe })}
+    ${actionFooter(BASE_URL() + "/payment/checkout", s.mr_cta, { cancelHref: BASE_URL() + "/dashboard", unsubLabel: s.unsubscribe })}
   `, siteName, { langCode: s.date_locale, autoSentText: s.auto_sent(siteName) });
 }
 
