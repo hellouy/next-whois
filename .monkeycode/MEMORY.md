@@ -364,3 +364,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - ocsp npm 包是纯 JS（无原生构建），不需要登记 pnpm-workspace.yaml allowBuilds；用 `ocsp.request.generate(certRawBuffer, issuerRawBuffer)` + 手动 POST + `ocsp.utils.parseResponse` 解析 good/revoked/unknown。
   - vitest 4：`vi.spyOn(require("crypto"),"X509Certificate")` mock 构造函数必须用 class 形式；模块 mock 工厂引用外部变量需 `vi.hoisted`。
   - ICP batch 拆分/聚合逻辑抽到纯函数库 src/lib/icp-batch.ts（splitSearchTerms 支持中英文逗号/换行/空格、去重、上限 20）；前端 CSV 导出用 `\uFEFF` BOM + 每字段加引号转义。
+
+[Project Knowledge Summary]
+- Date: 2026-09-12
+- Context: Discovered while diagnosing "lookup fast (0.99s·rdap) but result page appeared 10+s later" report on the preview environment
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 预览环境感知慢 ≠ 生产慢：dev server（next dev）的页面 JS bundle 未压缩——_app.js ~14.5MB + main.js ~5.25MB + 单页面 chunk ~3.5MB ≈ 23MB。经预览隧道下载+解析+hydration 即产生 ~10s 感知延迟，与服务端查询耗时无关。生产 Vercel build 会压缩+tree-shake+代码分割，同套依赖 gzip 后仅几百 KB，无此问题。
+  - 排查"结果页显示慢"的实测分解法：curl 完整 SSR 请求测 TTFB（getServerSideProps+SSR 渲染，~1.9s）；curl 带 `x-nextjs-data: 1` 测客户端导航 SSR JSON（~0.02s 空壳）；再单独 curl /api/lookup-stream 测服务端 WHOIS/RDAP 耗时（结果里的 time 字段）。三者相加≈用户感知，能定位慢在 SSR 还是 bundle 还是上游查询。
+  - dev 流式缓冲特性：next dev 只在 res.end() 时才刷新 NDJSON chunk，预览环境上 partial 结果不会实时到达——lookup-stream 里挂起的记录写入/等待窗口会直接延迟用户看到结果的时刻（生产 chunked 实时刷新不受影响）。
+  - 出境网络抖动判据：环境内 GitHub/npm/境外 WHOIS 服务器 TLS 握手 SSL_ERROR_SYSCALL 全断、国内域名正常时，WHOIS/RDAP/premium(Netim/Porkbun) 查询全部超时属环境问题而非代码 bug；c.xyz 这类"DNS 已注册但 WHOIS 全挂"结果会走 registered_no_whois 分支。

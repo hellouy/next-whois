@@ -58,6 +58,7 @@ import { format } from "date-fns";
 import { useSession, signOut } from "next-auth/react";
 import { useSiteSettings } from "@/lib/site-settings";
 import { useTranslation, TranslationKey } from "@/lib/i18n";
+import { NAV_ICON_BTN } from "@/components/nav-icons";
 
 const TAP = { whileTap: { scale: 0.88 }, transition: { type: "spring" as const, stiffness: 500, damping: 22 } };
 
@@ -168,7 +169,7 @@ function HistoryDrawer() {
       <DrawerTrigger asChild>
         <motion.button
           type="button"
-          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
+          className={NAV_ICON_BTN}
           {...TAP}
           aria-label={t("nav_search_history")}
         >
@@ -281,7 +282,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <button>
+      <button className={NAV_ICON_BTN} aria-hidden>
         <span className="sr-only">Toggle theme</span>
       </button>
     );
@@ -290,7 +291,7 @@ export function ThemeToggle() {
   return (
     <motion.button
       type="button"
-      className="p-2 pr-0 touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+      className={NAV_ICON_BTN}
       onClick={toggleTheme}
       {...TAP}
     >
@@ -443,7 +444,7 @@ export function NavDrawer() {
       <DrawerTrigger asChild>
         <motion.button
           type="button"
-          className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
+          className={NAV_ICON_BTN}
           {...TAP}
         >
           <AnimatePresence mode="wait">
@@ -859,7 +860,7 @@ function NotificationBell() {
         {...TAP}
         ref={buttonRef}
         onClick={handleToggle}
-        className="p-2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors touch-manipulation min-h-[44px] min-w-[44px]"
+        className={NAV_ICON_BTN}
         aria-label={t("notifications.bell_aria")}
       >
         <span className="relative inline-flex">
@@ -995,7 +996,7 @@ function UserButton() {
       <motion.div {...TAP} style={{ display: "inline-flex" }}>
         <Link
           href="/login"
-          className="p-2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+          className={NAV_ICON_BTN}
           aria-label={t("nav_login")}
         >
           <RiUserLine className="h-[1rem] w-[1rem]" />
@@ -1016,7 +1017,7 @@ function UserButton() {
         {...TAP}
         ref={buttonRef}
         onClick={handleToggle}
-        className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation min-h-[44px] min-w-[44px]"
+        className={NAV_ICON_BTN}
         aria-label={t("nav_dashboard")}
       >
         <span className={cn(
@@ -1139,13 +1140,13 @@ export function Navbar() {
 
         <div className="hidden sm:block h-4 w-[1px] bg-primary/10 shrink-0" />
 
-        <div className="flex items-center gap-1 sm:gap-3">
+        <div className="flex items-center gap-0.5 sm:gap-1">
           <ThemeToggle />
           <LanguageSwitcher />
           <motion.div {...TAP} className="hidden sm:inline-flex">
             <Link
               href="/directory"
-              className="p-2 pr-0 inline-flex items-center justify-center touch-manipulation"
+              className={NAV_ICON_BTN}
               aria-label={t("nav_directory")}
             >
               <RiCompassLine className="h-[1rem] w-[1rem]" />

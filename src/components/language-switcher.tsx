@@ -1,4 +1,5 @@
 import { useLocale, type Locale } from "@/lib/locale-context";
+import { NAV_ICON_BTN } from "@/components/nav-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,8 +25,8 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="group inline-flex items-center justify-center rounded-full p-2 pr-0 touch-manipulation active:scale-90 transition-transform duration-75">
-          <RiEarthFill className="h-[1rem] w-[1rem] group-hover:scale-110 transition-all duration-300" />
+        <button type="button" className={`group ${NAV_ICON_BTN}`}>
+          <RiEarthFill className="h-[1rem] w-[1rem] group-hover:scale-110 transition-transform duration-300" />
           <span className="sr-only">Language</span>
         </button>
       </DropdownMenuTrigger>
