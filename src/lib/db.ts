@@ -594,6 +594,8 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_snipe_targets_status ON snipe_targets (status)`,
   `CREATE INDEX IF NOT EXISTS idx_snipe_targets_hunt   ON snipe_targets (hunt_start, hunt_end) WHERE status IN ('armed','blocked_balance')`,
   `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS recharge_alerted_at TIMESTAMPTZ`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS whois_fail_alerted_at TIMESTAMPTZ`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS stale_alerted_at TIMESTAMPTZ`,
   `CREATE TABLE IF NOT EXISTS snipe_probes (
     id          BIGSERIAL   PRIMARY KEY,
     target_id   UUID        NOT NULL REFERENCES snipe_targets(id),

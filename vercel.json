@@ -24,6 +24,10 @@
     {
       "path": "/api/admin/expired-domains-crawl?action=crawl&mode=length",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/snipe-probe",
+      "schedule": "0 9 * * *"
     }
   ],
   "functions": {
@@ -67,6 +71,9 @@
       "maxDuration": 10
     },
     "src/pages/api/cron/tld-scrape.ts": {
+      "maxDuration": 300
+    },
+    "src/pages/api/cron/snipe-probe.ts": {
       "maxDuration": 300
     },
     "src/pages/api/admin/subscription-sync.ts": {

@@ -86,6 +86,8 @@ export interface SnipeTargetRow {
   fail_reason: string | null;
   notes: string | null;
   recharge_alerted_at: string | null;
+  whois_fail_alerted_at: string | null;
+  stale_alerted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -333,6 +335,90 @@ async function notifyRecharge(t: SnipeTargetRow, balance: number, needed: number
   await run(`UPDATE snipe_targets SET recharge_alerted_at = NOW() WHERE id = $1`, [t.id]);
 }
 
+/**
+ * WHOIS has failed `fails` consecutive probes for this target — alert the admin
+ * once per 24h. The last successful ETA is kept; this is a health signal that
+ * the drop date may drift if the whois source stays down.
+ */
+async function notifyWhoisFailing(t: SnipeTargetRow, fails: number): Promise<void> {
+  if (!ADMIN_EMAIL) return;
+  if (
+    t.whois_fail_alerted_at &&
+    Date.now() - new Date(t.whois_fail_alerted_at).getTime() < RECHARGE_ALERT_INTERVAL_MS
+  ) {
+    return;
+  }
+  await sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `[WHOIS 异常] 抢注目标 ${t.domain}`,
+    html: snipeNotifyHtml("warning", {
+      title: "WHOIS 连续探测失败",
+      domain: t.domain,
+      lines: [
+        ["连续失败次数", `${fails} 次`],
+        ["目标状态", t.status],
+        ["提示", "WHOIS 源不可用时保留上次成功结果；请核查网络后重试"],
+      ],
+    }),
+  }).catch((e) => logger.error(`[snipe] whois-fail email failed: ${e.message}`));
+  await run(`UPDATE snipe_targets SET whois_fail_alerted_at = NOW() WHERE id = $1`, [t.id]);
+}
+
+/**
+ * A target has stayed armed/blocked_balance well past its drop ETA (no
+ * release observed for 7+ days) — likely the GitHub Actions trigger stalled or
+ * the lifecycle rules are off. Alert the admin once per 24h.
+ */
+async function notifyStaleTarget(t: SnipeTargetRow): Promise<void> {
+  if (!ADMIN_EMAIL) return;
+  if (
+    t.stale_alerted_at &&
+    Date.now() - new Date(t.stale_alerted_at).getTime() < RECHARGE_ALERT_INTERVAL_MS
+  ) {
+    return;
+  }
+  const eta = t.drop_eta ? new Date(t.drop_eta + "T00:00:00Z") : null;
+  const daysOver = eta && !isNaN(eta.getTime())
+    ? Math.max(1, Math.round((Date.now() - eta.getTime()) / 86_400_000))
+    : 1;
+  await sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `[抢注滞留] 目标 ${t.domain}`,
+    html: snipeNotifyHtml("warning", {
+      title: "目标疑似滞留（超期未释放）",
+      domain: t.domain,
+      lines: [
+        ["预计掉落", t.drop_eta ?? "—"],
+        ["超期", `${daysOver} 天`],
+        ["目标状态", t.status],
+        ["提示", "请核查 GitHub Actions 触发器是否停摆，或生命周期规则是否需调整"],
+      ],
+    }),
+  }).catch((e) => logger.error(`[snipe] stale email failed: ${e.message}`));
+  await run(`UPDATE snipe_targets SET stale_alerted_at = NOW() WHERE id = $1`, [t.id]);
+}
+
+/** Stale threshold: 7 days past the drop ETA without a release. */
+const STALE_ETA_PAST_DAYS = 7;
+
+/** Find targets stuck armed/blocked_balance past their drop ETA and alert. */
+async function alertStaleTargets(): Promise<void> {
+  if (!ADMIN_EMAIL) return;
+  const cutoff = new Date(Date.now() - STALE_ETA_PAST_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const stale = await many<SnipeTargetRow>(
+    `SELECT * FROM snipe_targets
+     WHERE status IN ('armed','blocked_balance')
+       AND drop_eta IS NOT NULL
+       AND drop_eta < $1
+       AND (stale_alerted_at IS NULL OR stale_alerted_at < NOW() - make_interval(secs => $2))
+     ORDER BY drop_eta ASC`,
+    [cutoff, RECHARGE_ALERT_INTERVAL_MS / 1000],
+  );
+  for (const t of stale) {
+    await notifyStaleTarget(t);
+  }
+}
+
 // ── Precheck (arming) ────────────────────────────────────────────────────────
 
 /**
@@ -526,8 +612,8 @@ async function probeTarget(t: SnipeTargetRow): Promise<TargetOutcome> {
   // us to it) stays armed and waits for the next probe.
   if (!whois.release) {
     if (whois.whoisFails >= MAX_WHOIS_FAILS) {
-      // Warn once via a failed-outcome attempt (no create involved).
-      logger.warn(`[snipe] ${t.domain}: whois failing ${whois.whoisFails}× in a row`);
+      // Warn once per 24h via email; the last successful ETA is preserved.
+      await notifyWhoisFailing(t, whois.whoisFails);
     }
     return "still_registered";
   }
@@ -662,6 +748,10 @@ async function probeTarget(t: SnipeTargetRow): Promise<TargetOutcome> {
 // ── Entry points ─────────────────────────────────────────────────────────────
 
 async function runProbe(mode: "daily" | "hunt"): Promise<ProbeSummary> {
+  // Surface targets stuck armed/blocked_balance past their drop ETA before
+  // the regular pass — a stalled GitHub Actions trigger must not go unnoticed.
+  await alertStaleTargets();
+
   let rows: SnipeTargetRow[];
   if (mode === "hunt") {
     const now = new Date().toISOString();

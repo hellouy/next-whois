@@ -64,6 +64,7 @@ interface Target {
   fail_reason: string | null;
   notes: string | null;
   recharge_alerted_at: string | null;
+  stale_alerted_at: string | null;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -85,6 +86,7 @@ function makeTarget(over: Partial<Target> = {}): Target {
     fail_reason: null,
     notes: null,
     recharge_alerted_at: null,
+    stale_alerted_at: null,
     ...over,
   };
 }
@@ -94,6 +96,11 @@ function wireDb(targets: Target[]) {
   const store = new Map(targets.map((t) => [t.id, { ...t }]));
 
   mocks.many.mockImplementation((sql: string, params?: unknown[]) => {
+    if (sql.includes("drop_eta < $1")) {
+      // stale-target alert scan — tests keep drop_eta in the past or null, so
+      // never surface any target here unless a test opts in explicitly.
+      return [];
+    }
     if (sql.includes("hunt_start IS NOT NULL")) {
       const now = (params?.[0] as string) ?? nowIso();
       return [...store.values()].filter((t) =>
