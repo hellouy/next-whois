@@ -964,6 +964,12 @@ export interface LifecycleInfo {
  * Map EPP status codes to a lifecycle phase.
  * Returns null if no phase-specific EPP code is detected.
  * EPP codes: https://www.icann.org/resources/pages/epp-status-codes-2014-06-16-en
+ *
+ * Hold / locked statuses (clientHold, serverHold, *Prohibited, Registry Hold,
+ * "Disputed or Suspicious Activity", etc.) mean the domain is still occupied by
+ * the registry or under investigation — it must NEVER be reported as released
+ * ("dropped"). They map to "redemption" so the date-based drop estimate cannot
+ * trigger the "now available" notification while the name is frozen.
  */
 export function getPhaseFromEppStatus(eppStatuses: string[]): LifecyclePhase | null {
   if (!eppStatuses || eppStatuses.length === 0) return null;
@@ -977,6 +983,16 @@ export function getPhaseFromEppStatus(eppStatuses: string[]): LifecyclePhase | n
   if (normalized.some((s) => s.includes("pendingrestore"))) return "redemption";
   if (normalized.some((s) => s.includes("autorenewperiod"))) return "grace";
   if (normalized.some((s) => s.includes("addperiod"))) return "grace";
+  // Hold / lock family: domain is still occupied by the registry even if the
+  // date-based estimate says the drop window has passed. Block "dropped".
+  const isHeld = normalized.some((s) =>
+    s.includes("clienthold") || s.includes("serverhold") ||
+    s.includes("clientrenewprohibited") || s.includes("serverrenewprohibited") ||
+    s.includes("clientdeleteprohibited") || s.includes("serverdeleteprohibited") ||
+    s.includes("clienttransferprohibited") || s.includes("servertransferprohibited") ||
+    s.includes("clientupdateprohibited") || s.includes("serverupdateprohibited")
+  );
+  if (isHeld) return "redemption";
   return null;
 }
 

@@ -312,7 +312,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // ── Hold / Reserved detection (independent of lifecycle phase) ────────
         // Uses EPP status from the current WHOIS refresh, or the last persisted status.
-        const eppLower = reminder.epp_status.map(s => s.toLowerCase());
+        const eppLower = reminder.epp_status.map(s => s.toLowerCase().replace(/[\s_-]+/g, ""));
         const isHold = eppLower.some(s => s === "clienthold" || s === "serverhold");
         const isReserved = eppLower.some(s => s === "reserved" || s === "inactive" || s === "serverupdateprohibited");
         if (isHold && !reminder.hold_notified_at) {
@@ -385,6 +385,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         if (phase === "dropped") {
+          // ── Live release check (guards against date-based false positives) ─
+          // "dropped" here is normally a date-based estimate from the lifecycle
+          // table (expiry + grace + redemption + pending-delete). Real registries
+          // can hold expired names much longer (respectively freeze them for
+          // investigation, e.g. "Registry Hold - Suspicious Activity"), so a
+          // domain can be past its estimated drop date yet still fully occupied.
+          // Before telling the user "the domain is now available", re-check the
+          // live registry. Only when the name is genuinely gone (RDAP 404 /
+          // "Domain not found") do we send the release notification. If the live
+          // check fails or the name is still registered, skip the release and
+          // fall through to the persistent hold/reserved notifications instead.
+          const liveCheck = await Promise.race([
+            lookupWhoisWithCache(reminder.domain, { nocache: true }).catch(() => null),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 9000)),
+          ]);
+          const liveError = liveCheck?.error?.toLowerCase() ?? "";
+          const isGenuinelyReleased = Boolean(
+            liveCheck &&
+            !liveCheck.status &&
+            !liveCheck.result &&
+            (liveError.includes("not found") || liveError.includes("unregistered")),
+          );
+          if (!isGenuinelyReleased) {
+            // Still occupied or the live check was inconclusive — do NOT claim
+            // the domain is available. Persist the fresh EPP status (if any) so
+            // the hold / reserved branches below can act on reliable data.
+            if (liveCheck?.result?.status?.length) {
+              await run(
+                `UPDATE reminders SET last_epp_status = $1 WHERE id = $2`,
+                [JSON.stringify(liveCheck.result.status.map((s: { status?: string }) => s.status ?? "").filter(Boolean)), reminder.id],
+              ).catch(() => {});
+            }
+            logger.info(
+              `[process] ${reminder.domain} reached estimated drop date but live check says still occupied ` +
+              `(status=${liveCheck?.status}, error=${liveCheck?.error ?? "none"}) - skipping release notification`,
+            );
+            results.skipped++;
+            continue;
+          }
+
           if (phaseFlags.dropped && !sentKeys.includes(DROPPED_KEY)) {
             const claimed = await sendWithClaim(DROPPED_KEY, async () => {
               await sendEmail({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nextReminderFiring } from "@/lib/lifecycle";
+import { nextReminderFiring, computeLifecycle, getPhaseFromEppStatus } from "@/lib/lifecycle";
 
 const DAY = 86_400_000;
 const expiry = (daysAhead: number) => new Date(Date.now() + daysAhead * DAY);
@@ -69,5 +69,86 @@ describe("nextReminderFiring (interval semantics)", () => {
     const f = nextReminderFiring([30, 10], 12, expiry(12), [30], now);
     expect(f?.days).toBe(10);
     expect(f && Math.round((f.at.getTime() - now.getTime()) / DAY)).toBe(2);
+  });
+});
+
+describe("getPhaseFromEppStatus", () => {
+  it("maps pending-delete / pending-purge codes to pendingDelete", () => {
+    expect(getPhaseFromEppStatus(["pendingDelete", "clientDeleteProhibited"])).toBe("pendingDelete");
+    expect(getPhaseFromEppStatus(["pending purge"])).toBe("pendingDelete");
+  });
+
+  it("maps redemption / restore codes to redemption", () => {
+    expect(getPhaseFromEppStatus(["redemptionPeriod"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["pendingRestore"])).toBe("redemption");
+  });
+
+  it("maps auto-renew / add codes to grace", () => {
+    expect(getPhaseFromEppStatus(["autoRenewPeriod"])).toBe("grace");
+    expect(getPhaseFromEppStatus(["addPeriod"])).toBe("grace");
+  });
+
+  it("maps hold / lock family to redemption so dropped is impossible", () => {
+    expect(getPhaseFromEppStatus(["clientHold"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["server hold"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["clientDeleteProhibited", "serverRenewProhibited"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["client hold", "server hold"])).not.toBe("dropped");
+  });
+
+  it("returns null for empty or non-phase-specific statuses", () => {
+    expect(getPhaseFromEppStatus([])).toBeNull();
+    expect(getPhaseFromEppStatus(["ok", "active"])).toBeNull();
+  });
+
+  it("normalizes spaces, underscores and dashes", () => {
+    expect(getPhaseFromEppStatus(["client hold"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["Server-Hold"])).toBe("redemption");
+  });
+});
+
+describe("computeLifecycle", () => {
+  const sbOverride = {
+    sb: { grace: 30, redemption: 0, pendingDelete: 0, confidence: "est" as const, registry: "Solomon Islands NIC" },
+  };
+
+  it("dates only: expired longer than grace+redemption+pendingDelete -> dropped", () => {
+    // A .com with expiry 100 days ago: grace 30 + redemption 30 + pendingDelete 5 = 65
+    // => past dropDate => dropped by pure date arithmetic.
+    const past = new Date(Date.now() - 100 * DAY).toISOString().slice(0, 10);
+    const lc = computeLifecycle("example.com", past, [], {});
+    expect(lc?.phase).toBe("dropped");
+    expect(lc?.phaseSource).toBe("dates");
+  });
+
+  it("dates only: .sb past its estimated drop date is dropped", () => {
+    // .sb cfg: grace=30, redemption=0, pendingDelete=0 => dropDate = expiry + 30.
+    // Expiry 40 days ago => past dropDate => dropped by dates.
+    const past = new Date(Date.now() - 40 * DAY).toISOString().slice(0, 10);
+    const lc = computeLifecycle("f.sb", past, [], sbOverride);
+    expect(lc?.phase).toBe("dropped");
+    expect(lc?.phaseSource).toBe("dates");
+  });
+
+  it("EPP hold blocks the date-based dropped verdict", () => {
+    // Same f.sb scenario, but the registry reports hold/lock statuses
+    // (e.g. Registry Hold - Suspicious Activity): the domain is still occupied,
+    // so the lifecycle must NOT report dropped.
+    const past = new Date(Date.now() - 40 * DAY).toISOString().slice(0, 10);
+    const held = computeLifecycle("f.sb", past, ["client hold", "server hold"], sbOverride);
+    expect(held?.phase).not.toBe("dropped");
+    expect(held?.phase).toBe("redemption");
+    expect(held?.phaseSource).toBe("epp");
+  });
+
+  it("epp phase wins over date arithmetic (pendingDelete)", () => {
+    const past = new Date(Date.now() - 40 * DAY).toISOString().slice(0, 10);
+    const lc = computeLifecycle("f.sb", past, ["pendingDelete"], sbOverride);
+    expect(lc?.phase).toBe("pendingDelete");
+    expect(lc?.phaseSource).toBe("epp");
+  });
+
+  it("returns null for missing/invalid expiry", () => {
+    expect(computeLifecycle("example.com", null, [])).toBeNull();
+    expect(computeLifecycle("example.com", "not-a-date", [])).toBeNull();
   });
 });

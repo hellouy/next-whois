@@ -384,3 +384,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - snipe_targets 用 user_email（非 user_id）关联用户；查询实时状态以 snipe_targets.status 为唯一来源，余额/冻结额由服务端重算，前端只展示。
   - 移动端验证方法（playwright 未安装于项目）：用 /tmp/opencode/pw（playwright-core）临时环境 + /root/.cache/ms-playwright/chromium-1243 的 chrome；需真实 session 才能看到 dashboard 数据——用 next-auth/jwt encode 生成 JWE token（token 需含 id=用户表 id 字段而非 email、email、subscriptionAccess:true），经 page.context().addCookies 注入 localhost HTTP（cookie 名 next-auth.session-token，无 __Secure- 前缀）；无订阅的账号显示空态属正常。含账号无数据时工具栏导出/导入会隐藏。
   - 触控目标规范：移动端按钮高度 ≥36px（w-9 h-9 或 py-2.5），加 touch-manipulation；390px 视口下无 H-OVERFLOW 为验收标准。
+
+[Project Knowledge Summary]
+- Date: 2026-09-13
+- Context: Discovered while fixing false "已释放/now available" notification for f.sb (registry hold, date-based dropped estimate misfire)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 通知引擎误报「已释放」的根因链：reminder 只有过期日快照，`computeLifecycle`（lifecycle.ts）按 lifecycle 表日期推算 dropDate（f.sb: .sb grace=30, 其余 0 → dropDate=exp+30 到期即判 "dropped"）- 而 `getPhaseFromEppStatus` 只识别 pendingDelete/redemptionPeriod/autoRenewPeriod/addPeriod 类 phase 码，对 clientHold/serverHold/各类 *Prohibited 返回 null，无法覆盖日期推算；且 `refreshStaleWhoisDates` 对 `daysToExpiry < -30` 的域直接排除（lookup.ts L65），过期>30 天的 reminder 永不刷新 epp_status → isHold 检测拿不到数据 → dropped 分支裸发「已释放可注册」。
+  - 判定「域名仍占用」的实时信号：owner RDAP 返回 `status:true` + status 数组含 hold/*Prohibited（如 "Registry Hold - Suspicious Activity"）；真正「可注册/已释放」= `status:false` 且 error 含 "not found"/"unregistered" 且无 result。查询失败/超时/status:false 但 error 非 not found → 一律按「未确认」保守跳过，不能发释放通知。
+  - 修复位置（commit 待发）：① lifecycle.ts `getPhaseFromEppStatus` 增加 hold/lock 家族映射为 "redemption"（阻止 dropped，归一化空格/下划线/破折号）；② process.ts dropped 分支发送前 `lookupWhoisWithCache(domain, { nocache: true })` 实时复核，仍占用则跳过并持久化 last_epp_status（`liveCheck.result.status.map(s=>s.status)`,`UPDATE reminders SET last_epp_status`），下次运行 isHold 分支接管；③ process.ts `isHold`/`isReserved` 的 epp 比较需先归一化（RDAP 返回 "client hold" 带空格，`s==="clienthold"` 直接比较会失效）。
+  - 验证方法：`npx tsc --noEmit` + `npx vitest run`（lifecycle.test.ts 新增 computeLifecycle/getPhaseFromEppStatus 用例，含 .sb hold 阻止 dropped 场景）+ `npm run check:i18n`；端到端直接 POST /api/remind/process（Authorization: Bearer CRON_SECRET）看日志 `skipped release notification` 即修复生效。
