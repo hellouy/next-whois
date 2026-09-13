@@ -92,10 +92,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "PATCH") {
     const { action } = (req.body ?? {}) as { action?: string };
 
-    const existing = await loadTarget();
-    if (!existing) return res.status(404).json({ error: "Snipe target not found" });
-
     if (action === "disable") {
+      const existing = await loadTarget();
+      if (!existing) return res.status(404).json({ error: "Snipe target not found" });
       try {
         const released = await withTransaction((tx) =>
           cancelUserSnipeTarget(tx, { domain, userEmail }),
@@ -110,6 +109,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action !== "enable") {
       return res.status(400).json({ error: "action must be 'enable' or 'disable'" });
     }
+
+    // enable: no pre-existing target required — createUserSnipeTarget creates
+    // when absent and throws SnipeTakenError when another user holds the domain.
 
     try {
       const quote = await snipeServicePrice(domain);

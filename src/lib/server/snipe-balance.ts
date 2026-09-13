@@ -8,7 +8,6 @@
  * held key (hold_keys on snipe_targets) so retries are idempotent.
  */
 
-import { randomBytes } from "crypto";
 import type { TxClient } from "@/lib/db-query";
 import { one, many, run, withTransaction } from "@/lib/db-query";
 import { sendEmail } from "@/lib/email";
@@ -245,15 +244,15 @@ export async function createUserSnipeTarget(tx: TxClient, params: {
     return existing.id;
   }
 
-  const id = randomBytes(12).toString("hex");
-  const inserted = await tx.run(
+  const id = await tx.one<{ id: string }>(
     `INSERT INTO snipe_targets
-       (id, domain, tld, status, user_email, service_price_cents, frozen_cents, expiration_date)
-     VALUES ($1, $2, $3, 'watching', $4, $5, 0, $6)`,
-    [id, domain, tld, userEmail, serviceCents, expirationDate],
+       (domain, tld, status, user_email, service_price_cents, frozen_cents, expiration_date)
+     VALUES ($1, $2, 'watching', $3, $4, 0, $5)
+     RETURNING id`,
+    [domain, tld, userEmail, serviceCents, expirationDate],
   );
-  if (inserted !== 1) throw new SnipeTakenError(domain);
-  return id;
+  if (!id?.id) throw new SnipeTakenError(domain);
+  return id.id;
 }
 
 /**

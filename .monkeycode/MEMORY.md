@@ -374,3 +374,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - 排查"结果页显示慢"的实测分解法：curl 完整 SSR 请求测 TTFB（getServerSideProps+SSR 渲染，~1.9s）；curl 带 `x-nextjs-data: 1` 测客户端导航 SSR JSON（~0.02s 空壳）；再单独 curl /api/lookup-stream 测服务端 WHOIS/RDAP 耗时（结果里的 time 字段）。三者相加≈用户感知，能定位慢在 SSR 还是 bundle 还是上游查询。
   - dev 流式缓冲特性：next dev 只在 res.end() 时才刷新 NDJSON chunk，预览环境上 partial 结果不会实时到达——lookup-stream 里挂起的记录写入/等待窗口会直接延迟用户看到结果的时刻（生产 chunked 实时刷新不受影响）。
   - 出境网络抖动判据：环境内 GitHub/npm/境外 WHOIS 服务器 TLS 握手 SSL_ERROR_SYSCALL 全断、国内域名正常时，WHOIS/RDAP/premium(Netim/Porkbun) 查询全部超时属环境问题而非代码 bug；c.xyz 这类"DNS 已注册但 WHOIS 全挂"结果会走 registered_no_whois 分支。
+
+[Project Knowledge Summary]
+- Date: 2026-09-13
+- Context: Discovered while implementing user snipe center + mobile optimization (submission c2ed980 + 13175aa)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - snipe_* 表（snipe_targets/snipe_probes/snipe_attempts）由 src/lib/db.ts runMigrations 惰性创建：迁移结果缓存在 dev server 进程内，仅在首次 DB 访问时执行。dev server 启动后再改动的迁移不会生效——新增表必须重启 dev server（background terminal kill + 重建）并请求任一 DB API（如 GET /api/snipe/quote）触发，日志出现 "[db] Schema ready" 即建表完成；否则 API 报 PGRST116/relation does not exist。
+  - snipe_targets 用 user_email（非 user_id）关联用户；查询实时状态以 snipe_targets.status 为唯一来源，余额/冻结额由服务端重算，前端只展示。
+  - 移动端验证方法（playwright 未安装于项目）：用 /tmp/opencode/pw（playwright-core）临时环境 + /root/.cache/ms-playwright/chromium-1243 的 chrome；需真实 session 才能看到 dashboard 数据——用 next-auth/jwt encode 生成 JWE token（token 需含 id=用户表 id 字段而非 email、email、subscriptionAccess:true），经 page.context().addCookies 注入 localhost HTTP（cookie 名 next-auth.session-token，无 __Secure- 前缀）；无订阅的账号显示空态属正常。含账号无数据时工具栏导出/导入会隐藏。
+  - 触控目标规范：移动端按钮高度 ≥36px（w-9 h-9 或 py-2.5），加 touch-manipulation；390px 视口下无 H-OVERFLOW 为验收标准。

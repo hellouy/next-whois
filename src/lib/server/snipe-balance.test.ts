@@ -74,6 +74,21 @@ function makeTx(over: Partial<State> = {}): FakeTx {
     state,
     async one<R = Record<string, any>>(sql: string, params: unknown[] = []): Promise<R | null> {
       const s = sql.trimStart();
+      // create-new-target INSERT with RETURNING (id column is UUID, server-generated)
+      if (s.startsWith("INSERT INTO snipe_targets") && s.includes("RETURNING id")) {
+        const id = `gen-${state.targets.size + 1}`;
+        state.targets.set(id, {
+          id,
+          domain: params[0],
+          tld: params[1],
+          status: "watching",
+          user_email: params[2],
+          service_price_cents: params[3],
+          frozen_cents: 0,
+          expiration_date: params[4],
+        });
+        return { id } as R;
+      }
       // user lookup by email
       if (s.startsWith("SELECT id FROM users") && s.includes("WHERE email = $1")) {
         return (findUser(state, params) ?? null) as R | null;
@@ -122,19 +137,6 @@ function makeTx(over: Partial<State> = {}): FakeTx {
           type: params[2],
           description: params[3],
           target_id: params[4],
-        });
-        return 1;
-      }
-      if (s.startsWith("INSERT INTO snipe_targets")) {
-        state.targets.set(params[0] as string, {
-          id: params[0],
-          domain: params[1],
-          tld: params[2],
-          status: "watching",
-          user_email: params[3],
-          service_price_cents: params[4],
-          frozen_cents: 0,
-          expiration_date: params[5],
         });
         return 1;
       }

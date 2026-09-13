@@ -132,8 +132,8 @@ describe("api/user/snipe-targets/[domain]", () => {
   });
 
   describe("PATCH enable", () => {
-    it("creates + freezes and marks the target armed", async () => {
-      mocks.one.mockResolvedValueOnce(TARGET_ROW);
+    it("creates + freezes and marks the target armed (no pre-existing target needed)", async () => {
+      mocks.one.mockResolvedValueOnce(null);
       mocks.snipeServicePrice.mockResolvedValueOnce({
         domain: "dropme.com", serviceCents: 4000, cnyCost: null, fxRate: 8, markup: 4, isPremium: null,
       });
@@ -159,7 +159,7 @@ describe("api/user/snipe-targets/[domain]", () => {
     });
 
     it("reports blocked_balance with shortfall when funds are insufficient", async () => {
-      mocks.one.mockResolvedValueOnce(TARGET_ROW);
+      mocks.one.mockResolvedValueOnce(null);
       mocks.snipeServicePrice.mockResolvedValueOnce({
         domain: "dropme.com", serviceCents: 4000, cnyCost: null, fxRate: 8, markup: 4, isPremium: null,
       });
@@ -186,7 +186,7 @@ describe("api/user/snipe-targets/[domain]", () => {
     });
 
     it("maps a taken domain to 409 SNIPE_TAKEN", async () => {
-      mocks.one.mockResolvedValueOnce(TARGET_ROW);
+      mocks.one.mockResolvedValueOnce(null);
       mocks.snipeServicePrice.mockResolvedValueOnce({
         domain: "dropme.com", serviceCents: 4000, cnyCost: null, fxRate: 8, markup: 4, isPremium: null,
       });
@@ -204,13 +204,11 @@ describe("api/user/snipe-targets/[domain]", () => {
     });
 
     it("rejects a bad action", async () => {
-      mocks.one.mockResolvedValueOnce(TARGET_ROW);
       const result = await callHandler("PATCH", { domain: "dropme.com" }, { action: "nuke" });
       expect(result.code).toBe(400);
     });
 
     it("returns 502 when the price quote is unavailable", async () => {
-      mocks.one.mockResolvedValueOnce(TARGET_ROW);
       mocks.snipeServicePrice.mockResolvedValueOnce({
         domain: "dropme.com", serviceCents: null, cnyCost: null, fxRate: 8, markup: 4, isPremium: null, error: "no quote",
       });

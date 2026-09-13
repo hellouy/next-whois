@@ -115,6 +115,15 @@ export function SnipeDetailPage({
   const [showRules, setShowRules] = React.useState(false);
   const [activating, setActivating] = React.useState(false);
 
+  const handleEnable = async () => {
+    setActivating(true);
+    try {
+      await onEnable();
+    } finally {
+      setActivating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -129,11 +138,17 @@ export function SnipeDetailPage({
     return (
       <div className="glass-panel border border-border rounded-2xl p-8 text-center space-y-3 max-w-lg mx-auto">
         <RiCloseCircleLine className="w-10 h-10 text-muted-foreground/40 mx-auto" />
-        <p className="text-sm font-bold">没有找到这个抢注目标</p>
-        <p className="text-xs text-muted-foreground">目标不存在，或不属于当前账号。</p>
-        <Button size="sm" onClick={() => router.push("/dashboard?tab=subscriptions")} className="h-9 rounded-xl text-xs">
-          <RiArrowLeftSLine className="w-3.5 h-3.5" />返回抢注中心
-        </Button>
+        <p className="text-sm font-bold">尚未预定抢注这个域名</p>
+        <p className="text-xs text-muted-foreground">启用抢注后，域名到期释放的瞬间系统将自动为你发起注册抢占。</p>
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={() => router.push("/dashboard?tab=subscriptions")} className="h-9 rounded-xl text-xs">
+            <RiArrowLeftSLine className="w-3.5 h-3.5" />返回抢注中心
+          </Button>
+          <Button size="sm" onClick={handleEnable} disabled={activating} className="h-9 rounded-xl text-xs gap-1.5">
+            {activating ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiShieldCheckLine className="w-3.5 h-3.5" />}
+            启用抢注
+          </Button>
+        </div>
       </div>
     );
   }
@@ -141,15 +156,6 @@ export function SnipeDetailPage({
   const meta = getSnipeStatusMeta(target.status);
   const shortfall = Math.max(0, (target.serviceCents ?? 0) - target.frozenCents);
   const isBlocked = target.status === "blocked_balance";
-
-  const handleEnable = async () => {
-    setActivating(true);
-    try {
-      await onEnable();
-    } finally {
-      setActivating(false);
-    }
-  };
 
   return (
     <div className="max-w-lg mx-auto space-y-3">
