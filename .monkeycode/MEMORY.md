@@ -394,3 +394,11 @@ Entries discovered by the Agent during task execution should follow this format:
   - 判定「域名仍占用」的实时信号：owner RDAP 返回 `status:true` + status 数组含 hold/*Prohibited（如 "Registry Hold - Suspicious Activity"）；真正「可注册/已释放」= `status:false` 且 error 含 "not found"/"unregistered" 且无 result。查询失败/超时/status:false 但 error 非 not found → 一律按「未确认」保守跳过，不能发释放通知。
   - 最终修复（commit 1e2e4a6，已推送并全绿）：① lifecycle.ts `getPhaseFromEppStatus` 增加 hold/lock 家族映射为 "redemption"（阻止 dropped，归一化空格/下划线/破折号）；② computeLifecycle 末尾新增守卫：日期推算得 "dropped" 但传入了非空 eppStatuses 时降级为 "redemption"（phaseSource="epp"）——只要注册局有任一状态即占用，纯日期估算不得判释放；③ subscriptions.ts + dashboard.ts SELECT 补 `last_epp_status` 并 JSON.parse 容错后传入 computeLifecycle（两个前端 subscription 数据源同步修复）；④ process.ts dropped 分支改用 `src/lib/server/release-confirm.ts` 的 `confirmDomainReleased(domain)` 三源确认：两次 nocache 实时注册局查询（间隔 1.5s，用 `isNotRegisteredWhoisResponse` 严格匹配 WHOIS_NOT_REGISTERED_PATTERNS，boundedLookup 9s 超时）+ 独立 `probeDomain` DNS 深探测（仅 registrationStatus==="unregistered" 放行）——任一源不确认即 released:false 不发送邮件，未确认时持久化最新 eppStatuses 到 last_epp_status 并 results.skipped++；⑤ `isHold`/`isReserved` 的 epp 比较需先归一化（RDAP 返回 "client hold" 带空格，`s==="clienthold"` 直接比较会失效）。
   - 验证方法：`npx tsc --noEmit` + `npx vitest run`（438 用例：lifecycle.test.ts 含 "任何 EPP 数据阻断日期 dropped" 用例、release-confirm.test.ts 6 纵向多源确认）+ `npm run check:i18n`；端到端用 next-auth/jwt encode（token 含 id=用户表真实 id）注入 cookie 访问 /dashboard 监听 /api/user/dashboard 响应，f.sb phase=redemption 而非 dropped 即修复生效。
+
+[Project Knowledge Summary]
+- Date: 2026-09-13
+- Context: Discovered while shipping domain-info-enhancement (T1-T9, commit 104ee1b + specs 1731469)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - `mergeResults`（src/lib/whois/whois-generic.ts）用白名单字段重建结果对象，会静默丢弃新增的可选字段（registrarIanaId/nsAttributions/parkingProvider/dateSanity 等）。凡给 WhoisAnalyzeResult 加新字段，必须同步在 mergeResults 的返回对象里逐字段透传（RDAP 优先 + `??` 回退 WHOIS），否则 RDAP+WHOIS 合并路径上字段为 undefined，落库成 null（qq.com registrarIanaId=null 就是此坑）。JSON.stringify 会省略 undefined 字段，API 响应里"消失"的字段不一定没被设置。
+  - 增强落库链路：查询时 enrichDomainInfo 即时计算 → domain_enrichments 表 UPSERT（TTL 7 天，db.ts runMigrations 惰性建表，dev server 已占用旧迁移缓存需重启）；二次查询 Redis 未命中时 supplementFromEnrichment 从表补回增强字段。DB 失败 best-effort 降级，查询主流程不阻塞。
