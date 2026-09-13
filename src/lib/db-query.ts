@@ -47,17 +47,20 @@ export async function isDbReady(): Promise<boolean> {
   }
 }
 
+/** Query surface available inside a transaction (and used by helper services). */
+export interface TxClient {
+  one: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R | null>;
+  many: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R[]>;
+  run: (sql: string, params?: any[]) => Promise<number>;
+}
+
 /**
  * Run a sequence of queries inside a single DB transaction.
  * If the callback throws, the transaction is rolled back and the error re-thrown.
  * Returns whatever the callback returns.
  */
 export async function withTransaction<T>(
-  fn: (client: {
-    one: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R | null>;
-    many: <R = Record<string, any>>(sql: string, params?: any[]) => Promise<R[]>;
-    run: (sql: string, params?: any[]) => Promise<number>;
-  }) => Promise<T>,
+  fn: (client: TxClient) => Promise<T>,
 ): Promise<T> {
   const db = await getDbReady();
   if (!db) throw new Error("Database unavailable");

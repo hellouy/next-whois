@@ -40,6 +40,7 @@ export default function DashboardPage() {
     editingSubscription, setEditingSubscription,
     cancelling,
     togglingPause,
+    togglingSnipe,
     showBulkImport, setShowBulkImport,
     bulkImporting,
     deletingStamp,
@@ -88,7 +89,7 @@ export default function DashboardPage() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, togglePauseSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, togglePauseSubscription, toggleSnipeSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
   } = useDashboard();
@@ -368,8 +369,10 @@ export default function DashboardPage() {
               onCancelSubscription={cancelSubscription}
               onEditSubscription={setEditingSubscription}
               onTogglePause={togglePauseSubscription}
+              onToggleSnipe={toggleSnipeSubscription}
               onShowBulkImport={() => setShowBulkImport(true)}
               togglingPause={togglingPause}
+              togglingSnipe={togglingSnipe}
               bulkImporting={bulkImporting}
               onApplyInviteCode={handleApplyInviteCode}
               setInviteCodeInput={setInviteCodeInput}

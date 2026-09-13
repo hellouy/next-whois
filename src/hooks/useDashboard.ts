@@ -39,6 +39,7 @@ export function useDashboard() {
   const [savingDaysBefore, setSavingDaysBefore] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState<string | null>(null);
   const [togglingPause, setTogglingPause] = React.useState<string | null>(null);
+  const [togglingSnipe, setTogglingSnipe] = React.useState<string | null>(null);
   const [showBulkImport, setShowBulkImport] = React.useState(false);
   const [bulkImporting, setBulkImporting] = React.useState(false);
   const [deletingStamp, setDeletingStamp] = React.useState<string | null>(null);
@@ -236,6 +237,47 @@ export function useDashboard() {
       toast.error(t("dashboard.op_failed"));
     } finally {
       setCancelling(null);
+    }
+  }
+
+  async function toggleSnipeSubscription(id: string) {
+    const sub = subscriptions.find(s => s.id === id);
+    if (!sub) return;
+    setTogglingSnipe(id);
+    try {
+      const res = await fetch(`/api/user/subscriptions?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snipe_action: sub.snipe ? "disable" : "enable" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || String(res.status));
+
+      // Reconcile with what the API approved so the UI matches reality.
+      if (data.snipe?.status === "armed") {
+        setSubscriptions(prev => prev.map(s => s.id === id ? {
+          ...s,
+          snipe: { id: data.snipe.id ?? "", status: "armed", service_cents: data.snipe.serviceCents ?? null, frozen_cents: data.snipe.serviceCents ?? 0, fail_reason: null },
+        } : s));
+        toast.success("抢注预定已生效，将自动进入竞速");
+      } else if (data.snipe?.status === "blocked_balance") {
+        setSubscriptions(prev => prev.map(s => s.id === id ? {
+          ...s,
+          snipe: { id: "", status: "blocked_balance", service_cents: data.snipe.serviceCents ?? null, frozen_cents: 0, fail_reason: null },
+        } : s));
+        toast.warning("余额不足，充值到账后将自动启用抢注");
+      } else if (data.snipe?.status === "cancelled") {
+        setSubscriptions(prev => prev.map(s => s.id === id ? { ...s, snipe: null } : s));
+        toast.success("已取消抢占，冻结金额已退还");
+      } else {
+        refreshData();
+        toast.success("操作成功");
+      }
+      invalidateDashCache();
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.op_failed"));
+    } finally {
+      setTogglingSnipe(null);
     }
   }
 
@@ -558,10 +600,10 @@ export function useDashboard() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, togglePauseSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, togglePauseSubscription, toggleSnipeSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
     showBulkImport, setShowBulkImport,
-    togglingPause, bulkImporting,
+    togglingPause, togglingSnipe, bulkImporting,
   };
 }

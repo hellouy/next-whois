@@ -19,6 +19,13 @@ export type Subscription = {
   registrar: string | null;
   creation_date: string | null;
   whois_synced_at: string | null;
+  snipe: {
+    id: string;
+    status: string;
+    service_cents: number | null;
+    frozen_cents: number;
+    fail_reason: string | null;
+  } | null;
 };
 
 export type Order = {

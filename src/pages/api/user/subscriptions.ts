@@ -1,10 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { many, run, isDbReady } from "@/lib/db-query";
+import { many, one, run, withTransaction, isDbReady } from "@/lib/db-query";
 import { computeLifecycle, nextReminderFiring } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { createLogger } from "@/lib/logger";
+import { snipeServicePrice } from "@/lib/server/snipe-pricing";
+import {
+  createUserSnipeTarget,
+  freezeForSnipe,
+  cancelUserSnipeTarget,
+  SnipeTakenError,
+} from "@/lib/server/snipe-balance";
 
 const logger = createLogger("api/user/subscriptions");
 
@@ -48,6 +55,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             [ids],
           )
         : [];
+
+      // Fetch the user's snipe targets (preorders) joined to their reminders by domain
+      const domains = rows.map(r => r.domain);
+      const snipeTargets = domains.length > 0
+        ? await many<{
+            id: string; domain: string; status: string;
+            service_price_cents: number | null; frozen_cents: number; fail_reason: string | null;
+          }>(
+            `SELECT id, domain, status, service_price_cents, frozen_cents, fail_reason
+             FROM snipe_targets
+             WHERE user_email = $1`,
+            [session.user.email],
+          )
+        : [];
+      const snipeByDomain: Record<string, {
+        id: string; status: string; service_price_cents: number | null; frozen_cents: number; fail_reason: string | null;
+      }> = {};
+      for (const s of snipeTargets) snipeByDomain[s.domain] = s;
 
       // Index logs by reminder_id
       const logsByReminder: Record<string, { days_before: number; sent_at: string }[]> = {};
@@ -135,6 +160,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           phase_flags: phaseFlags,
           notify_email: r.notify_email ?? null,
           paused: r.paused,
+          snipe: (() => {
+            const s = snipeByDomain[r.domain];
+            if (!s) return null;
+            return {
+              id: s.id,
+              status: s.status,
+              service_cents: s.service_price_cents,
+              frozen_cents: s.frozen_cents,
+              fail_reason: s.fail_reason,
+            };
+          })(),
         };
       });
 
@@ -149,7 +185,81 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: "Missing id" });
 
-    const { expiration_date, days_before, active, whois_sync, thresholds, phase_flags, notify_email, paused } = req.body ?? {};
+    const userEmail = session.user.email;
+
+    const { expiration_date, days_before, active, whois_sync, thresholds, phase_flags, notify_email, paused, snipe_action } = req.body ?? {};
+
+    // Preorder sniping toggle: enable creates a hold (price freeze) for this
+    // subscription's domain; disable cancels the hold and releases the funds.
+    if (snipe_action !== undefined) {
+      if (snipe_action !== "enable" && snipe_action !== "disable") {
+        return res.status(400).json({ error: "snipe_action must be 'enable' or 'disable'" });
+      }
+
+      const sub = await one<{ id: string; domain: string }>(
+        "SELECT id, domain FROM reminders WHERE id = $1 AND email = $2",
+        [id as string, userEmail],
+      );
+      if (!sub) return res.status(404).json({ error: "Subscription not found" });
+
+      try {
+        if (snipe_action === "disable") {
+          const released = await withTransaction((tx) =>
+            cancelUserSnipeTarget(tx, { domain: sub.domain, userEmail }),
+          );
+          return res.status(200).json({ ok: true, snipe: { status: "cancelled", releasedCents: released } });
+        }
+
+        // enable — recompute service price server-side, then create + freeze.
+        const quote = await snipeServicePrice(sub.domain);
+        if (!quote || quote.serviceCents == null || quote.serviceCents <= 0) {
+          return res.status(502).json({ error: "无法获取注册报价，抢注暂不可用" });
+        }
+        const serviceCents = quote.serviceCents as number;
+        const result = await withTransaction(async (tx) => {
+          const targetId = await createUserSnipeTarget(tx, {
+            domain: sub.domain,
+            tld: (() => {
+              const labels = sub.domain.split(".");
+              return labels[labels.length - 1] ?? "";
+            })(),
+            userEmail,
+            serviceCents,
+            expirationDate: null,
+          });
+          const hold = await freezeForSnipe(tx, targetId, userEmail, serviceCents);
+          return { targetId, hold };
+        });
+
+        if (result.hold.insufficient) {
+          await run(
+            "UPDATE snipe_targets SET status = 'blocked_balance', updated_at = NOW() WHERE id = $1",
+            [result.targetId],
+          );
+          return res.status(200).json({
+            ok: true,
+            snipe: {
+              status: "blocked_balance",
+              serviceCents,
+              balanceCents: result.hold.balanceCents,
+              neededCents: serviceCents - Math.max(0, result.hold.balanceCents),
+            },
+          });
+        }
+
+        await run(
+          "UPDATE snipe_targets SET status = 'armed', updated_at = NOW() WHERE id = $1",
+          [result.targetId],
+        );
+        return res.status(200).json({ ok: true, snipe: { status: "armed", serviceCents } });
+      } catch (err) {
+        if (err instanceof SnipeTakenError) {
+          return res.status(409).json({ error: "该域名已被其他用户预定抢注", code: "SNIPE_TAKEN" });
+        }
+        logger.error("[subscriptions] PATCH snipe_action error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "抢注操作失败，请稍后重试" });
+      }
+    }
 
     // Full WHOIS sync: update expiry date + all WHOIS metadata atomically
     if (whois_sync && typeof whois_sync === "object") {

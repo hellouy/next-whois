@@ -802,7 +802,7 @@ export function adminNotifyHtml({ subject, body, siteName = "WHOIS" }: {
 // ──────────────────────────────────────────────────────────────────────────────
 // 7b. Domain-drop snipe notifications (admin-only — fixed Chinese copy)
 // ──────────────────────────────────────────────────────────────────────────────
-export function snipeNotifyHtml(tone: "success" | "danger" | "warning", p: {
+export function snipeNotifyHtml(tone: "success" | "danger" | "warning" | "info", p: {
   title: string;
   domain: string;
   lines: Array<[string, string]>;
@@ -821,6 +821,84 @@ export function snipeNotifyHtml(tone: "success" | "danger" | "warning", p: {
       </table>
     `)}
   `, p.siteName ?? "WHOIS");
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 8. User preorder sniping notifications (user-facing — fixed Chinese copy).
+// Reuses the snipe admin layout; tone + amount emphasise the only material
+// changes for the user (charge / refund / frozen / needed).
+// ──────────────────────────────────────────────────────────────────────────────
+export function snipeArmedHtml(p: {
+  domain: string;
+  serviceCents: number;
+  siteName?: string;
+}): string {
+  return snipeNotifyHtml("success", {
+    title: "抢注预定已生效（冻结完成）",
+    domain: p.domain,
+    lines: [
+      ["状态", "已进入竞速阶段，将在域名释放时自动抢注"],
+      ["服务价", `¥ ${(p.serviceCents / 100).toFixed(2)}（已冻结）`],
+      ["说明", "冻结金额仅在抢注成功时扣费；未抢到将自动解冻退还"],
+    ],
+    siteName: p.siteName,
+  });
+}
+
+export function snipeSettledHtml(p: {
+  domain: string;
+  serviceCents: number;
+  opeId: string | undefined;
+  siteName?: string;
+}): string {
+  return snipeNotifyHtml("success", {
+    title: "域名抢注成功",
+    domain: p.domain,
+    lines: [
+      ["状态", "已注册成功，冻结金额已作为实际扣费"],
+      ["扣费金额", `¥ ${(p.serviceCents / 100).toFixed(2)}+`],
+      ["操作号", p.opeId ?? "—"],
+      ["提示", "域名已注册至平台账户，交付方式请留意站内后续通知"],
+    ],
+    siteName: p.siteName,
+  });
+}
+
+export function snipeReleasedHtml(p: {
+  domain: string;
+  releasedCents: number;
+  siteName?: string;
+}): string {
+  return snipeNotifyHtml("info", {
+    title: "抢注未成功，冻结已解冻",
+    domain: p.domain,
+    lines: [
+      ["状态", "本次未抢到该域名，预定占坑已释放"],
+      ["解冻金额", `¥ ${(p.releasedCents / 100).toFixed(2)} 已退回余额`],
+      ["后续", "如需再次预定该域名，可重新提交"],
+    ],
+    siteName: p.siteName,
+  });
+}
+
+export function snipeInsufficientHtml(p: {
+  domain: string;
+  serviceCents: number;
+  balanceCents: number;
+  siteName?: string;
+}): string {
+  const needed = p.serviceCents - p.balanceCents;
+  return snipeNotifyHtml("warning", {
+    title: "抢注预定额度不足，需充值",
+    domain: p.domain,
+    lines: [
+      ["状态", "预定额度不足以进入竞速，充值到账后将自动启用"],
+      ["服务价", `¥ ${(p.serviceCents / 100).toFixed(2)}`],
+      ["当前余额", `¥ ${(p.balanceCents / 100).toFixed(2)}`],
+      ["缺口", `¥ ${(Math.max(0, needed) / 100).toFixed(2)}`],
+    ],
+    siteName: p.siteName,
+  });
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

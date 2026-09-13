@@ -1,6 +1,7 @@
 import { randomBytes, createHash, createHmac } from "crypto";
 import { run, one, many, withTransaction } from "@/lib/db-query";
 import { sendEmail, paymentConfirmHtml, getSiteLabel } from "@/lib/email";
+import { autoArmBlockedTargets } from "@/lib/server/snipe-balance";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("payment");
@@ -288,6 +289,15 @@ export async function markOrderPaid(params: {
     logger.error("[markOrderPaid] grant transaction failed:", e);
     throw e;
   });
+
+  // User preorders stuck on blocked_balance: after this top-up lands, try to
+  // complete their holds and arm them. Runs outside the grant transaction so a
+  // per-target email failure never voids the payment.
+  if (balanceGrantCents > 0) {
+    void autoArmBlockedTargets(order.user_email).catch(e =>
+      logger.error("[markOrderPaid] auto-arm blocked targets failed:", e)
+    );
+  }
 
   return { alreadyPaid: false, userEmail: order.user_email, grantsSubscription };
 }

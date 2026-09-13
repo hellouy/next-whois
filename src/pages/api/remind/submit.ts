@@ -6,10 +6,16 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { sendEmail, subscriptionConfirmHtml, getSiteLabel } from "@/lib/email";
 import { localeFromCookieHeader, getEmailStrings } from "@/lib/email-strings";
 import { computeLifecycle, fmtDate } from "@/lib/lifecycle";
-import { one, run, isDbReady } from "@/lib/db-query";
+import { one, run, withTransaction, isDbReady } from "@/lib/db-query";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { createLogger } from "@/lib/logger";
+import { snipeServicePrice } from "@/lib/server/snipe-pricing";
+import {
+  createUserSnipeTarget,
+  freezeForSnipe,
+  SnipeTakenError,
+} from "@/lib/server/snipe-balance";
 
 const logger = createLogger("api/remind/submit");
 
@@ -71,8 +77,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const rl = await checkRateLimit(ip, 5);
   if (!rl.ok) return res.status(429).json({ error: "Too many requests, please try again later" });
 
-  const { domain, email, expirationDate, phaseAlerts, thresholds, regStatusType } = req.body;
+  const { domain, email, expirationDate, phaseAlerts, thresholds, regStatusType, snipe } = req.body;
   if (!domain || !email) return res.status(400).json({ error: "Missing required fields" });
+  const snipeRequested = snipe === true || snipe === "true";
 
   const flags = {
     grace:         phaseAlerts?.grace         !== false,
@@ -256,6 +263,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // ── Preorder sniping (optional extension) ─────────────────────────────────
+  // When the user checked "预定抢注", reserve the domain for them: create a
+  // snipe_target owned by their account and freeze the service price. Success
+  // or a blocked_balance state is reported in the response for the frontend.
+  let snipeInfo: {
+    status: "armed" | "blocked_balance" | "failed";
+    serviceCents?: number;
+    balanceCents?: number;
+    neededCents?: number;
+    reason?: string;
+  } | null = null;
+
+  if (snipeRequested) {
+    const quote = await snipeServicePrice(cleanDomain);
+    if (!quote || quote.serviceCents == null || quote.serviceCents <= 0) {
+      snipeInfo = { status: "failed", reason: "无法获取注册报价，抢注暂不可用" };
+    } else {
+      const serviceCents = quote.serviceCents as number;
+      try {
+        const outcome = await withTransaction(async (tx) => {
+          const targetId = await createUserSnipeTarget(tx, {
+            domain: cleanDomain,
+            tld: (() => {
+              const labels = cleanDomain.split(".");
+              return labels[labels.length - 1] ?? "";
+            })(),
+            userEmail: cleanEmail,
+            serviceCents,
+            expirationDate: verifiedExpDate,
+          });
+          const hold = await freezeForSnipe(tx, targetId, cleanEmail, serviceCents);
+          return { targetId, hold };
+        });
+
+        if (outcome.hold.insufficient) {
+          snipeInfo = {
+            status: "blocked_balance",
+            serviceCents,
+            balanceCents: outcome.hold.balanceCents,
+            neededCents: serviceCents - Math.max(0, outcome.hold.balanceCents),
+          };
+        } else {
+          snipeInfo = { status: "armed", serviceCents };
+        }
+      } catch (e) {
+        if (e instanceof SnipeTakenError) {
+          snipeInfo = { status: "failed", reason: "该域名已被其他用户预定抢注" };
+        } else {
+          logger.error("[remind/submit] snipe target creation failed:", e);
+          snipeInfo = { status: "failed", reason: "抢注预定创建失败，请稍后重试" };
+        }
+      }
+    }
+  }
+
   // Use admin-curated and AI-scraped lifecycle overrides for accurate email info
   const overrides = await loadLifecycleOverrides().catch(() => ({}));
   const lc = computeLifecycle(cleanDomain, verifiedExpDate, eppStatuses.length ? eppStatuses : undefined, overrides);
@@ -291,5 +353,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }),
   });
 
-  return res.status(200).json({ id: reminderId, thresholds: selectedThresholds });
+  return res.status(200).json({ id: reminderId, thresholds: selectedThresholds, snipe: snipeInfo });
 }

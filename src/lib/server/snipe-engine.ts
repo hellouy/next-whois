@@ -28,7 +28,7 @@
  *      writes the audit trail.
  */
 
-import { many, one, run } from "@/lib/db-query";
+import { many, one, run, withTransaction } from "@/lib/db-query";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import type { WhoisResult } from "@/lib/whois/types";
 import {
@@ -41,9 +41,11 @@ import {
 import { computeLifecycle } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { sendEmail } from "@/lib/email";
-import { snipeNotifyHtml } from "@/lib/email";
+import { snipeNotifyHtml, snipeArmedHtml, snipeSettledHtml, snipeReleasedHtml, snipeInsufficientHtml } from "@/lib/email";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { createLogger } from "@/lib/logger";
+import { freezeForSnipe, settleSnipeCharge, releaseSnipeHold } from "@/lib/server/snipe-balance";
+import { snipeServicePrice } from "@/lib/server/snipe-pricing";
 
 const logger = createLogger("server/snipe-engine");
 
@@ -88,6 +90,10 @@ export interface SnipeTargetRow {
   recharge_alerted_at: string | null;
   whois_fail_alerted_at: string | null;
   stale_alerted_at: string | null;
+  user_email: string | null;
+  service_price_cents: number | null;
+  frozen_cents: number;
+  hold_keys: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -336,6 +342,76 @@ async function notifyRecharge(t: SnipeTargetRow, balance: number, needed: number
 }
 
 /**
+ * Tell a user their preorder can't be armed because the frozen amount no
+ * longer covers the (risen) service price, or the initial hold couldn't be
+ * completed. Reuses the recharge-failure interval to avoid spamming.
+ */
+async function notifySnipeInsufficient(t: SnipeTargetRow, serviceCents: number): Promise<void> {
+  if (!t.user_email) return;
+  if (
+    t.recharge_alerted_at &&
+    Date.now() - new Date(t.recharge_alerted_at).getTime() < RECHARGE_ALERT_INTERVAL_MS
+  ) {
+    return;
+  }
+  const balance = t.frozen_cents ?? 0;
+  await sendEmail({
+    to: t.user_email,
+    subject: `[抢注预定] 余额不足 ${t.domain}`,
+    html: snipeInsufficientHtml({
+      domain: t.domain,
+      serviceCents,
+      balanceCents: balance,
+      siteName: "WHOIS",
+    }),
+  }).catch((e) => logger.error(`[snipe] user insufficient email failed: ${e.message}`));
+  await run(`UPDATE snipe_targets SET recharge_alerted_at = NOW() WHERE id = $1`, [t.id]);
+}
+
+/**
+ * User preorder succeeded — convert the frozen hold into an actual charge and
+ * notify. Idempotent on the target's `snipe` transaction so a retried probe
+ * never double-bills.
+ */
+async function settleUserCharge(t: SnipeTargetRow, opeId: string | undefined): Promise<void> {
+  if (!t.user_email) return;
+  const amount = t.service_price_cents ?? t.frozen_cents ?? 0;
+  if (amount <= 0) return;
+  try {
+    await withTransaction((tx) => settleSnipeCharge(tx, t.id, t.user_email as string, amount));
+  } catch (e) {
+    logger.error(`[snipe] user charge settle failed for ${t.domain}: ${(e as Error).message}`);
+    return;
+  }
+  await sendEmail({
+    to: t.user_email,
+    subject: `[抢注成功] ${t.domain}`,
+    html: snipeSettledHtml({ domain: t.domain, serviceCents: amount, opeId, siteName: "WHOIS" }),
+  }).catch((e) => logger.error(`[snipe] user settled email failed: ${e.message}`));
+}
+
+/**
+ * User preorder ended without a registration — release the frozen hold back
+ * and notify. Idempotent on the `unhold` key.
+ */
+async function releaseUserHold(t: SnipeTargetRow): Promise<void> {
+  if (!t.user_email) return;
+  const amount = t.frozen_cents ?? 0;
+  if (amount <= 0) return;
+  try {
+    await withTransaction((tx) => releaseSnipeHold(tx, t.id, t.user_email as string, amount));
+  } catch (e) {
+    logger.error(`[snipe] user hold release failed for ${t.domain}: ${(e as Error).message}`);
+    return;
+  }
+  await sendEmail({
+    to: t.user_email,
+    subject: `[抢注未成功] ${t.domain}`,
+    html: snipeReleasedHtml({ domain: t.domain, releasedCents: amount, siteName: "WHOIS" }),
+  }).catch((e) => logger.error(`[snipe] user released email failed: ${e.message}`));
+}
+
+/**
  * WHOIS has failed `fails` consecutive probes for this target — alert the admin
  * once per 24h. The last successful ETA is kept; this is a health signal that
  * the drop date may drift if the whois source stays down.
@@ -424,8 +500,53 @@ async function alertStaleTargets(): Promise<void> {
 /**
  * Re-check balance + live price and move the target between watching,
  * armed and blocked_balance. Runs in daily mode for every active target.
+ *
+ * User targets use a literally-frozen service price (hold) as their budget
+ * gate. The engine refreshes the quote, tops up the hold when the price has
+ * risen, and only arms when the full amount is frozen. When the user's
+ * balance can't cover the rise, the target drops back to blocked_balance and
+ * an insufficient-funds notice goes out.
  */
 async function armPrecheck(t: SnipeTargetRow): Promise<TargetOutcome> {
+  // ── User target branch ──────────────────────────────────────────────────
+  if (t.user_email) {
+    // Refresh the quote and, when it moved up, top up the frozen hold. A
+    // failed quote keeps the previous service price and stays armed/blocked.
+    const quote = await snipeServicePrice(t.domain);
+    const newService = quote?.serviceCents ?? t.service_price_cents;
+
+    if (newService == null || newService <= 0) {
+      // No price available — nothing to freeze; keep current state, retry next probe.
+      return t.status === "blocked_balance" ? "blocked_balance" : "armed";
+    }
+
+    const outcome = await withTransaction((tx) =>
+      freezeForSnipe(tx, t.id, t.user_email as string, newService),
+    );
+
+    if (outcome.insufficient) {
+      await run(
+        `UPDATE snipe_targets
+           SET status = 'blocked_balance',
+               service_price_cents = $2,
+               notes = NULL,
+               updated_at = NOW()
+         WHERE id = $1 AND status IN ('watching','armed','blocked_balance')`,
+        [t.id, newService],
+      );
+      await notifySnipeInsufficient(t, newService);
+      return "blocked_balance";
+    }
+
+    await run(
+      `UPDATE snipe_targets
+         SET status = 'armed', service_price_cents = $2, updated_at = NOW()
+       WHERE id = $1 AND status IN ('watching','blocked_balance')`,
+      [t.id, newService],
+    );
+    return "armed";
+  }
+
   const account = await netimQueryResellerAccount();
   const price = await netimQueryDomainPrice(t.domain);
 
@@ -563,6 +684,8 @@ async function settleCreate(
       [t.id, price],
     );
     await notifySuccess(t, opeId, price);
+    // User target: move the frozen hold into an actual charge.
+    await settleUserCharge(t, opeId);
     return "succeeded";
   }
 
@@ -581,6 +704,8 @@ async function settleCreate(
       [t.id],
     );
     await notifyFailed(t, "Netim 操作失败（queryOpe）", "failed_permanent");
+    // User target: release the hold back to the user.
+    await releaseUserHold(t);
     return "failed_permanent";
   }
 
@@ -661,6 +786,22 @@ async function probeTarget(t: SnipeTargetRow): Promise<TargetOutcome> {
     return "blocked_balance";
   }
 
+  // User preorder guard: never register unless the full service price is
+  // frozen. Defensive — the arming precheck already enforces this, but a
+  // price rise between probes must not slip a registration through.
+  if (t.user_email) {
+    const service = t.service_price_cents ?? 0;
+    const frozen = t.frozen_cents ?? 0;
+    if (frozen < service) {
+      await run(
+        `UPDATE snipe_targets SET status = 'blocked_balance', fail_reason = 'hold_short', updated_at = NOW() WHERE id = $1 AND status IN ('armed','sniping')`,
+        [t.id],
+      );
+      await notifySnipeInsufficient(t, service);
+      return "blocked_balance";
+    }
+  }
+
   // 4. CAS: armed → sniping. Only one process may pass this gate.
   const claimed = await one<SnipeTargetRow>(
     `UPDATE snipe_targets SET status = 'sniping', updated_at = NOW()
@@ -738,6 +879,8 @@ async function probeTarget(t: SnipeTargetRow): Promise<TargetOutcome> {
       [t.id, createResult.reason ?? "refused"],
     );
     await notifyFailed(t, createResult.reason ?? "refused", "failed_permanent");
+    // User target: failed permanently, release the hold back.
+    await releaseUserHold(t);
     return "failed_permanent";
   }
 

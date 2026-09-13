@@ -377,6 +377,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS creation_date       TEXT`,
   `ALTER TABLE reminders     ADD COLUMN IF NOT EXISTS nameservers_json    TEXT`,
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS balance_cents       INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE users         ADD COLUMN IF NOT EXISTS frozen_cents        INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS membership_plan     TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS model_used          TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS scrape_status       TEXT    NOT NULL DEFAULT 'pending'`,
@@ -408,6 +409,8 @@ const ALTER_COLUMNS = [
   `ALTER TABLE search_history   ADD COLUMN IF NOT EXISTS source          TEXT`,
   `ALTER TABLE users             ADD COLUMN IF NOT EXISTS locale          TEXT NOT NULL DEFAULT 'zh'`,
   `ALTER TABLE users             ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE balance_transactions ADD COLUMN IF NOT EXISTS target_id     TEXT`,
+  `ALTER TABLE balance_transactions ADD COLUMN IF NOT EXISTS meta          TEXT`,
 ];
 
 const CREATE_INDEXES = [
@@ -592,10 +595,15 @@ const CREATE_INDEXES = [
     updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
   )`,
   `CREATE INDEX IF NOT EXISTS idx_snipe_targets_status ON snipe_targets (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_snipe_targets_user   ON snipe_targets (user_email) WHERE user_email IS NOT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_snipe_targets_hunt   ON snipe_targets (hunt_start, hunt_end) WHERE status IN ('armed','blocked_balance')`,
   `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS recharge_alerted_at TIMESTAMPTZ`,
   `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS whois_fail_alerted_at TIMESTAMPTZ`,
   `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS stale_alerted_at TIMESTAMPTZ`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS user_email          TEXT`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS service_price_cents BIGINT`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS frozen_cents        BIGINT  NOT NULL DEFAULT 0`,
+  `ALTER TABLE snipe_targets ADD COLUMN IF NOT EXISTS hold_keys           TEXT`,
   `CREATE TABLE IF NOT EXISTS snipe_probes (
     id          BIGSERIAL   PRIMARY KEY,
     target_id   UUID        NOT NULL REFERENCES snipe_targets(id),
@@ -812,6 +820,14 @@ export async function runMigrations(db: Pool): Promise<void> {
            last_fail_at = NULL
        WHERE fail_count > 0`,
     ).catch((e: Error) => logger.warn(`[db] legacy counter zeroing skipped: ${e.message}`));
+
+    // Batch 5: seed snipe pricing settings defaults (idempotent upserts).
+    await client.query(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES
+         ('snipe_eur_fx_rate', '8.0', NOW()),
+         ('snipe_markup', '4', NOW())
+       ON CONFLICT (key) DO NOTHING`,
+    ).catch((e: Error) => logger.warn(`[db] snipe settings seed skipped: ${e.message}`));
 
     logger.info("[db] Schema ready");
   } finally {

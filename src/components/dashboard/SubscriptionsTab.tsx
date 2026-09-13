@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -43,8 +44,10 @@ export type SubscriptionsTabProps = {
   onCancelSubscription: (id: string) => void;
   onEditSubscription: (sub: Subscription) => void;
   onTogglePause: (id: string) => void;
+  onToggleSnipe: (id: string) => void;
   onShowBulkImport: () => void;
   togglingPause: string | null;
+  togglingSnipe: string | null;
   bulkImporting: boolean;
   onApplyInviteCode: (e: React.FormEvent) => void;
   setInviteCodeInput: (v: string) => void;
@@ -57,11 +60,12 @@ export function SubscriptionsTab({
   activeSubs, expiringSoon, urgentSubs, postExpirySubs,
   cancelling, inviteCodeInput, applyingCode, paymentEnabled, user, locale, t,
   setSubSearch, setSubFilter, onShowSubscribeGuide, onExportCSV,
-  onCancelSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
-  togglingPause, bulkImporting,
+  onCancelSubscription, onEditSubscription, onTogglePause, onToggleSnipe, onShowBulkImport,
+  togglingPause, togglingSnipe, bulkImporting,
   onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
 }: SubscriptionsTabProps) {
+  const router = useRouter();
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
@@ -395,6 +399,20 @@ export function SubscriptionsTab({
                         {t("dashboard.paused")}
                       </span>
                     )}
+                    {sub.active && sub.snipe?.status === "armed" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-300/50">
+                        抢注中 · {((sub.snipe.service_cents ?? 0) / 100).toFixed(2)} 元
+                      </span>
+                    )}
+                    {sub.active && sub.snipe?.status === "blocked_balance" && (
+                      <button
+                        type="button"
+                        onClick={() => router.push("/payment/checkout")}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50 hover:bg-amber-200/60 dark:hover:bg-amber-900/40 transition-colors"
+                      >
+                        抢注余额不足 · 去充值
+                      </button>
+                    )}
                     {isUrgent && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
                         {days === 0 ? t("dashboard.expires_today") : t("dashboard.expires_in_days", { n: days ?? 0 })}
@@ -460,6 +478,23 @@ export function SubscriptionsTab({
                       {togglingPause === sub.id
                         ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
                         : sub.paused ? <RiPlayLine className="w-3.5 h-3.5" /> : <RiPauseLine className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  {sub.active && (
+                    <button
+                      onClick={() => onToggleSnipe(sub.id)}
+                      disabled={togglingSnipe === sub.id}
+                      title={sub.snipe?.status === "armed" ? "停止混合抢注预定" : "启用混合抢注预定"}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors disabled:opacity-50",
+                        sub.snipe?.status === "armed"
+                          ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200/60 dark:hover:bg-emerald-900/40"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      {togglingSnipe === sub.id
+                        ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                        : <RiShieldCheckLine className="w-3.5 h-3.5" />}
                     </button>
                   )}
                   {sub.active && (
