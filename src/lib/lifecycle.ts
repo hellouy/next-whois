@@ -1031,6 +1031,15 @@ export function computeLifecycle(
     else if (now < redemptionEnd) phase = "redemption";
     else if (now < dropDate) phase = "pendingDelete";
     else phase = "dropped";
+
+    // Registry data exists (any EPP status = a registration object was returned
+    // by WHOIS/RDAP) but it matched no phase-specific code above. The name is
+    // still occupied — a date-only drop estimate must never claim the domain is
+    // released while the registry reports any status for it.
+    if (phase === "dropped" && Array.isArray(eppStatuses) && eppStatuses.length > 0) {
+      phase = "redemption";
+      phaseSource = "epp";
+    }
   }
 
   return { phase, expiry, graceEnd, redemptionEnd, dropDate, cfg, tld, daysToExpiry, phaseSource };

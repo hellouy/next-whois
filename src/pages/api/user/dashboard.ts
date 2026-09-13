@@ -45,11 +45,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         days_before: number | null; thresholds_json: string | null;
         phase_flags: string | null; registrar: string | null;
         creation_date: string | null; nameservers_json: string | null;
+        last_epp_status: string | null;
         logs_json: string;
       }>(
         `SELECT r.id, r.domain, r.expiration_date, r.whois_expiry_date, r.whois_synced_at,
                 r.active, r.cancel_token, r.created_at, r.days_before,
                 r.thresholds_json, r.phase_flags, r.registrar, r.creation_date, r.nameservers_json,
+                r.last_epp_status,
                 COALESCE(
                   JSON_AGG(
                     JSON_BUILD_OBJECT(
@@ -65,7 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          WHERE r.email = $1
          GROUP BY r.id, r.domain, r.expiration_date, r.whois_expiry_date, r.whois_synced_at,
                   r.active, r.cancel_token, r.created_at, r.days_before,
-                  r.thresholds_json, r.phase_flags, r.registrar, r.creation_date, r.nameservers_json
+                  r.thresholds_json, r.phase_flags, r.registrar, r.creation_date, r.nameservers_json,
+                  r.last_epp_status
          ORDER BY r.created_at DESC`,
         [email],
       ),
@@ -127,8 +130,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // whois_expiry_date is the WHOIS-verified expiry (authoritative when present),
       // falling back to the user-provided expiration_date
       const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
+      // Feed the last persisted registry EPP statuses into the lifecycle so a
+      // date-only "dropped" estimate cannot override live registry data (e.g.
+      // Registry Hold) — a name still occupied must not be shown as released.
+      let eppStatuses: string[] = [];
+      try { if (r.last_epp_status) eppStatuses = JSON.parse(r.last_epp_status); } catch { /* ignore */ }
       const lc = effectiveExpiry
-        ? computeLifecycle(r.domain, effectiveExpiry, undefined, overrides)
+        ? computeLifecycle(r.domain, effectiveExpiry, eppStatuses.length ? eppStatuses : undefined, overrides)
         : null;
 
       const reminderLogs = logsByReminder[r.id] ?? [];

@@ -147,6 +147,17 @@ describe("computeLifecycle", () => {
     expect(lc?.phaseSource).toBe("epp");
   });
 
+  it("any registry EPP data blocks a date-only dropped verdict", () => {
+    // f.sb reports non phase-specific statuses (inactive, ok, ...) — the name is
+    // still occupied by the registry even though the date arithmetic says it is
+    // past its estimated drop date. It must never be reported as released.
+    const past = new Date(Date.now() - 40 * DAY).toISOString().slice(0, 10);
+    const occupied = computeLifecycle("f.sb", past, ["inactive", "ok"], sbOverride);
+    expect(occupied?.phase).not.toBe("dropped");
+    expect(occupied?.phase).toBe("redemption");
+    expect(occupied?.phaseSource).toBe("epp");
+  });
+
   it("returns null for missing/invalid expiry", () => {
     expect(computeLifecycle("example.com", null, [])).toBeNull();
     expect(computeLifecycle("example.com", "not-a-date", [])).toBeNull();

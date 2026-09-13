@@ -37,11 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nameservers_json: string | null;
         notify_email: string | null;
         paused: boolean;
+        last_epp_status: string | null;
       }>(
         `SELECT id, domain, expiration_date, whois_expiry_date, whois_synced_at,
                 active, cancel_token, created_at, days_before,
                 thresholds_json, phase_flags, registrar, creation_date, nameservers_json,
-                notify_email, paused
+                notify_email, paused, last_epp_status
          FROM reminders WHERE email = $1 ORDER BY created_at DESC`,
         [session.user.email],
       );
@@ -88,8 +89,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const subscriptions = rows.map((r) => {
         // Use WHOIS-verified date as authoritative source (same as dashboard.ts)
         const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
+        // Feed the last persisted registry EPP statuses (if any) into the
+        // lifecycle so a date-only "dropped" estimate can never override live
+        // registry data that still occupies the name (e.g. Registry Hold).
+        let eppStatuses: string[] = [];
+        try { if (r.last_epp_status) eppStatuses = JSON.parse(r.last_epp_status); } catch { /* ignore */ }
         const lc = effectiveExpiry
-          ? computeLifecycle(r.domain, effectiveExpiry, undefined, overrides)
+          ? computeLifecycle(r.domain, effectiveExpiry, eppStatuses.length ? eppStatuses : undefined, overrides)
           : null;
 
         // Reminder logs for this subscription
