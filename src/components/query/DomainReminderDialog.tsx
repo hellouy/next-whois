@@ -25,6 +25,9 @@ import {
   RiShoppingCartLine,
   RiNotification3Line,
   RiArrowRightLine,
+  RiScanLine,
+  RiShieldFlashLine,
+  RiErrorWarningLine,
 } from "@remixicon/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { computeLifecycle } from "@/lib/lifecycle";
@@ -94,6 +97,40 @@ export function DomainReminderDialog({
   const [lcSubmitting, setLcSubmitting] = React.useState(false);
   const [lcDone, setLcDone] = React.useState(false);
 
+  // Preorder snipe toggle: when enabled we fetch a live quote so the user sees
+  // the frozen amount before subscribing. The server recomputes the price on
+  // submit anyway (remind/submit.ts), so this panel is informational only.
+  const [snipeEnabled, setSnipeEnabled] = React.useState(false);
+  const [snipeQuote, setSnipeQuote] = React.useState<{
+    serviceCents: number | null;
+    balanceCents: number | null;
+  } | null>(null);
+  const [snipeQuoteLoading, setSnipeQuoteLoading] = React.useState(false);
+  const [snipeResult, setSnipeResult] = React.useState<{
+    status: "armed" | "blocked_balance" | "failed";
+    serviceCents?: number;
+    neededCents?: number;
+    reason?: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!snipeEnabled) return;
+    let cancelled = false;
+    setSnipeQuoteLoading(true);
+    setSnipeQuote(null);
+    fetch(`/api/snipe/quote?domain=${encodeURIComponent(domain)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        setSnipeQuote(data ? { serviceCents: data.serviceCents ?? null, balanceCents: data.balanceCents ?? null } : null);
+      })
+      .catch(() => { if (!cancelled) setSnipeQuote(null); })
+      .finally(() => { if (!cancelled) setSnipeQuoteLoading(false); });
+    return () => {
+      cancelled = true;
+    };
+  }, [snipeEnabled, domain]);
+
   function toggleThreshold(d: number) {
     setSelectedThresholds(prev =>
       prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
@@ -106,6 +143,9 @@ export function DomainReminderDialog({
       setDone(false);
       setAlreadySubscribed(false);
       setSelectedThresholds(DEFAULT_REMINDER_THRESHOLDS);
+      setSnipeEnabled(false);
+      setSnipeQuote(null);
+      setSnipeResult(null);
       // Reset phase toggles like the thresholds above — re-opening the
       // dialog must not keep the previous session's chip selection.
       setPhaseAlerts({ grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true });
@@ -143,9 +183,25 @@ export function DomainReminderDialog({
           domain, email, expirationDate, phaseAlerts,
           thresholds: isRestricted ? [] : selectedThresholds,
           regStatusType,
+          snipe: snipeEnabled,
         }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const snipe = data.snipe as { status?: string; serviceCents?: number; neededCents?: number; reason?: string } | undefined;
+        if (snipe && snipe.status === "armed") {
+          setSnipeResult({ status: "armed", serviceCents: snipe.serviceCents });
+          toast.success("抢注预定已生效，冻结完成");
+        } else if (snipe && snipe.status === "blocked_balance") {
+          setSnipeResult({ status: "blocked_balance", serviceCents: snipe.serviceCents, neededCents: snipe.neededCents });
+          toast.warning("抢注预定已创建，但余额不足，充值后自动开始竞速");
+        } else if (snipe && snipe.status === "failed") {
+          setSnipeResult({ status: "failed", reason: snipe.reason });
+          setSnipeEnabled(false);
+          toast.error(snipe.reason && !snipe.reason.startsWith("无法获取")
+            ? snipe.reason
+            : "抢注预定失败，尚未冻结金额");
+        }
         setDone(true);
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -416,6 +472,41 @@ export function DomainReminderDialog({
                     </>
                   )}
                 </div>
+                {snipeResult && (
+                  <div className={cn(
+                    "rounded-xl border p-3 text-left",
+                    snipeResult.status === "armed"
+                      ? "border-violet-300/60 bg-violet-50/50 dark:bg-violet-950/20"
+                      : snipeResult.status === "blocked_balance"
+                        ? "border-amber-300/60 bg-amber-50/50 dark:bg-amber-950/20"
+                        : "border-rose-300/60 bg-rose-50/50 dark:bg-rose-950/20"
+                  )}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {isZh ? "抢注预定" : "Preorder snipe"}
+                    </p>
+                    {snipeResult.status === "armed" && (
+                      <p className="text-[11px] text-violet-700 dark:text-violet-300 leading-snug mt-1">
+                        {isZh
+                          ? `已冻结 ¥${((snipeResult.serviceCents ?? 0) / 100).toFixed(2)}，域名释放时自动抢占。`
+                          : `Frozen ¥${((snipeResult.serviceCents ?? 0) / 100).toFixed(2)}. We'll auto-register the moment it drops.`}
+                      </p>
+                    )}
+                    {snipeResult.status === "blocked_balance" && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug mt-1">
+                        {isZh
+                          ? `已创建预定，但余额不足，需再充值 ¥${((snipeResult.neededCents ?? 0) / 100).toFixed(2)} 后自动开始竞速。`
+                          : `Preorder created, but balance is short. Top up ¥${((snipeResult.neededCents ?? 0) / 100).toFixed(2)} to start racing.`}
+                      </p>
+                    )}
+                    {snipeResult.status === "failed" && (
+                      <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-snug mt-1">
+                        {isZh
+                          ? (snipeResult.reason || "抢注预定失败，未冻结金额。")
+                          : (snipeResult.reason || "Preorder failed, nothing was frozen.")}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="text-[10px] text-muted-foreground/55">{isZh ? "确认邮件已发送，请查收" : "Check your inbox for confirmation"}</p>
                 <button
                   type="button"
@@ -657,6 +748,107 @@ export function DomainReminderDialog({
                         ? "域名释放后自动停止 · 续费时提醒保留直至到期 · 可随时取消"
                         : "Auto-stops on drop · Reminders continue after renewal until new expiry · Unsubscribe anytime"}
                     </p>
+                  </div>
+                )}
+
+                {/* ── Preorder snipe toggle ─────────────────────────────── */}
+                {!isRestricted && (
+                  <div className="rounded-xl border border-border/60 bg-muted/15 p-3.5 space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSnipeEnabled(v => !v)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors text-left cursor-pointer",
+                        snipeEnabled
+                          ? "bg-violet-500/10 border-violet-400/50"
+                          : "bg-muted/30 border-border/50 hover:border-violet-300/40"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                        snipeEnabled ? "bg-violet-500/15 text-violet-600 dark:text-violet-400" : "bg-muted text-muted-foreground"
+                      )}>
+                        <RiScanLine className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn("text-[11px] font-bold", snipeEnabled ? "text-violet-700 dark:text-violet-300" : "text-foreground/80")}>
+                          {isZh ? "同时预定抢注该域名" : "Also preorder this domain"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground leading-snug mt-0.5">
+                          {isZh
+                            ? "域名释放时自动发起注册抢占。需冻结服务费，失败全额退还。"
+                            : "Auto-register the moment it drops. Requires a frozen service fee, refunded on failure."}
+                        </p>
+                      </div>
+                      <div className={cn(
+                        "w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                        snipeEnabled ? "bg-violet-500 border-violet-500 text-white" : "bg-background border-border"
+                      )}>
+                        {snipeEnabled && <RiCheckboxCircleLine className="w-3.5 h-3.5" />}
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {snipeEnabled && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-1 space-y-2">
+                            {snipeQuoteLoading ? (
+                              <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-1 py-2">
+                                <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                                {isZh ? "获取预估价…" : "Fetching estimate…"}
+                              </div>
+                            ) : !snipeQuote || snipeQuote.serviceCents == null ? (
+                              <div className="flex items-start gap-2 text-[11px] text-amber-600 dark:text-amber-400 px-1 py-1.5">
+                                <RiErrorWarningLine className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                <span>
+                                  {isZh
+                                    ? "当前无法获取该域名的注册报价，可先订阅，稍后可在抢注中心开启抢占。"
+                                    : "We can't fetch a quote for this domain right now. Subscribe first, then enable sniping from your snipe center."}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5 px-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-muted-foreground">{isZh ? "预估冻结" : "Est. freeze"}</span>
+                                  <span className="font-bold font-mono text-violet-600 dark:text-violet-400">
+                                    ¥{((snipeQuote.serviceCents ?? 0) / 100).toFixed(2)}
+                                  </span>
+                                </div>
+                                {snipeQuote.balanceCents != null && (
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="text-muted-foreground">{isZh ? "当前余额" : "Current balance"}</span>
+                                    <span className={cn(
+                                      "font-semibold font-mono",
+                                      snipeQuote.balanceCents < (snipeQuote.serviceCents ?? 0)
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-emerald-600 dark:text-emerald-400"
+                                    )}>
+                                      ¥{((snipeQuote.balanceCents ?? 0) / 100).toFixed(2)}
+                                      {snipeQuote.balanceCents < (snipeQuote.serviceCents ?? 0) && (
+                                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                                          {isZh ? "不足" : "short"}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="text-[10px] text-muted-foreground/65 leading-snug">
+                                  {isZh
+                                    ? "冻结金额按服务价实时计算，客户端不可修改。成功注册后扣费，失败或停用全额解冻。"
+                                    : "The freeze is computed server-side and can't be changed client-side. Charged on success, fully refunded on failure."}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
 

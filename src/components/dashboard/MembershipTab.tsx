@@ -49,6 +49,18 @@ const STATUS_CLS: Record<string, string> = {
   expired: "text-muted-foreground bg-muted border-border",
 };
 
+// Chinese labels for snipe-related balance transactions. Anything unmapped
+// falls back to the raw type string.
+const TX_TYPE_LABEL: Record<string, string> = {
+  hold: "抢注冻结",
+  unhold: "抢注解冻",
+  snipe: "抢注扣费",
+};
+
+function txLabel(tx: BalanceTx): string {
+  return TX_TYPE_LABEL[tx.type] ?? tx.description ?? tx.type;
+}
+
 export function MembershipTab({
   subscriptionAccessDB, subscriptionExpiresAt, loadingData,
   balanceCents, membershipPlan, orders, loadingOrders,
@@ -177,7 +189,7 @@ export function MembershipTab({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-muted-foreground truncate">
-                        {tx.description || tx.type}
+                        {txLabel(tx)}
                       </p>
                       <p className="text-[9px] text-muted-foreground/50">
                         {new Date(tx.created_at).toLocaleDateString()}

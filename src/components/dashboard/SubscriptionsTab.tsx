@@ -10,11 +10,20 @@ import {
   RiCheckLine, RiSearchLine, RiCloseLine, RiGlobalLine, RiShieldCheckLine,
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
   RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
-  RiPauseLine, RiPlayLine, RiCalendarScheduleLine,
+  RiPauseLine, RiPlayLine, RiCalendarScheduleLine, RiScanLine,
+  RiArrowRightSLine,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
 import type { TranslationKey } from "@/lib/i18n";
+import { toast } from "sonner";
+import type { UserSnipeTargetDto } from "@/pages/api/user/snipe-targets";
+import {
+  SnipeListView, type SnipeListViewProps,
+} from "./SnipeListView";
+import {
+  isSnipeActive, type SnipeFilter,
+} from "./snipe-status";
 
 export type SubscriptionsTabProps = {
   subscriptionAccessDB: boolean | null;
@@ -44,10 +53,8 @@ export type SubscriptionsTabProps = {
   onCancelSubscription: (id: string) => void;
   onEditSubscription: (sub: Subscription) => void;
   onTogglePause: (id: string) => void;
-  onToggleSnipe: (id: string) => void;
   onShowBulkImport: () => void;
   togglingPause: string | null;
-  togglingSnipe: string | null;
   bulkImporting: boolean;
   onApplyInviteCode: (e: React.FormEvent) => void;
   setInviteCodeInput: (v: string) => void;
@@ -60,13 +67,71 @@ export function SubscriptionsTab({
   activeSubs, expiringSoon, urgentSubs, postExpirySubs,
   cancelling, inviteCodeInput, applyingCode, paymentEnabled, user, locale, t,
   setSubSearch, setSubFilter, onShowSubscribeGuide, onExportCSV,
-  onCancelSubscription, onEditSubscription, onTogglePause, onToggleSnipe, onShowBulkImport,
-  togglingPause, togglingSnipe, bulkImporting,
+  onCancelSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
+  togglingPause, bulkImporting,
   onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
 }: SubscriptionsTabProps) {
   const router = useRouter();
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = React.useState<"subscriptions" | "snipe">("subscriptions");
+
+  const [snipeTargets, setSnipeTargets] = React.useState<UserSnipeTargetDto[]>([]);
+  const [loadingTargets, setLoadingTargets] = React.useState(false);
+  const [errorTargets, setErrorTargets] = React.useState(false);
+  const [snipeFilter, setSnipeFilter] = React.useState<SnipeFilter>("all");
+  const [snipeSearch, setSnipeSearch] = React.useState("");
+
+  const snipeCount = snipeTargets.filter(t => isSnipeActive(t.status)).length;
+
+  const loadSnipeTargets = React.useCallback(async (filter = snipeFilter, search = snipeSearch) => {
+    setLoadingTargets(true);
+    setErrorTargets(false);
+    try {
+      const params = new URLSearchParams();
+      if (filter && filter !== "all") params.set("status", filter);
+      if (search) params.set("q", search);
+      const res = await fetch(`/api/user/snipe-targets?${params.toString()}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setSnipeTargets(data.targets ?? []);
+    } catch {
+      setErrorTargets(true);
+    } finally {
+      setLoadingTargets(false);
+    }
+  }, [snipeFilter, snipeSearch]);
+
+  React.useEffect(() => {
+    void loadSnipeTargets();
+  }, [loadSnipeTargets]);
+
+  const handleFilterChange = React.useCallback((f: SnipeFilter) => {
+    setSnipeFilter(f);
+    void loadSnipeTargets(f, snipeSearch);
+  }, [snipeSearch, loadSnipeTargets]);
+
+  const handleSearch = React.useCallback((q: string) => {
+    setSnipeSearch(q);
+    void loadSnipeTargets(snipeFilter, q);
+  }, [snipeFilter, loadSnipeTargets]);
+
+  const handleDisableSnipe = React.useCallback(async (domain: string) => {
+    try {
+      const res = await fetch(`/api/user/snipe-targets/${encodeURIComponent(domain)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disable" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "停用失败");
+      const released = data.snipe?.releasedCents ?? 0;
+      toast.success(released > 0 ? `已停用并解冻 ¥${(released / 100).toFixed(2)}` : "已停用抢注");
+      await loadSnipeTargets();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "停用失败，请稍后重试");
+    }
+  }, [loadSnipeTargets]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -79,7 +144,79 @@ export function SubscriptionsTab({
 
   return (
     <motion.div key="subscriptions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-3">
-      {!(subscriptionAccessDB ?? user.subscriptionAccess) && (
+      {/* Segment toggle: subscriptions | snipe */}
+      <div className="flex rounded-xl bg-muted/40 border border-border/50 p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setViewMode("subscriptions")}
+          className={cn(
+            "relative flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-semibold transition-colors duration-150 min-h-[36px]",
+            viewMode === "subscriptions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {viewMode === "subscriptions" && (
+            <motion.div
+              layoutId="snipeViewActive"
+              className="absolute inset-0 bg-background shadow-sm border border-border/60 rounded-lg"
+              transition={{ type: "spring", stiffness: 450, damping: 38 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            <RiCalendarLine className="w-3.5 h-3.5" />
+            订阅
+            {subscriptions.length > 0 && (
+              <span className={cn(
+                "text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4",
+                viewMode === "subscriptions" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+              )}>{subscriptions.length}</span>
+            )}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("snipe")}
+          className={cn(
+            "relative flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-semibold transition-colors duration-150 min-h-[36px]",
+            viewMode === "snipe" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {viewMode === "snipe" && (
+            <motion.div
+              layoutId="snipeViewActive"
+              className="absolute inset-0 bg-background shadow-sm border border-border/60 rounded-lg"
+              transition={{ type: "spring", stiffness: 450, damping: 38 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            <RiScanLine className="w-3.5 h-3.5" />
+            抢注
+            {snipeCount > 0 && (
+              <span className={cn(
+                "text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4",
+                viewMode === "snipe"
+                  ? "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
+                  : "bg-muted text-muted-foreground"
+              )}>{snipeCount}</span>
+            )}
+          </span>
+        </button>
+      </div>
+
+      {viewMode === "snipe" ? (
+        <SnipeListView
+          targets={snipeTargets}
+          loadingTargets={loadingTargets}
+          errorTargets={errorTargets}
+          filter={snipeFilter}
+          search={snipeSearch}
+          onRefresh={() => void loadSnipeTargets()}
+          onFilterChange={handleFilterChange}
+          onSearch={handleSearch}
+          onDisable={handleDisableSnipe}
+        />
+      ) : (
+        <>
+        {!(subscriptionAccessDB ?? user.subscriptionAccess) && (
         <div className="space-y-5 py-4">
           <div className="flex flex-col items-center text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-700/40 flex items-center justify-center">
@@ -400,18 +537,14 @@ export function SubscriptionsTab({
                       </span>
                     )}
                     {sub.active && sub.snipe?.status === "armed" && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-300/50">
+                      <Link href={`/snipe/${encodeURIComponent(sub.domain)}`} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-300/50 hover:bg-emerald-200/60 dark:hover:bg-emerald-900/40 transition-colors">
                         抢注中 · {((sub.snipe.service_cents ?? 0) / 100).toFixed(2)} 元
-                      </span>
+                      </Link>
                     )}
                     {sub.active && sub.snipe?.status === "blocked_balance" && (
-                      <button
-                        type="button"
-                        onClick={() => router.push("/payment/checkout")}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50 hover:bg-amber-200/60 dark:hover:bg-amber-900/40 transition-colors"
-                      >
-                        抢注余额不足 · 去充值
-                      </button>
+                      <Link href={`/snipe/${encodeURIComponent(sub.domain)}`} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50 hover:bg-amber-200/60 dark:hover:bg-amber-900/40 transition-colors">
+                        抢注余额不足
+                      </Link>
                     )}
                     {isUrgent && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
@@ -462,10 +595,10 @@ export function SubscriptionsTab({
                   <button
                     onClick={() => onEditSubscription(sub)}
                     title={t("dashboard.edit_expiry_title")}
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                    className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground active:scale-[0.94] touch-manipulation">
                     <RiEdit2Line className="w-3.5 h-3.5" />
                   </button>
-                  <Link href={`/${sub.domain}`} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                  <Link href={`/${sub.domain}`} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground active:scale-[0.94] touch-manipulation">
                     <RiExternalLinkLine className="w-3.5 h-3.5" />
                   </Link>
                   {sub.active && (
@@ -473,7 +606,7 @@ export function SubscriptionsTab({
                       onClick={() => onTogglePause(sub.id)}
                       disabled={togglingPause === sub.id}
                       title={sub.paused ? t("dashboard.sub_resume") : t("dashboard.sub_pause")}
-                      className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50 active:scale-[0.94] touch-manipulation"
                     >
                       {togglingPause === sub.id
                         ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
@@ -481,25 +614,22 @@ export function SubscriptionsTab({
                     </button>
                   )}
                   {sub.active && (
-                    <button
-                      onClick={() => onToggleSnipe(sub.id)}
-                      disabled={togglingSnipe === sub.id}
-                      title={sub.snipe?.status === "armed" ? "停止混合抢注预定" : "启用混合抢注预定"}
+                    <Link
+                      href={`/snipe/${encodeURIComponent(sub.domain)}`}
+                      title={sub.snipe?.status === "armed" ? "抢注详情" : "启用抢注预定"}
                       className={cn(
-                        "p-1.5 rounded-lg transition-colors disabled:opacity-50",
+                        "w-9 h-9 flex items-center justify-center rounded-lg transition-colors active:scale-[0.94] touch-manipulation",
                         sub.snipe?.status === "armed"
                           ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200/60 dark:hover:bg-emerald-900/40"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
-                      {togglingSnipe === sub.id
-                        ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
-                        : <RiShieldCheckLine className="w-3.5 h-3.5" />}
-                    </button>
+                      <RiShieldCheckLine className="w-3.5 h-3.5" />
+                    </Link>
                   )}
                   {sub.active && (
                     <button onClick={() => onCancelSubscription(sub.id)} disabled={cancelling === sub.id}
-                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors">
+                      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50 active:scale-[0.94] touch-manipulation">
                       {cancelling === sub.id
                         ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
                         : <RiDeleteBinLine className="w-3.5 h-3.5" />}
@@ -671,10 +801,12 @@ export function SubscriptionsTab({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        );
-      })}
-      </>}
+            </div>
+          );
+        })}
+        </>}
+        </>
+      )}
     </motion.div>
   );
 }
