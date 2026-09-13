@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import {
   RiLoader4Line, RiCloseLine, RiCheckLine, RiCalendarLine,
   RiRefreshLine, RiShieldCheckLine, RiInformationLine, RiMailLine,
+  RiTimeLine, RiAlertLine, RiNotificationLine, RiSettings4Line,
+  RiArrowUpSLine, RiArrowDownSLine,
 } from "@remixicon/react";
 import { useTranslation } from "@/lib/i18n";
 import type { Subscription } from "@/components/dashboard/types";
@@ -21,6 +23,62 @@ type WhoisMeta = {
 
 const THRESHOLD_OPTIONS = [60, 30, 10, 5, 1];
 const PHASE_FLAG_KEYS = ["grace", "redemption", "pendingDelete", "dropSoon", "dropped"] as const;
+
+type PhaseFlags = Record<string, boolean>;
+
+const ALL_FLAGS_ON: PhaseFlags = {
+  grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true,
+};
+
+type ReminderPreset = {
+  id: string;
+  label: string;
+  desc: string;
+  thresholds: number[];
+  phaseFlags: PhaseFlags;
+};
+
+const REMINDER_PRESETS: ReminderPreset[] = [
+  {
+    id: "standard",
+    label: "标准",
+    desc: "提前 60/30/10/5/1 天，覆盖所有阶段",
+    thresholds: [60, 30, 10, 5, 1],
+    phaseFlags: { ...ALL_FLAGS_ON },
+  },
+  {
+    id: "early",
+    label: "提前",
+    desc: "提前 90/60/30/15/7/3 天，更早介入",
+    thresholds: [90, 60, 30, 15, 7, 3],
+    phaseFlags: { ...ALL_FLAGS_ON },
+  },
+  {
+    id: "late",
+    label: "临期",
+    desc: "仅剩 5/1 天与赎回、释放阶段",
+    thresholds: [5, 1],
+    phaseFlags: { grace: true, redemption: true, pendingDelete: true, dropSoon: true, dropped: true },
+  },
+  {
+    id: "critical",
+    label: "仅关键",
+    desc: "只在赎回、释放当天提醒",
+    thresholds: [1],
+    phaseFlags: { grace: false, redemption: true, pendingDelete: true, dropSoon: true, dropped: true },
+  },
+];
+
+function flagsEqual(a: PhaseFlags, b: PhaseFlags): boolean {
+  return PHASE_FLAG_KEYS.every(k => Boolean(a[k]) === Boolean(b[k]));
+}
+
+function arraysEqualSorted(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
+}
 
 export function EditExpiryModal({ sub, onClose, onSaved }: {
   sub: Subscription;
@@ -46,6 +104,14 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
     dropped: sub.phase_flags?.dropped ?? true,
   });
   const [notifyEmail, setNotifyEmail] = React.useState(sub.notify_email ?? "");
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+
+  const activePresetId = React.useMemo(() => {
+    const match = REMINDER_PRESETS.find(p =>
+      arraysEqualSorted(p.thresholds, thresholds) && flagsEqual(p.phaseFlags, phaseFlags)
+    );
+    return match?.id ?? null;
+  }, [thresholds, phaseFlags]);
 
   const toggleThreshold = (d: number) => {
     setThresholds(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => b - a));
@@ -220,56 +286,103 @@ export function EditExpiryModal({ sub, onClose, onSaved }: {
             </div>
           )}
 
-          {/* Reminder thresholds */}
+          {/* Reminder plan: presets + advanced */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">{t("dashboard.reminder_threshold")}</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {THRESHOLD_OPTIONS.map(d => {
-                const active = thresholds.includes(d);
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => toggleThreshold(d)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors tabular-nums",
-                      active
-                        ? "bg-primary/10 text-primary border-primary/40"
-                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
-                    )}
-                  >
-                    {t("dashboard.n_days_abbr", { days: d })}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-muted-foreground/70">{t("dashboard.threshold_desc")}</p>
-          </div>
-
-          {/* Phase event toggles */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">{t("dashboard.phase_alerts_title")}</Label>
             <div className="grid grid-cols-2 gap-1.5">
-              {PHASE_FLAG_KEYS.map(k => {
-                const active = phaseFlags[k];
+              {REMINDER_PRESETS.map(p => {
+                const selected = activePresetId === p.id;
                 return (
                   <button
-                    key={k}
+                    key={p.id}
                     type="button"
-                    onClick={() => setPhaseFlags(prev => ({ ...prev, [k]: !prev[k] }))}
+                    onClick={() => { setThresholds([...p.thresholds].sort((a, b) => b - a)); setPhaseFlags({ ...p.phaseFlags }); setAdvancedOpen(false); }}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
-                      active
+                      "relative flex flex-col items-start gap-1 px-2.5 py-2 rounded-xl text-left border transition-colors min-h-[56px]",
+                      selected
                         ? "bg-primary/10 text-primary border-primary/40"
                         : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
                     )}
                   >
-                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-primary" : "bg-muted-foreground/40")} />
-                    {t(("dashboard.phase_" + k) as any)}
+                    <span className="flex items-center gap-1 text-[11px] font-bold">
+                      <RiNotificationLine className="w-3 h-3 shrink-0" />
+                      {p.label}
+                      {selected && <RiCheckLine className="w-3 h-3 shrink-0" />}
+                    </span>
+                    <span className="text-[9.5px] leading-tight text-muted-foreground">{p.desc}</span>
                   </button>
                 );
               })}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen(v => !v)}
+              className="flex w-full items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+            >
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                <RiSettings4Line className="w-3.5 h-3.5 shrink-0" />
+                高级自定义
+                {activePresetId === null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">已自定义</span>}
+              </span>
+              {advancedOpen
+                ? <RiArrowUpSLine className="w-4 h-4 text-muted-foreground" />
+                : <RiArrowDownSLine className="w-4 h-4 text-muted-foreground" />}
+            </button>
+
+            {advancedOpen && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">提前天数</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {THRESHOLD_OPTIONS.map(d => {
+                      const active = thresholds.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => toggleThreshold(d)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors tabular-nums",
+                            active
+                              ? "bg-primary/10 text-primary border-primary/40"
+                              : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                          )}
+                        >
+                          {t("dashboard.n_days_abbr", { days: d })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70">{t("dashboard.threshold_desc")}</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">{t("dashboard.phase_alerts_title")}</Label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {PHASE_FLAG_KEYS.map(k => {
+                      const active = phaseFlags[k];
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setPhaseFlags(prev => ({ ...prev, [k]: !prev[k] }))}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
+                            active
+                              ? "bg-primary/10 text-primary border-primary/40"
+                              : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                          )}
+                        >
+                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-primary" : "bg-muted-foreground/40")} />
+                          {t(("dashboard.phase_" + k) as any)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notification email */}

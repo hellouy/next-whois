@@ -413,6 +413,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "DELETE") {
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: "Missing id" });
+    const hard = req.query.hard === "1" || req.query.hard === "true";
+
+    // Physical delete: permanently remove the subscription row and its reminder
+    // logs. Only allowed for inactive rows. If the domain still has a running
+    // preorder, the caller must stop it in the snipe center first.
+    if (hard) {
+      const userEmail = session.user.email;
+      try {
+        const sub = await one<{ domain: string }>(
+          "SELECT domain FROM reminders WHERE id = $1 AND email = $2",
+          [id as string, userEmail],
+        );
+        if (!sub) return res.status(404).json({ error: "Subscription not found" });
+
+        const activeSnipe = await one<{ id: string }>(
+          `SELECT id FROM snipe_targets
+           WHERE domain = $1 AND user_email = $2
+             AND status IN ('watching','armed','blocked_balance','sniping','paused','succeeded')`,
+          [sub.domain, userEmail],
+        );
+        if (activeSnipe) {
+          return res.status(409).json({
+            error: "该域名仍有进行中的抢注预定，请先在抢注中心停用后再删除订阅",
+          });
+        }
+
+        await withTransaction(async (tx) => {
+          await tx.run("DELETE FROM reminder_logs WHERE reminder_id = $1", [id as string]);
+          await tx.run("DELETE FROM reminders WHERE id = $1 AND email = $2", [id as string, userEmail]);
+        });
+        return res.status(200).json({ ok: true });
+      } catch (err) {
+        logger.error("[subscriptions] DELETE hard error:", err instanceof Error ? err.message : String(err));
+        return res.status(500).json({ error: "删除失败，请稍后重试" });
+      }
+    }
 
     try {
       await run(

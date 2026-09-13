@@ -28,6 +28,7 @@ import {
   RiScanLine,
   RiShieldFlashLine,
   RiErrorWarningLine,
+  RiWalletLine,
 } from "@remixicon/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { computeLifecycle } from "@/lib/lifecycle";
@@ -837,6 +838,17 @@ export function DomainReminderDialog({
                                       )}
                                     </span>
                                   </div>
+                                )}
+                                {snipeQuote.balanceCents != null && snipeQuote.balanceCents < (snipeQuote.serviceCents ?? 0) && (
+                                  <a
+                                    href="/payment/checkout"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-semibold transition-colors active:scale-[0.98] touch-manipulation"
+                                  >
+                                    <RiWalletLine className="w-3.5 h-3.5 shrink-0" />
+                                    {isZh ? "去充值，余额充足后自动开启抢占" : "Top up — sniping starts once funded"}
+                                  </a>
                                 )}
                                 <p className="text-[10px] text-muted-foreground/65 leading-snug">
                                   {isZh

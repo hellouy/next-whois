@@ -11,7 +11,7 @@ import {
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
   RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
   RiPauseLine, RiPlayLine, RiCalendarScheduleLine, RiScanLine,
-  RiArrowRightSLine, RiAddLine, RiMore2Line,
+  RiArrowRightSLine, RiAddLine, RiMore2Line, RiWalletLine,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
@@ -20,6 +20,9 @@ import { toast } from "sonner";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import type { UserSnipeTargetDto } from "@/pages/api/user/snipe-targets";
 import {
   SnipeListView, type SnipeListViewProps,
@@ -54,6 +57,7 @@ export type SubscriptionsTabProps = {
   onShowSubscribeGuide: () => void;
   onExportCSV: () => void;
   onCancelSubscription: (id: string) => void;
+  onDeleteSubscription: (id: string) => void;
   onEditSubscription: (sub: Subscription) => void;
   onTogglePause: (id: string) => void;
   onShowBulkImport: () => void;
@@ -70,7 +74,7 @@ export function SubscriptionsTab({
   activeSubs, expiringSoon, urgentSubs, postExpirySubs,
   cancelling, inviteCodeInput, applyingCode, paymentEnabled, user, locale, t,
   setSubSearch, setSubFilter, onShowSubscribeGuide, onExportCSV,
-  onCancelSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
+  onCancelSubscription, onDeleteSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
   togglingPause, bulkImporting,
   onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
@@ -78,6 +82,7 @@ export function SubscriptionsTab({
   const router = useRouter();
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = React.useState<"subscriptions" | "snipe">("subscriptions");
+  const [confirmDelete, setConfirmDelete] = React.useState<Subscription | null>(null);
 
   const [snipeTargets, setSnipeTargets] = React.useState<UserSnipeTargetDto[]>([]);
   const [loadingTargets, setLoadingTargets] = React.useState(false);
@@ -646,6 +651,15 @@ export function SubscriptionsTab({
                         : <RiDeleteBinLine className="w-3.5 h-3.5" />}
                     </button>
                   )}
+                  {!sub.active && (
+                    <button
+                      onClick={() => setConfirmDelete(sub)}
+                      title="删除记录"
+                      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors active:scale-[0.94] touch-manipulation"
+                    >
+                      <RiDeleteBinLine className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -685,6 +699,21 @@ export function SubscriptionsTab({
                   )}
                 </div>
               )}
+
+              {/* Insufficient balance for preorder — top-up CTA */}
+              {sub.active && sub.snipe?.status === "blocked_balance" && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-700/40">
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1 min-w-0">
+                    <RiWalletLine className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">需充值 ¥{(((sub.snipe.service_cents ?? 0) - (sub.snipe.frozen_cents ?? 0)) / 100).toFixed(2)} 启动抢注</span>
+                  </p>
+                  <Link href="/payment/checkout" className="shrink-0">
+                    <Button size="sm" className="h-7 rounded-lg px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white gap-1">
+                      <RiWalletLine className="w-3 h-3" />去充值
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Mobile action row */}
@@ -717,7 +746,17 @@ export function SubscriptionsTab({
                   {sub.paused ? t("dashboard.sub_resume") : t("dashboard.sub_pause")}
                 </button>
               ) : (
-                <span className="flex items-center justify-center py-2.5 text-[11px] text-muted-foreground/50">已停用</span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(sub)}
+                  disabled={cancelling === sub.id}
+                  className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-red-500 hover:bg-red-50/60 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50 active:scale-[0.97] touch-manipulation"
+                >
+                  {cancelling === sub.id
+                    ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    : <RiDeleteBinLine className="w-3.5 h-3.5 shrink-0" />}
+                  删除记录
+                </button>
               )}
               {sub.active && (
                 <div className="col-span-3 grid grid-cols-2 border-t border-border/30">
@@ -874,6 +913,39 @@ export function SubscriptionsTab({
         </>}
         </>
       )}
+
+      {/* Delete subscription confirm dialog */}
+      <Dialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除订阅记录？</DialogTitle>
+            <DialogDescription>
+              将永久删除 <span className="font-mono font-semibold text-foreground">{confirmDelete?.domain}</span> 的订阅记录及提醒历史，且无法恢复。该操作不影响已完成的抢注记录。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setConfirmDelete(null)}>取消</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="rounded-xl"
+              disabled={cancelling === confirmDelete?.id}
+              onClick={() => {
+                if (!confirmDelete) return;
+                const id = confirmDelete.id;
+                setConfirmDelete(null);
+                onDeleteSubscription(id);
+              }}
+            >
+              {cancelling === confirmDelete?.id ? (
+                <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />删除中…</>
+              ) : (
+                "确认删除"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

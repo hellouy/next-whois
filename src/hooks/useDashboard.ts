@@ -239,6 +239,24 @@ export function useDashboard() {
     }
   }
 
+  async function deleteSubscription(id: string) {
+    setCancelling(id);
+    try {
+      const res = await fetch(`/api/user/subscriptions?id=${encodeURIComponent(id)}&hard=1`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t("dashboard.op_failed"));
+      }
+      setSubscriptions(prev => prev.filter(s => s.id !== id));
+      invalidateDashCache();
+      toast.success("订阅已删除");
+    } catch (err) {
+      toast.error((err instanceof Error ? err.message : String(err)) || t("dashboard.op_failed"));
+    } finally {
+      setCancelling(null);
+    }
+  }
+
   async function saveDaysBefore(id: string, days: number) {
     setSavingDaysBefore(id);
     try {
@@ -558,7 +576,7 @@ export function useDashboard() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, togglePauseSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, deleteSubscription, togglePauseSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
     showBulkImport, setShowBulkImport,

@@ -88,7 +88,7 @@ export default function DashboardPage() {
     searchStats,
     recentSearches,
     refreshData, retryLoad,
-    cancelSubscription, togglePauseSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
+    cancelSubscription, deleteSubscription, togglePauseSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
     handleRedeemCode, handleApplyInviteCode,
   } = useDashboard();
@@ -366,6 +366,7 @@ export default function DashboardPage() {
               onShowSubscribeGuide={() => setShowSubscribeGuide(true)}
               onExportCSV={exportSubscriptionsCSV}
               onCancelSubscription={cancelSubscription}
+              onDeleteSubscription={deleteSubscription}
               onEditSubscription={setEditingSubscription}
               onTogglePause={togglePauseSubscription}
               onShowBulkImport={() => setShowBulkImport(true)}
