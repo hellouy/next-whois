@@ -46,14 +46,14 @@ export function SnipeListView({
       {/* Filter chips + search + refresh */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-w-0">
             {SNIPE_FILTERS.map(f => (
               <button
                 key={f.key}
                 type="button"
                 onClick={() => onFilterChange(f.key)}
                 className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors min-h-[24px]",
+                  "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors min-h-[28px]",
                   filter === f.key
                     ? "bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-300 border-violet-400/60"
                     : "bg-muted/40 text-muted-foreground border-border hover:border-violet-300/50 hover:text-foreground"
@@ -67,7 +67,7 @@ export function SnipeListView({
             type="button"
             onClick={onRefresh}
             disabled={loadingTargets}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 min-h-[32px] min-w-[32px] flex items-center justify-center"
+            className="w-9 h-9 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 flex items-center justify-center touch-manipulation"
             title="刷新"
           >
             <RiLoader4Line className={cn("w-3.5 h-3.5", loadingTargets && "animate-spin")} />
@@ -239,7 +239,7 @@ export function SnipeListView({
                   <button
                     type="button"
                     onClick={e => { e.stopPropagation(); onDisable(target.domain); }}
-                    className="text-[10px] text-muted-foreground hover:text-red-500 px-1.5 py-1 min-h-[28px] rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    className="text-[10px] text-muted-foreground hover:text-red-500 px-2 py-1.5 min-h-[32px] rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors touch-manipulation"
                   >
                     停用
                   </button>

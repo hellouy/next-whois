@@ -11,12 +11,15 @@ import {
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
   RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
   RiPauseLine, RiPlayLine, RiCalendarScheduleLine, RiScanLine,
-  RiArrowRightSLine,
+  RiArrowRightSLine, RiAddLine, RiMore2Line,
 } from "@remixicon/react";
 import type { Subscription, DashboardUser, TFunction } from "./types";
 import { PHASE_LABEL, fmt, daysUntilExpiry } from "./types";
 import type { TranslationKey } from "@/lib/i18n";
 import { toast } from "sonner";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import type { UserSnipeTargetDto } from "@/pages/api/user/snipe-targets";
 import {
   SnipeListView, type SnipeListViewProps,
@@ -268,41 +271,49 @@ export function SubscriptionsTab({
         </div>
       )}
       {(subscriptionAccessDB ?? user.subscriptionAccess) && <>
-      {/* Header */}
+      {/* Header: title + primary action, secondary actions in overflow menu */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("dashboard.sub_section_title")}</p>
-        <div className="flex items-center gap-2">
-          {activeSubs.length > 0 && (
-            <button
-              onClick={onExportCSV}
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
-            >
-              <RiDownloadLine className="w-3 h-3" />{t("dashboard.export_csv")}
-            </button>
-          )}
-          {activeSubs.length > 0 && (
-            <a
-              href="/api/user/subscriptions/ics"
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
-            >
-              <RiCalendarScheduleLine className="w-3 h-3" />{t("dashboard.export_ics")}
-            </a>
-          )}
-          <button
-            onClick={onShowBulkImport}
-            className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
-          >
-            {bulkImporting
-              ? <RiLoader4Line className="w-3 h-3 animate-spin" />
-              : <RiUploadCloud2Line className="w-3 h-3" />}
-            {t("dashboard.bulk_import")}
-          </button>
-          <button
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground truncate">{t("dashboard.sub_section_title")}</p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            size="sm"
             onClick={onShowSubscribeGuide}
-            className="text-[11px] text-primary hover:underline flex items-center gap-1"
+            className="h-9 rounded-xl gap-1.5 text-xs"
           >
-            <RiCalendarLine className="w-3 h-3" />{t("dashboard.new_sub")}
-          </button>
+            <RiAddLine className="w-3.5 h-3.5" />{t("dashboard.new_sub")}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-[0.94] touch-manipulation"
+                title="更多操作"
+                aria-label="更多操作"
+              >
+                <RiMore2Line className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                disabled={activeSubs.length === 0}
+                onSelect={() => { if (activeSubs.length > 0) onExportCSV(); }}
+              >
+                <RiDownloadLine className="w-3.5 h-3.5 mr-2 text-muted-foreground" />{t("dashboard.export_csv")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={activeSubs.length === 0}
+                onSelect={() => { if (activeSubs.length > 0) window.location.href = "/api/user/subscriptions/ics"; }}
+              >
+                <RiCalendarScheduleLine className="w-3.5 h-3.5 mr-2 text-muted-foreground" />{t("dashboard.export_ics")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onShowBulkImport}>
+                {bulkImporting
+                  ? <RiLoader4Line className="w-3.5 h-3.5 mr-2 animate-spin text-muted-foreground" />
+                  : <RiUploadCloud2Line className="w-3.5 h-3.5 mr-2 text-muted-foreground" />}
+                {t("dashboard.bulk_import")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -590,8 +601,8 @@ export function SubscriptionsTab({
                   )}
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Desktop action icons */}
+                <div className="hidden sm:flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => onEditSubscription(sub)}
                     title={t("dashboard.edit_expiry_title")}
@@ -672,6 +683,62 @@ export function SubscriptionsTab({
                       {t("dashboard.advance_days", { n: sub.next_reminder_days })}
                     </span>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile action row */}
+            <div className="sm:hidden grid grid-cols-3 items-center border-t border-border/40 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => onEditSubscription(sub)}
+                title={t("dashboard.edit_expiry_title")}
+                className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors active:scale-[0.97] touch-manipulation border-r border-border/30"
+              >
+                <RiEdit2Line className="w-3.5 h-3.5 shrink-0" />{t("dashboard.edit_expiry_title")}
+              </button>
+              <Link
+                href={`/${sub.domain}`}
+                title={t("not_found.back_home")}
+                className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors active:scale-[0.97] touch-manipulation border-r border-border/30"
+              >
+                <RiExternalLinkLine className="w-3.5 h-3.5 shrink-0" />查看
+              </Link>
+              {sub.active ? (
+                <button
+                  type="button"
+                  onClick={() => onTogglePause(sub.id)}
+                  disabled={togglingPause === sub.id}
+                  className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50 active:scale-[0.97] touch-manipulation"
+                >
+                  {togglingPause === sub.id
+                    ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    : sub.paused ? <RiPlayLine className="w-3.5 h-3.5 shrink-0" /> : <RiPauseLine className="w-3.5 h-3.5 shrink-0" />}
+                  {sub.paused ? t("dashboard.sub_resume") : t("dashboard.sub_pause")}
+                </button>
+              ) : (
+                <span className="flex items-center justify-center py-2.5 text-[11px] text-muted-foreground/50">已停用</span>
+              )}
+              {sub.active && (
+                <div className="col-span-3 grid grid-cols-2 border-t border-border/30">
+                  <Link
+                    href={`/snipe/${encodeURIComponent(sub.domain)}`}
+                    className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors active:scale-[0.97] touch-manipulation border-r border-border/30"
+                  >
+                    <RiShieldCheckLine className={cn("w-3.5 h-3.5 shrink-0", sub.snipe?.status === "armed" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/70")} />
+                    {sub.snipe?.status === "armed" ? "抢注详情" : "抢注预定"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => onCancelSubscription(sub.id)}
+                    disabled={cancelling === sub.id}
+                    className="flex min-w-0 items-center justify-center gap-1 py-2.5 text-[11px] text-muted-foreground hover:text-red-500 hover:bg-red-50/60 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50 active:scale-[0.97] touch-manipulation"
+                  >
+                    {cancelling === sub.id
+                      ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      : <RiDeleteBinLine className="w-3.5 h-3.5 shrink-0" />}
+                    取消订阅
+                  </button>
                 </div>
               )}
             </div>

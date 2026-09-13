@@ -324,9 +324,9 @@ export default function DashboardPage() {
                   transition={{ type: "spring", stiffness: 450, damping: 38 }}
                 />
               )}
-              <span className="relative z-10 flex items-center gap-1.5">
+              <span className="relative z-10 flex items-center gap-1">
                 {tabItem.icon}
-                <span className="hidden sm:inline">{tabItem.label}</span>
+                <span className={cn(tabItem.label.length > 4 ? "hidden sm:inline" : "text-[11px]")}>{tabItem.label}</span>
                 {tabItem.count !== undefined && (
                   <span className={cn(
                     "text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4",
