@@ -66,8 +66,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const rows = await many<{
         id: string; domain: string; whois_expiry_date: string | null; expiration_date: string | null;
+        last_epp_status: string | null;
       }>(
-        `SELECT id, domain, whois_expiry_date, expiration_date
+        `SELECT id, domain, whois_expiry_date, expiration_date, last_epp_status
          FROM reminders WHERE email = $1 AND active = true`,
         [email],
       );
@@ -76,7 +77,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const r of rows) {
         const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
         if (!effectiveExpiry) continue;
-        const lc = computeLifecycle(r.domain, effectiveExpiry, undefined, overrides);
+        let eppStatuses: string[] = [];
+        try { if (r.last_epp_status) eppStatuses = JSON.parse(r.last_epp_status); } catch { /* ignore */ }
+        // A registry that still reports hold/prohibited statuses (e.g. Registry
+        // Hold) has frozen the name — the date-based drop estimate is not going
+        // to happen on schedule. Do not advertise it as an upcoming drop.
+        if (eppStatuses.some((s) => /(client|server)?hold|prohibited|disputed|suspicious/i.test(s))) continue;
+        const lc = computeLifecycle(r.domain, effectiveExpiry, eppStatuses.length ? eppStatuses : undefined, overrides);
         if (!lc || lc.phase === "dropped") continue;
         const dropStr = lc.dropDate.toISOString().slice(0, 10);
         if (dropStr < todayStr || dropStr > endStr) continue;

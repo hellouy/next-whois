@@ -19,9 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const rows = await many<{
       id: string; domain: string; expiration_date: string | null;
-      whois_expiry_date: string | null;
+      whois_expiry_date: string | null; last_epp_status: string | null;
     }>(
-      `SELECT id, domain, expiration_date, whois_expiry_date
+      `SELECT id, domain, expiration_date, whois_expiry_date, last_epp_status
        FROM reminders WHERE email = $1 AND active = true`,
       [session.user.email],
     );
@@ -31,9 +31,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const events = rows.map((r) => {
       const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
+      // Feed persisted registry EPP statuses into the lifecycle so a held /
+      // frozen name is never advertised with a misleading "estimated drop".
+      let eppStatuses: string[] = [];
+      try { if (r.last_epp_status) eppStatuses = JSON.parse(r.last_epp_status); } catch { /* ignore */ }
       const eventsForDomain: { uid: string; summary: string; start: string; end?: string; description?: string; url?: string }[] = [];
       if (effectiveExpiry) {
-        const lc = computeLifecycle(r.domain, effectiveExpiry, undefined, overrides);
+        const lc = computeLifecycle(r.domain, effectiveExpiry, eppStatuses.length ? eppStatuses : undefined, overrides);
         if (lc) {
           eventsForDomain.push({
             uid: `${r.id}@expiry`,
@@ -54,7 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             start: lc.redemptionEnd.toISOString().slice(0, 10),
             url: `${baseUrl}/${r.domain}`,
           });
-          if (lc.dropDate) eventsForDomain.push({
+          // Only include the estimated drop when the registry data does not
+          // contradict it — a held/frozen name has no predictable drop date.
+          const held = eppStatuses.some((s) => /(client|server)?hold|prohibited|disputed|suspicious/i.test(s));
+          if (lc.dropDate && !held) eventsForDomain.push({
             uid: `${r.id}@drop`,
             summary: `${r.domain} estimated drop date`,
             start: lc.dropDate.toISOString().slice(0, 10),

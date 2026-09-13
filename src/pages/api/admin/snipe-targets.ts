@@ -99,7 +99,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   let overrides: Record<string, unknown> = {};
   try { overrides = await loadLifecycleOverrides(); } catch { /* default lifecycle */ }
 
-  const lc = computeLifecycle(domain, expiration, undefined, overrides as never);
+  // A registry still reporting hold/prohibited statuses has frozen the name —
+  // no reliable drop ETA exists. Only date the ETA when the registry data does
+  // not contradict the release estimate.
+  const held = epp.some((s) => /(client|server)?hold|prohibited|disputed|suspicious/i.test(s));
+  const lc = held ? null : computeLifecycle(domain, expiration, epp.length ? epp : undefined, overrides as never);
   const dropEta = lc ? lc.dropDate.toISOString().slice(0, 10) : null;
   const base = dropEta ? new Date(dropEta + "T00:00:00Z") : new Date();
   const huntStart = new Date(base.getTime() - HUNT_PRE_DAYS * 86_400_000).toISOString();
