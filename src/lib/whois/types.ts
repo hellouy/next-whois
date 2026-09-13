@@ -100,6 +100,45 @@ export type WhoisAnalyzeResult = {
   netName: string;
   netType: string;
   originAS: string;
+
+  // ── Domain-info enhancement (optional, filled by domain-enrichment.ts) ──
+  /** Per-nameserver brand attribution with kind classification. */
+  nsAttributions?: NsAttribution[];
+  /** Brand attribution of the authoritative WHOIS server (IANA / registry). */
+  whoisServerAttribution?: string;
+  /** Detected parking / aftermarket platform via NS records. */
+  parkingProvider?: string;
+  /** Parking platform kind (parking / aftermarket / both). */
+  parkingKind?: "parking" | "aftermarket" | "both";
+  /** Whether the domain shows for-sale signals (RDAP status / WHOIS text / NS). */
+  forSale?: boolean;
+  /** For-sale signal source for display / debugging. */
+  forSaleSource?: string;
+  /** Date sanity check verdicts (creation <= updated <= expiry). */
+  dateSanity?: DateSanity;
+  /** True when registrant contact fields were redacted by a privacy proxy. */
+  registrantPrivacy?: boolean;
+  /** IANA ID filled from the built-in registrar library, not from the record. */
+  ianaIdFromLibrary?: boolean;
+  /** Registrar IANA ID when present in the record or resolved from the library. */
+  registrarIanaId?: string | null;
+};
+
+/**
+ * Per-nameserver brand attribution produced by the enrichment service.
+ * `kind` mirrors the parking-platform / ns-brands classification.
+ */
+export type NsAttribution = {
+  ns: string;
+  brand: string | null;
+  kind: "dns-hosting" | "parking" | "registrar" | "unknown";
+};
+
+/** Sanity checks on the WHOIS date triplet. */
+export type DateSanity = {
+  valid: boolean;
+  /** List of violated rules, e.g. "creation > updated". */
+  issues: string[];
 };
 
 export type DomainStatusProps = {

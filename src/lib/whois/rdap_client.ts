@@ -8,6 +8,7 @@ import { extractDomain } from "@/lib/utils";
 import { applyParams } from "./common_parser";
 import { domainToASCII } from "url";
 import { getGtldRdapServer } from "./rdap_gtld_bootstrap";
+import { resolveRegistrarIanaId } from "@/data/query-page/registrar-library";
 
 function derivePunycode(unicodeName: string): string | undefined {
   try {
@@ -478,6 +479,7 @@ function parseRdapEntity(entities: RdapEntity[]): {
   registrar: string;
   registrarURL: string;
   ianaId: string;
+  registrarHandle: string | null;
   registrantName: string;
   registrantOrganization: string;
   registrantCountry: string;
@@ -503,6 +505,7 @@ function parseRdapEntity(entities: RdapEntity[]): {
   let registrar = "Unknown";
   let registrarURL = "Unknown";
   let ianaId = "N/A";
+  let registrarHandle: string | null = null;
   let registrantName = "Unknown";
   let registrantOrganization = "Unknown";
   let registrantCountry = "Unknown";
@@ -527,6 +530,7 @@ function parseRdapEntity(entities: RdapEntity[]): {
 
   for (const entity of entities) {
     if (entity.roles?.includes("registrar")) {
+      if (entity.handle && !registrarHandle) registrarHandle = entity.handle;
       if (entity.vcardArray?.[1]) {
         const fn = extractVcardField(entity.vcardArray[1], "fn");
         if (fn && fn !== "Unknown") registrar = fn;
@@ -537,6 +541,9 @@ function parseRdapEntity(entities: RdapEntity[]): {
         );
         if (ianaEntry) ianaId = ianaEntry.identifier;
       }
+      // Capture the registrar entity handle (e.g. "DIRECTNIC") for the IANA
+      // ID backfill in convertRdapToWhoisResult when publicIds are missing.
+      if (entity.handle) registrarHandle = entity.handle;
       // Prefer explicit `url` field on entity, then fall back to links
       if (entity.links) {
         const aboutLink = entity.links.find(
@@ -640,6 +647,7 @@ function parseRdapEntity(entities: RdapEntity[]): {
     registrar,
     registrarURL,
     ianaId,
+    registrarHandle,
     registrantName,
     registrantOrganization,
     registrantCountry,
@@ -746,12 +754,26 @@ export async function convertRdapToWhoisResult(
     displayDomain = originalQuery;
   }
 
+  // Backfill IANA ID from the built-in registrar library when the RDAP record
+  // omitted it (many registries only publish a handle, e.g. "DIRECTNIC").
+  const hasExplicitIanaId = entityData.ianaId !== "N/A" && entityData.ianaId !== "";
+  const libraryIanaId =
+    hasExplicitIanaId
+      ? null
+      : (entityData.registrarHandle
+          ? resolveRegistrarIanaId(entityData.registrarHandle)
+          : null) ?? resolveRegistrarIanaId(entityData.registrar);
+
   const result = {
     domain: displayDomain,
     domainPunycode: punycodeDomain,
     registrar: entityData.registrar,
     registrarURL: entityData.registrarURL,
-    ianaId: entityData.ianaId,
+    ianaId: hasExplicitIanaId ? entityData.ianaId : libraryIanaId ?? "N/A",
+    registrarIanaId: hasExplicitIanaId
+      ? entityData.ianaId
+      : libraryIanaId ?? null,
+    ianaIdFromLibrary: !hasExplicitIanaId && libraryIanaId !== null,
     whoisServer: "https://rdap.org",
     registryDomainId: rdapData.handle || "Unknown",
     updatedDate,

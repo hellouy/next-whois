@@ -35,6 +35,42 @@ import { injectSyntheticStatuses } from "@/lib/whois/parsers/status-injection";
 // Re-export for backward compatibility (rdap_client.ts and others import this).
 export { applyParams };
 
+/**
+ * Detect explicit privacy-protection markers in WHOIS/RDAP text.
+ *
+ * Only exact, well-known proxy markers count — "privacy" appearing in a
+ * registrar name ("Namecheap, Inc.") or a random sentence must NOT set the
+ * flag. The matcher looks for standalone proxy-brand tokens or the canonical
+ * ICANN "Withheld for Privacy Purposes" phrase.
+ */
+const PRIVACY_PROXY_PATTERNS: RegExp[] = [
+  /\bwithheld for privacy\b/i,
+  // Explicit proxy brands / service phrasing — "privacy service" alone is too
+  // broad (a registrar named "Privacy Services LLC" must NOT match), so we
+  // require either a well-known brand token or the "provided by" construction.
+  /\bwhoisguard\b/i,
+  /\bdomains by proxy\b/i,
+  /\bprivacy(?:-)?guard\b/i,
+  /\bprivacy(?:-)?protect(?:ion)?\b/i,
+  /\bperfect privacy\b/i,
+  /\bprivacy protector\b/i,
+  /\bprivacy shield\b/i,
+  /\bprivacy services? provided by\b/i,
+  /\bprivacy(?:-)?proxy\b/i,
+  /\bprivacy(?:-)?service\s+of\s+/i,
+  /\bdomain (?:privacy|protection)\b/i,
+  // Chinese ccTLD privacy-proxy labels
+  /隐私保护/,
+  /隐私服务/,
+  // Russian privacy phrasing
+  /скрыто для конфиденциальности/i,
+];
+
+export function detectPrivacyProxy(text: string): boolean {
+  if (!text) return false;
+  return PRIVACY_PROXY_PATTERNS.some((re) => re.test(text));
+}
+
 export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
   data = preprocessSmWhois(data);
   data = preprocessIslandNetworks(data);
@@ -129,6 +165,14 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrar-name":
       case "enregistreur":
       case "bureau d'enregistrement":
+      // ── Chinese ccTLD (.cn CNNIC) ───────────────────────────────
+      case "注册商":
+      case "注册服务商":
+      case "注册机构":
+      // ── Portuguese (.br Registro.br) ─────────────────────────────
+      case "registrador":
+      // ── Russian (.ru / .рф TCI) ──────────────────────────────────
+      case "регистратор":
         result.registrar = result.registrar === "Unknown" ? value : result.registrar;
         break;
       case "iana id":
@@ -372,6 +416,14 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "personname":
       case "登録者名":
       case "名前":
+      // Chinese ccTLD (.cn CNNIC)
+      case "注册者":
+      case "注册人":
+      case "域名持有者":
+      case "持有人":
+      case "主办单位名称":
+      // Russian (.ru TCI)
+      case "организация-владелец":
       // JPRS English contact section: "[Name]" (only JPRS uses bare "name")
       case "name":
         if (!isRedactedValue(value) && result.registrantName === "Unknown")
@@ -383,6 +435,11 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant organisation":
       case "registrant org":
       case "domain holder organization":
+      // Chinese ccTLD (.cn CNNIC)
+      case "注册单位":
+      case "主办单位":
+      // Russian (.ru TCI)
+      case "организация":
         if (!isRedactedValue(value)) result.registrantOrganization = value;
         break;
       case "organization":
@@ -392,7 +449,17 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
           result.registrantOrganization = value;
         break;
       case "registrant":
-        if (!isRedactedValue(value)) result.registrantOrganization = value;
+        // A bare "Registrant" value is the registrant's name/handle (common in
+        // .cn CNNIC English output and .vn / .kr ccTLD whois). Only use it for
+        // the organization field when the value is clearly a company and the
+        // name field is still unset — see includeArgs fallback below.
+        if (
+          !isRedactedValue(value) &&
+          result.registrantName === "Unknown" &&
+          result.registrantOrganization === "Unknown"
+        ) {
+          result.registrantName = value;
+        }
         break;
       case "descr":
         if (
@@ -407,6 +474,8 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant state":
       case "registrant province":
       case "province":
+      case "省/市":
+      case "省份":
         if (!isRedactedValue(value) && result.registrantProvince === "Unknown")
           result.registrantProvince = value;
         break;
@@ -418,6 +487,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "locality":
       case "ville":
       case "ciudad":
+      case "市":
+      case "城市":
+      case "cidade":
         if (!isRedactedValue(value) && result.registrantCity === "Unknown")
           result.registrantCity = value;
         break;
@@ -435,6 +507,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "direccion":
       case "street address":
       case "domain holder street":
+      case "通讯地址":
+      case "联系地址":
+      case "详细地址":
       // JPRS English contact section: "[Postal Address]" (only JPRS uses this)
       case "postal address":
       case "住所":
@@ -453,6 +528,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "postcode":
       case "postalcode":
       case "postal-code":
+      case "邮政编码":
+      case "邮编":
+      case "codigo postal":
         if (!isRedactedValue(value) && result.registrantPostalCode === "Unknown")
           result.registrantPostalCode = value;
         break;
@@ -461,12 +539,14 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "registrant country":
       case "registrant country code":
       case "registrant country/economy":
+      case "国家/地区":
+      case "国家":
+      case "pais":
         if (!isRedactedValue(value)) result.registrantCountry = value;
         break;
       case "country":
       case "country-code":
       case "pays":
-      case "pais":
       case "domain holder country":
         if (!isRedactedValue(value) && result.registrantCountry === "Unknown")
           result.registrantCountry = value;
@@ -480,6 +560,9 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
       case "telephone":
       case "téléphone":
       case "telefono":
+      case "联系电话":
+      case "telefone":
+      case "телефон":
         if (!isRedactedValue(value) && result.registrantPhone === "Unknown")
           result.registrantPhone = value.replace(/^tel:/i, "").trim();
         break;
@@ -590,6 +673,8 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         break;
       case "registrant email":
       case "registrant contact email":
+      case "注册者联系人邮箱":
+      case "注册者邮箱":
         if (!isRedactedValue(value))
           result.registrantEmail = value.replace(
             "Select Request Email Form at ",
@@ -602,14 +687,14 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
         result.dnssec = value;
         break;
       case "email":
+      case "电子邮件":
+      case "邮箱":
+      case "联系人邮箱":
+      case "e-mail":
         if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
           result.registrantEmail = value;
         break;
       case "courriel":
-        if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
-          result.registrantEmail = value;
-        break;
-      case "e-mail":
         if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
           result.registrantEmail = value;
         break;
@@ -746,6 +831,15 @@ export async function analyzeWhois(data: string): Promise<WhoisAnalyzeResult> {
   // Detect synthetic statuses from free-form WHOIS text (reserved, premium,
   // prohibited, suspended) — see parsers/status-injection.ts for full details.
   injectSyntheticStatuses(data, result);
+
+  // Detect registrant privacy-protection markers (WhoisGuard, PrivacyGuard,
+  // Withheld for Privacy, etc.). When a privacy proxy is explicitly named in
+  // the WHOIS body, contact fields are almost certainly proxied — flag it so
+  // the UI can avoid presenting them as the real registrant. Only explicit
+  // markers count; a bare email address is never treated as privacy evidence.
+  if (detectPrivacyProxy(data)) {
+    result.registrantPrivacy = true;
+  }
 
   // Deduplicate nameservers
   const seenNS = new Set<string>();

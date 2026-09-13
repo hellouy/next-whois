@@ -2,6 +2,10 @@ import dns from "dns/promises";
 import https from "https";
 import { domainToASCII } from "url";
 import { extractDomain } from "@/lib/utils";
+import { detectParkingProvider } from "@/data/query-page/parking-platforms";
+
+// Re-export for backward compatibility (callers/tests import from dns-check).
+export { detectParkingProvider };
 
 export type DnsParkingInfo = {
   isParked: boolean;
@@ -40,37 +44,11 @@ const DNS_FAST_TIMEOUT_MS = 2500;
  *
  * `domaincontrol.com` is deliberately excluded: it is GoDaddy's generic DNS
  * hosting and is used by countless normal, non-parked websites.
+ *
+ * The curated list lives in `@/data/query-page/parking-platforms` (20+ entries
+ * with kind classification). `detectParkingProvider` is re-exported from there
+ * so existing callers keep the same signature.
  */
-const PARKING_NS_MAP: Array<{ provider: string; suffixes: string[] }> = [
-  { provider: "Sedo", suffixes: ["sedoparking.com", "sedo.com"] },
-  { provider: "Afternic", suffixes: ["afternic.com"] },
-  { provider: "BuyDomains", suffixes: ["buydomains.com"] },
-  { provider: "Bodis", suffixes: ["bodis.com"] },
-  { provider: "ParkingCrew", suffixes: ["parkingcrew.net"] },
-  { provider: "HugeDomains", suffixes: ["hugedomains.com"] },
-  { provider: "Dan.com", suffixes: ["dan.com"] },
-  { provider: "Above.com", suffixes: ["above.com"] },
-  { provider: "ParkLogic", suffixes: ["parklogic.com"] },
-  { provider: "DomainSponsor", suffixes: ["domainsponsor.com"] },
-];
-
-/**
- * Match a list of nameserver hostnames against the parking platform map.
- * Returns the provider name if any NS matches, otherwise null.
- */
-export function detectParkingProvider(nameservers: string[]): string | null {
-  if (!nameservers || nameservers.length === 0) return null;
-  const lower = nameservers.map((ns) => ns.toLowerCase().trim());
-  for (const entry of PARKING_NS_MAP) {
-    for (const suffix of entry.suffixes) {
-      const matched = lower.some(
-        (ns) => ns === suffix || ns.endsWith(`.${suffix}`),
-      );
-      if (matched) return entry.provider;
-    }
-  }
-  return null;
-}
 
 /**
  * Wraps a DNS lookup promise with a timeout.

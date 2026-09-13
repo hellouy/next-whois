@@ -17,6 +17,8 @@ import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { probeDomain, probeDomainFast } from "@/lib/whois/dns-check";
 import { checkDomainPremium } from "@/lib/server/premium-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
+import { enrichDomainInfo } from "@/lib/server/domain-enrichment";
+import { saveEnrichment, readEnrichment } from "@/lib/server/domain-enrichment-db";
 import {
   isWhoisRateLimited,
   isNotRegisteredWhoisResponse,
@@ -282,6 +284,31 @@ export async function lookupWhoisWithCache(
   // cache entry, preventing duplicate lookups for identical domains.
   const key = `whois:${toAsciiDomain(domain) || domain}`;
 
+  // T008: When a cache hit's result predates the domain-info enrichment feature
+  // (missing the optional enrichment fields), hydrate it from the
+  // domain_enrichments store so repeat visitors still see parking / NS
+  // attribution data without a fresh registry round-trip.
+  const supplementFromEnrichment = async (r: WhoisResult): Promise<void> => {
+    if (!r.result || !r.result.domain) return;
+    const res = r.result;
+    if (res.parkingProvider !== undefined || res.nsAttributions !== undefined) return; // already enriched
+    const hit = await readEnrichment(res.domain).catch(() => null);
+    if (!hit || hit.stale) return;
+    const e = hit.row;
+    if (e.parkingProvider) res.parkingProvider = e.parkingProvider;
+    if (e.parkingKind) res.parkingKind = e.parkingKind;
+    if (e.nsAttributions) res.nsAttributions = e.nsAttributions;
+    if (e.whoisServerAttribution) res.whoisServerAttribution = e.whoisServerAttribution;
+    if (e.forSale !== null) res.forSale = e.forSale;
+    if (e.forSaleSource) res.forSaleSource = e.forSaleSource;
+    if (e.dateSanity) res.dateSanity = e.dateSanity;
+    if (e.registrantPrivacy !== null) res.registrantPrivacy = e.registrantPrivacy;
+    if (e.registrarIanaId) {
+      res.registrarIanaId = e.registrarIanaId;
+      if (res.ianaId === "N/A") res.ianaId = e.registrarIanaId;
+    }
+  };
+
   if (!options.nocache) {
     // L1 — in-process memory (fastest, no network)
     const l1Hit = l1Get(key);
@@ -296,6 +323,7 @@ export async function lookupWhoisWithCache(
       }
       const r1 = { ...l1Hit, time: 0, cached: true, cachedAt: l1Hit.cachedAt, cacheTtl: remainingTtl ?? l1Hit.cacheTtl };
       if (r1.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r1, domain, key);
+      await supplementFromEnrichment(r1);
       return r1;
     }
     // L2 — Redis (Upstash HTTP preferred, ioredis TCP standby)
@@ -309,6 +337,7 @@ export async function lookupWhoisWithCache(
         }
         const r2 = { ...l2.value, time: 0, cached: true, cachedAt: l2.value.cachedAt, cacheTtl: l2.remainingTtl ?? l2.value.cacheTtl };
         if (r2.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r2, domain, key);
+        await supplementFromEnrichment(r2);
         return r2;
       }
     }
@@ -321,6 +350,7 @@ export async function lookupWhoisWithCache(
           l1Set(key, l3);
           const r3 = { ...l3, time: 0, cached: true };
           if (r3.premium === undefined && !isIPAddress(domain) && !isASNumber(domain)) void enrichWithPremium(r3, domain, key);
+          await supplementFromEnrichment(r3);
           return r3;
         } catch { /* corrupted — fall through to fresh lookup */ }
       }
@@ -828,6 +858,35 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   ) {
     recordTldLookupFailure(tldSuffix, reason, domainToQuery, errorMsg).catch(() => {});
   }
+
+  /**
+   * Enrich a successful result with derived domain intelligence and persist it
+   * to the domain_enrichments table (best-effort). Persisting is fire-and-forget
+   * so a slow DB never delays the response; enrichment itself is synchronous.
+   */
+  const enrichAndPersist = (res: WhoisAnalyzeResult): WhoisAnalyzeResult => {
+    try {
+      enrichDomainInfo(res);
+    } catch { /* enrichment must never fail a successful lookup */ }
+    // Only persist for domain queries with a resolvable name.
+    if (isDomainQuery && res.domain) {
+      saveEnrichment(res.domain, {
+        registrar: res.registrar === "Unknown" ? null : res.registrar,
+        registrarIanaId: res.registrarIanaId ?? null,
+        whoisServer: res.whoisServer === "Unknown" ? null : res.whoisServer,
+        whoisServerAttribution: res.whoisServerAttribution ?? null,
+        parkingProvider: res.parkingProvider ?? null,
+        parkingKind: res.parkingKind ?? null,
+        forSale: res.forSale ?? null,
+        forSaleSource: res.forSaleSource ?? null,
+        dateSanity: res.dateSanity ?? null,
+        registrantPrivacy: res.registrantPrivacy ?? null,
+        nsAttributions: res.nsAttributions ?? null,
+        dnssec: res.dnssec || null,
+      }).catch(() => {});
+    }
+    return res;
+  };
   const baseInnerTimeout = Math.min(LOOKUP_TIMEOUT, WHOIS_TIMEOUT - 300);
   // Per-TLD extended timeout for known-slow WHOIS servers.
   // Both the inner TCP timeout and the outer withTimeout wrapper are extended.
@@ -929,7 +988,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
             const dnsProbe = isDomainQuery && unconditionalDnsProbe
               ? await raceWithFallback(unconditionalDnsProbe, 500, undefined)
               : undefined;
-            return { time: elapsed(), status: true, cached: false, source: "whois", result: parsed, dnsProbe };
+            return { time: elapsed(), status: true, cached: false, source: "whois", result: enrichAndPersist(parsed), dnsProbe };
           }
         } catch { /* parse failed → fall through to RDAP+WHOIS */ }
       }
@@ -1091,7 +1150,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       const dnsProbe = await getProbeForSuccess();
       // RDAP success → auto-remove any lingering failure record for this TLD
       clearTldFailureStats(tldSuffix).catch(() => {});
-      return { time: elapsed(), status: true, cached: false, source: "rdap", result, dnsProbe };
+      return { time: elapsed(), status: true, cached: false, source: "rdap", result: enrichAndPersist(result), dnsProbe };
     } catch {}
   }
 
@@ -1124,7 +1183,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
         if (rdapRaw) result.rawRdapContent = rdapRaw;
         clearTldFailureStats(tldSuffix).catch(() => {});
         const dnsProbe = await getProbeForSuccess();
-        return { time: elapsed(), status: true, cached: false, source: "whois", result, dnsProbe };
+        return { time: elapsed(), status: true, cached: false, source: "whois", result: enrichAndPersist(result), dnsProbe };
       }
       const detectedError = detectWhoisError(whoisRawStr);
       if (detectedError || isEmptyResult(result)) {
@@ -1150,7 +1209,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
       if (rdapRaw) result.rawRdapContent = rdapRaw;
       clearTldFailureStats(tldSuffix).catch(() => {});
       const dnsProbe = await getProbeForSuccess();
-      return { time: elapsed(), status: true, cached: false, source: "whois", result, dnsProbe };
+      return { time: elapsed(), status: true, cached: false, source: "whois", result: enrichAndPersist(result), dnsProbe };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to parse WHOIS response";
       recordFailure("parse_error", msg);

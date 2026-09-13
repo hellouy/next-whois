@@ -301,5 +301,20 @@ export function mergeResults(
     netName: p(rdap.netName, whoisParsed.netName),
     netType: p(rdap.netType, whoisParsed.netType),
     originAS: p(rdap.originAS, whoisParsed.originAS),
+    // Domain-info enhancement fields — RDAP is the preferred source; fall back
+    // to the WHOIS-parsed values when the RDAP instance lacks them.
+    registrarIanaId: rdap.registrarIanaId ?? whoisParsed.registrarIanaId,
+    ianaIdFromLibrary: rdap.ianaIdFromLibrary ?? whoisParsed.ianaIdFromLibrary,
+    whoisServerAttribution:
+      rdap.whoisServerAttribution ?? whoisParsed.whoisServerAttribution,
+    parkingProvider: rdap.parkingProvider ?? whoisParsed.parkingProvider,
+    parkingKind: rdap.parkingKind ?? whoisParsed.parkingKind,
+    forSale: rdap.forSale ?? whoisParsed.forSale,
+    forSaleSource: rdap.forSaleSource ?? whoisParsed.forSaleSource,
+    registrantPrivacy: rdap.registrantPrivacy ?? whoisParsed.registrantPrivacy,
+    nsAttributions:
+      rdap.nsAttributions && rdap.nsAttributions.length > 0
+        ? rdap.nsAttributions
+        : whoisParsed.nsAttributions,
   };
 }

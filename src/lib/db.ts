@@ -625,6 +625,24 @@ const CREATE_INDEXES = [
     price           NUMERIC(10,2),
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
+  `CREATE TABLE IF NOT EXISTS domain_enrichments (
+    domain                  TEXT         PRIMARY KEY,
+    registrar               TEXT,
+    registrar_iana_id       TEXT,
+    whois_server            TEXT,
+    whois_server_attribution TEXT,
+    parking_provider        TEXT,
+    parking_kind            TEXT,
+    for_sale                BOOLEAN,
+    for_sale_source         TEXT,
+    date_sanity             TEXT,         -- JSON: { valid, issues[] }
+    registrant_privacy      BOOLEAN,
+    ns_attributions         TEXT,         -- JSON: [{ ns, brand, kind }]
+    dnssec                  TEXT,
+    updated_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    created_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_domain_enrichments_updated ON domain_enrichments (updated_at DESC)`,
 ];
 
 /**

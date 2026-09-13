@@ -1,8 +1,41 @@
+export type NsBrandKind = "dns-hosting" | "parking" | "registrar";
+
+/**
+ * Match a nameserver hostname to a known brand. Returns the brand metadata
+ * (with kind, defaulting to "dns-hosting") or null. Uses substring matching,
+ * so "ns1.example.com" hits an entry whose domain list contains "example.com".
+ */
+export function resolveNsBrand(
+  ns: string,
+): { brand: string; slug: string | null; color: string; kind: NsBrandKind } | null {
+  if (!ns) return null;
+  const lower = ns.toLowerCase();
+  for (const info of NS_BRANDS) {
+    if (info.domains.some((d) => lower.includes(d.toLowerCase()))) {
+      return {
+        brand: info.brand,
+        slug: info.slug,
+        color: info.color,
+        kind: info.kind ?? "dns-hosting",
+      };
+    }
+  }
+  return null;
+}
+
 export const NS_BRANDS: {
   brand: string;
   domains: string[];
   slug: string | null;
   color: string;
+  /**
+   * Optional classification used by the domain-enrichment service:
+   *   - "dns-hosting" — generic DNS hosting / CDN (default when absent)
+   *   - "parking"     — domain parking / aftermarket platform
+   *   - "registrar"   — primarily a domain registrar
+   * Absent entries default to "dns-hosting".
+   */
+  kind?: NsBrandKind;
 }[] = [
   {
     brand: "GoDaddy",
@@ -70,6 +103,7 @@ export const NS_BRANDS: {
     domains: ["dns-parking.com", "main-hosting.eu"],
     slug: "hostinger",
     color: "#673DE6",
+    kind: "parking",
   },
   {
     brand: "Netlify",
@@ -187,6 +221,7 @@ export const NS_BRANDS: {
     domains: ["dynadot.com"],
     slug: "/registrar-icons/dynadot.png",
     color: "#4E2998",
+    kind: "registrar",
   },
   {
     brand: "Enom",
@@ -558,4 +593,12 @@ export const NS_BRANDS: {
     color: "#003BDE",
   },
   { brand: "Zoho", domains: ["zoho.com"], slug: "zoho", color: "#C8202B" },
+  { brand: "eNom", domains: ["enom.com"], slug: null, color: "#0093D0" },
+  { brand: "Register.com", domains: ["register.com"], slug: null, color: "#0057B8" },
+  { brand: "Network Solutions", domains: ["networksolutions.com", "worldnic.com"], slug: null, color: "#F36F21" },
+  { brand: "Name.com", domains: ["name.com"], slug: null, color: "#00B5E2" },
+  { brand: "OpenSRS/Tucows", domains: ["opensrs.net"], slug: null, color: "#8DC63F" },
+  { brand: "Webnic", domains: ["webnic.cc"], slug: null, color: "#00A651" },
+  { brand: "22.vip", domains: ["22vip.com"], slug: null, color: "#FF6600" },
+  { brand: "Netim", domains: ["netim.com", "netim.fr"], slug: null, color: "#5B21B6" },
 ];

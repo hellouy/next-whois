@@ -45,10 +45,11 @@ export const CARD_ITEM_VARIANTS = {
 
 export function getNsBrand(
   ns: string,
-): { brand: string; slug: string | null; color: string } | null {
+): { brand: string; slug: string | null; color: string; kind?: "dns-hosting" | "parking" | "registrar" } | null {
   const lower = ns.toLowerCase();
   for (const info of NS_BRANDS) {
-    if (info.domains.some((d) => lower.includes(d))) return info;
+    if (info.domains.some((d) => lower.includes(d)))
+      return { brand: info.brand, slug: info.slug, color: info.color, kind: info.kind ?? "dns-hosting" };
   }
   return null;
 }
