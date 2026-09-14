@@ -23,7 +23,7 @@ import { StampLandingPage } from "@/components/stamp/StampLandingPage";
 import { MemberBanner } from "@/components/stamp/MemberBanner";
 import { StampFormCard } from "@/components/stamp/StampFormCard";
 
-const SPECIAL_THEME_IDS = ["celebrate", "neon", "gradient", "split", "flash"] as const;
+const SPECIAL_THEME_IDS = ["neon", "gradient", "split", "flash"] as const;
 
 type Step = "form" | "verify" | "done";
 

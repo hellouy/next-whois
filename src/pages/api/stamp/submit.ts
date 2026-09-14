@@ -29,7 +29,7 @@ const MEMBER_TAG_NAME_MAX = 20;
 const FREE_TAG_STYLES   = ["personal"];
 const FREE_CARD_THEMES  = ["app"];
 const ALLOWED_TAG_STYLES   = ["personal","official","brand","verified","partner","dev","warning","premium"];
-const ALLOWED_CARD_THEMES  = ["app","gradient","celebrate","split","flash","neon"];
+const ALLOWED_CARD_THEMES  = ["app","gradient","split","flash","neon"];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();

@@ -5,7 +5,7 @@
  *
  * The 8 tag-style themes (app/official/aurora/emerald/solar/dev/warning/premium)
  * each render a structurally distinct layout. The special member themes
- * (celebrate/neon/gradient/split/flash) keep their flashy design language.
+ * (neon/gradient/split/flash) keep their flashy design language.
  *
  * Design rules:
  *  - Animations are pure CSS keyframes injected via <style> (no JS rAF loops)
@@ -21,7 +21,7 @@ export type CardThemeDef = {
   hero: string; shimmer: string;
   badge: string; btn: string;
   cardBg: string; cardBorder: string; cardText: string;
-  layout?: "default" | "celebrate" | "neon" | "gradient" | "split" | "flash";
+  layout?: "default" | "neon" | "gradient" | "split" | "flash";
   accent?: string; accentText?: string;
 };
 
@@ -34,7 +34,6 @@ export const STAMP_CARD_THEMES: Record<string, CardThemeDef & { label: string; s
   dev:      { label: "开发",     hero: "bg-gradient-to-br from-slate-600 to-[#0d1117]",                  shimmer: "text-[#58a6ff] font-black font-mono", badge: "bg-[#161b22] text-[#58a6ff] border border-[#30363d]",                                                                                btn: "bg-[#238636] text-white",                                                     cardBg: "bg-zinc-950",   cardBorder: "border-zinc-800",  cardText: "text-zinc-200" },
   warning:  { label: "警示",     hero: "bg-gradient-to-br from-red-500 to-red-900",                     shimmer: "text-foreground font-black",       badge: "bg-red-50 text-red-700 border border-red-200/80 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800/60",                        btn: "bg-red-600 text-white",                                                     cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground" },
   premium:  { label: "尊享",     hero: "bg-gradient-to-br from-purple-600 via-fuchsia-500 to-rose-500",  shimmer: "text-foreground font-black",       badge: "bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200/80 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 dark:border-fuchsia-800/60", btn: "bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white",                  cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground" },
-  celebrate: { label: "庆典",     layout: "celebrate", hero: "bg-gradient-to-br from-red-700 to-red-900",                     shimmer: "text-white font-black",    badge: "bg-amber-400 text-amber-900 border-0", btn: "bg-amber-500 text-white",  cardBg: "bg-white",       cardBorder: "border-amber-100",  cardText: "text-gray-900", special: "🎊" },
   neon:      { label: "霓虹",     layout: "neon",      hero: "bg-[#050d18]",                                                   shimmer: "text-white font-black",    badge: "bg-cyan-400 text-slate-900 border-0", btn: "bg-gradient-to-r from-cyan-400 to-violet-600 text-white", cardBg: "bg-[#050d18]", cardBorder: "border-slate-800", cardText: "text-white", special: "⚡" },
   gradient:  { label: "渐变流光", layout: "gradient",  hero: "bg-gradient-to-br from-rose-300 via-sky-300 to-emerald-300",    shimmer: "text-gray-900 font-black", badge: "bg-black/10 text-gray-800 border border-black/20", btn: "bg-gray-900 text-white", cardBg: "bg-transparent", cardBorder: "border-0", cardText: "text-gray-900", special: "✨" },
   split:     { label: "分栏",     layout: "split",     hero: "bg-black",                                                       shimmer: "text-white font-black",    badge: "bg-blue-500 text-white border-0", btn: "bg-gray-900 text-white", cardBg: "bg-white", cardBorder: "border-gray-100", cardText: "text-gray-900", special: "◼" },
@@ -114,7 +113,7 @@ function CenteredHeader({
 /* Theme default badge labels (used when data.tagLabel is absent) */
 const DEFAULT_BADGE: Record<string, { zh: string; en: string }> = {
   app:      { zh: "个人", en: "Personal" },
-  official: { zh: "官方认证", en: "Official Certificate" },
+  official: { zh: "官方网站", en: "Official Website" },
   aurora:   { zh: "品牌", en: "Brand" },
   emerald:  { zh: "已认证", en: "DNS Verified" },
   solar:    { zh: "合作", en: "PARTNER" },
@@ -175,47 +174,41 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
     </>
   );
 
-  /* ═══ official — 官方·庄重蓝金证书 ═══════════════════════════════════ */
+  /* ═══ official — 官方·地址栏官方网站 ═════════════════════════════════ */
   if (themeKey === "official") return (
     <>
-      <style>{`@keyframes off-glow{0%,100%{box-shadow:0 0 14px rgba(212,175,55,0.25)}50%{box-shadow:0 0 26px rgba(212,175,55,0.5)}}`}</style>
-      <div className="rounded-[16px] overflow-hidden bg-[#0a1628] border border-[#d4af37]/25 shadow-[0_8px_34px_rgba(0,0,0,0.5)]">
-        {/* Double gold frame */}
-        <div className="m-[7px] rounded-[11px] border-2 border-[#d4af37]/35 p-[6px]"
-             style={{ background: "linear-gradient(180deg,#152b4e,#0a1628)" }}>
-          <div className="rounded-[8px] border border-[#d4af37]/20 px-5 pt-6 pb-5 text-center">
-            {/* Emblem medallion */}
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#d4af37]/70 bg-gradient-to-br from-[#1e3a5f] to-[#0f2038]"
-                 style={{ animation: "off-glow 4s ease-in-out infinite" }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.8"
-                   strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
-                <path d="M12 2l8 3.5v5c0 5-3.5 8.5-8 11.5-4.5-3-8-6.5-8-11.5v-5l8-3.5z" />
-                <path d="M9 12l2 2 4-4" />
-              </svg>
-            </div>
-            {/* Gold hairline + label */}
-            <div className="mt-3.5 flex items-center justify-center gap-2">
-              <span className="h-px w-9 bg-gradient-to-r from-transparent to-[#d4af37]/70" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#d4af37]">
-                {locale === "en" ? "Certificate" : "认证证书"}
-              </span>
-              <span className="h-px w-9 bg-gradient-to-l from-transparent to-[#d4af37]/70" />
-            </div>
-            <p className="mt-2.5 font-serif text-[23px] font-bold leading-tight tracking-wide text-[#f7f3e8]">{tagName}</p>
-            <p className="mt-1.5 text-[10px] font-mono tracking-[0.18em] text-[#d4af37]/55">
-              {locale === "en" ? "NO." : "编号 "}{domain}
-            </p>
-          </div>
+      <style>{`@keyframes off-verified{0%,100%{opacity:.85}50%{opacity:1}}`}</style>
+      <div className="rounded-[16px] overflow-hidden bg-[#0f2b52] border border-[#1e3a8a]/60 shadow-[0_6px_28px_rgba(30,58,138,0.3)]">
+        {/* Browser address bar */}
+        <div className="flex items-center gap-2 px-4 py-3" style={{ background: "#0b2140" }}>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+          </span>
+          <span className="flex-1 truncate rounded-lg bg-black/25 px-2.5 py-1 text-[11px] font-mono text-sky-200/80">
+            https://{domain}
+          </span>
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#2563eb,#1d4ed8)" }}>
+            {locale === "en" ? "Official" : "官方"}
+          </span>
         </div>
-        <div className="text-center px-5 pt-3.5 pb-5">
+        {/* Body */}
+        <div className="px-5 pb-5 pt-4 text-left">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-sky-400">
+            {locale === "en" ? "Official Website" : "官方网站"}
+          </p>
+          <p className="mt-1.5 text-[20px] font-bold leading-tight text-white">{tagName}</p>
+          <p className="mt-0.5 text-[11px] font-mono text-sky-300/50">{domain}</p>
           {desc && (
-            <p className="text-[12px] leading-relaxed text-slate-300/70 overflow-hidden"
+            <p className="mt-2 text-[12px] leading-relaxed text-slate-300/75 overflow-hidden"
                style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{desc}</p>
           )}
           {link ? (
             <a href={link}
-               className="mt-3 flex h-[42px] w-full items-center justify-center gap-1 rounded-[10px] text-[13px] font-semibold text-[#0a1628]"
-               style={{ background: "linear-gradient(135deg,#d4af37,#b8860b)", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}>
+               className="mt-3 flex h-[38px] w-full items-center justify-center gap-1 rounded-[9px] bg-[#2563eb] text-[13px] font-semibold text-white">
               {ctaText} <RiArrowRightSLine className="w-4 h-4" />
             </a>
           ) : (
@@ -534,48 +527,6 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
               <p className="mt-2 text-[12px] text-white/40">{noLinkText}</p>
             )}
           </div>
-        </div>
-      </div>
-    </>
-  );
-
-  /* ════════════════════════════════════════
-     Layout: celebrate — 庆典·彩旗礼花
-  ════════════════════════════════════════ */
-  if (t.layout === "celebrate") return (
-    <>
-      <style>{`
-        ${BASE_ANIM}
-        @keyframes cel-flag{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
-        @keyframes cel-pop{0%{transform:scale(0) rotate(0deg);opacity:0}55%{transform:scale(1.25) rotate(90deg);opacity:1}100%{transform:scale(1) rotate(180deg);opacity:.85}}
-        @keyframes cel-dot{0%{transform:translateY(0) scale(1);opacity:.9}50%{transform:translateY(-6px) scale(1.15);opacity:1}100%{transform:translateY(0) scale(1);opacity:.9}}
-      `}</style>
-      <div className="rounded-2xl overflow-hidden shadow-lg bg-white">
-        {/* Bunting flags */}
-        <div className="relative h-6 bg-gradient-to-b from-[#b30f24] to-[#C8102E]">
-          {[{l:"8%",d:"0s"},{l:"22%",d:"0.3s"},{l:"36%",d:"0.6s"},{l:"50%",d:"0.1s"},{l:"64%",d:"0.8s"},{l:"78%",d:"0.4s"},{l:"91%",d:"0.2s"}].map((p,i) => (
-            <span key={i} className="absolute -bottom-[7px] h-4 w-4 origin-top rounded-[2px]"
-                  style={{ left: p.l, background: ["#D4AF37","#F5C542","#E5B93E","#D4AF37","#F5C542","#E5B93E","#D4AF37"][i], clipPath: "polygon(0 0,100% 0,100% 75%,50% 100%,0 75%)", animation: `cel-flag 2.4s ease-in-out ${p.d} infinite` }} />
-          ))}
-        </div>
-        {/* Red hero */}
-        <div className="relative px-4 pt-5 pb-5 overflow-hidden text-center" style={{ background: "linear-gradient(160deg,#C8102E 0%,#8A0D20 100%)" }}>
-          {/* confetti stars + dots */}
-          {[{l:"10%",t:"22%",c:"#F5C542"},{l:"24%",t:"40%",c:"#FFE9A8"},{l:"38%",t:"18%",c:"#FFD166"},{l:"55%",t:"34%",c:"#F5C542"},{l:"70%",t:"15%",c:"#FFE9A8"},{l:"86%",t:"28%",c:"#FFD166"}].map((p,i) => (
-            <span key={i} className="absolute pointer-events-none text-[11px] leading-none" style={{ left: p.l, top: p.t, color: p.c, animation: `cel-pop 2.6s ease-in-out ${i*0.25}s infinite` }}>✦</span>
-          ))}
-          {[{l:"15%",t:"55%",s:4,d:"0.2s"},{l:"45%",t:"62%",s:3,d:"0.9s"},{l:"75%",t:"52%",s:4,d:"1.5s"},{l:"88%",t:"60%",s:3,d:"0.6s"},{l:"5%",t:"60%",s:3,d:"1.1s"}].map((p,i) => (
-            <span key={`d${i}`} className="absolute pointer-events-none rounded-full" style={{ left: p.l, top: p.t, width: p.s, height: p.s, background: "rgba(255,233,168,0.75)", animation: `cel-dot 2s ease-in-out ${p.d} infinite` }} />
-          ))}
-          <span className="relative z-10 inline-block font-bold rounded-full" style={{ ...badgeAnim, padding: SZ.badgePad, fontSize: SZ.badgeFs, background: "rgba(212,175,55,0.28)", border: "1px solid rgba(212,175,55,0.7)", color: "rgba(255,224,130,1)", marginBottom: 10 }}>{badge}</span>
-          <p className="relative z-10 font-black leading-tight tracking-tight" style={{ ...sheenW, fontSize: SZ.titleFs, margin: 0 }}>{tagName}</p>
-          <p className="relative z-10 font-mono tracking-wider mt-2" style={{ fontSize: SZ.domainFs, color: "rgba(255,255,255,0.5)" }}>{domain}</p>
-        </div>
-        <div className="px-4 pt-3 pb-4 text-center">
-          {desc && <p style={{ fontSize: SZ.descFs, color: "#9ca3af", marginBottom: 12, lineHeight: 1.6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } as React.CSSProperties}>{desc}</p>}
-          {link ? <a href={link} className="inline-flex items-center gap-1.5 rounded-full text-white font-bold" style={{ padding: SZ.btnPad, fontSize: SZ.btnFs, background: "linear-gradient(135deg,#D4AF37,#B8860B)", boxShadow: "0 3px 14px rgba(180,140,30,0.38)" }}>
-            {ctaText} <RiArrowRightSLine style={{ width: SZ.btnIconSz, height: SZ.btnIconSz, opacity: .9 }} />
-          </a> : <p style={{ fontSize: SZ.noLinkFs, textAlign: "center", margin: 0, padding: "8px 0", opacity: 0.4, color: "#6b7280" }}>{noLinkText}</p>}
         </div>
       </div>
     </>

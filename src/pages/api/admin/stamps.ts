@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { verified, tag_name, tag_style, card_theme, link, description } = req.body;
 
     const ALLOWED_TAG_STYLES  = ["personal","official","brand","verified","partner","dev","warning","premium"];
-    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","celebrate","neon","gradient","split","flash"];
+    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","neon","gradient","split","flash"];
 
     try {
       if (verified === true) {

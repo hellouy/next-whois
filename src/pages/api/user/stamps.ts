@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!existing) return res.status(404).json({ error: "Stamp not found" });
 
     const ALLOWED_TAG_STYLES  = ["personal","official","brand","verified","partner","dev","warning","premium"];
-    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","gradient","celebrate","split","flash","neon"];
+    const ALLOWED_CARD_THEMES = ["app","official","aurora","emerald","solar","dev","warning","premium","gradient","split","flash","neon"];
 
     const { tagName, tagStyle, cardTheme, link, description, nickname } = req.body;
     const setClauses: string[] = [];

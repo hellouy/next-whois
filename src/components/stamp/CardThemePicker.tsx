@@ -15,7 +15,7 @@ import { TAG_STYLES } from "./TagStylePicker";
 type _ExtractStampKey<T extends string> = T extends `stamp.${infer K}` ? K : never;
 type StampKey = _ExtractStampKey<TranslationKey>;
 
-export const SPECIAL_THEME_IDS = ["celebrate", "neon", "gradient", "split", "flash"] as const;
+export const SPECIAL_THEME_IDS = ["neon", "gradient", "split", "flash"] as const;
 
 const CARD_THEME_KEYS = Object.keys(STAMP_CARD_THEMES);
 
