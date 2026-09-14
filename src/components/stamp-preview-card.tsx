@@ -175,40 +175,47 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
     </>
   );
 
-  /* ═══ official — 官方·证书 + 印章环 ═══════════════════════════════════ */
+  /* ═══ official — 官方·庄重蓝金证书 ═══════════════════════════════════ */
   if (themeKey === "official") return (
     <>
-      <style>{`@keyframes off-seal{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-      <div className="rounded-[16px] overflow-hidden bg-[#0a1628] border border-blue-400/20 shadow-[0_6px_30px_rgba(37,99,235,0.22)]">
-        {/* Certificate inner frame */}
-        <div className="m-[7px] rounded-[10px] border border-blue-400/25 px-5 pt-7 pb-[18px] text-center"
-             style={{ background: "linear-gradient(180deg,#1e3a8a,#0a1628)" }}>
-          {/* Seal ring */}
-          <div className="relative mx-auto h-[60px] w-[60px]">
-            <div className="absolute inset-0 rounded-full border border-dashed border-sky-400/40"
-                 style={{ animation: "off-seal 20s linear infinite" }} />
-            <div className="absolute inset-[6px] rounded-full border-2 border-sky-300/70 flex items-center justify-center bg-[#0f1f3a]">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2"
-                   strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <style>{`@keyframes off-glow{0%,100%{box-shadow:0 0 14px rgba(212,175,55,0.25)}50%{box-shadow:0 0 26px rgba(212,175,55,0.5)}}`}</style>
+      <div className="rounded-[16px] overflow-hidden bg-[#0a1628] border border-[#d4af37]/25 shadow-[0_8px_34px_rgba(0,0,0,0.5)]">
+        {/* Double gold frame */}
+        <div className="m-[7px] rounded-[11px] border-2 border-[#d4af37]/35 p-[6px]"
+             style={{ background: "linear-gradient(180deg,#152b4e,#0a1628)" }}>
+          <div className="rounded-[8px] border border-[#d4af37]/20 px-5 pt-6 pb-5 text-center">
+            {/* Emblem medallion */}
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#d4af37]/70 bg-gradient-to-br from-[#1e3a5f] to-[#0f2038]"
+                 style={{ animation: "off-glow 4s ease-in-out infinite" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.8"
+                   strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
                 <path d="M12 2l8 3.5v5c0 5-3.5 8.5-8 11.5-4.5-3-8-6.5-8-11.5v-5l8-3.5z" />
                 <path d="M9 12l2 2 4-4" />
               </svg>
             </div>
+            {/* Gold hairline + label */}
+            <div className="mt-3.5 flex items-center justify-center gap-2">
+              <span className="h-px w-9 bg-gradient-to-r from-transparent to-[#d4af37]/70" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#d4af37]">
+                {locale === "en" ? "Certificate" : "认证证书"}
+              </span>
+              <span className="h-px w-9 bg-gradient-to-l from-transparent to-[#d4af37]/70" />
+            </div>
+            <p className="mt-2.5 font-serif text-[23px] font-bold leading-tight tracking-wide text-[#f7f3e8]">{tagName}</p>
+            <p className="mt-1.5 text-[10px] font-mono tracking-[0.18em] text-[#d4af37]/55">
+              {locale === "en" ? "NO." : "编号 "}{domain}
+            </p>
           </div>
-          <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-300">
-            {locale === "en" ? "Official Certificate" : "官方认证"}
-          </p>
-          <p className="mt-2 text-[22px] font-extrabold leading-tight text-white">{tagName}</p>
-          <p className="mt-1 text-[11px] font-mono text-sky-300/50">{domain}</p>
         </div>
-        <div className="text-center px-5 pt-3.5 pb-5" style={{ borderTop: "1px solid rgba(59,130,246,0.12)" }}>
+        <div className="text-center px-5 pt-3.5 pb-5">
           {desc && (
             <p className="text-[12px] leading-relaxed text-slate-300/70 overflow-hidden"
                style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{desc}</p>
           )}
           {link ? (
             <a href={link}
-               className="mt-3 flex h-[42px] w-full items-center justify-center gap-1 rounded-[10px] bg-[#2563eb] text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(37,99,235,0.35)]">
+               className="mt-3 flex h-[42px] w-full items-center justify-center gap-1 rounded-[10px] text-[13px] font-semibold text-[#0a1628]"
+               style={{ background: "linear-gradient(135deg,#d4af37,#b8860b)", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}>
               {ctaText} <RiArrowRightSLine className="w-4 h-4" />
             </a>
           ) : (
@@ -533,28 +540,38 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
   );
 
   /* ════════════════════════════════════════
-     Layout: celebrate — 庆典·中国红
+     Layout: celebrate — 庆典·彩旗礼花
   ════════════════════════════════════════ */
   if (t.layout === "celebrate") return (
     <>
       <style>{`
         ${BASE_ANIM}
-        @keyframes cel-confetti{0%{transform:translateY(0) rotate(0deg) scale(1);opacity:.8}30%{transform:translateY(-7px) rotate(130deg) scale(1.1);opacity:1}60%{transform:translateY(-3px) rotate(260deg) scale(.9);opacity:.7}100%{transform:translateY(0) rotate(360deg) scale(1);opacity:.8}}
-        @keyframes cel-glow{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0)}50%{box-shadow:0 0 18px 4px rgba(212,175,55,0.35)}}
+        @keyframes cel-flag{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+        @keyframes cel-pop{0%{transform:scale(0) rotate(0deg);opacity:0}55%{transform:scale(1.25) rotate(90deg);opacity:1}100%{transform:scale(1) rotate(180deg);opacity:.85}}
+        @keyframes cel-dot{0%{transform:translateY(0) scale(1);opacity:.9}50%{transform:translateY(-6px) scale(1.15);opacity:1}100%{transform:translateY(0) scale(1);opacity:.9}}
       `}</style>
       <div className="rounded-2xl overflow-hidden shadow-lg bg-white">
-        <div className="relative pt-5 pb-5 overflow-hidden text-center" style={{ background: "linear-gradient(160deg,#C8102E 0%,#7B0D1E 100%)" }}>
-          {[{x:"7%",y:"10%",s:8,d:"0s"},{x:"22%",y:"5%",s:5,d:"0.5s"},{x:"38%",y:"18%",s:9,d:"1s"},{x:"57%",y:"4%",s:6,d:"0.3s"},{x:"72%",y:"14%",s:8,d:"1.4s"},{x:"87%",y:"7%",s:5,d:"0.7s"}].map((p,i) => (
-            <span key={i} className="absolute pointer-events-none rounded-[2px]" style={{ left: p.x, top: p.y, width: p.s, height: p.s, background: "rgba(212,175,55,0.8)", transform: "rotate(45deg)", animation: `cel-confetti 2.8s ease-in-out ${p.d} infinite` }} />
+        {/* Bunting flags */}
+        <div className="relative h-6 bg-gradient-to-b from-[#b30f24] to-[#C8102E]">
+          {[{l:"8%",d:"0s"},{l:"22%",d:"0.3s"},{l:"36%",d:"0.6s"},{l:"50%",d:"0.1s"},{l:"64%",d:"0.8s"},{l:"78%",d:"0.4s"},{l:"91%",d:"0.2s"}].map((p,i) => (
+            <span key={i} className="absolute -bottom-[7px] h-4 w-4 origin-top rounded-[2px]"
+                  style={{ left: p.l, background: ["#D4AF37","#F5C542","#E5B93E","#D4AF37","#F5C542","#E5B93E","#D4AF37"][i], clipPath: "polygon(0 0,100% 0,100% 75%,50% 100%,0 75%)", animation: `cel-flag 2.4s ease-in-out ${p.d} infinite` }} />
           ))}
-          <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
-            <svg viewBox="0 0 400 22" preserveAspectRatio="none" className="w-full h-5 block"><path d="M0 22 C80 4,160 18,240 8,320 -2,380 16,400 6 L400 22 Z" fill="white"/></svg>
-          </div>
-          <span className="relative z-10 inline-block font-bold rounded-full" style={{ ...badgeAnim, padding: SZ.badgePad, fontSize: SZ.badgeFs, background: "rgba(212,175,55,0.25)", border: "1px solid rgba(212,175,55,0.6)", color: "rgba(255,220,100,0.95)", marginBottom: 10 }}>{badge}</span>
-          <p className="relative z-10 font-black leading-tight tracking-tight" style={{ ...sheenW, fontSize: SZ.titleFs, margin: 0 }}>{tagName}</p>
-          <p className="relative z-10 font-mono tracking-wider mt-2" style={{ fontSize: SZ.domainFs, color: "rgba(255,255,255,0.45)" }}>{domain}</p>
         </div>
-        <div className="px-4 pt-3 pb-4 text-center" style={{ animation: "cel-glow 2.5s ease-in-out infinite" }}>
+        {/* Red hero */}
+        <div className="relative px-4 pt-5 pb-5 overflow-hidden text-center" style={{ background: "linear-gradient(160deg,#C8102E 0%,#8A0D20 100%)" }}>
+          {/* confetti stars + dots */}
+          {[{l:"10%",t:"22%",c:"#F5C542"},{l:"24%",t:"40%",c:"#FFE9A8"},{l:"38%",t:"18%",c:"#FFD166"},{l:"55%",t:"34%",c:"#F5C542"},{l:"70%",t:"15%",c:"#FFE9A8"},{l:"86%",t:"28%",c:"#FFD166"}].map((p,i) => (
+            <span key={i} className="absolute pointer-events-none text-[11px] leading-none" style={{ left: p.l, top: p.t, color: p.c, animation: `cel-pop 2.6s ease-in-out ${i*0.25}s infinite` }}>✦</span>
+          ))}
+          {[{l:"15%",t:"55%",s:4,d:"0.2s"},{l:"45%",t:"62%",s:3,d:"0.9s"},{l:"75%",t:"52%",s:4,d:"1.5s"},{l:"88%",t:"60%",s:3,d:"0.6s"},{l:"5%",t:"60%",s:3,d:"1.1s"}].map((p,i) => (
+            <span key={`d${i}`} className="absolute pointer-events-none rounded-full" style={{ left: p.l, top: p.t, width: p.s, height: p.s, background: "rgba(255,233,168,0.75)", animation: `cel-dot 2s ease-in-out ${p.d} infinite` }} />
+          ))}
+          <span className="relative z-10 inline-block font-bold rounded-full" style={{ ...badgeAnim, padding: SZ.badgePad, fontSize: SZ.badgeFs, background: "rgba(212,175,55,0.28)", border: "1px solid rgba(212,175,55,0.7)", color: "rgba(255,224,130,1)", marginBottom: 10 }}>{badge}</span>
+          <p className="relative z-10 font-black leading-tight tracking-tight" style={{ ...sheenW, fontSize: SZ.titleFs, margin: 0 }}>{tagName}</p>
+          <p className="relative z-10 font-mono tracking-wider mt-2" style={{ fontSize: SZ.domainFs, color: "rgba(255,255,255,0.5)" }}>{domain}</p>
+        </div>
+        <div className="px-4 pt-3 pb-4 text-center">
           {desc && <p style={{ fontSize: SZ.descFs, color: "#9ca3af", marginBottom: 12, lineHeight: 1.6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } as React.CSSProperties}>{desc}</p>}
           {link ? <a href={link} className="inline-flex items-center gap-1.5 rounded-full text-white font-bold" style={{ padding: SZ.btnPad, fontSize: SZ.btnFs, background: "linear-gradient(135deg,#D4AF37,#B8860B)", boxShadow: "0 3px 14px rgba(180,140,30,0.38)" }}>
             {ctaText} <RiArrowRightSLine style={{ width: SZ.btnIconSz, height: SZ.btnIconSz, opacity: .9 }} />
@@ -565,31 +582,43 @@ export function StampPreviewCard({ themeKey, data, locale = "zh" }: { themeKey: 
   );
 
   /* ════════════════════════════════════════
-     Layout: neon — 霓虹·赛博
+     Layout: neon — 霓虹·赛博网格
   ════════════════════════════════════════ */
   if (t.layout === "neon") return (
     <>
       <style>{`
         ${BASE_ANIM}
-        @keyframes neon-scan{0%{top:-8%;opacity:.5}100%{top:110%;opacity:0}}
-        @keyframes neon-badge-glow{0%,100%{box-shadow:0 0 8px rgba(0,210,255,0.2)}50%{box-shadow:0 0 20px rgba(0,210,255,0.65)}}
-        @keyframes neon-title-glow{0%,100%{text-shadow:0 0 10px rgba(0,210,255,0.4)}50%{text-shadow:0 0 22px rgba(0,210,255,0.9),0 0 44px rgba(0,210,255,0.3)}}
+        @keyframes neon-flicker{0%,100%{opacity:1}6%{opacity:.55}8%{opacity:1}11%{opacity:.7}14%{opacity:1}}
+        @keyframes neon-grid-move{0%{background-position:0 0}100%{background-position:0 42px}}
+        @keyframes neon-title-glow{0%,100%{text-shadow:0 0 8px rgba(0,229,255,.7),0 0 22px rgba(0,229,255,.4),0 0 44px rgba(0,229,255,.25)}50%{text-shadow:0 0 14px rgba(0,229,255,.95),0 0 34px rgba(0,229,255,.6),0 0 66px rgba(0,229,255,.35)}}
+        @keyframes neon-sun{0%,100%{opacity:.5}50%{opacity:.85}}
       `}</style>
-      <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: "#050d18" }}>
-        <div className="relative flex flex-col items-center pt-6 pb-4 overflow-hidden text-center" style={{ background: "#050d18" }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 85% 65% at 50% 0%,rgba(0,210,255,0.14) 0%,rgba(123,47,190,0.08) 55%,transparent 80%)" }} />
-          <div className="absolute left-0 right-0 overflow-hidden" style={{ top: 0, bottom: 0 }}>
-            <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent,rgba(0,210,255,0.5),transparent)", animation: "neon-scan 3.5s linear infinite" }} />
-          </div>
-          <span className="relative z-10 inline-block font-bold font-mono rounded-full" style={{ ...badgeAnim, padding: SZ.badgePad, fontSize: SZ.badgeFs, background: "rgba(0,210,255,0.08)", border: "1px solid rgba(0,210,255,0.5)", color: "#00D2FF", animation: `badge-pulse 2.2s ease-in-out infinite, neon-badge-glow 2.2s ease-in-out infinite`, marginBottom: 12 }}>{badge}</span>
-          <p className="relative z-10 font-black leading-tight tracking-tight" style={{ ...sheenW, fontSize: SZ.titleFs, margin: 0, animation: "card-sheen 3s linear infinite, neon-title-glow 2.4s ease-in-out infinite" }}>{tagName}</p>
-          <p className="relative z-10 font-mono tracking-[0.15em] mt-2" style={{ fontSize: SZ.domainFs, color: "rgba(0,210,255,0.38)" }}>{domain}</p>
+      <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: "#07030d" }}>
+        {/* Grid horizon backdrop */}
+        <div className="relative flex flex-col items-center px-4 pt-7 pb-4 text-center overflow-hidden">
+          {/* Synthwave grid floor */}
+          <div className="absolute inset-x-0 bottom-0 h-[46%]"
+               style={{
+                 backgroundImage: "linear-gradient(to right,rgba(0,229,255,0.16) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,229,255,0.16) 1px,transparent 1px)",
+                 backgroundSize: "26px 26px",
+                 transform: "perspective(220px) rotateX(62deg)",
+                 transformOrigin: "bottom",
+                 animation: "neon-grid-move 1.2s linear infinite",
+               }} />
+          {/* Neon sun */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 h-14 w-24 rounded-t-full"
+               style={{ background: "linear-gradient(to top,#ff2ec4,rgba(255,46,196,0.15))", filter: "blur(1px)", animation: "neon-sun 3.5s ease-in-out infinite" }} />
+          <div className="absolute inset-x-0 bottom-[2px] h-px" style={{ background: "linear-gradient(90deg,transparent,#00e5ff,transparent)" }} />
+          {/* Header */}
+          <span className="relative z-10 inline-block font-bold font-mono rounded-full" style={{ ...badgeAnim, padding: SZ.badgePad, fontSize: SZ.badgeFs, background: "rgba(255,46,196,0.12)", border: "1px solid rgba(255,46,196,0.6)", color: "#ff6ad5", marginBottom: 12 }}>{badge}</span>
+          <p className="relative z-10 font-black leading-tight tracking-tight" style={{ fontSize: SZ.titleFs, margin: 0, color: "#00E5FF", animation: "neon-title-glow 2.2s ease-in-out infinite, neon-flicker 6s linear infinite" }}>{tagName}</p>
+          <p className="relative z-10 font-mono tracking-[0.15em] mt-2" style={{ fontSize: SZ.domainFs, color: "rgba(0,229,255,0.55)" }}>{domain}</p>
         </div>
-        <div className="px-4 pt-2 pb-4 text-center" style={{ borderTop: "1px solid rgba(0,210,255,0.08)" }}>
-          {desc && <p style={{ fontSize: SZ.descFs, color: "rgba(100,130,160,0.85)", lineHeight: 1.6, marginBottom: 12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } as React.CSSProperties}>{desc}</p>}
-          {link ? <a href={link} className="inline-flex items-center gap-1.5 rounded-full font-bold text-white" style={{ padding: SZ.btnPad, fontSize: SZ.btnFs, background: "linear-gradient(135deg,#00D2FF,#7B2FBE)", boxShadow: "0 0 20px rgba(0,210,255,0.4)" }}>
+        <div className="px-4 pt-2 pb-4 text-center" style={{ borderTop: "1px solid rgba(255,46,196,0.25)" }}>
+          {desc && <p style={{ fontSize: SZ.descFs, color: "rgba(150,190,220,0.85)", lineHeight: 1.6, marginBottom: 12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } as React.CSSProperties}>{desc}</p>}
+          {link ? <a href={link} className="inline-flex items-center gap-1.5 rounded-full font-bold text-white" style={{ padding: SZ.btnPad, fontSize: SZ.btnFs, background: "linear-gradient(135deg,#00E5FF,#FF2EC4)", boxShadow: "0 0 22px rgba(0,229,255,0.45),0 0 30px rgba(255,46,196,0.3)" }}>
             {ctaText} <RiArrowRightSLine style={{ width: SZ.btnIconSz, height: SZ.btnIconSz, opacity: .9 }} />
-          </a> : <p style={{ fontSize: SZ.noLinkFs, textAlign: "center", margin: 0, padding: "8px 0", opacity: 0.35, color: "#00D2FF" }}>{noLinkText}</p>}
+          </a> : <p style={{ fontSize: SZ.noLinkFs, textAlign: "center", margin: 0, padding: "8px 0", opacity: 0.35, color: "#00E5FF" }}>{noLinkText}</p>}
         </div>
       </div>
     </>
