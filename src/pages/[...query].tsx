@@ -681,6 +681,15 @@ export default function LookupPage({
     return MAINSTREAM_DOMAINS.has(d);
   }, [target]);
 
+  const officialBadgeLabel = React.useMemo(() => {
+    if (!isOfficialDomain) return "";
+    const d = (target || "").toLowerCase().replace(/^www\./, "");
+    const info = OFFICIAL_DOMAIN_DESC[d];
+    if (info?.name && /^[\x00-\x7F]+$/.test(info.name)) return info.name;
+    if (isChinese) return info?.name || (d.split(".")[0] || "Official");
+    return (d.split(".")[0] || "Official").toUpperCase();
+  }, [isOfficialDomain, target, isChinese]);
+
 
   const STAMP_STYLE_MAP: Record<string, string> = {
     personal: "bg-teal-500 text-white border-0",
@@ -1643,8 +1652,8 @@ export default function LookupPage({
                                 : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400"
                             )}
                           >
-                            <RiGlobalLine className="w-3 h-3" />
-                            {isChinese ? "官网认证" : "Official"}
+                            <RiGlobalLine className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[100px]">{officialBadgeLabel}</span>
                           </button>
                         ) : enableStamps ? verifiedStamps.length > 0 ? (
                           <button
@@ -1857,8 +1866,8 @@ export default function LookupPage({
                                 : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
                             )}
                           >
-                            <RiGlobalLine className="w-3 h-3" />
-                            {isChinese ? "官网认证" : "Official"}
+                            <RiGlobalLine className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[160px]">{officialBadgeLabel}</span>
                           </button>
                         ) : enableStamps ? verifiedStamps.length > 0 ? (
                           <button
@@ -2015,7 +2024,6 @@ export default function LookupPage({
                                                 <span className="text-[9.5px] text-blue-500 font-semibold leading-none">{isChinese ? "官网认证" : "Verified"}</span>
                                               </span>
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">{isChinese ? "系统自动认证 · 无需人工审核" : "Auto-certified · No manual review"}</p>
                                           </div>
                                         </div>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">{domainDesc}</p>
@@ -2055,7 +2063,6 @@ export default function LookupPage({
                                               <span className="text-[9.5px] text-blue-500 font-semibold leading-none">{isChinese ? "官网认证" : "Verified"}</span>
                                             </span>
                                           </div>
-                                          <p className="text-[10px] text-muted-foreground mt-0.5">{isChinese ? "系统自动认证 · 无需人工审核" : "Auto-certified · No manual review"}</p>
                                         </div>
                                       </div>
                                       <p className="text-[11px] text-muted-foreground leading-relaxed">{domainDesc}</p>
