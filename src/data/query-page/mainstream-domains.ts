@@ -50,4 +50,33 @@ export const MAINSTREAM_DOMAINS = new Set<string>([
   "mit.edu","harvard.edu","stanford.edu","ox.ac.uk","cam.ac.uk",
   // Gov/Standards
   "iana.org","icann.org","w3.org","ietf.org","iso.org",
+  // CN Mainstream (国内知名站点)
+  "douban.com","kuaishou.com","douyu.com","huya.com","ximalaya.com","hupu.com","dianping.com",
+  "ctrip.com","qunar.com","feizhu.com","12306.cn","suning.com","vip.com","dangdang.com",
+  "58.com","toutiao.com","csdn.net","juejin.cn","36kr.com","tianyancha.com","qcc.com",
+  "maimai.cn","zhipin.com","51job.com","zhaopin.com","liepin.com","weixin.qq.com","cctv.com",
+  "mgtv.com","didichuxing.com","lianjia.com","ke.com","autohome.com.cn","xueqiu.com","eastmoney.com",
+  "10jqka.com.cn","futunn.com","tigerbrokers.com",
+  // Global Tech (全球科技/互联网补漏)
+  "meta.com","spacex.com","tesla.com","qualcomm.com","mediatek.com","tsmc.com","arm.com","sap.com",
+  "workday.com","jetbrains.com","gitlab.com","bitbucket.org","mongodb.com","redis.com","postgresql.org",
+  "mysql.com","elastic.co","snowflake.com","datadoghq.com","grafana.com","twilio.com","sendgrid.com",
+  "mailchimp.com","zendesk.com","intercom.com","okta.com","auth0.com","zapier.com","airtable.com",
+  "monday.com","clickup.com","linear.app","wikimedia.org","kernel.org","python.org","nodejs.org",
+  "golang.org","rust-lang.org","swift.org","java.com","spring.io",
+  // Gov/Public service (政府/公共服务)
+  "gov.cn","un.org","who.int","unicef.org","unesco.org","worldbank.org","imf.org","oecd.org",
+  "wto.org","redcross.org","fao.org","undp.org","nato.int","whitehouse.gov","gov.uk","go.jp",
+  // Banking/Finance (金融/支付/银行)
+  "icbc.com.cn","ccb.com","abchina.com","boc.cn","cmbchina.com","bankcomm.com","spdb.com.cn",
+  "cib.com.cn","cebbank.com","cmbc.com.cn","ecitic.com","cgbchina.com.cn","psbc.com","unionpay.com",
+  "antgroup.com","jpmorgan.com","goldmansachs.com","morganstanley.com","ubs.com","barclays.com",
+  "deutsche-bank.de","schwab.com","fidelity.com","vanguard.com","blackrock.com","robinhood.com",
+  "revolut.com","wise.com","squareup.com",
+  // Universities (大学/教育机构)
+  "tsinghua.edu.cn","pku.edu.cn","fudan.edu.cn","sjtu.edu.cn","zju.edu.cn","ustc.edu.cn","nju.edu.cn",
+  "whu.edu.cn","hit.edu.cn","ruc.edu.cn","princeton.edu","yale.edu","caltech.edu","berkeley.edu",
+  "columbia.edu","uchicago.edu","cornell.edu","upenn.edu","duke.edu","northwestern.edu","ucla.edu",
+  "cmu.edu","imperial.ac.uk","lse.ac.uk","ucl.ac.uk","ethz.ch","nus.edu.sg","ntu.edu.sg","hku.hk",
+  "cuhk.edu.hk","ust.hk",
 ]);
