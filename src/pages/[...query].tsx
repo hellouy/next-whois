@@ -687,6 +687,7 @@ export default function LookupPage({
   const [officialPopoverOpen, setOfficialPopoverOpen] = React.useState(false);
   const [officialPopoverPos, setOfficialPopoverPos] = React.useState<{ bottom: number; centerX: number; isMobile: boolean } | null>(null);
   const [showTapHint, setShowTapHint] = React.useState(false);
+  const [showSubscribeHint, setShowSubscribeHint] = React.useState(false);
 
   const [verifiedStamps, setVerifiedStamps] = React.useState<
     { id: string; tagName: string; tagStyle: string; cardTheme: string; link: string; nickname: string; description?: string }[]
@@ -717,7 +718,7 @@ export default function LookupPage({
       return;
     }
     setShowTapHint(true);
-    const t = setTimeout(() => setShowTapHint(false), 3000);
+    const t = setTimeout(() => setShowTapHint(false), 5000);
     return () => clearTimeout(t);
   }, [isOfficialDomain, verifiedStamps.length]);
 
@@ -839,6 +840,17 @@ export default function LookupPage({
   // submitted → data displayed); fall back to the server-reported WHOIS/RDAP
   // duration while the e2e timer hasn't finalized yet (e.g. SSR snapshot).
   const displayTime = e2eSeconds ?? time ?? 0;
+
+  useEffect(() => {
+    const rd = result?.remainingDays;
+    if (rd === null || rd === undefined || rd > 0) {
+      setShowSubscribeHint(false);
+      return;
+    }
+    setShowSubscribeHint(true);
+    const t = setTimeout(() => setShowSubscribeHint(false), 5000);
+    return () => clearTimeout(t);
+  }, [result?.remainingDays]);
 
   const { data: session, status: sessionStatus } = useSession();
 
@@ -1638,6 +1650,7 @@ export default function LookupPage({
                           {queryType}
                         </Badge>
                         {enableRemind && (
+                        <span className="relative inline-flex sm:hidden">
                         <button
                           onClick={() => {
                             if (!session) {
@@ -1655,7 +1668,7 @@ export default function LookupPage({
                           }}
                           title={isChinese ? "域名订阅" : "Subscribe"}
                           className={cn(
-                            "sm:hidden flex items-center justify-center w-6 h-6 rounded-full text-xs border transition-all active:scale-[0.93]",
+                            "flex items-center justify-center w-6 h-6 rounded-full text-xs border transition-all active:scale-[0.93]",
                             (result.remainingDays !== null && result.remainingDays <= 30)
                               ? "animate-breathe breathe-red bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
                               : "bg-sky-500/5 dark:bg-sky-500/10 border-sky-400/30 text-sky-500/90 hover:border-sky-400/60 hover:text-sky-400",
@@ -1663,6 +1676,10 @@ export default function LookupPage({
                         >
                           <RiTimerLine className="w-3 h-3" />
                         </button>
+                        <AnimatePresence>
+                          {showSubscribeHint && <TapHintCapsule label={isChinese ? "点击订阅/抢注" : "Subscribe / Snipe"} />}
+                        </AnimatePresence>
+                        </span>
                         )}
                         {isOfficialDomain ? (
                           <span className="relative inline-flex sm:hidden">
@@ -1862,6 +1879,7 @@ export default function LookupPage({
                           </>)}
                         {/* Desktop-only Subscribe text button */}
                         {enableRemind && (
+                        <span className="relative hidden sm:inline-flex">
                         <button
                           onClick={() => {
                             if (!session) {
@@ -1878,7 +1896,7 @@ export default function LookupPage({
                             setReminderDialogOpen(true);
                           }}
                           className={cn(
-                            "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-[0.93]",
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-[0.93]",
                             (result.remainingDays !== null && result.remainingDays <= 30)
                               ? "animate-breathe breathe-red bg-red-100 dark:bg-red-900/30 border-red-400/60 text-red-500"
                               : "bg-sky-500/5 dark:bg-sky-500/10 border-sky-400/30 text-sky-500/90 hover:border-sky-400/60 hover:text-sky-400",
@@ -1887,6 +1905,10 @@ export default function LookupPage({
                           <RiTimerLine className="w-3 h-3" />
                           {isChinese ? "域名订阅" : "Subscribe"}
                         </button>
+                        <AnimatePresence>
+                          {showSubscribeHint && <TapHintCapsule label={isChinese ? "点击订阅/抢注" : "Subscribe / Snipe"} />}
+                        </AnimatePresence>
+                        </span>
                         )}
                         {isOfficialDomain ? (
                           <span className="relative hidden sm:inline-flex">
