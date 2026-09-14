@@ -79,4 +79,38 @@ export const MAINSTREAM_DOMAINS = new Set<string>([
   "columbia.edu","uchicago.edu","cornell.edu","upenn.edu","duke.edu","northwestern.edu","ucla.edu",
   "cmu.edu","imperial.ac.uk","lse.ac.uk","ucl.ac.uk","ethz.ch","nus.edu.sg","ntu.edu.sg","hku.hk",
   "cuhk.edu.hk","ust.hk",
+  // AI/Frontier (AI 前沿)
+  "x.ai","midjourney.com","character.ai","perplexity.ai","stability.ai","groq.com","cohere.com",
+  "mistral.ai","deepseek.com","moonshot.cn","zhipuai.cn","doubao.com","aliyun.com","iflytek.com",
+  "minimaxi.com",
+  // CN Brands (国内知名品牌)
+  "oppo.com","vivo.com","oneplus.com","honor.com","zte.com.cn","tcl.com","hisense.com","skyworth.com",
+  "konka.com","xiaopeng.com","nio.com","lixiang.com","byd.com","geely.com","gwm.com.cn","leapmotor.com",
+  "caocao.com","dongqiudi.com","tianya.cn","qingting.fm","dedao.cn","dewu.com","smzdm.com","mogujie.com",
+  "you.163.com","dingtalk.com","feishu.cn","wps.cn","shimo.im","yuque.com","docs.qq.com","qyer.com",
+  "mafengwo.cn","tongcheng.com","pingan.com","webank.com","mybank.cn","lu.com","hxb.com.cn",
+  "fanqienovel.com","qidian.com","yuewen.com","jjwxc.net","temu.com","shein.com","1688.com","alibaba.com",
+  "cainiao.com","sf-express.com","zto.com",
+  // Gov Ministries (政务部委)
+  "miit.gov.cn","moe.gov.cn","mof.gov.cn","mps.gov.cn","nhc.gov.cn","samr.gov.cn","ndrc.gov.cn",
+  "mofcom.gov.cn","mfa.gov.cn","pbc.gov.cn","csrc.gov.cn","cbirc.gov.cn","nfra.gov.cn","customs.gov.cn",
+  "nrta.gov.cn","nmpa.gov.cn","most.gov.cn","moj.gov.cn","court.gov.cn",
+  // Gov/Intl orgs (国际政府与组织)
+  "europa.eu","usa.gov","state.gov","india.gov.in","canada.ca","korea.go.kr","gov.sg","msf.org",
+  "greenpeace.org","amnesty.org","unhcr.org","ilo.org",
+  // More Universities (更多高校)
+  "tongji.edu.cn","buaa.edu.cn","bit.edu.cn","xjtu.edu.cn","scu.edu.cn","sysu.edu.cn","nankai.edu.cn",
+  "tju.edu.cn","xmu.edu.cn","sdu.edu.cn","jlu.edu.cn","hust.edu.cn","csu.edu.cn","hnu.edu.cn",
+  "seu.edu.cn","scut.edu.cn","uestc.edu.cn","bupt.edu.cn","u-tokyo.ac.jp","kyoto-u.ac.jp","snu.ac.kr",
+  "kaist.ac.kr","unimelb.edu.au","usyd.edu.au","monash.edu","utoronto.ca","ubc.ca","mcgill.ca",
+  "nyu.edu","dartmouth.edu",
+  // Global companies (全球企业)
+  "databricks.com","palantir.com","crowdstrike.com","signal.org","proton.me","cgtn.com","aljazeera.com",
+  "dw.com","npr.org","economist.com","time.com","fortune.com","nationalgeographic.com","riotgames.com",
+  "supercell.com","toyota.com","honda.com","nissan.com","hyundai.com","kia.com","vw.com","bmw.com",
+  "mercedes-benz.com","audi.com","ford.com","gm.com","porsche.com","nike.com","adidas.com",
+  "mcdonalds.com","starbucks.com","coca-cola.com","nestle.com","pg.com","unilever.com","siemens.com",
+  "ge.com","3m.com","boeing.com","airbus.com","shell.com","bp.com","cnpc.com.cn","sinopec.com",
+  "10086.cn","chinaunicom.com.cn","chinatelecom.com.cn","att.com","verizon.com","t-mobile.com",
+  "dhl.com","fedex.com","ups.com",
 ]);
