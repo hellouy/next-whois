@@ -4,7 +4,7 @@ import { WhoisAnalyzeResult, initialWhoisAnalyzeResult } from "@/lib/whois/types
 import { DnsProbeResult } from "@/lib/whois/dns-check";
 import { rateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
-import { enforceApiKey, isSameOriginRequest } from "@/lib/access-key";
+import { enforceApiKey } from "@/lib/access-key";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
@@ -73,22 +73,18 @@ export default async function handler(
   const userEmail = session?.user?.email                    ?? null;
   const isSubscribed = !!((session?.user as any)?.subscriptionAccess);
 
-  // Tiered rate limiting — same-origin (the site itself) is always exempt.
-  // Tier key includes auth state so each tier has its own independent bucket.
+  // Tiered rate limiting applies to every request, including same-origin
+  // browser requests. Same-origin is not a security boundary: a public page,
+  // compromised browser tab, or scripted client can still exhaust WHOIS quota.
   const ip         = getClientIp(req);
-  const sameOrigin = isSameOriginRequest(req);
-  const tierLimit  = sameOrigin  ? RATE_LIMIT_SUB
-                   : isSubscribed ? RATE_LIMIT_SUB
+  const tierLimit  = isSubscribed ? RATE_LIMIT_SUB
                    : userEmail    ? RATE_LIMIT_AUTHED
                    :                RATE_LIMIT_ANON;
-  const tierKey    = sameOrigin  ? `${ip}:origin`
-                   : isSubscribed ? `${ip}:sub`
+  const tierKey    = isSubscribed ? `${ip}:sub`
                    : userEmail    ? `${ip}:auth`
                    :                `${ip}:anon`;
 
-  const { allowed, remaining, resetMs } = sameOrigin
-    ? { allowed: true, remaining: tierLimit, resetMs: 0 }
-    : rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
+  const { allowed, remaining, resetMs } = rateLimit(tierKey, tierLimit, RATE_WINDOW_MS);
 
   res.setHeader("X-RateLimit-Limit", String(tierLimit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
@@ -140,6 +136,9 @@ export default async function handler(
 
   if (!status) {
     logQuery({ domain: trimmed, tld, success: false, cached: false, durationMs: time * 1000, errorCode: error?.slice(0, 60) ?? null, source: source ?? null }).catch(e => console.error("[lookup] logQuery failed:", e.message));
+    // Failed responses can contain transient upstream details and should not
+    // be retained by a CDN or browser cache.
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ time, status, error, dnsProbe, registryUrl });
   }
 
@@ -149,8 +148,12 @@ export default async function handler(
 
   // Set Cache-Control header to match the actual smart TTL so Vercel's
   // CDN edge cache also honours the same expiry windows as Redis.
-  const sMaxAge = cacheTtl && cacheTtl > 0 ? cacheTtl : 3600;
-  const swr     = Math.min(sMaxAge * 4, 86_400);
-  res.setHeader("Cache-Control", `s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`);
+  if (nocache) {
+    res.setHeader("Cache-Control", "no-store");
+  } else {
+    const sMaxAge = cacheTtl && cacheTtl > 0 ? cacheTtl : 3600;
+    const swr = Math.min(sMaxAge * 4, 86_400);
+    res.setHeader("Cache-Control", `public, s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`);
+  }
   return res.status(200).json({ time, status, result, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl });
 }
