@@ -1,3 +1,5 @@
 allowBuilds:
   esbuild: false
   "@sentry/cli": false
+minimumReleaseAgeExclude:
+  - nodemailer@10.0.10
