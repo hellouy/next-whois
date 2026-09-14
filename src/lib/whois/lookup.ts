@@ -1382,51 +1382,102 @@ async function confirmCandidate(
   domain: string,
   probe: import("@/lib/whois/dns-check").FastProbeResult,
 ): Promise<BatchAvailability> {
-  // RDAP confirm. lookupRdap returns a domain object on success, an object
-  // with errorCode 404 when the registry says "not found", and throws when the
-  // TLD has no RDAP service at all (IANA bootstrap / local override miss).
-  let rdap: RdapResponse | { errorCode: number } | null = null;
-  try {
-    const res = await withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS);
-    rdap = res && !("errorCode" in (res as object))
-      ? (res as RdapResponse)
-      : (res as { errorCode: number });
-  } catch {
-    rdap = null;
-  }
+  // RDAP confirm + WHOIS guard run CONCURRENTLY.  For TLDs without an RDAP
+  // service, lookupRdap throws after its per-TLD timeout (~4s); waiting for
+  // that to finish before starting WHOIS would add the full RDAP wait on top
+  // of the WHOIS pass.  Racing them cuts the no-RDAP worst case from
+  // ~12s (4s RDAP + 8s WHOIS) to ~8s (parallel max), and RDAP still wins
+  // immediately when it has an authoritative answer (404 = available).
+  const [rdapRes, whoisRes] = await Promise.all([
+    (async (): Promise<{ kind: "rdap" } & ({ code: 404 } | { data: RdapResponse }) | { kind: "error" }> => {
+      try {
+        const res = await withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS);
+        if (res && "errorCode" in (res as object) && (res as { errorCode: number }).errorCode === 404) {
+          return { kind: "rdap", code: 404 };
+        }
+        if (res && !("errorCode" in (res as object))) {
+          return { kind: "rdap", data: res as RdapResponse };
+        }
+        return { kind: "error" };
+      } catch {
+        return { kind: "error" };
+      }
+    })(),
+    (async (): Promise<{ kind: "whois"; r: WhoisResult }> => {
+      const r = await lookupWhoisWithCache(domain);
+      return { kind: "whois", r };
+    })(),
+  ]);
 
-  const errorCode = rdap && "errorCode" in rdap ? (rdap as { errorCode: number }).errorCode : null;
-
-  if (errorCode === 404) {
-    // Registry authoritatively says "not found" → genuinely available.
-    return cacheAndReturn(key, {
-      registration: "available",
-      confidence: "high",
-      source: "rdap",
-      dnsProbe: probe,
-    });
-  }
-
-  if (rdap && errorCode === null) {
-    try {
-      const converted = await convertRdapToWhoisResult(rdap as RdapResponse, domain);
-      const reg = classifyResultStatus(converted);
-      // Only retain the rich result when it's not a plain "available" —
-      // an RDAP hit for a queried name always means registered/reserved/premium.
+  // ── RDAP path (authoritative when it answers) ─────────────────────────────
+  if (rdapRes.kind === "rdap") {
+    if (rdapRes.kind === "rdap" && "code" in rdapRes && rdapRes.code === 404) {
+      // Registry authoritatively says "not found" → genuinely available.
       return cacheAndReturn(key, {
-        registration: reg,
+        registration: "available",
         confidence: "high",
         source: "rdap",
         dnsProbe: probe,
-        result: converted,
       });
-    } catch {
-      // conversion failed → WHOIS guard
+    }
+    if (rdapRes.kind === "rdap" && "data" in rdapRes) {
+      try {
+        const converted = await convertRdapToWhoisResult(rdapRes.data, domain);
+        const reg = classifyResultStatus(converted);
+        // Only retain the rich result when it's not a plain "available" —
+        // an RDAP hit for a queried name always means registered/reserved/premium.
+        return cacheAndReturn(key, {
+          registration: reg,
+          confidence: "high",
+          source: "rdap",
+          dnsProbe: probe,
+          result: converted,
+        });
+      } catch {
+        // conversion failed → fall through to WHOIS result below
+      }
     }
   }
 
-  // No RDAP service / non-404 RDAP error / conversion failure → WHOIS guard.
-  return fullFallback(key, domain, probe);
+  // ── WHOIS guard result (already settled in parallel) ──────────────────────
+  const r = whoisRes.r;
+
+  // Successful lookup → registered / reserved / premium via status codes.
+  if (r.status && r.result) {
+    const reg = classifyResultStatus(r.result);
+    return cacheAndReturn(key, {
+      registration: reg,
+      confidence: "high",
+      source: r.source === "rdap" ? "rdap" : "whois",
+      dnsProbe: probe,
+      result: r.result,
+    });
+  }
+
+  // lookupWhois's unregistered verdicts: RDAP 404, WHOIS "not registered"
+  // text, NO_SERVER_TLDS with synthesized unregistered DNS.
+  const unregisteredVerdict =
+    r.dnsProbe?.registrationStatus === "unregistered" ||
+    /domain not found/i.test(r.error ?? "") ||
+    /no match/i.test(r.error ?? "");
+  if (!r.status && unregisteredVerdict) {
+    return cacheAndReturn(key, {
+      registration: "available",
+      confidence: r.dnsProbe?.registrationStatus === "unregistered" ? "medium" : "high",
+      source: r.source === "rdap" ? "rdap" : "mixed",
+      dnsProbe: probe,
+      error: r.error,
+    });
+  }
+
+  // Genuine failure / no verdict — do NOT cache, do NOT mark available.
+  return {
+    registration: "unknown",
+    confidence: "low",
+    source: "whois",
+    dnsProbe: probe,
+    error: r.error ?? "Unknown error",
+  };
 }
 
 async function fullFallback(
