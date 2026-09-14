@@ -201,11 +201,11 @@ function StampFormFields({
             </div>
             {/* Scrollable grid */}
             <div className="overflow-y-auto px-5 py-4 space-y-5">
-              {/* Standard themes */}
+              {/* All themes — unified grid */}
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">标准配色</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">全部样式</p>
                 <div className="grid grid-cols-3 gap-2.5">
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, t]) => !t.special).map(([key, t]) => (
+                  {Object.entries(STAMP_CARD_THEMES).map(([key, t]) => (
                     <button key={key} type="button"
                       onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
                       className={cn(
@@ -214,39 +214,13 @@ function StampFormFields({
                           ? "border-primary bg-primary/5"
                           : "border-transparent hover:border-border hover:bg-muted/40"
                       )}>
-                      <span className={cn("w-full h-7 rounded-lg overflow-hidden", t.hero)} />
+                      <span className={cn("w-full h-7 rounded-lg overflow-hidden relative flex items-center justify-center", t.hero)}>
+                        {t.special && <span className="text-sm leading-none text-white/90 drop-shadow">{t.special}</span>}
+                      </span>
                       <span className="text-[11px] font-semibold leading-none">{t.label}</span>
                       {cardTheme === key && (
                         <span className="text-[9px] text-primary font-bold uppercase tracking-widest">已选</span>
                       )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Special layout themes — show actual card previews */}
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">特殊排版 <span className="normal-case font-normal opacity-60">· 实际效果预览</span></p>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, t]) => !!t.special).map(([key, t]) => (
-                    <button key={key} type="button"
-                      onClick={() => { setCardTheme(key); setThemePickerOpen(false); }}
-                      className={cn(
-                        "flex flex-col gap-2 rounded-xl border-2 overflow-hidden transition-all active:scale-[0.97]",
-                        cardTheme === key
-                          ? "border-primary"
-                          : "border-transparent hover:border-border"
-                      )}>
-                      <div className="pointer-events-none scale-[0.72] origin-top-left w-[138.8%]">
-                        <StampPreviewCard themeKey={key} />
-                      </div>
-                      <div className={cn(
-                        "flex items-center justify-between px-2 pb-2 -mt-[28%]",
-                      )}>
-                        <span className="text-[11px] font-semibold">{t.special} {t.label}</span>
-                        {cardTheme === key && (
-                          <span className="text-[9px] text-primary font-bold uppercase tracking-widest">已选</span>
-                        )}
-                      </div>
                     </button>
                   ))}
                 </div>
@@ -275,7 +249,7 @@ function StampFormFields({
               </span>
               <span className="text-sm font-medium flex-1">
                 {cur?.label ?? cardTheme}
-                {cur?.special && <span className="ml-1.5 text-muted-foreground text-xs font-normal">· 特殊排版</span>}
+                {cur?.special && <span className="ml-1.5 text-muted-foreground text-xs font-normal">· {cur.special}</span>}
               </span>
               <span className="text-[11px] text-muted-foreground font-medium shrink-0">点击更换 ›</span>
             </button>

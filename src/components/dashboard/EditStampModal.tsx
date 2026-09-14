@@ -130,11 +130,11 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
 
               <div>
                 <div className="mb-3 flex items-end justify-between gap-3">
-                  <p className="text-xs font-semibold">{isZh ? "标准配色" : "Standard palettes"}</p>
-                  <p className="text-[10px] text-muted-foreground">8 {isZh ? "种方案" : "options"}</p>
+                  <p className="text-xs font-semibold">{isZh ? "弹窗样式" : "Card themes"}</p>
+                  <p className="text-[10px] text-muted-foreground">{Object.keys(STAMP_CARD_THEMES).length} {isZh ? "种方案" : "options"}</p>
                 </div>
                 <div className={cn("grid gap-2", pickerStyle === "compact" ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !th.special).map(([key, th]) => {
+                  {Object.entries(STAMP_CARD_THEMES).map(([key, th]) => {
                     const selected = cardTheme === key;
                     return (
                       <button key={key} type="button"
@@ -145,42 +145,14 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
                           pickerStyle === "gallery" ? "p-3" : pickerStyle === "editorial" ? "p-2.5" : "p-2",
                           selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
                         )}>
-                        <span className={cn("h-9 w-9 shrink-0 rounded-lg shadow-inner", th.hero)} />
+                        <span className={cn("h-9 w-9 shrink-0 rounded-lg shadow-inner flex items-center justify-center text-sm", th.hero)}>
+                          {th.special && <span className="leading-none text-white/90 drop-shadow">{th.special}</span>}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-semibold">{th.label}</span>
                           <span className="mt-0.5 block text-[9px] text-muted-foreground">{key}</span>
                         </span>
                         <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", selected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{selected && <RiCheckLine className="size-3" />}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                  {isZh ? "特殊排版" : "Special layouts"} <span className="normal-case font-normal opacity-60">· {isZh ? "实际效果预览" : "preview"}</span>
-                </p>
-                <div className="flex flex-col gap-2">
-                  {Object.entries(STAMP_CARD_THEMES).filter(([, th]) => !!th.special).map(([key, th]) => {
-                    const selected = cardTheme === key;
-                    return (
-                      <button key={key} type="button"
-                        onClick={() => setCardTheme(key)}
-                        aria-pressed={selected}
-                        className={cn(
-                          "flex min-w-0 items-center gap-3 rounded-xl border p-2.5 text-left transition-colors active:scale-[0.99]",
-                          selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
-                        )}>
-                        <div className="pointer-events-none h-16 w-28 shrink-0 overflow-hidden rounded-lg border border-border/40 bg-muted/20">
-                          <div className="w-[178px] origin-top-left scale-[0.63]">
-                            <StampPreviewCard themeKey={key} />
-                          </div>
-                        </div>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold">{th.special} {th.label}</span>
-                          <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">{isZh ? "独特的品牌展示排版" : "Distinctive card composition"}</span>
-                        </span>
-                        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", selected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{selected && <RiCheckLine className="size-3.5" />}</span>
                       </button>
                     );
                   })}
@@ -262,7 +234,7 @@ export function EditStampModal({ stamp, onClose, onSaved, isMember }: {
                 </span>
                 <span className="text-sm font-medium flex-1">
                   {curTheme?.label ?? cardTheme}
-                  {curTheme?.special && <span className="ml-1.5 text-muted-foreground text-xs font-normal">· {isZh ? "特殊排版" : "special"}</span>}
+                  {curTheme?.special && <span className="ml-1.5 text-muted-foreground text-xs font-normal">· {curTheme.special}</span>}
                 </span>
                 <span className="text-[11px] text-muted-foreground font-medium shrink-0">{isZh ? "点击更换 ›" : "Change ›"}</span>
               </button>

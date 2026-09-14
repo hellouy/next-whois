@@ -11,8 +11,7 @@ const STAMPS_TABS = [
 ];
 
 export default function StampStylesPage() {
-  const standardThemes = Object.entries(CARD_THEMES).filter(([, t]) => !t.special);
-  const specialThemes  = Object.entries(CARD_THEMES).filter(([, t]) => !!t.special);
+  const allThemes = Object.entries(CARD_THEMES);
 
   const [previewKey, setPreviewKey] = React.useState<string | null>(null);
 
@@ -62,41 +61,20 @@ export default function StampStylesPage() {
           </p>
         </div>
 
-        {/* ── Standard themes ── */}
+        {/* ── All themes ── */}
         <section className="space-y-3">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-            标准配色 · {standardThemes.length} 种
+            全部样式 · {allThemes.length} 种
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {standardThemes.map(([key, t]) => (
+            {allThemes.map(([key, t]) => (
               <div key={key} className="space-y-1.5">
                 <button className="w-full text-left cursor-pointer rounded-xl overflow-hidden ring-0 hover:ring-2 ring-primary/40 transition-all active:scale-[0.98]"
                   onClick={() => openPreview(key)}>
                   <StampPreviewCard themeKey={key} />
                 </button>
                 <div className="flex items-center gap-1.5 px-0.5">
-                  <p className="text-xs font-semibold">{t.label}</p>
-                  <code className="text-[10px] text-muted-foreground/50 font-mono ml-auto">{key}</code>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Special layout themes ── */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-            特殊排版 · {specialThemes.length} 种
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {specialThemes.map(([key, t]) => (
-              <div key={key} className="space-y-1.5">
-                <button className="w-full text-left cursor-pointer rounded-xl overflow-hidden ring-0 hover:ring-2 ring-primary/40 transition-all active:scale-[0.98]"
-                  onClick={() => openPreview(key)}>
-                  <StampPreviewCard themeKey={key} />
-                </button>
-                <div className="flex items-center gap-1.5 px-0.5">
-                  <span className="text-sm leading-none">{t.special}</span>
+                  {t.special && <span className="text-sm leading-none">{t.special}</span>}
                   <p className="text-xs font-semibold">{t.label}</p>
                   <code className="text-[10px] text-muted-foreground/50 font-mono ml-auto">{key}</code>
                 </div>

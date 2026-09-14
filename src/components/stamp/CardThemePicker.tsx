@@ -5,7 +5,6 @@ import {
   RiCloseLine,
   RiVipCrownLine,
   RiCheckboxCircleLine,
-  RiArrowDownSLine,
 } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -16,21 +15,9 @@ import { TAG_STYLES } from "./TagStylePicker";
 type _ExtractStampKey<T extends string> = T extends `stamp.${infer K}` ? K : never;
 type StampKey = _ExtractStampKey<TranslationKey>;
 
-const SPECIAL_THEME_IDS = ["celebrate", "neon", "gradient", "split", "flash"] as const;
+export const SPECIAL_THEME_IDS = ["celebrate", "neon", "gradient", "split", "flash"] as const;
 
-const CARD_THEME_OPTIONS: {
-  id: string; label: string; enLabel: string; hero: string; dot: string;
-  shimmer: string; cardBg: string; cardBorder: string; cardText: string; btn: string;
-}[] = [
-  { id: "app",      label: "极简", enLabel: "Minimal",  hero: "bg-gradient-to-br from-zinc-600 to-zinc-900",                      dot: "bg-zinc-600",    shimmer: "text-shimmer",              cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-zinc-900 text-white"                              },
-  { id: "official", label: "官方", enLabel: "Official", hero: "bg-gradient-to-br from-blue-600 to-indigo-800",                    dot: "bg-blue-700",    shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-blue-700 text-white"                               },
-  { id: "aurora",   label: "极光", enLabel: "Aurora",   hero: "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-purple-700",  dot: "bg-violet-600",  shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-violet-600 text-white"                             },
-  { id: "emerald",  label: "翡翠", enLabel: "Emerald",  hero: "bg-gradient-to-br from-emerald-400 to-teal-700",                   dot: "bg-emerald-600", shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-emerald-600 text-white"                            },
-  { id: "solar",    label: "暖阳", enLabel: "Solar",    hero: "bg-gradient-to-br from-amber-400 to-orange-600",                   dot: "bg-orange-500",  shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-orange-500 text-white"                             },
-  { id: "dev",      label: "开发", enLabel: "Dev",      hero: "bg-gradient-to-br from-slate-600 to-[#0d1117]",                    dot: "bg-[#238636]",   shimmer: "text-[#58a6ff] font-black font-mono", cardBg: "bg-zinc-950",   cardBorder: "border-zinc-800",  cardText: "text-zinc-200",   btn: "bg-[#238636] text-white"                          },
-  { id: "warning",  label: "警示", enLabel: "Warning",  hero: "bg-gradient-to-br from-yellow-400 to-amber-600",                   dot: "bg-amber-500",   shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-amber-500 text-white"                             },
-  { id: "premium",  label: "尊享", enLabel: "Premium",  hero: "bg-gradient-to-br from-purple-600 via-fuchsia-500 to-rose-500",    dot: "bg-fuchsia-600", shimmer: "text-foreground font-black", cardBg: "bg-background", cardBorder: "border-border/50", cardText: "text-foreground", btn: "bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white" },
-];
+const CARD_THEME_KEYS = Object.keys(STAMP_CARD_THEMES);
 
 interface CardThemePickerProps {
   selectedTheme: string;
@@ -67,20 +54,19 @@ export function CardThemePicker({
   const s = (key: StampKey, params?: Record<string, string | number>) =>
     t(`stamp.${key}` as TranslationKey, params);
 
-  const [lockedExpanded, setLockedExpanded] = React.useState(false);
-
   const renderThemeCard = (themeId: string) => {
     const th = STAMP_CARD_THEMES[themeId];
     if (!th) return null;
-    const isSpecialSelected = selectedTheme === themeId;
-    const locked = !isMember;
+    const isSpecial = (SPECIAL_THEME_IDS as readonly string[]).includes(themeId);
+    const isSelected = selectedTheme === themeId;
+    const locked = !isMember && isSpecial;
     return (
       <button
         key={themeId}
         type="button"
         onClick={() => {
           if (locked) { toast.info(isZh ? "升级会员解锁特殊排版" : "Upgrade to unlock special layouts"); return; }
-          if (isSpecialSelected) {
+          if (isSelected && isSpecial) {
             onSpecialDeselect();
           } else {
             onThemeSelect(themeId);
@@ -90,27 +76,27 @@ export function CardThemePicker({
         className={cn(
           "group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-150",
           locked ? "opacity-55 cursor-not-allowed border-border/30 bg-muted/20"
-            : isSpecialSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
+            : isSelected ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/20"
             : "border-border/60 bg-background hover:border-primary/40 hover:shadow-sm"
         )}
       >
         <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl shadow-inner", th.hero)}>
           {locked
             ? <RiVipCrownLine className="h-5 w-5 text-white/80 drop-shadow" />
-            : isSpecialSelected
+            : isSelected
               ? <RiCheckLine className="h-5 w-5 text-white drop-shadow" />
               : <span className="text-xl">{th.special || "*"}</span>
           }
         </div>
         <div className="min-w-0 flex-1">
-          <p className={cn("truncate text-xs font-bold", isSpecialSelected ? "text-primary" : "text-foreground")}>
-            {th.special} {th.label}
+          <p className={cn("truncate text-xs font-bold", isSelected ? "text-primary" : "text-foreground")}>
+            {th.label}
           </p>
           <p className="mt-1 truncate text-[10px] text-muted-foreground">
-            {locked ? (isZh ? "会员专属排版" : "Members only") : isSpecialSelected ? (isZh ? "当前已选" : "Selected") : (isZh ? "点击查看预览" : "Tap to preview")}
+            {locked ? (isZh ? "会员专属排版" : "Members only") : isSelected ? (isZh ? "当前已选" : "Selected") : (isZh ? "点击查看预览" : "Tap to preview")}
           </p>
         </div>
-        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSpecialSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSpecialSelected && <RiCheckLine className="size-3" />}</span>
+        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{isSelected && <RiCheckLine className="size-3" />}</span>
       </button>
     );
   };
@@ -123,61 +109,13 @@ export function CardThemePicker({
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{isZh ? "卡片排版" : "Card Layout"}</label>
             {!isMember && (
               <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-violet-600 dark:text-violet-400">
-                <RiVipCrownLine className="w-2.5 h-2.5" />{isZh ? "会员专属" : "Members Only"}
+                <RiVipCrownLine className="w-2.5 h-2.5" />{isZh ? "部分会员专属" : "Members Only"}
               </span>
             )}
           </div>
-          {!(SPECIAL_THEME_IDS as readonly string[]).includes(selectedTheme) && (
-            <span className="text-[9px] text-muted-foreground/60 font-mono">
-              {isZh ? STAMP_CARD_THEMES[selectedTheme]?.label : selectedTheme}
-            </span>
-          )}
         </div>
         <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-          {isMember
-            ? (SPECIAL_THEME_IDS as readonly string[]).map(renderThemeCard)
-            : (
-              <>
-                <div className="col-span-full">
-                  <button
-                    type="button"
-                    onClick={() => setLockedExpanded((v) => !v)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/40 bg-violet-500/5 dark:bg-violet-500/10 px-3 py-2.5 text-left transition-colors hover:border-violet-400/70 hover:bg-violet-500/10"
-                  >
-                    <div className={cn("flex h-14 w-24 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-rose-500 shadow-inner")}>
-                      <RiVipCrownLine className="h-5 w-5 text-white/90 drop-shadow" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold text-foreground">
-                        {isZh ? "会员专属特殊排版" : "Members-only card layouts"}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                        {lockedExpanded
-                          ? (isZh ? `共 ${SPECIAL_THEME_IDS.length} 款 · 点击收起` : `${SPECIAL_THEME_IDS.length} layouts · tap to collapse`)
-                          : (isZh ? `共 ${SPECIAL_THEME_IDS.length} 款 · 点击预览` : `${SPECIAL_THEME_IDS.length} layouts · tap to preview`)}
-                      </p>
-                    </div>
-                    <RiArrowDownSLine className={cn("h-5 w-5 shrink-0 text-violet-500 transition-transform duration-200", lockedExpanded && "rotate-180")} />
-                  </button>
-                </div>
-                <AnimatePresence initial={false}>
-                  {lockedExpanded && (
-                    <motion.div
-                      key="locked-themes"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="col-span-full overflow-hidden"
-                    >
-                      <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-                        {(SPECIAL_THEME_IDS as readonly string[]).map(renderThemeCard)}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
+          {CARD_THEME_KEYS.map(renderThemeCard)}
         </div>
         {(SPECIAL_THEME_IDS as readonly string[]).includes(selectedTheme) && (
           <p className="text-[9.5px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">
@@ -193,13 +131,14 @@ export function CardThemePicker({
 
       {/* Card Layout preview popup */}
       <AnimatePresence>
-        {previewThemeKey && isMember && (() => {
+        {previewThemeKey && (() => {
           const th = STAMP_CARD_THEMES[previewThemeKey];
           if (!th) return null;
           const styleObj = TAG_STYLES.find(ts => ts.id === selectedTagStyle) || TAG_STYLES[0];
           const badgeLabel = s((`badge_${selectedTagStyle}`) as StampKey) || s("badge_default");
           const previewName = tagName.trim() || t("stamp.brand_name_placeholder" as TranslationKey);
           const isSelected = selectedTheme === previewThemeKey;
+          const isSpecial = (SPECIAL_THEME_IDS as readonly string[]).includes(previewThemeKey);
           return (
             <>
               <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
@@ -213,11 +152,17 @@ export function CardThemePicker({
                 <div className="bg-background border border-border rounded-2xl shadow-2xl overflow-hidden w-full max-w-sm">
                   <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/50">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{isZh ? "特殊排版预览" : "Special Layout Preview"}</span>
+                      <span className="text-sm font-semibold">{isZh ? "排版预览" : "Layout Preview"}</span>
                       <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
                         style={{background:"rgba(124,58,237,0.08)",color:"#7C3AED",border:"1px solid rgba(124,58,237,0.2)"}}>
                         {th.label}
                       </span>
+                      {isSpecial && (
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
+                          style={{background:"rgba(245,158,11,0.1)",color:"#D97706",border:"1px solid rgba(245,158,11,0.25)"}}>
+                          {isZh ? "特殊" : "Special"}
+                        </span>
+                      )}
                     </div>
                     <button type="button" onClick={onPreviewClose}
                       className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
