@@ -405,6 +405,21 @@ function clampPopoverX(centerX: number, width: number, gap = 8): number {
   return Math.min(Math.max(centerX, half), Math.max(half, vw - half));
 }
 
+/** Tiny floating capsule shown next to the verified badge for 3s to hint a tap. */
+function TapHintCapsule({ label }: { label: string }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0, y: 3, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 3, scale: 0.9 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute -top-2.5 -right-1 z-20 pointer-events-none select-none whitespace-nowrap px-1.5 py-[3px] rounded-full bg-amber-400 text-white text-[9px] font-bold leading-none shadow-md shadow-amber-500/30"
+    >
+      {label}
+    </motion.span>
+  );
+}
+
 export default function LookupPage({
   data: initialData,
   target: propTarget,
@@ -671,6 +686,7 @@ export default function LookupPage({
   const [stampDetailOpen, setStampDetailOpen] = React.useState(false);
   const [officialPopoverOpen, setOfficialPopoverOpen] = React.useState(false);
   const [officialPopoverPos, setOfficialPopoverPos] = React.useState<{ bottom: number; centerX: number; isMobile: boolean } | null>(null);
+  const [showTapHint, setShowTapHint] = React.useState(false);
 
   const [verifiedStamps, setVerifiedStamps] = React.useState<
     { id: string; tagName: string; tagStyle: string; cardTheme: string; link: string; nickname: string; description?: string }[]
@@ -689,6 +705,21 @@ export default function LookupPage({
     if (isChinese) return info?.name || (d.split(".")[0] || "Official");
     return (d.split(".")[0] || "Official").toUpperCase();
   }, [isOfficialDomain, target, isChinese]);
+
+  const claimedBadgeLabel = React.useMemo(() => {
+    if (verifiedStamps.length === 0) return "";
+    return verifiedStamps[0]?.tagName?.trim() || (isChinese ? "已认领" : "Claimed");
+  }, [verifiedStamps, isChinese]);
+
+  useEffect(() => {
+    if (!isOfficialDomain && verifiedStamps.length === 0) {
+      setShowTapHint(false);
+      return;
+    }
+    setShowTapHint(true);
+    const t = setTimeout(() => setShowTapHint(false), 3000);
+    return () => clearTimeout(t);
+  }, [isOfficialDomain, verifiedStamps.length]);
 
 
   const STAMP_STYLE_MAP: Record<string, string> = {
@@ -1634,35 +1665,45 @@ export default function LookupPage({
                         </button>
                         )}
                         {isOfficialDomain ? (
-                          <button
-                            onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              if (officialPopoverOpen) {
-                                setOfficialPopoverOpen(false);
-                                setOfficialPopoverPos(null);
-                              } else {
-                                setOfficialPopoverOpen(true);
-                                setOfficialPopoverPos({ bottom: window.innerHeight - rect.top + 10, centerX: rect.left + rect.width / 2, isMobile: window.innerWidth < 640 });
-                              }
-                            }}
-                            className={cn(
-                              "stamp-claimed-badge sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.93]",
-                              officialPopoverOpen
-                                ? "bg-blue-100 dark:bg-blue-900/40 border-blue-500/80 text-blue-700 dark:text-blue-300"
-                                : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400"
-                            )}
-                          >
-                            <RiGlobalLine className="w-3 h-3 shrink-0" />
-                            <span className="truncate max-w-[100px]">{officialBadgeLabel}</span>
-                          </button>
+                          <span className="relative inline-flex sm:hidden">
+                            <button
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                if (officialPopoverOpen) {
+                                  setOfficialPopoverOpen(false);
+                                  setOfficialPopoverPos(null);
+                                } else {
+                                  setOfficialPopoverOpen(true);
+                                  setOfficialPopoverPos({ bottom: window.innerHeight - rect.top + 10, centerX: rect.left + rect.width / 2, isMobile: window.innerWidth < 640 });
+                                }
+                              }}
+                              className={cn(
+                                "stamp-claimed-badge flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.93]",
+                                officialPopoverOpen
+                                  ? "bg-blue-100 dark:bg-blue-900/40 border-blue-500/80 text-blue-700 dark:text-blue-300"
+                                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400"
+                              )}
+                            >
+                              <RiGlobalLine className="w-3 h-3 shrink-0" />
+                              <span className="truncate max-w-[100px]">{officialBadgeLabel}</span>
+                            </button>
+                            <AnimatePresence>
+                              {showTapHint && <TapHintCapsule label={isChinese ? "点击查看" : "Tap to view"} />}
+                            </AnimatePresence>
+                          </span>
                         ) : enableStamps ? verifiedStamps.length > 0 ? (
-                          <button
-                            onClick={() => setStampDetailOpen(true)}
-                            className="stamp-claimed-badge sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400"
-                          >
-                            <RiShieldCheckLine className="w-3 h-3" />
-                            {isChinese ? "已认领" : "Claimed"}
-                          </button>
+                          <span className="relative inline-flex sm:hidden">
+                            <button
+                              onClick={() => setStampDetailOpen(true)}
+                              className="stamp-claimed-badge flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400"
+                            >
+                              <RiShieldCheckLine className="w-3 h-3 shrink-0" />
+                              <span className="truncate max-w-[100px]">{claimedBadgeLabel}</span>
+                            </button>
+                            <AnimatePresence>
+                              {showTapHint && <TapHintCapsule label={isChinese ? "点击查看" : "Tap to view"} />}
+                            </AnimatePresence>
+                          </span>
                         ) : (
                           <button
                             onClick={() => {
@@ -1848,35 +1889,45 @@ export default function LookupPage({
                         </button>
                         )}
                         {isOfficialDomain ? (
-                          <button
-                            onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              if (officialPopoverOpen) {
-                                setOfficialPopoverOpen(false);
-                                setOfficialPopoverPos(null);
-                              } else {
-                                setOfficialPopoverOpen(true);
-                                setOfficialPopoverPos({ bottom: window.innerHeight - rect.top + 10, centerX: rect.left + rect.width / 2, isMobile: window.innerWidth < 640 });
-                              }
-                            }}
-                            className={cn(
-                              "stamp-claimed-badge hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-[0.93]",
-                              officialPopoverOpen
-                                ? "bg-blue-100 dark:bg-blue-900/40 border-blue-500/80 text-blue-700 dark:text-blue-300"
-                                : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                            )}
-                          >
-                            <RiGlobalLine className="w-3 h-3 shrink-0" />
-                            <span className="truncate max-w-[160px]">{officialBadgeLabel}</span>
-                          </button>
+                          <span className="relative hidden sm:inline-flex">
+                            <button
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                if (officialPopoverOpen) {
+                                  setOfficialPopoverOpen(false);
+                                  setOfficialPopoverPos(null);
+                                } else {
+                                  setOfficialPopoverOpen(true);
+                                  setOfficialPopoverPos({ bottom: window.innerHeight - rect.top + 10, centerX: rect.left + rect.width / 2, isMobile: window.innerWidth < 640 });
+                                }
+                              }}
+                              className={cn(
+                                "stamp-claimed-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-[0.93]",
+                                officialPopoverOpen
+                                  ? "bg-blue-100 dark:bg-blue-900/40 border-blue-500/80 text-blue-700 dark:text-blue-300"
+                                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-400/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                              )}
+                            >
+                              <RiGlobalLine className="w-3 h-3 shrink-0" />
+                              <span className="truncate max-w-[160px]">{officialBadgeLabel}</span>
+                            </button>
+                            <AnimatePresence>
+                              {showTapHint && <TapHintCapsule label={isChinese ? "点击查看" : "Tap to view"} />}
+                            </AnimatePresence>
+                          </span>
                         ) : enableStamps ? verifiedStamps.length > 0 ? (
-                          <button
-                            onClick={() => setStampDetailOpen(true)}
-                            className="stamp-claimed-badge hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/40"
-                          >
-                            <RiShieldCheckLine className="w-3 h-3" />
-                            {isChinese ? "已认领" : "Claimed"}
-                          </button>
+                          <span className="relative hidden sm:inline-flex">
+                            <button
+                              onClick={() => setStampDetailOpen(true)}
+                              className="stamp-claimed-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-[0.93] bg-teal-50 dark:bg-teal-900/20 border-teal-400/50 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/40"
+                            >
+                              <RiShieldCheckLine className="w-3 h-3 shrink-0" />
+                              <span className="truncate max-w-[160px]">{claimedBadgeLabel}</span>
+                            </button>
+                            <AnimatePresence>
+                              {showTapHint && <TapHintCapsule label={isChinese ? "点击查看" : "Tap to view"} />}
+                            </AnimatePresence>
+                          </span>
                         ) : (
                           <button
                             onClick={() => {
