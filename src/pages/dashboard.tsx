@@ -481,7 +481,14 @@ export default function DashboardPage() {
               stamps={stamps}
               searchStats={searchStats ?? null}
               balanceCents={balanceCents}
-              onGoMembership={() => setTab("membership")}
+              onGoRecharge={() => router.push("/payment/checkout")}
+              onGoOrders={() => {
+                setTab("membership");
+                setShowBalanceTxs(true);
+                setTimeout(() => {
+                  document.getElementById("membership-orders")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 380);
+              }}
               t={t}
               setEditingAvatar={setEditingAvatar}
               onSaveAvatarColor={saveAvatarColor}

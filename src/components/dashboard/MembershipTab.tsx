@@ -352,7 +352,7 @@ export function MembershipTab({
       </div>
 
       {/* Order history */}
-      <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+      <div id="membership-orders" className="glass-panel border border-border rounded-2xl overflow-hidden scroll-mt-20">
         <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RiFileTextLine className="w-3.5 h-3.5 text-muted-foreground" />

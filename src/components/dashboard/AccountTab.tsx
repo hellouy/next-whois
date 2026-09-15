@@ -68,7 +68,8 @@ export type AccountTabProps = {
   searchStats: SearchStats | null;
   balanceCents: number;
   t: TFunction;
-  onGoMembership: () => void;
+  onGoRecharge: () => void;
+  onGoOrders: () => void;
   setEditingAvatar: (v: boolean | ((prev: boolean) => boolean)) => void;
   onSaveAvatarColor: (color: string) => void;
   setEditingName: (v: boolean) => void;
@@ -104,7 +105,7 @@ export function AccountTab({
   emailChangeCode, sendingChangeCode, changeCodeCooldown,
   showDeleteConfirm, deleteConfirmEmail, deletingAccount,
   contactMsg, contactCategory, contactSending, contactSent,
-  subscriptions, stamps, searchStats, balanceCents, t, onGoMembership,
+  subscriptions, stamps, searchStats, balanceCents, t, onGoRecharge, onGoOrders,
   setEditingAvatar, onSaveAvatarColor,
   setEditingName, setNameValue, onSaveName,
   setEditingEmail, setEmailValue, setEmailChangeCode, onSaveEmail, onSendEmailChangeCode, setChangeCodeCooldown,
@@ -177,14 +178,14 @@ export function AccountTab({
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={onGoMembership}
+            onClick={onGoRecharge}
             className="h-8 rounded-xl text-[11px] font-medium border border-primary/30 text-primary hover:bg-primary/10 transition-colors touch-manipulation"
           >
             {t("payment.balance_credit")}
           </button>
           <button
             type="button"
-            onClick={onGoMembership}
+            onClick={onGoOrders}
             className="h-8 rounded-xl text-[11px] font-medium border border-border text-muted-foreground hover:bg-muted transition-colors touch-manipulation"
           >
             {t("dashboard.order_history")}
