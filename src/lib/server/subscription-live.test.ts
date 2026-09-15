@@ -18,11 +18,12 @@ describe("needsLiveCheck", () => {
   it("skips in-range subscriptions", () => {
     expect(needsLiveCheck(null, true)).toBe(false);
     expect(needsLiveCheck("active", true)).toBe(false);
-    expect(needsLiveCheck("grace", true)).toBe(false);
-    expect(needsLiveCheck("grace", false)).toBe(true);
+    expect(needsLiveCheck("active", false)).toBe(false);
   });
 
-  it("re-checks post-expiry / dropped phases", () => {
+  it("re-checks grace and post-expiry / dropped phases", () => {
+    expect(needsLiveCheck("grace", true)).toBe(true);
+    expect(needsLiveCheck("grace", false)).toBe(true);
     expect(needsLiveCheck("dropped", true)).toBe(true);
     expect(needsLiveCheck("pendingDelete", true)).toBe(true);
     expect(needsLiveCheck("redemption", true)).toBe(true);

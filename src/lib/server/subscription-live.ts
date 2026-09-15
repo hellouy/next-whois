@@ -87,9 +87,10 @@ export async function liveCheckDomain(domain: string): Promise<LiveCheck> {
  */
 export function needsLiveCheck(phase: string | null, active: boolean): boolean {
   if (!phase) return false;
-  if (phase === "dropped" || phase === "pendingDelete" || phase === "redemption") return true;
-  if (!active && phase === "grace") return true;
-  return false;
+  // Any name that has passed (or is right at) its expiry — grace and beyond —
+  // gets a live re-check: the estimated drop date from the TLD config is a
+  // guess, so the UI must confirm against the actual registry snapshot.
+  return phase === "dropped" || phase === "pendingDelete" || phase === "redemption" || phase === "grace";
 }
 
 /**

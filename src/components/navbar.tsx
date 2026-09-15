@@ -21,6 +21,7 @@ import {
   RiMapPinLine,
   RiInformationLine,
   RiHeart3Line,
+  RiLinksLine,
   RiFileList2Line,
   RiCompassLine,
   RiWifiLine,
@@ -356,7 +357,7 @@ const NAV_GROUPS: NavGroup[] = [
       { labelKey: "nav_drops",          descKey: "nav_drops_desc",          href: "/drops",      icon: <RiCalendarLine className="h-6 w-6" />, settingKey: "enable_remind" },
       { labelKey: "nav_tools",          descKey: "nav_tools_desc",           subPanel: "tools",   icon: <RiToolsLine className="h-6 w-6" />, settingKey: "enable_tools" },
       { labelKey: "nav_directory",      descKey: "nav_directory_desc",       href: "/directory",  icon: <RiCompassLine className="h-6 w-6" /> },
-      { labelKey: "nav_search_history", descKey: "nav_search_history",       subPanel: "history", icon: <RiHistoryLine className="h-6 w-6" /> },
+      { labelKey: "nav_search_history", descKey: "nav_search_history_desc",       subPanel: "history", icon: <RiHistoryLine className="h-6 w-6" /> },
     ],
   },
   {
@@ -366,6 +367,7 @@ const NAV_GROUPS: NavGroup[] = [
       { labelKey: "nav_tlds",       descKey: "nav_tlds_desc",       href: "/tlds",    icon: <RiServerLine className="h-6 w-6" /> },
       { labelKey: "nav_about",      descKey: "nav_about_desc",      href: "/about",   icon: <RiInformationLine className="h-6 w-6" />, settingKey: "enable_about" },
       { labelKey: "nav_sponsor",    descKey: "nav_sponsor_desc",    href: "/sponsor", icon: <RiHeart3Line className="h-6 w-6" />, settingKey: "enable_sponsor" },
+      { labelKey: "nav_links",      descKey: "nav_links_desc",      href: "/links",   icon: <RiLinksLine className="h-6 w-6" /> },
     ],
   },
 ];
@@ -760,6 +762,7 @@ function NotificationBell() {
   const [unread, setUnread] = React.useState(0);
   const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const queryOnlyMode = settings.query_only_mode === "1";
   const isAdminUser = (session?.user as any)?.isAdmin === true;
@@ -795,6 +798,7 @@ function NotificationBell() {
     if (!open) return;
     function handleOutside(e: MouseEvent | TouchEvent) {
       if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
       setOpen(false);
     }
     function handleReposition() { setOpen(false); }
@@ -843,6 +847,17 @@ function NotificationBell() {
     }
   }, []);
 
+  const openNotif = React.useCallback((it: NotifItem) => {
+    if (!it.read) markRead(it.id);
+    setOpen(false);
+    if (it.domain) router.push(toSearchURI(it.domain));
+  }, [markRead, router]);
+
+  const viewAll = React.useCallback(() => {
+    setOpen(false);
+    router.push("/notifications");
+  }, [router]);
+
   if (status === "loading") return null;
   if (status !== "authenticated") return null;
   if (queryOnlyMode && !isAdminUser) return null;
@@ -875,6 +890,7 @@ function NotificationBell() {
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={dropdownRef}
             initial={{ opacity: 0, scale: 0.92, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: -4 }}
@@ -899,7 +915,7 @@ function NotificationBell() {
                   <button
                     key={it.id}
                     type="button"
-                    onClick={() => markRead(it.id)}
+                    onClick={() => openNotif(it)}
                     className={cn(
                       "w-full text-left flex items-start gap-2 px-3 py-2 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation border-b border-border/30 last:border-b-0",
                       !it.read && "bg-primary/[0.04]",
@@ -921,13 +937,13 @@ function NotificationBell() {
                 ))}
               </div>
             )}
-            <Link
-              href="/notifications"
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-center gap-1 px-3 py-2 text-[11px] font-medium border-t border-border/50 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
+            <button
+              type="button"
+              onClick={viewAll}
+              className="w-full flex items-center justify-center gap-1 px-3 py-2 text-[11px] font-medium border-t border-border/50 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation"
             >
               {t("notifications.view_all")}
-            </Link>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
