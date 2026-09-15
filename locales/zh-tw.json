@@ -1789,7 +1789,8 @@
     "nav_expired_domains": "過期域名挖掘",
     "nav_domain_access": "網域接入",
     "nav_db_export": "資料匯出",
-    "nav_server_test": "伺服器測試"
+    "nav_server_test": "伺服器測試",
+    "nav_link_applications": "友鏈申請"
   },
   "common": {
     "retry": "重試",
@@ -1937,7 +1938,8 @@
     "empty": "暫無連結",
     "empty_hint": "管理員尚未新增任何友情連結",
     "apply_hint": "如需申請友鏈，請透過回饋表單聯絡管理員",
-    "go_feedback": "前往回饋表單"
+    "go_feedback": "前往回饋表單",
+    "go_apply": "去申請"
   },
   "query": {
     "loading_with_domain": "正在查詢 {{domain}}…",

@@ -935,6 +935,88 @@ export function feedbackHtml({
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 8.5 Friendly-link application notifications
+// ──────────────────────────────────────────────────────────────────────────────
+export function linkApplyAdminHtml({
+  name, url, email, category, description, autoApproved, backlinkSummary, ts, siteName = "WHOIS",
+}: {
+  name: string; url: string; email?: string; category?: string; description?: string;
+  autoApproved: boolean; backlinkSummary?: string; ts: string; siteName?: string;
+}): string {
+  const rows = [
+    kvRow("站点名称", name),
+    kvRow("网站地址", `<a href="${url}" style="color:${PRIMARY}">${url}</a>`),
+    ...(email ? [kvRow("联系人邮箱", `<a href="mailto:${email}" style="color:${PRIMARY}">${email}</a>`)] : []),
+    ...(category ? [kvRow("建议分类", category)] : []),
+    ...(description ? [kvRow("站点简介", `<span style="white-space:pre-wrap">${description}</span>`)] : []),
+    kvRow("反链检查", backlinkSummary || "未捕获"),
+  ];
+
+  return emailLayout(`
+    ${brandHeader(
+      autoApproved ? "success" : "warning",
+      "友链申请",
+      name,
+      ts + "（北京时间）",
+    )}
+
+    ${section(`
+      <table cellpadding="0" cellspacing="0" style="width:100%">
+        ${rows.join("")}
+      </table>
+    `)}
+
+    ${divider()}
+    <div style="padding:14px 32px;background:${PANEL}">
+      <p style="margin:0;font-size:11px;color:${MUTED}">
+        ${autoApproved ? "已自动通过（检出本站链接）。" : "未检出本站链接，等待人工审核。"}
+      </p>
+    </div>
+  `, siteName);
+}
+
+export function linkApplyResultHtml({
+  name, approved, rejected, reason, siteName = "WHOIS", locale = "en",
+}: {
+  name: string; approved?: boolean; rejected?: boolean; reason?: string; siteName?: string; locale?: string;
+}): string {
+  const zh = locale === "zh";
+  const title = approved
+    ? zh ? "友链申请已通过" : "Link request approved"
+    : rejected
+      ? zh ? "友链申请未通过" : "Link request declined"
+      : zh ? "友链申请待审核" : "Link request under review";
+
+  const body = approved
+    ? zh
+      ? `恭喜，您的网站 <strong>${name}</strong> 的友链申请已通过，现已展示在友链列表中。`
+      : `Congratulations, the link request for <strong>${name}</strong> was approved and is now listed.`
+    : rejected
+      ? zh
+        ? `很遗憾，<strong>${name}</strong> 的友链申请未通过。${reason ? `原因：${reason}` : ""}`
+        : `Unfortunately, the link request for <strong>${name}</strong> was declined.${reason ? ` Reason: ${reason}` : ""}`
+      : zh
+        ? `您的友链申请已收到，我们正在审核 <strong>${name}</strong>。审核通过后将展示在友链列表中。`
+        : `We received your link request for <strong>${name}</strong> and are reviewing it now.`;
+
+  const rowColor = approved ? TONES.success.fg : rejected ? TONES.danger.fg : TONES.warning.fg;
+
+  return emailLayout(`
+    ${brandHeader(approved ? "success" : rejected ? "danger" : "warning", "友链申请", title)}
+
+    ${section(`
+      <div style="font-size:13px;line-height:1.7;color:${PRIMARY}">
+        <p style="margin:0 0 12px">${body}</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%">
+          ${kvRow(zh ? "申请站点" : "Site", `<span style="font-family:${MONO}">${name}</span>`, `color:${rowColor};font-weight:600`)}
+          ${rejected && reason ? kvRow(zh ? "原因" : "Reason", reason) : ""}
+        </table>
+      </div>
+    `)}
+  `, siteName);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 9. High-value available domain alert (sent to admin — stays in Chinese)
 // ──────────────────────────────────────────────────────────────────────────────
 export interface HighValueAlertParams {

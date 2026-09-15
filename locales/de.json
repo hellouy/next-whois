@@ -1789,7 +1789,8 @@
     "nav_domain_access": "Domain-Zugang",
     "nav_db_export": "DB-Export",
     "nav_server_test": "Server-Test",
-    "nav_whois_servers": "WHOIS-Server-Verwaltung"
+    "nav_whois_servers": "WHOIS-Server-Verwaltung",
+    "nav_link_applications": "Link-Anfragen"
   },
   "common": {
     "retry": "Wiederholen",
@@ -1937,7 +1938,8 @@
     "empty": "Noch keine Links",
     "empty_hint": "Es wurden noch keine Empfehlungslinks hinzugefügt",
     "apply_hint": "Um einen Link zu beantragen, kontaktieren Sie den Administrator über das Feedback-Formular",
-    "go_feedback": "Zum Feedback-Formular"
+    "go_feedback": "Zum Feedback-Formular",
+    "go_apply": "Jetzt bewerben"
   },
   "query": {
     "loading_with_domain": "{{domain}} wird abgefragt…",

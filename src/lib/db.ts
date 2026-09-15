@@ -229,6 +229,21 @@ const CREATE_TABLES = [
     active       BOOLEAN      NOT NULL DEFAULT true,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
+  `CREATE TABLE IF NOT EXISTS friendly_link_applications (
+    id             VARCHAR(16)  PRIMARY KEY,
+    name           TEXT         NOT NULL,
+    url            TEXT         NOT NULL,
+    description    TEXT,
+    category       TEXT,
+    email          TEXT         NOT NULL,
+    status         TEXT         NOT NULL DEFAULT 'review',
+    auto_approved  BOOLEAN      NOT NULL DEFAULT false,
+    backlink_pages TEXT,
+    admin_note     TEXT,
+    link_id        INTEGER      REFERENCES friendly_links(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    reviewed_at    TIMESTAMPTZ
+  )`,
   `CREATE TABLE IF NOT EXISTS access_keys (
     id           VARCHAR(16)  PRIMARY KEY,
     key          TEXT         UNIQUE NOT NULL,

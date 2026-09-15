@@ -1789,7 +1789,8 @@
     "nav_whois_servers": "WHOIS 服务器管理",
     "nav_notify_service": "推送渠道",
     "nav_expired_domains": "过期域名挖掘",
-    "nav_domain_access": "域名接入"
+    "nav_domain_access": "域名接入",
+    "nav_link_applications": "友链申请"
   },
   "common": {
     "retry": "重试",
@@ -1937,7 +1938,8 @@
     "empty": "暂无链接",
     "empty_hint": "管理员尚未添加任何友情链接",
     "apply_hint": "如需申请友链，请通过反馈表单联系管理员",
-    "go_feedback": "前往反馈表单"
+    "go_feedback": "前往反馈表单",
+    "go_apply": "去申请"
   },
   "query": {
     "loading_with_domain": "正在查询 {{domain}}…",

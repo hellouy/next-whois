@@ -1788,7 +1788,8 @@
     "nav_domain_access": "ドメインアクセス",
     "nav_db_export": "DBエクスポート",
     "nav_server_test": "サーバーテスト",
-    "nav_whois_servers": "WHOISサーバー管理"
+    "nav_whois_servers": "WHOISサーバー管理",
+    "nav_link_applications": "リンク申請"
   },
   "common": {
     "retry": "再試行",
@@ -1937,7 +1938,8 @@
     "empty": "リンクはまだありません",
     "empty_hint": "まだ友情リンクが追加されていません",
     "apply_hint": "リンクを申請するには、フィードバックフォームから管理者にご連絡ください",
-    "go_feedback": "フィードバックフォームへ"
+    "go_feedback": "フィードバックフォームへ",
+    "go_apply": "申請する"
   },
   "query": {
     "loading_with_domain": "{{domain}} を検索中…",

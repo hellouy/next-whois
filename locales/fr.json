@@ -1789,7 +1789,8 @@
     "nav_domain_access": "Accès Domaine",
     "nav_db_export": "Export DB",
     "nav_server_test": "Test serveur",
-    "nav_whois_servers": "Gestion des serveurs WHOIS"
+    "nav_whois_servers": "Gestion des serveurs WHOIS",
+    "nav_link_applications": "Demandes de liens"
   },
   "common": {
     "retry": "Réessayer",
@@ -1937,7 +1938,8 @@
     "empty": "Aucun lien pour l'instant",
     "empty_hint": "Aucun lien ami n'a encore été ajouté",
     "apply_hint": "Pour demander un lien, contactez l'administrateur via le formulaire de retour",
-    "go_feedback": "Aller au formulaire de retour"
+    "go_feedback": "Aller au formulaire de retour",
+    "go_apply": "Postuler"
   },
   "query": {
     "loading_with_domain": "Interrogation de {{domain}}…",

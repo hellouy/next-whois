@@ -1789,7 +1789,8 @@
     "nav_domain_access": "도메인 접속",
     "nav_db_export": "DB 내보내기",
     "nav_server_test": "서버 테스트",
-    "nav_whois_servers": "WHOIS 서버 관리"
+    "nav_whois_servers": "WHOIS 서버 관리",
+    "nav_link_applications": "링크 신청"
   },
   "common": {
     "retry": "재시도",
@@ -1937,7 +1938,8 @@
     "empty": "아직 링크가 없습니다",
     "empty_hint": "아직 추가된 링크가 없습니다",
     "apply_hint": "링크 신청은 피드백 양식을 통해 관리자에게 연락해 주세요",
-    "go_feedback": "피드백 양식으로 이동"
+    "go_feedback": "피드백 양식으로 이동",
+    "go_apply": "신청하기"
   },
   "query": {
     "loading_with_domain": "{{domain}} 조회 중…",
