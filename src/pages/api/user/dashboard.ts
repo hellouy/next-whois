@@ -15,6 +15,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, isDbReady } from "@/lib/db-query";
 import { computeLifecycle, nextReminderFiring } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
+import { needsLiveCheck, liveCheckDomain, classifyLive, type LiveStatus } from "@/lib/server/subscription-live";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("api/user/dashboard");
@@ -126,7 +127,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const nowMs = Date.now();
-    const subscriptions = rows.map((r) => {
+    const pendingChecks: { index: number; domain: string; active: boolean }[] = [];
+    const subscriptions = rows.map((r, index) => {
       // whois_expiry_date is the WHOIS-verified expiry (authoritative when present),
       // falling back to the user-provided expiration_date
       const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
@@ -166,6 +168,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      if (needsLiveCheck(lc?.phase ?? null, r.active)) {
+        pendingChecks.push({ index, domain: r.domain, active: r.active });
+      }
+
       return {
         id: r.id,
         domain: r.domain,
@@ -195,6 +201,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
+    // Live re-check for post-expiry / dropped / cancelled subscriptions: confirm
+    // against a live registry lookup before the UI claims "released". A name that
+    // was released but is now registered by someone else becomes "re_registered"
+    // instead of being shown as available.
+    const checked = await Promise.all(pendingChecks.map((c) => liveCheckDomain(c.domain)));
+    const liveByIndex = new Map<number, { live: LiveStatus; eppStatuses: string[]; recheckedAt: string | null }>();
+    checked.forEach((ch, i) => {
+      const c = pendingChecks[i];
+      liveByIndex.set(c.index, {
+        live: classifyLive(ch.live ?? "unknown", c.active),
+        eppStatuses: ch.eppStatuses,
+        recheckedAt: ch.recheckedAt,
+      });
+    });
+    const liveSubscriptions = subscriptions.map((s, index) => {
+      const lv = liveByIndex.get(index);
+      return lv ? { ...s, live_status: lv.live, epp_statuses: lv.eppStatuses, rechecked_at: lv.recheckedAt } : s;
+    });
+
     // DB-authoritative access flag — always trust DB over stale JWT
     // Auto-revoke if a time-limited subscription has expired
     let subscriptionAccess = userRow?.subscription_access ?? false;
@@ -212,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // User-specific; allow browser to serve stale while quietly revalidating
     res.setHeader("Cache-Control", "private, max-age=0, stale-while-revalidate=60");
     return res.status(200).json({
-      subscriptions,
+      subscriptions: liveSubscriptions,
       stamps: stampsRows,
       subscriptionAccess,
       subscriptionExpiresAt,

@@ -489,6 +489,7 @@ export function SubscriptionsTab({
         const isUrgent = sub.active && ((days !== null && days >= 0 && days <= 7) || isDropSoon);
         const isWarn = sub.active && days !== null && days >= 0 && days <= 30 && !isUrgent;
         const isPostExpiry = sub.active && phase && phase !== "active";
+        const liveStatus = sub.live_status ?? null;
 
         const barPct = (days !== null && days > 0 && phase === "active")
           ? Math.min(100, Math.round((days / 365) * 100))
@@ -584,6 +585,21 @@ export function SubscriptionsTab({
                         phase === "pendingDelete" ? "bg-purple-50 dark:bg-purple-950/30 border-purple-300/50" :
                         "bg-muted border-border/50"
                       )}>{t(("dashboard.phase_" + phase) as TranslationKey)}</span>
+                    )}
+                    {liveStatus === "re_registered" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold border border-red-300/50">
+                        {t("dashboard.live_re_registered")}
+                      </span>
+                    )}
+                    {liveStatus === "released" && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-300/50">
+                        {t("dashboard.live_released")}
+                      </span>
+                    )}
+                    {liveStatus === "occupied" && !sub.active && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-300/50">
+                        {t("dashboard.live_occupied")}
+                      </span>
                     )}
                   </div>
                   {/* Expiry date row */}

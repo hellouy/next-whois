@@ -4,6 +4,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { many, one, run, withTransaction, isDbReady } from "@/lib/db-query";
 import { computeLifecycle, nextReminderFiring } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
+import { needsLiveCheck, liveCheckDomain, classifyLive, type LiveStatus } from "@/lib/server/subscription-live";
 import { createLogger } from "@/lib/logger";
 import { snipeServicePrice } from "@/lib/server/snipe-pricing";
 import {
@@ -86,7 +87,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const overrides = await loadLifecycleOverrides();
       const nowMs = Date.now();
 
-      const subscriptions = rows.map((r) => {
+      const pendingChecks: { index: number; domain: string; active: boolean }[] = [];
+      const subscriptions = rows.map((r, index) => {
         // Use WHOIS-verified date as authoritative source (same as dashboard.ts)
         const effectiveExpiry = r.whois_expiry_date ?? r.expiration_date;
         // Feed the last persisted registry EPP statuses (if any) into the
@@ -139,6 +141,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
+        if (needsLiveCheck(lc?.phase ?? null, r.active)) {
+          pendingChecks.push({ index, domain: r.domain, active: r.active });
+        }
+
         return {
           id: r.id,
           domain: r.domain,
@@ -180,7 +186,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
       });
 
-      return res.status(200).json({ subscriptions });
+      // Live re-check for post-expiry / dropped / cancelled subscriptions: confirm
+      // against a live registry lookup before the UI claims "released". A name that
+      // was released but is now registered by someone else becomes "re_registered".
+      const checked = await Promise.all(pendingChecks.map((c) => liveCheckDomain(c.domain)));
+      const liveByIndex = new Map<number, { live: LiveStatus; eppStatuses: string[]; recheckedAt: string | null }>();
+      checked.forEach((ch, i) => {
+        const c = pendingChecks[i];
+        liveByIndex.set(c.index, {
+          live: classifyLive(ch.live ?? "unknown", c.active),
+          eppStatuses: ch.eppStatuses,
+          recheckedAt: ch.recheckedAt,
+        });
+      });
+      const liveSubscriptions = subscriptions.map((s, index) => {
+        const lv = liveByIndex.get(index);
+        return lv ? { ...s, live_status: lv.live, epp_statuses: lv.eppStatuses, rechecked_at: lv.recheckedAt } : s;
+      });
+
+      return res.status(200).json({ subscriptions: liveSubscriptions });
     } catch (err) {
       logger.error("[subscriptions] GET error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "Failed to retrieve data" });

@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 import {
   RiLoader4Line, RiUserLine, RiLogoutBoxLine, RiAlertLine,
   RiPencilLine, RiCheckLine, RiCloseLine, RiMailLine,
   RiEyeLine, RiEyeOffLine, RiPaletteLine, RiLockLine,
-  RiDeleteBinLine, RiSearchLine,
+  RiDeleteBinLine, RiSearchLine, RiWalletLine, RiSettingsLine,
+  RiRestartLine, RiHistoryLine,
 } from "@remixicon/react";
 import type { Subscription, Stamp, DashboardUser, TFunction } from "./types";
 import { AVATAR_COLORS } from "./types";
@@ -64,7 +66,9 @@ export type AccountTabProps = {
   subscriptions: Subscription[];
   stamps: Stamp[];
   searchStats: SearchStats | null;
+  balanceCents: number;
   t: TFunction;
+  onGoMembership: () => void;
   setEditingAvatar: (v: boolean | ((prev: boolean) => boolean)) => void;
   onSaveAvatarColor: (color: string) => void;
   setEditingName: (v: boolean) => void;
@@ -100,7 +104,7 @@ export function AccountTab({
   emailChangeCode, sendingChangeCode, changeCodeCooldown,
   showDeleteConfirm, deleteConfirmEmail, deletingAccount,
   contactMsg, contactCategory, contactSending, contactSent,
-  subscriptions, stamps, searchStats, t,
+  subscriptions, stamps, searchStats, balanceCents, t, onGoMembership,
   setEditingAvatar, onSaveAvatarColor,
   setEditingName, setNameValue, onSaveName,
   setEditingEmail, setEmailValue, setEmailChangeCode, onSaveEmail, onSendEmailChangeCode, setChangeCodeCooldown,
@@ -109,8 +113,28 @@ export function AccountTab({
   setShowDeleteConfirm, setDeleteConfirmEmail, onDeleteAccount,
 }: AccountTabProps) {
   const [contactError, setContactError] = React.useState(false);
+  const [historyCount, setHistoryCount] = React.useState(0);
+  const [historyCleared, setHistoryCleared] = React.useState(false);
   const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
   const initial = (user.name || user.email || "U").charAt(0).toUpperCase();
+
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("history");
+      setHistoryCount(raw ? (JSON.parse(raw) as unknown[]).length : 0);
+    } catch { /* ignore */ }
+  }, []);
+
+  const clearLocalHistory = () => {
+    try { window.localStorage.removeItem("history"); } catch { /* ignore */ }
+    setHistoryCount(0);
+    setHistoryCleared(true);
+  };
+
+  const resetLanguage = () => {
+    document.cookie = "NEXT_LOCALE=;path=/;max-age=0;samesite=lax";
+    window.location.reload();
+  };
 
   return (
     <motion.div key="account" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }} className="space-y-4">
@@ -136,6 +160,35 @@ export function AccountTab({
               {t("founder")}
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Wallet card */}
+      <div className="glass-panel border border-border rounded-2xl p-4">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <RiWalletLine className="w-3.5 h-3.5 text-primary" />
+            {t("dashboard.plan_balance")}
+          </p>
+          <span className="text-xs font-bold tabular-nums">
+            <span className="text-muted-foreground mr-0.5">¥</span>{((balanceCents ?? 0) / 100).toFixed(2)}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onGoMembership}
+            className="h-8 rounded-xl text-[11px] font-medium border border-primary/30 text-primary hover:bg-primary/10 transition-colors touch-manipulation"
+          >
+            {t("payment.balance_credit")}
+          </button>
+          <button
+            type="button"
+            onClick={onGoMembership}
+            className="h-8 rounded-xl text-[11px] font-medium border border-border text-muted-foreground hover:bg-muted transition-colors touch-manipulation"
+          >
+            {t("dashboard.order_history")}
+          </button>
         </div>
       </div>
 
@@ -459,6 +512,34 @@ export function AccountTab({
               </Button>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Reset local settings + password recovery */}
+      <div className="glass-panel border border-border rounded-2xl overflow-hidden">
+        <div className="grid grid-cols-2 gap-2 px-2.5 py-2.5">
+          <button
+            type="button"
+            onClick={resetLanguage}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-border/60 hover:bg-muted/40 transition-colors text-xs font-medium text-muted-foreground"
+          >
+            <RiRestartLine className="w-4 h-4 text-muted-foreground" />
+            {t("dashboard.reset_language")}
+          </button>
+          <button
+            type="button"
+            onClick={clearLocalHistory}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-border/60 hover:bg-muted/40 transition-colors text-xs font-medium text-muted-foreground"
+          >
+            <RiHistoryLine className="w-4 h-4 text-muted-foreground" />
+            {t("dashboard.reset_history")}
+          </button>
+        </div>
+        {historyCleared && (
+          <p className="px-3 pb-2 text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <RiCheckLine className="w-3 h-3" />
+            {t("dashboard.history_cleared")}
+          </p>
         )}
       </div>
 

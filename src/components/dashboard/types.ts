@@ -19,6 +19,9 @@ export type Subscription = {
   registrar: string | null;
   creation_date: string | null;
   whois_synced_at: string | null;
+  live_status: "released" | "occupied" | "re_registered" | "unknown" | null;
+  rechecked_at: string | null;
+  epp_statuses?: string[];
   snipe: {
     id: string;
     status: string;

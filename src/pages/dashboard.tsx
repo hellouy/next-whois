@@ -1,6 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -12,17 +13,41 @@ import {
   RiExternalLinkLine,
 } from "@remixicon/react";
 import { useSiteSettings } from "@/lib/site-settings";
-import { SubscriptionsTab } from "@/components/dashboard/SubscriptionsTab";
-import { StampsTab } from "@/components/dashboard/StampsTab";
-import { MembershipTab } from "@/components/dashboard/MembershipTab";
-import { AccountTab } from "@/components/dashboard/AccountTab";
 import type { DashboardUser } from "@/components/dashboard/types";
-import { EditStampModal } from "@/components/dashboard/EditStampModal";
-import { EditExpiryModal } from "@/components/dashboard/EditExpiryModal";
-import { BulkImportModal } from "@/components/dashboard/BulkImportModal";
-import { ClaimGuideModal, SubscribeGuideModal } from "@/components/dashboard/GuideModals";
 import { invalidateDashCache } from "@/lib/dashboard-cache";
 import { useDashboard } from "@/hooks/useDashboard";
+
+const SubscriptionsTab = dynamic(
+  () => import("@/components/dashboard/SubscriptionsTab").then(m => m.SubscriptionsTab),
+  { loading: () => <div className="glass-panel border border-border/50 rounded-2xl h-40 animate-pulse" /> },
+);
+const StampsTab = dynamic(
+  () => import("@/components/dashboard/StampsTab").then(m => m.StampsTab),
+  { loading: () => <div className="glass-panel border border-border/50 rounded-2xl h-40 animate-pulse" /> },
+);
+const MembershipTab = dynamic(
+  () => import("@/components/dashboard/MembershipTab").then(m => m.MembershipTab),
+  { loading: () => <div className="glass-panel border border-border/50 rounded-2xl h-40 animate-pulse" /> },
+);
+const AccountTab = dynamic(
+  () => import("@/components/dashboard/AccountTab").then(m => m.AccountTab),
+  { loading: () => <div className="glass-panel border border-border/50 rounded-2xl h-40 animate-pulse" /> },
+);
+const EditStampModal = dynamic(
+  () => import("@/components/dashboard/EditStampModal").then(m => m.EditStampModal),
+);
+const EditExpiryModal = dynamic(
+  () => import("@/components/dashboard/EditExpiryModal").then(m => m.EditExpiryModal),
+);
+const BulkImportModal = dynamic(
+  () => import("@/components/dashboard/BulkImportModal").then(m => m.BulkImportModal),
+);
+const ClaimGuideModal = dynamic(
+  () => import("@/components/dashboard/GuideModals").then(m => m.ClaimGuideModal),
+);
+const SubscribeGuideModal = dynamic(
+  () => import("@/components/dashboard/GuideModals").then(m => m.SubscribeGuideModal),
+);
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -455,6 +480,8 @@ export default function DashboardPage() {
               subscriptions={subscriptions}
               stamps={stamps}
               searchStats={searchStats ?? null}
+              balanceCents={balanceCents}
+              onGoMembership={() => setTab("membership")}
               t={t}
               setEditingAvatar={setEditingAvatar}
               onSaveAvatarColor={saveAvatarColor}

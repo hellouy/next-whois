@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { toSearchURI } from "@/lib/utils";
 import {
   RiNotification3Line,
   RiNotificationOffLine,
@@ -122,6 +123,11 @@ export default function NotificationsPage() {
     }
   };
 
+  const openNotif = (it: NotifItem) => {
+    if (!it.read) markRead(it.id);
+    if (it.domain) router.push(toSearchURI(it.domain));
+  };
+
   const markAllRead = async () => {
     if (!items.some(it => !it.read)) return;
     setItems(prev => prev.map(it => ({ ...it, read: true })));
@@ -160,6 +166,14 @@ export default function NotificationsPage() {
   };
 
   const unreadCount = items.filter(it => !it.read).length;
+
+  const listVariants = {
+    show: { transition: { staggerChildren: 0.035 } },
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 8 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" as const } },
+  };
 
   return (
     <>
@@ -207,8 +221,17 @@ export default function NotificationsPage() {
             </div>
 
             {loading ? (
-              <div className="px-4 py-12 text-center">
-                <RiLoader4Line className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+              <div className="px-4 py-2">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3.5 animate-pulse">
+                    <div className="mt-0.5 w-8 h-8 rounded-lg bg-muted shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="h-2 w-20 bg-muted rounded" />
+                      <div className="h-3 w-3/4 bg-muted rounded" />
+                      <div className="h-2.5 w-32 bg-muted/70 rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : error ? (
               <div className="px-4 py-12 text-center space-y-2">
@@ -228,16 +251,22 @@ export default function NotificationsPage() {
                 <p className="text-sm text-muted-foreground">{t("notifications.all_clear")}</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/40">
+              <motion.div
+                className="divide-y divide-border/40"
+                variants={listVariants}
+                initial="hidden"
+                animate="show"
+              >
+                <AnimatePresence initial={false}>
                 {items.map(it => (
                   <motion.button
                     key={it.id}
+                    layout
+                    variants={itemVariants}
                     type="button"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={() => markRead(it.id)}
+                    onClick={() => openNotif(it)}
                     className={cn(
-                      "w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-muted active:bg-muted/70 transition-colors touch-manipulation",
+                      "w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-muted active:bg-muted/70 touch-manipulation transition-colors active:scale-[0.985] duration-300 rounded-xl",
                       !it.read && "bg-primary/[0.04]",
                     )}
                   >
@@ -255,21 +284,44 @@ export default function NotificationsPage() {
                           </span>
                         )}
                         {it.domain && (
-                          <span className="text-[10px] text-muted-foreground truncate">{it.domain}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[160px]">{it.domain}</span>
                         )}
                       </span>
-                      <span className={cn("block text-sm mt-1", !it.read && "font-semibold")}>{it.title}</span>
+                      <motion.span
+                        className={cn("block text-sm mt-1", !it.read && "font-semibold")}
+                        animate={{ opacity: it.read ? 0.72 : 1 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        {it.title}
+                      </motion.span>
                       {it.body && <span className="block text-xs text-muted-foreground mt-0.5">{it.body}</span>}
                       <span className="block text-[10px] text-muted-foreground/70 mt-1">{fmtDate(it.created_at)}</span>
                     </span>
-                    {!it.read ? (
-                      <span className="mt-1 w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                    ) : (
-                      <RiCheckDoubleLine className="mt-1 w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-                    )}
+                    <span className="shrink-0 w-4">
+                      {!it.read ? (
+                        <motion.span
+                          key="dot"
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0, opacity: 0 }}
+                          className="mt-1.5 w-2 h-2 rounded-full bg-red-500 block"
+                        />
+                      ) : (
+                        <motion.span
+                          key="check"
+                          initial={{ opacity: 0, scale: 0.6 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.6 }}
+                          className="mt-1 block"
+                        >
+                          <RiCheckDoubleLine className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        </motion.span>
+                      )}
+                    </span>
                   </motion.button>
                 ))}
-              </div>
+                </AnimatePresence>
+              </motion.div>
             )}
           </div>
 
