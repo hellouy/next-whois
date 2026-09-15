@@ -167,6 +167,8 @@ export interface SiteSettings {
   expireddomains_tld_filter: string;
   expireddomains_rows: string;
   expireddomains_prefix_list: string;
+  // Site background style
+  site_background: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -314,6 +316,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   expireddomains_tld_filter: "",
   expireddomains_rows: "200",
   expireddomains_prefix_list: "",
+  site_background: "dot",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";
@@ -358,7 +361,7 @@ export function SiteSettingsProvider({
   });
 
   const fetchSettings = React.useCallback(() => {
-    fetch("/api/admin/settings")
+    fetch("/api/admin/settings", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (data.settings) {

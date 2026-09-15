@@ -21,6 +21,7 @@ import {
   RiShareLine, RiServerLine, RiMapPin2Line, RiFileList3Line,
   RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
   RiArrowRightLine, RiTimerLine, RiWifiLine, RiCalendarLine,
+  RiPaintLine, RiPaintFill,
 } from "@remixicon/react";
 
 type TabKey =
@@ -352,6 +353,44 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
         <Field label="页脚文字" desc="显示在所有页面底部（© 版权行）">
           <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 域见你 · WHOIS & RDAP Lookup Service" className="text-xs" />
         </Field>
+      </div>
+
+      {/* ── 站点背景 ────────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiPaintLine}
+          title="站点背景"
+          effect="全站"
+          desc="选择全站页面的背景样式，保存后立即生效"
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(
+            [
+              { value: "dot",       label: "点阵网格（默认）", desc: "原有细点阵 + 顶部渐隐，简洁低调" },
+              { value: "dotfield",  label: "交互点阵（DotField）", desc: "Canvas 点阵，光标划过产生凹陷与光晕" },
+              { value: "shapegrid", label: "形状网格（ShapeGrid）", desc: "Canvas 形状网格缓慢滚动，光标划过网格填充高亮" },
+            ] as const
+          ).map(opt => {
+            const active = (s.site_background || "dot") === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set("site_background", opt.value)}
+                className={cn(
+                  "text-left p-3 rounded-xl border transition-all",
+                  active ? "border-primary/30 bg-primary/5" : "border-border hover:border-primary/30 hover:bg-muted/40",
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold">{opt.label}</p>
+                  <span className={cn("w-3 h-3 rounded-full border transition-colors", active ? "bg-primary border-primary" : "border-border")} />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{opt.desc}</p>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── 首页 Hero ────────────────────────────────────────── */}
