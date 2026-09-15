@@ -965,11 +965,16 @@ export interface LifecycleInfo {
  * Returns null if no phase-specific EPP code is detected.
  * EPP codes: https://www.icann.org/resources/pages/epp-status-codes-2014-06-16-en
  *
- * Hold / locked statuses (clientHold, serverHold, *Prohibited, Registry Hold,
- * "Disputed or Suspicious Activity", etc.) mean the domain is still occupied by
- * the registry or under investigation — it must NEVER be reported as released
- * ("dropped"). They map to "redemption" so the date-based drop estimate cannot
- * trigger the "now available" notification while the name is frozen.
+ * Only explicit registry phase codes (pendingDelete / pendingPurge,
+ * redemptionPeriod / pendingRestore, autoRenewPeriod / addPeriod) are
+ * authoritative and may override the date-based phase. Generic hold / lock
+ * statuses (clientHold, serverHold, *Prohibited, Registry Hold, "Disputed or
+ * Suspicious Activity") mean the name is still occupied, but they are NOT an
+ * expiry/redemption phase — e.g. a routine "client transfer prohibited" lock
+ * must not push a freshly renewed domain into redemption. They return null so
+ * the date-based phase governs; if the date arithmetic ever concludes
+ * "dropped" while any EPP status exists, computeLifecycle forces redemption
+ * and the name is never reported as released.
  */
 export function getPhaseFromEppStatus(eppStatuses: string[]): LifecyclePhase | null {
   if (!eppStatuses || eppStatuses.length === 0) return null;
@@ -983,16 +988,7 @@ export function getPhaseFromEppStatus(eppStatuses: string[]): LifecyclePhase | n
   if (normalized.some((s) => s.includes("pendingrestore"))) return "redemption";
   if (normalized.some((s) => s.includes("autorenewperiod"))) return "grace";
   if (normalized.some((s) => s.includes("addperiod"))) return "grace";
-  // Hold / lock family: domain is still occupied by the registry even if the
-  // date-based estimate says the drop window has passed. Block "dropped".
-  const isHeld = normalized.some((s) =>
-    s.includes("clienthold") || s.includes("serverhold") ||
-    s.includes("clientrenewprohibited") || s.includes("serverrenewprohibited") ||
-    s.includes("clientdeleteprohibited") || s.includes("serverdeleteprohibited") ||
-    s.includes("clienttransferprohibited") || s.includes("servertransferprohibited") ||
-    s.includes("clientupdateprohibited") || s.includes("serverupdateprohibited")
-  );
-  if (isHeld) return "redemption";
+  // Hold / lock family is not a phase — see doc comment above.
   return null;
 }
 

@@ -88,21 +88,25 @@ describe("getPhaseFromEppStatus", () => {
     expect(getPhaseFromEppStatus(["addPeriod"])).toBe("grace");
   });
 
-  it("maps hold / lock family to redemption so dropped is impossible", () => {
-    expect(getPhaseFromEppStatus(["clientHold"])).toBe("redemption");
-    expect(getPhaseFromEppStatus(["server hold"])).toBe("redemption");
-    expect(getPhaseFromEppStatus(["clientDeleteProhibited", "serverRenewProhibited"])).toBe("redemption");
+  it("maps hold / lock family to null (not a redemption phase)", () => {
+    // "client transfer prohibited" is a routine registrar lock (e.g. af.af) —
+    // it must NOT push an in-range domain into the redemption phase.
+    expect(getPhaseFromEppStatus(["clientHold"])).toBeNull();
+    expect(getPhaseFromEppStatus(["server hold"])).toBeNull();
+    expect(getPhaseFromEppStatus(["clientDeleteProhibited", "serverRenewProhibited"])).toBeNull();
     expect(getPhaseFromEppStatus(["client hold", "server hold"])).not.toBe("dropped");
   });
 
   it("returns null for empty or non-phase-specific statuses", () => {
     expect(getPhaseFromEppStatus([])).toBeNull();
     expect(getPhaseFromEppStatus(["ok", "active"])).toBeNull();
+    expect(getPhaseFromEppStatus(["client transfer prohibited"])).toBeNull();
   });
 
   it("normalizes spaces, underscores and dashes", () => {
-    expect(getPhaseFromEppStatus(["client hold"])).toBe("redemption");
-    expect(getPhaseFromEppStatus(["Server-Hold"])).toBe("redemption");
+    expect(getPhaseFromEppStatus(["client hold"])).toBeNull();
+    expect(getPhaseFromEppStatus(["Server-Hold"])).toBeNull();
+    expect(getPhaseFromEppStatus(["autoRenew Period"])).toBe("grace");
   });
 });
 
@@ -156,6 +160,15 @@ describe("computeLifecycle", () => {
     expect(occupied?.phase).not.toBe("dropped");
     expect(occupied?.phase).toBe("redemption");
     expect(occupied?.phaseSource).toBe("epp");
+  });
+
+  it("routine client lock does not override an in-range date phase", () => {
+    // af.af regression: renewed through 2027-09-08 with a routine
+    // "client transfer prohibited" lock must stay active, not redemption.
+    const future = new Date(Date.now() + 400 * DAY).toISOString().slice(0, 10);
+    const lc = computeLifecycle("af.af", future, ["client transfer prohibited"], {});
+    expect(lc?.phase).toBe("active");
+    expect(lc?.phaseSource).toBe("dates");
   });
 
   it("returns null for missing/invalid expiry", () => {

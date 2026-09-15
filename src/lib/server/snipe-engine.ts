@@ -164,6 +164,21 @@ export function isSuspectRelease(r: WhoisResult | null): boolean {
   return false;
 }
 
+/**
+ * True when WHOIS still returns registration data (an EPP status list) for the
+ * domain — no release signal. While that holds, an insufficient-balance notice
+ * is pure noise (e.g. f.sb under Registry Hold): the name is not droppable yet,
+ * so the target parks on blocked_balance and stays silent until WHOIS actually
+ * reports a release.
+ */
+async function stillRegisteredOnWhois(domain: string): Promise<boolean> {
+  const res = await withTimeout(lookupWhoisWithCache(domain), WHOIS_TIMEOUT_MS);
+  if (!res) return false;
+  if (isSuspectRelease(res)) return false;
+  const codes = res.result?.status ?? [];
+  return codes.length > 0;
+}
+
 // ── DB helpers ───────────────────────────────────────────────────────────────
 
 /** Atomic per-target claim: only one concurrent probe owns the row. */
@@ -534,7 +549,12 @@ async function armPrecheck(t: SnipeTargetRow): Promise<TargetOutcome> {
          WHERE id = $1 AND status IN ('watching','armed','blocked_balance')`,
         [t.id, newService],
       );
-      await notifySnipeInsufficient(t, newService);
+      // A domain still occupied (EPP data present) is not droppable yet — an
+      // insufficient-funds notice would be noise (e.g. f.sb under Registry
+      // Hold). Keep the target blocked and stay silent until WHOIS reports a
+      // real release signal.
+      const stillRegistered = await stillRegisteredOnWhois(t.domain);
+      if (!stillRegistered) await notifySnipeInsufficient(t, newService);
       return "blocked_balance";
     }
 
