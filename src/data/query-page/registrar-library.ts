@@ -246,6 +246,18 @@ export const REGISTRAR_LIBRARY: RegistrarInfo[] = [
     ianaId: "1408",
     website: "https://www.united-domains.de",
   },
+  {
+    name: "HOSTAFRICA",
+    matchKeys: ["hostafrica"],
+    ianaId: "N/A",
+    website: "https://www.hostafrica.com",
+  },
+  {
+    name: "KENIC",
+    matchKeys: ["kenic"],
+    ianaId: "N/A",
+    website: "https://kenic.or.ke",
+  },
 ];
 
 const NORMALIZED_REGISTRAR_CACHE = REGISTRAR_LIBRARY.map((r) => ({

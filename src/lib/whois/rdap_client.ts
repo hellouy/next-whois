@@ -8,7 +8,25 @@ import { extractDomain } from "@/lib/utils";
 import { applyParams } from "./common_parser";
 import { domainToASCII } from "url";
 import { getGtldRdapServer } from "./rdap_gtld_bootstrap";
-import { resolveRegistrarIanaId } from "@/data/query-page/registrar-library";
+import { resolveRegistrarIanaId, findRegistrarInfo } from "@/data/query-page/registrar-library";
+
+/**
+ * True when a link points at an RDAP resource served by the registry's own
+ * RDAP server (e.g. https://rdap.kenic.or.ke/entity/EAL). Such links are
+ * frequently the only "about"/"related" link on a registrar entity, but they
+ * are NOT the registrar's website and must never surface as registrarURL.
+ */
+function isRdapInternalLink(l: { href?: string; type?: string; rel?: string }): boolean {
+  if (!l.href || !l.href.startsWith("http")) return true;
+  if (l.type && l.type !== "application/rdap+json") return false;
+  if (l.rel === "self") return true;
+  try {
+    const path = new URL(l.href).pathname;
+    return /(^|\/)(domain|entity|nameserver|ip|autnum|network)\//i.test(path);
+  } catch {
+    return true;
+  }
+}
 
 function derivePunycode(unicodeName: string): string | undefined {
   try {
@@ -546,14 +564,15 @@ function parseRdapEntity(entities: RdapEntity[]): {
       if (entity.handle) registrarHandle = entity.handle;
       // Prefer explicit `url` field on entity, then fall back to links
       if (entity.links) {
+        // Skip RDAP-internal resource links (e.g. /entity/EAL on the registry's
+        // own server) — those are registry metadata, not the registrar website.
         const aboutLink = entity.links.find(
-          (l) => l.rel === "about" || l.rel === "related",
+          (l) => (l.rel === "about" || l.rel === "related") && !isRdapInternalLink(l),
         );
-        const selfLink = entity.links.find(
-          (l) => l.rel === "self" || l.type === "application/rdap+json",
+        const anyLink = entity.links.find(
+          (l) => l.href?.startsWith("http") && !isRdapInternalLink(l),
         );
-        const anyLink = entity.links.find((l) => l.href?.startsWith("http"));
-        const best = aboutLink || selfLink || anyLink;
+        const best = aboutLink || anyLink;
         if (best?.href && best.href.startsWith("http")) {
           registrarURL = best.href;
         }
@@ -641,6 +660,14 @@ function parseRdapEntity(entities: RdapEntity[]): {
         techPhone = phone.replace(/^tel:/i, "").trim();
       if (email && email !== "Unknown" && techEmail === "Unknown") techEmail = email;
     }
+  }
+
+  // When RDAP exposed no usable website link (most ccTLD registries only serve
+  // RDAP-internal links), fall back to the curated registrar library so the
+  // registrar card still links to the actual registrar website.
+  if (registrarURL === "Unknown") {
+    const lib = findRegistrarInfo(registrar);
+    if (lib?.website) registrarURL = lib.website;
   }
 
   return {
