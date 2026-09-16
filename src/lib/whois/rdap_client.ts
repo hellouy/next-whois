@@ -9,6 +9,7 @@ import { applyParams } from "./common_parser";
 import { domainToASCII } from "url";
 import { getGtldRdapServer } from "./rdap_gtld_bootstrap";
 import { resolveRegistrarIanaId, findRegistrarInfo } from "@/data/query-page/registrar-library";
+import { safeFetchWithRedirectGuard } from "@/lib/ssrf-guard";
 
 /**
  * True when a link points at an RDAP resource served by the registry's own
@@ -376,7 +377,7 @@ async function tryRdapWithUrl(
 ): Promise<any | null> {
   const url = `${baseUrl}domain/${domainToQuery}`;
   try {
-    const res = await fetch(url, {
+    const res = await safeFetchWithRedirectGuard(url, {
       headers: { Accept: "application/rdap+json, application/json" },
       signal: AbortSignal.timeout(timeoutMs),
     });

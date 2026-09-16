@@ -1,4 +1,4 @@
-import { randomBytes, createHash, createHmac } from "crypto";
+import { randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
 import { run, one, many, withTransaction } from "@/lib/db-query";
 import { sendEmail, paymentConfirmHtml, getSiteLabel } from "@/lib/email";
 import { autoArmBlockedTargets } from "@/lib/server/snipe-balance";
@@ -324,7 +324,13 @@ export function verifyXunhupayWebhook(body: Record<string, string>, appSecret: s
   const { sign, ...rest } = body;
   if (!sign) return false;
   const expected = xunhupaySign(rest, appSecret);
-  return sign.toLowerCase() === expected.toLowerCase();
+  const a = Buffer.from(sign.toLowerCase());
+  const b = Buffer.from(expected.toLowerCase());
+  if (a.length !== b.length) {
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
 }
 
 export function verifyStripeWebhookSignature(
@@ -343,9 +349,23 @@ export function verifyStripeWebhookSignature(
       .filter(([k]) => k === "v1")
       .map(([, v]) => v);
     if (!timestamp || signatures.length === 0) return false;
+
+    // Replay protection: reject timestamps older than 5 minutes.
+    const tsNum = parseInt(timestamp, 10);
+    if (!Number.isFinite(tsNum)) return false;
+    const ageSeconds = Math.abs(Math.floor(Date.now() / 1000) - tsNum);
+    if (ageSeconds > 300) return false;
+
     const signedPayload = `${timestamp}.${payload}`;
     const expected = createHmac("sha256", secret).update(signedPayload).digest("hex");
-    return signatures.some(s => s === expected);
+    const expectedBuf = Buffer.from(expected);
+    for (const sig of signatures) {
+      const sigBuf = Buffer.from(sig);
+      if (sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf)) {
+        return true;
+      }
+    }
+    return false;
   } catch {
     return false;
   }

@@ -22,6 +22,7 @@ import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdminEmail } from "@/lib/admin-server";
+import { verifySecretTimingSafe } from "@/lib/admin";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { recordNotification } from "@/lib/notifications";
 import { confirmDomainReleased } from "@/lib/server/release-confirm";
@@ -155,7 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Note: query string secret removed for security (secrets can leak into server logs)
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
     const provided = bearerToken || legacyHeader;
-    if (provided === cronSecret) authed = true;
+    if (verifySecretTimingSafe(provided, cronSecret)) authed = true;
   }
   if (!authed) {
     // Fall back to admin session auth (always required when cron secret not matched)

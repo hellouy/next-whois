@@ -3,6 +3,7 @@ import { isDbReady } from "@/lib/db-query";
 import { getDbReady } from "@/lib/db";
 import { isRedisAvailable, getRedisValue } from "@/lib/server/redis";
 import { createLogger } from "@/lib/logger";
+import { verifyCronSecret } from "@/lib/admin";
 
 const logger = createLogger("api/cron/ping");
 
@@ -13,8 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // session may trigger the endpoint (never anonymous access).
   const secret = process.env.CRON_SECRET;
   if (secret) {
-    const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${secret}`) {
+    if (!verifyCronSecret(req.headers.authorization, secret)) {
       return res.status(401).json({ error: "unauthorized" });
     }
   } else {

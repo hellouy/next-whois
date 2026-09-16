@@ -1,3 +1,5 @@
+import { isBlockedHost, safeFetchWithRedirectGuard } from "@/lib/ssrf-guard";
+
 /** Minimal shape of an HTTP custom-server entry (mirrors HttpServerEntry in custom-servers.ts). */
 interface HttpEntry {
   url: string;
@@ -16,6 +18,16 @@ export async function queryWhoisTcp(
   try {
     resolvedHost = await resolveWithDohFallback(host);
   } catch {}
+
+  // SSRF guard: reject private/internal addresses before opening a TCP
+  // connection. Checks both the original host (covers direct IP literals)
+  // and the DNS-resolved address (covers hostname-based bypass).
+  if (await isBlockedHost(host)) {
+    throw new Error(`SSRF guard: blocked WHOIS TCP host ${host}`);
+  }
+  if (resolvedHost !== host && (await isBlockedHost(resolvedHost))) {
+    throw new Error(`SSRF guard: resolved WHOIS TCP host ${resolvedHost} (${host}) is private`);
+  }
 
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -119,7 +131,7 @@ export async function queryWhoisHttp(
       (init.headers as Record<string, string>)["Content-Type"] =
         "application/x-www-form-urlencoded";
     }
-    const res = await fetch(url, init);
+    const res = await safeFetchWithRedirectGuard(url, init);
     if (!res.ok) throw new Error(`HTTP WHOIS server returned ${res.status}`);
     const contentType = res.headers.get("content-type") || "";
     const text = await res.text();

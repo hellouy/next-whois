@@ -16,7 +16,7 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { many, one, run, isDbReady } from "@/lib/db-query";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, verifySecretTimingSafe } from "@/lib/admin";
 import { getSettings } from "@/lib/server/site-settings-server";
 import * as cheerio from "cheerio";
 import { createLogger } from "@/lib/logger";
@@ -265,7 +265,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const legacyHeader = req.headers["x-cron-secret"] as string | undefined;
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
     const provided = bearerToken || legacyHeader;
-    const cronOk = !!(cronSecret && provided && provided === cronSecret);
+    const cronOk = !!(cronSecret && verifySecretTimingSafe(provided, cronSecret));
     if (!cronOk && !(await requireAdmin(req, res))) return;
   }
   if (!(await isDbReady())) return res.status(503).json({ error: "DB unavailable" });

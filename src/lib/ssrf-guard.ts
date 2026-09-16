@@ -99,3 +99,39 @@ export async function isBlockedHost(host: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Fetch with SSRF guard and manual redirect handling.
+ *
+ * - Validates the initial URL host (and every redirect Location) via
+ *   `isBlockedHost` before opening a connection.
+ * - Uses `redirect: 'manual'` so redirects are never followed blindly by
+ *   the runtime; each hop is resolved and checked explicitly.
+ * - Follows up to `maxRedirects` hops (default 3).
+ *
+ * Throws when a host resolves to private/internal space, when the redirect
+ * chain exceeds the limit, or when a redirect response lacks a Location
+ * header.
+ */
+export async function safeFetchWithRedirectGuard(
+  url: string,
+  init: RequestInit,
+  maxRedirects = 3,
+): Promise<Response> {
+  let currentUrl = url;
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const parsed = new URL(currentUrl);
+    if (await isBlockedHost(parsed.host)) {
+      throw new Error(`SSRF guard: blocked host ${parsed.host}`);
+    }
+    const res = await fetch(currentUrl, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) throw new Error("Redirect response without Location header");
+      currentUrl = new URL(location, currentUrl).href;
+      continue;
+    }
+    return res;
+  }
+  throw new Error(`Too many redirects (max ${maxRedirects})`);
+}

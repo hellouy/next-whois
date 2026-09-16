@@ -4,6 +4,7 @@ import { many, run, isDbReady } from "@/lib/db-query";
 import { WhoisRawResult } from "@/lib/whois/types";
 import { queryWhoisTcp, queryWhoisHttp } from "@/lib/whois/whois-transport";
 import { isWhoisRateLimited } from "@/lib/whois/whois-patterns";
+import { isBlockedHost } from "@/lib/ssrf-guard";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupNicPh } from "@/lib/whois/http-scrapers/nic-ph";
 import { lookupNicGw } from "@/lib/whois/http-scrapers/nic-gw";
@@ -552,6 +553,13 @@ async function executeServerEntry(
 
   const tcpHost = getTcpHost(customEntry);
   if (tcpHost) {
+    // SSRF guard: reject private/internal hosts before calling whoiser or
+    // queryWhoisTcp. queryWhoisTcp also checks internally (defense-in-depth),
+    // but the port-43 whoiser path bypasses it entirely.
+    if (await isBlockedHost(tcpHost)) {
+      if (isUserServer) throw new Error(`SSRF guard: blocked WHOIS TCP host ${tcpHost}`);
+      return null;
+    }
     const port =
       typeof customEntry === "object" && "port" in customEntry && customEntry.port
         ? customEntry.port

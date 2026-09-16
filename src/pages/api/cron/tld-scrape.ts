@@ -17,6 +17,7 @@ import { one, run, many } from "@/lib/db-query";
 import { fetchPageText, extractWithAI } from "@/pages/api/admin/tld-rules";
 import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
 import { createLogger } from "@/lib/logger";
+import { verifySecretTimingSafe } from "@/lib/admin";
 
 const logger = createLogger("api/cron/tld-scrape");
 
@@ -208,7 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const auth = req.headers.authorization;
     const legacy = req.headers["x-cron-secret"] as string | undefined;
     const provided = auth?.startsWith("Bearer ") ? auth.slice(7) : legacy;
-    if (provided !== cronSecret) {
+    if (!verifySecretTimingSafe(provided, cronSecret)) {
       return res.status(401).json({ error: "unauthorized" });
     }
   } else {

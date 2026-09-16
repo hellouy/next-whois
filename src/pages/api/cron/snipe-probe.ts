@@ -18,6 +18,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdminEmail } from "@/lib/admin-server";
+import { verifySecretTimingSafe } from "@/lib/admin";
 import { runDailyProbe, runHuntProbe } from "@/lib/server/snipe-engine";
 
 export const config = { maxDuration: 300 };
@@ -35,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const authHeader = req.headers.authorization;
     const legacyHeader = req.headers["x-cron-secret"] as string | undefined;
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-    if ((bearerToken || legacyHeader) === cronSecret) authed = true;
+    if (verifySecretTimingSafe(bearerToken || legacyHeader, cronSecret)) authed = true;
   }
   if (!authed) {
     const session = await getServerSession(req, res, authOptions);

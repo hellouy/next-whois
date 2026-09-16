@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { isAdminEmail } from "@/lib/admin-server";
+import { verifySecretTimingSafe } from "@/lib/admin";
 import { sendEmailDirect } from "@/lib/email";
 import {
   processEmailQueue,
@@ -32,7 +33,7 @@ async function isAuthorized(req: NextApiRequest, res: NextApiResponse): Promise<
   if (cronSecret) {
     const authHeader = req.headers.authorization ?? "";
     const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-    if (bearer === cronSecret) return true;
+    if (verifySecretTimingSafe(bearer, cronSecret)) return true;
   }
   try {
     const session = await getServerSession(req, res, authOptions);
