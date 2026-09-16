@@ -142,6 +142,7 @@ Entries discovered by the Agent during task execution should follow this format:
   - Dev server (port 3777) compiles pages on first curl; check /tmp/terminal_term_*.log for compile errors after edits
   - Playwright 验证 admin 页面需真实登录：伪造 next-auth JWT 时 token.id 必须等于 DB users 表真实 id（不是 email），且 sessionVersion 与 users.session_version 一致，否则 [...nextauth].ts session 回调查不到行返回空 session → 前端始终 "No Access"。构造：用 next-auth/jwt 的 encode({token:{id:<db_id>, email, sessionVersion, isAdmin:true}, secret:NEXTAUTH_SECRET})，cookie 名 next-auth.session-token。admin 判定读 session.user.isAdmin（AdminLayout）。
   - 后台站点背景切换链路：admin/settings.tsx 的站点背景选项写 site_background（string，无枚举约束）→ _app.tsx SiteBackground() 按值渲染 dot/dotfield/galaxy/stars（fixed inset-0 -z-10）。新增背景选项 = settings.tsx 加选项 + _app.tsx 加分支，无需改类型。
+  - StarsBackground（animate-ui）组件自带硬编码深色渐变背景 `bg-[radial-gradient(ellipse_at_bottom,#262626→#000)]`，直接接入会把整页盖成黑色。覆盖它不能用 bg-transparent（tailwind-merge 将 bg-[radial-gradient] 归类为 background-image、bg-transparent 为 background-color，两者不冲突所以都会保留），必须传 `bg-none`（background-image 类，可正确合并覆盖）。星星颜色要跟随主题：浅色用深色星（#3f3f46）否则白星在浅背景不可见，深色用 #ffffff，用 next-themes 的 resolvedTheme 判断。验证方法：playwright 读 [data-slot=stars-background] 的 getComputedStyle().backgroundImage 应为 "none"。
 
 [Project Knowledge Summary]
 - Date: 2026-09-04
