@@ -20,6 +20,7 @@ import Link from "next/link";
 import { ErrorBoundary } from "@/components/error-boundary";
 import DotField from "@/components/DotField";
 import Galaxy from "@/components/Galaxy";
+import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars";
 
 
 function AppHead({ origin }: { origin: string }) {
@@ -147,6 +148,7 @@ function AnalyticsScripts() {
 // `dot`      → default dot grid + subtle fade (existing look)
 // `dotfield` → interactive canvas dot field (DotField)
 // `galaxy`   → WebGL starfield galaxy (Galaxy)
+// `stars`    → CSS box-shadow starfield with mouse parallax (StarsBackground)
 function SiteBackground() {
   const settings = useSiteSettings();
   const style = settings.site_background || "dot";
@@ -167,6 +169,19 @@ function SiteBackground() {
     return (
       <div className="fixed inset-0 -z-10">
         <Galaxy className="absolute inset-0" />
+      </div>
+    );
+  }
+  if (style === "stars") {
+    return (
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <StarsBackground
+          factor={0.04}
+          speed={45}
+          starColor="#ffffff"
+          pointerEvents={false}
+          className="absolute inset-0"
+        />
       </div>
     );
   }
