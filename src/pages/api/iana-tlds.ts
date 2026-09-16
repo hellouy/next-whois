@@ -10,12 +10,16 @@ import {
   getJsonRedisValue,
   setJsonRedisValue,
 } from "@/lib/server/redis";
+import { tldToUnicode } from "@/lib/punycode";
 
-const REDIS_IANA_KEY = "iana_tlds:v3";
+// v4: adds TldInfo.unicode (IDN display form) — v3 payloads lack the field
+const REDIS_IANA_KEY = "iana_tlds:v4";
 const REDIS_IANA_TTL = 43_200; // 12 hours — shared across all Vercel instances
 
 export type TldInfo = {
   tld: string;
+  /** Unicode display form for IDN TLDs ("xn--fiqs8s" → "中国"); absent for ASCII TLDs. The `tld` field keeps the wire format. */
+  unicode?: string;
   type: "cctld" | "gtld";
   country?: string;
   countryEn?: string;
@@ -383,8 +387,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const hasRdap = Boolean(rdapServer);
 
       const names = isCc ? CC_NAMES[tld] : undefined;
+      const decoded = tld.startsWith("xn--") ? tldToUnicode(tld) : tld;
       return {
         tld,
+        unicode: decoded !== tld ? decoded : undefined,
         type: isCc ? "cctld" : "gtld",
         country: names?.zh,
         countryEn: names?.en,

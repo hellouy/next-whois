@@ -31,7 +31,14 @@ const TldCard = React.memo(function TldCard({ entry, isChinese }: { entry: TldIn
   return (
     <div className="glass-panel border border-border rounded-xl p-3 flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-1">
-        <span className="font-mono text-sm font-bold truncate">.{entry.tld}</span>
+        {entry.unicode ? (
+          <div className="min-w-0 flex flex-col leading-tight">
+            <span className="text-sm font-bold truncate" title={`.${entry.unicode}`}>.{entry.unicode}</span>
+            <span className="text-[9px] text-muted-foreground font-mono truncate" title={entry.tld}>{entry.tld}</span>
+          </div>
+        ) : (
+          <span className="font-mono text-sm font-bold truncate">.{entry.tld}</span>
+        )}
         {isCc && countryLabel ? (
           <span className="text-[9px] px-1.5 py-0 h-4 leading-4 rounded-sm bg-blue-500/12 text-blue-600 dark:text-blue-400 border border-blue-400/30 truncate max-w-[80px] inline-block">
             {countryLabel}
@@ -113,7 +120,7 @@ export default function TldsPage() {
     if (typeFilter !== "all") list = list.filter((t) => t.type === typeFilter);
     if (!q) return list;
     return list.filter(
-      (t) => t.tld.includes(q) || (t.country && t.country.includes(q)) || (t.countryEn && t.countryEn.toLowerCase().includes(q)),
+      (t) => t.tld.includes(q) || (!!t.unicode && t.unicode.toLowerCase().includes(q)) || (t.country && t.country.includes(q)) || (t.countryEn && t.countryEn.toLowerCase().includes(q)),
     );
   }, [supported, search, typeFilter]);
 
@@ -121,7 +128,7 @@ export default function TldsPage() {
     const q = uSearch.trim().toLowerCase().replace(/^\./, "");
     if (!q) return unsupported;
     return unsupported.filter(
-      (t) => t.tld.includes(q) || (t.country && t.country.includes(q)) || (t.countryEn && t.countryEn.toLowerCase().includes(q)),
+      (t) => t.tld.includes(q) || (!!t.unicode && t.unicode.toLowerCase().includes(q)) || (t.country && t.country.includes(q)) || (t.countryEn && t.countryEn.toLowerCase().includes(q)),
     );
   }, [unsupported, uSearch]);
 
