@@ -368,7 +368,7 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
             [
               { value: "dot",       label: "点阵网格（默认）", desc: "原有细点阵 + 顶部渐隐，简洁低调" },
               { value: "dotfield",  label: "交互点阵（DotField）", desc: "Canvas 点阵，光标划过产生凹陷与光晕" },
-              { value: "shapegrid", label: "形状网格（ShapeGrid）", desc: "Canvas 形状网格缓慢滚动，光标划过网格填充高亮" },
+              { value: "galaxy",    label: "星空星云（Galaxy）", desc: "WebGL 动态星云星场，支持鼠标交互" },
             ] as const
           ).map(opt => {
             const active = (s.site_background || "dot") === opt.value;

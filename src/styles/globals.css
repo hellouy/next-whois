@@ -133,11 +133,10 @@
   height: 100%;
 }
 
-.shapegrid-canvas {
+.galaxy-container {
   width: 100%;
   height: 100%;
-  border: none;
-  display: block;
+  position: relative;
 }
 
 .glass-panel {

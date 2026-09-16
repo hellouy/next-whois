@@ -19,7 +19,7 @@ import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { ErrorBoundary } from "@/components/error-boundary";
 import DotField from "@/components/DotField";
-import ShapeGrid from "@/components/ShapeGrid";
+import Galaxy from "@/components/Galaxy";
 
 
 function AppHead({ origin }: { origin: string }) {
@@ -144,9 +144,9 @@ function AnalyticsScripts() {
 }
 
 // ── Site background — switchable via the `site_background` setting ──────────
-// `dot`       → default dot grid + subtle fade (existing look)
-// `dotfield`  → interactive canvas dot field (DotField)
-// `shapegrid` → scrolling canvas shape grid (ShapeGrid)
+// `dot`      → default dot grid + subtle fade (existing look)
+// `dotfield` → interactive canvas dot field (DotField)
+// `galaxy`   → WebGL starfield galaxy (Galaxy)
 function SiteBackground() {
   const settings = useSiteSettings();
   const style = settings.site_background || "dot";
@@ -154,38 +154,19 @@ function SiteBackground() {
     return (
       <div className="fixed inset-0 -z-10">
         <DotField
-          dotRadius={2}
-          dotSpacing={16}
-          cursorRadius={260}
-          cursorForce={0.08}
-          bulgeOnly
-          bulgeStrength={80}
-          waveAmplitude={0}
-          sparkle={false}
-          gradientFrom="rgba(160,170,190,0.45)"
-          gradientTo="rgba(160,170,190,0.18)"
-          glowColor="rgba(120,160,255,0.35)"
-          glowRadius={180}
+          gradientFrom="#000000"
+          gradientTo="#e9e7ec"
+          glowColor="#ffffff"
+          sparkle
           className="absolute inset-0"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/25 to-background" />
       </div>
     );
   }
-  if (style === "shapegrid") {
+  if (style === "galaxy") {
     return (
       <div className="fixed inset-0 -z-10">
-        <ShapeGrid
-          direction="right"
-          speed={0.6}
-          squareSize={40}
-          borderColor="rgba(160,170,190,0.35)"
-          hoverFillColor="rgba(120,160,255,0.28)"
-          shape="square"
-          hoverTrailAmount={6}
-          className="absolute inset-0"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/25 to-background" />
+        <Galaxy className="absolute inset-0" />
       </div>
     );
   }

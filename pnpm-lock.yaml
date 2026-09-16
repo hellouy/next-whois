@@ -110,6 +110,9 @@ importers:
       ocsp:
         specifier: ^1.2.0
         version: 1.2.0
+      ogl:
+        specifier: ^1.0.11
+        version: 1.0.11
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -3622,6 +3625,9 @@ packages:
 
   ocsp@1.2.0:
     resolution: {integrity: sha512-r4Q3oYKU+3b6iD4bn+5O2dQqctu8pFrJfWouUiKjiNXXjdr99lN/EaTVkFQevGlV/lKsomgtt/XRGB8xV8rq3Q==}
+
+  ogl@1.0.11:
+    resolution: {integrity: sha512-kUpC154AFfxi16pmZUK4jk3J+8zxwTWGPo03EoYA8QPbzikHoaC82n6pNTbd+oEaJonaE8aPWBlX7ad9zrqLsA==}
 
   oidc-token-hash@5.2.0:
     resolution: {integrity: sha512-6gj2m8cJZ+iSW8bm0FXdGF0YhIQbKrfP4yWTNzxc31U6MOjfEmB1rHvlYvxI1B7t7BCi1F2vYTT6YhtQRG4hxw==}
@@ -8423,6 +8429,8 @@ snapshots:
       asn1.js-rfc5280: 2.0.1
       async: 1.5.2
       simple-lru-cache: 0.0.2
+
+  ogl@1.0.11: {}
 
   oidc-token-hash@5.2.0: {}
 
