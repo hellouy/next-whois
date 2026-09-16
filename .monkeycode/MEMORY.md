@@ -402,3 +402,15 @@ Entries discovered by the Agent during task execution should follow this format:
 - Instructions:
   - `mergeResults`（src/lib/whois/whois-generic.ts）用白名单字段重建结果对象，会静默丢弃新增的可选字段（registrarIanaId/nsAttributions/parkingProvider/dateSanity 等）。凡给 WhoisAnalyzeResult 加新字段，必须同步在 mergeResults 的返回对象里逐字段透传（RDAP 优先 + `??` 回退 WHOIS），否则 RDAP+WHOIS 合并路径上字段为 undefined，落库成 null（qq.com registrarIanaId=null 就是此坑）。JSON.stringify 会省略 undefined 字段，API 响应里"消失"的字段不一定没被设置。
   - 增强落库链路：查询时 enrichDomainInfo 即时计算 → domain_enrichments 表 UPSERT（TTL 7 天，db.ts runMigrations 惰性建表，dev server 已占用旧迁移缓存需重启）；二次查询 Redis 未命中时 supplementFromEnrichment 从表补回增强字段。DB 失败 best-effort 降级，查询主流程不阻塞。
+
+[Project Knowledge Summary]
+- Date: 2026-09-16
+- Context: Discovered during full WHOIS-host connectivity audit (513 hosts → 39 dead fixed, commit 4ddc732)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - IANA 数据源分工：whois.iana.org:43 响应中的 whois:/rdap: 字段只有 gTLD 记录携带（uk/wales/cymru 等部分 ccTLD 没有 whois 字段，但 be/co/ky/sr/tn/tr/ua/iq/fj/nc 有）；IANA root db 网页 (iana.org/domains/root/db/<tld>.html) 已不再列出 WHOIS Server。判定"某 TLD 无 WHOIS"必须以 port-43 记录缺 whois: 字段为准，且只对 gTLD 生效。
+  - whois.nominet.uk 大面积污染的根因：Nominet TLD Registry Services 是众多品牌 gTLD（amazon/aws/azure/abbvie/google 无关）的注册局后端运营方，当年 bootstrap 生成脚本把后端运营方当成了 WHOIS 主机。同类错误排查关键词：bootstrap 里与 IANA 记录不符的 host。
+  - 沙箱 DNS 对部分 WHOIS 主机说谎（513 个主机中 46 个 NXDOMAIN/REFUSED，其中至少 6 个真实存活）：判定主机死亡前必须用 DoH（https://dns.google/resolve）复核；DNS_NX 的主机再用解析出的 IP 直连 TCP-43 复测一次。RDAP 404 是合法的"未注册"应答，勿当故障。
+  - WHOIS 主机审计工作流：collect-hosts(唯一 host 清单) → DoH 复核 → IANA:43 批量拉权威值(350ms 间隔+3 重试) → 替代主机按 IP 直连 TCP-43 验活 → 更新 whois-servers.json(null 语义=确认无服务) + bootstrap(删除走 IANA 自动发现→RDAP 回退) → tsc+vitest → push → Vercel 轮询 → 线上 /api/lookup-stream?query= 验证。
+  - 生产 API Key 强制开启后，线上验证必须携带与 Host 相同的 Origin 头（isSameOriginRequest 同源放行）：curl --resolve <host>:443:<ip> 且 -H "Origin: https://<host>"，Origin 与 Host 不一致会 401。
+  - 本次修复的新服务器（均已验活）：whois.nic.uk / whois.registry.co / whois.dns.be / whois.kyregistry.ky / whois.sr / whois.ati.tn / whois.trabis.gov.tr / whois.ua / whois.gtld.knet.cn / whois.gtld.zdns.cn / whois.nic.icbc|ren|top|unicom|observer|realty / whois.registry.click / whois.afilias-srs.net / www.whois.fj；RDAP 回退已确认存活：rdap.nominet.uk、pubapi.registry.google、rdap.zdnsgtld.com。
