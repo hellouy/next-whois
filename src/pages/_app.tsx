@@ -21,6 +21,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import DotField from "@/components/DotField";
 import Galaxy from "@/components/Galaxy";
 import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars";
+import { useTheme } from "next-themes";
 
 
 function AppHead({ origin }: { origin: string }) {
@@ -151,6 +152,7 @@ function AnalyticsScripts() {
 // `stars`    → CSS box-shadow starfield with mouse parallax (StarsBackground)
 function SiteBackground() {
   const settings = useSiteSettings();
+  const { resolvedTheme } = useTheme();
   const style = settings.site_background || "dot";
   if (style === "dotfield") {
     return (
@@ -178,9 +180,9 @@ function SiteBackground() {
         <StarsBackground
           factor={0.04}
           speed={45}
-          starColor="#ffffff"
+          starColor={resolvedTheme === "dark" ? "#ffffff" : "#3f3f46"}
           pointerEvents={false}
-          className="absolute inset-0"
+          className="absolute inset-0 bg-none"
         />
       </div>
     );
