@@ -140,6 +140,8 @@ Entries discovered by the Agent during task execution should follow this format:
   - Admin i18n is a known catalog-wide gap: all 30 pages hardcode Simplified Chinese while frontend uses useTranslation — deliberate scope decision, not a bug
   - No ESLint config in project (next lint enters interactive setup); rely on npx tsc --noEmit + dev-server compile + curl sweep for verification
   - Dev server (port 3777) compiles pages on first curl; check /tmp/terminal_term_*.log for compile errors after edits
+  - Playwright 验证 admin 页面需真实登录：伪造 next-auth JWT 时 token.id 必须等于 DB users 表真实 id（不是 email），且 sessionVersion 与 users.session_version 一致，否则 [...nextauth].ts session 回调查不到行返回空 session → 前端始终 "No Access"。构造：用 next-auth/jwt 的 encode({token:{id:<db_id>, email, sessionVersion, isAdmin:true}, secret:NEXTAUTH_SECRET})，cookie 名 next-auth.session-token。admin 判定读 session.user.isAdmin（AdminLayout）。
+  - 后台站点背景切换链路：admin/settings.tsx 的站点背景选项写 site_background（string，无枚举约束）→ _app.tsx SiteBackground() 按值渲染 dot/dotfield/galaxy/stars（fixed inset-0 -z-10）。新增背景选项 = settings.tsx 加选项 + _app.tsx 加分支，无需改类型。
 
 [Project Knowledge Summary]
 - Date: 2026-09-04
