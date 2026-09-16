@@ -12,8 +12,8 @@ import {
 } from "@/lib/server/redis";
 import { tldToUnicode } from "@/lib/punycode";
 
-// v4: adds TldInfo.unicode (IDN display form) — v3 payloads lack the field
-const REDIS_IANA_KEY = "iana_tlds:v4";
+// v5: adds missing IDN ccTLD whois servers (中国/香港/台灣/台湾/рф/бг/срб/укр/ایران/ไทย/新加坡)
+const REDIS_IANA_KEY = "iana_tlds:v5";
 const REDIS_IANA_TTL = 43_200; // 12 hours — shared across all Vercel instances
 
 export type TldInfo = {
