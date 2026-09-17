@@ -1002,12 +1002,16 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   // NOTE: RDAP is already running above, so this Redis check runs in parallel
   // with the live RDAP fetch rather than sequentially before it.
   const tldWhoisRateLimited = await checkWhoisRateLimit(tldSuffix).catch(() => false);
+  let _scraperError: ScraperRequiredError | null = null;
   const whoisPromise = tldWhoisRateLimited
     ? (Promise.resolve(null) as Promise<WhoisRawResult | null>)
     : withTimeout(
         tryGenericWhoisForDomain(domainToQuery, tld, tldSuffix, innerTimeout, follow),
         effectiveWhoisTimeout,
-      );
+      ).catch((e: unknown) => {
+        if (e instanceof ScraperRequiredError) _scraperError = e;
+        throw e;
+      });
 
   // When RDAP finishes first with good data, only wait an additional grace period
   // for WHOIS to add raw text — then proceed rather than blocking until WHOIS_TIMEOUT.
@@ -1223,9 +1227,9 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
 
   // Preserve the registryUrl from ScraperRequiredError so the UI can show a
   // "manual lookup" link when automated access is blocked (e.g. .ba).
-  const scraperRegistryUrl = whoisError instanceof ScraperRequiredError
-    ? whoisError.registryUrl
-    : undefined;
+  const scraperError = _scraperError
+    ?? (whoisError instanceof ScraperRequiredError ? whoisError : null);
+  const scraperRegistryUrl = scraperError?.registryUrl;
 
   const reason = /timeout|timed.?out/i.test(whoisMsg) ? "timeout" : "no_server";
   const errMsg = /not supported/i.test(whoisMsg)
@@ -1234,7 +1238,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     ? "No WHOIS/RDAP data found for this query"
     : whoisReturnedEmpty && whoisData?.server
     ? `WHOIS server (${whoisData.server}) connected but returned no data — the server may restrict access by IP or require queries from the registry's country`
-    : whoisMsg || rdapMsg || "Unknown error occurred";
+    : whoisMsg || scraperError?.message || rdapMsg || "Unknown error occurred";
   recordFailure(reason, errMsg);
   return failWithDns(errMsg, scraperRegistryUrl);
 }
