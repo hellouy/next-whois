@@ -56,12 +56,28 @@ function makeSignal(): AbortSignal {
  * Detect Cloudflare bot-protection challenge pages.
  * The challenge page contains a verification message and heavy obfuscated JS,
  * but none of the WHOIS result structure (#whois-raw, <pre>, <dl class="row">).
+ *
+ * Cloudflare serves several challenge variants depending on its ruleset and
+ * the caller's IP reputation:
+ *   - "Please wait while your request is being verified..." (managed challenge)
+ *   - "One moment, please..." (JS challenge / interstitial)
+ *   - "Just a moment..." (classic 5-second challenge)
+ * All of them are detected here so the caller reports blocked=true instead of
+ * a misleading "Unexpected response".
  */
-function isCloudflareChallenge(html: string): boolean {
-  if (/Please wait while your request is being verified/i.test(html)) {
+function isCloudflareChallenge(html: string, headers: Headers): boolean {
+  if (
+    /Please wait while your request is being verified/i.test(html) ||
+    /id="text"[^>]*>\s*Please/i.test(html) ||
+    /One moment, please/i.test(html) ||
+    /Just a moment\.\.\./i.test(html) ||
+    /cf-browser-verification|cf_chl_opt|__cf_chl|challenge-platform/i.test(html)
+  ) {
     return true;
   }
-  if (/id="text"[^>]*>\s*Please/i.test(html)) {
+  // Header-based signal: Cloudflare stamps every response with cf-ray.
+  const cfRay = headers.get("cf-ray");
+  if (cfRay && /^<!DOCTYPE html>/i.test(html.trimStart()) && !/whois-raw/i.test(html)) {
     return true;
   }
   return false;
@@ -80,6 +96,7 @@ export async function lookupNicPs(domain: string): Promise<NicPsResult> {
   }
 
   let html: string;
+  let respHeaders: Headers;
   try {
     const res = await fetch(
       `${PNINA_WHOIS}?domain=${encodeURIComponent(cleanDomain)}`,
@@ -103,6 +120,7 @@ export async function lookupNicPs(domain: string): Promise<NicPsResult> {
         reason: `HTTP ${res.status}`,
       };
     }
+    respHeaders = res.headers;
     html = await res.text();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -113,7 +131,7 @@ export async function lookupNicPs(domain: string): Promise<NicPsResult> {
     };
   }
 
-  if (isCloudflareChallenge(html)) {
+  if (isCloudflareChallenge(html, respHeaders)) {
     return {
       success: false,
       blocked: true,
