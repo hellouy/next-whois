@@ -417,3 +417,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - WHOIS 主机审计工作流：collect-hosts(唯一 host 清单) → DoH 复核 → IANA:43 批量拉权威值(350ms 间隔+3 重试) → 替代主机按 IP 直连 TCP-43 验活 → 更新 whois-servers.json(null 语义=确认无服务) + bootstrap(删除走 IANA 自动发现→RDAP 回退) → tsc+vitest → push → Vercel 轮询 → 线上 /api/lookup-stream?query= 验证。
   - 生产 API Key 强制开启后，线上验证必须携带与 Host 相同的 Origin 头（isSameOriginRequest 同源放行）：curl --resolve <host>:443:<ip> 且 -H "Origin: https://<host>"，Origin 与 Host 不一致会 401。
   - 本次修复的新服务器（均已验活）：whois.nic.uk / whois.registry.co / whois.dns.be / whois.kyregistry.ky / whois.sr / whois.ati.tn / whois.trabis.gov.tr / whois.ua / whois.gtld.knet.cn / whois.gtld.zdns.cn / whois.nic.icbc|ren|top|unicom|observer|realty / whois.registry.click / whois.afilias-srs.net / www.whois.fj；RDAP 回退已确认存活：rdap.nominet.uk、pubapi.registry.google、rdap.zdnsgtld.com。
+
+[Project Knowledge Summary]
+- Date: 2026-09-17
+- Context: Discovered while adding .ps (Palestine/PNINA) web WHOIS scraper after port-43 and RDAP both failed
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - .ps port-43 (whois.pnina.ps, 65.21.199.175) TCP connects but returns 0 bytes to cloud/datacenter egress — NOT ECONNREFUSED as previously noted. DoH resolves the host fine; the server silently accepts then closes without sending data. Same pattern as .lu policy-banner-to-cloud but worse (zero bytes vs at least a banner).
+  - .ps web WHOIS at https://www.pnina.ps/whois/?domain=<domain> sits behind Cloudflare bot management: first request from a datacenter IP typically succeeds (full HTML with #whois-pretty <dl> + #whois-raw <pre> standard WHOIS text); subsequent rapid requests receive a JS challenge page ("Please wait while your request is being verified..."). On Vercel each Lambda may use a different egress IP, giving the scraper a chance; when blocked, ScraperRequiredError(blocked=true) surfaces a registry link for manual check.
+  - nic-ps scraper pattern: extract `#whois-raw pre` text (standard "Key: Value" WHOIS format directly consumable by common_parser.ts), detect Cloudflare challenge via /Please wait while your request is being verified/i or /id="text"[^>]*>\s*Please/i, check for /^Domain Name:/im in extracted text. Registrar email is Cloudflare-obfuscated inside <pre> (shows [email protected]); registrant data is GDPR-redacted by registry ("Redacted | EU Registrar").
+  - Scraper registration recipe (3 edits to custom-servers.ts): import lookupNicPs → BUILTIN_SERVERS `ps: { type:"scraper", name:"nic-ps", registryUrl:"https://www.pnina.ps/whois/" }` → dispatch branch in executeServerEntry after nic-ph block. whois-servers.json `"ps"` nulled (port-43 dead from cloud egress); iana_tlds cache key bumped v5→v6.
+  - Verification chain: npx tsc --noEmit (exit 0) → npx vitest run src/lib/whois/http-scrapers/ (13 passed, existing scrapers unaffected) → pnpm build (exit 0, ~8min, peak 2.23 GiB).

@@ -210,7 +210,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   // jo: removed — rdap.nic.jo ENOTFOUND; whois.ripe.net in cctld-whois is wrong for .jo domains
   lb: "https://rdap.lbdr.org.lb/",
   // om: removed — rdap.nic.om ENOTFOUND; WHOIS via whois.registry.om works
-  // ps: removed — rdap.nic.ps ENOTFOUND; WHOIS whois.pnina.ps ECONNREFUSED
+  // ps: removed — rdap.nic.ps ENOTFOUND; WHOIS whois.pnina.ps connects but returns 0 bytes to cloud egress; web WHOIS scraper (nic-ps) handles it
   // sy: removed — rdap.nic.sy ENOTFOUND; WHOIS via whois.tld.sy works
   ye: "https://rdap.y.net.ye/",
   // ── Asia / Pacific ───────────────────────────────────────────────────────

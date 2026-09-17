@@ -16,7 +16,7 @@ const SECURITY_HEADERS = [
       "default-src 'self'",
       // Captcha providers (Turnstile / hCaptcha / MTCaptcha) need their own CDN
       // origins in both script-src (JS) and frame-src (verification iframe).
-      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://challenges.cloudflare.com https://js.hcaptcha.com https://newassets.hcaptcha.com https://service.mtcaptcha.com",
+      `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''} https://va.vercel-scripts.com https://challenges.cloudflare.com https://js.hcaptcha.com https://newassets.hcaptcha.com https://service.mtcaptcha.com`,
       "style-src 'self' 'unsafe-inline' https://newassets.hcaptcha.com https://service.mtcaptcha.com",
       "img-src * data: blob:",
       "font-src 'self' data: https://newassets.hcaptcha.com",
