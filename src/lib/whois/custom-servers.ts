@@ -8,6 +8,7 @@ import { isBlockedHost } from "@/lib/ssrf-guard";
 import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupNicPh } from "@/lib/whois/http-scrapers/nic-ph";
 import { lookupNicGw } from "@/lib/whois/http-scrapers/nic-gw";
+import { lookupNicPs } from "@/lib/whois/http-scrapers/nic-ps";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
 
 export type TcpServerEntry = {
@@ -96,6 +97,7 @@ const BUILTIN_SERVERS: CustomServerMap = {
   "edu.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
   "gov.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
   "mil.ph":  { type: "scraper", name: "nic-ph", registryUrl: "https://www.whois.ph/" },
+  ps: { type: "scraper", name: "nic-ps", registryUrl: "https://www.pnina.ps/whois/" },
 };
 
 function readFileServers(): CustomServerMap {
@@ -534,6 +536,20 @@ async function executeServerEntry(
           : `nic.ph scraper error: ${nicPhFail.reason}`,
         registryUrl,
         nicPhFail.blocked,
+      );
+    }
+    if (scraperName === "nic-ps") {
+      const nicPsResult = await lookupNicPs(domainToQuery);
+      if (nicPsResult.success) {
+        return { raw: nicPsResult.rawWhoisContent, structured: {}, server: "pnina.ps", registryUrl };
+      }
+      const nicPsFail = nicPsResult as { success: false; blocked: boolean; reason: string };
+      throw new ScraperRequiredError(
+        nicPsFail.blocked
+          ? "pnina.ps requires Cloudflare verification — automated WHOIS lookup is not available, please check the registry directly"
+          : `nic.ps scraper error: ${nicPsFail.reason}`,
+        registryUrl,
+        nicPsFail.blocked,
       );
     }
     throw new ScraperRequiredError(`No scraper implementation for "${scraperName}"`, customEntry.registryUrl);
