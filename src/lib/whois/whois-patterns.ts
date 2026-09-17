@@ -60,10 +60,24 @@ export function isWhoisRateLimited(raw: string): boolean {
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  // Policy/terms-of-use banner openers. Some registries (Identity Digital:
+  // .ac, .io, .sh, …) append the ENTIRE terms-of-use block as a single line
+  // containing phrases like "If too many queries are received …". Without
+  // this exclusion that boilerplate matched /too many (requests|queries)/ and
+  // a normal "Domain not found." answer was misread as rate-limiting — which
+  // also persisted a TLD-wide rate-limit flag, breaking every later lookup.
+  const isBoilerplate = (l: string): boolean =>
+    /^(?:NOTICE|TERMS OF USE|Terms of Use|By submitting|This service|Access to|You agree)\b/.test(l);
+
   // Check the full response (including % comment lines) — servers like
   // whois.nic.hu put access-restriction messages inside % comment lines.
   // Scan first 30 lines of the raw response for rate-limit signals.
-  const allContent = allLines.slice(0, 30).join("\n");
+  // %/# comment lines are kept (that is the point of this pass) but policy
+  // banner lines are dropped.
+  const allContent = allLines
+    .filter((l) => !isBoilerplate(l))
+    .slice(0, 30)
+    .join("\n");
 
   // Also check only non-boilerplate content lines for other servers.
   const filteredLines = allLines.filter(
@@ -71,13 +85,7 @@ export function isWhoisRateLimited(raw: string): boolean {
       !l.startsWith("%") &&
       !l.startsWith("#") &&
       !l.startsWith(">>>") &&
-      !l.startsWith("NOTICE") &&
-      !l.startsWith("TERMS OF USE") &&
-      !l.startsWith("Terms of Use") &&
-      !l.startsWith("By submitting") &&
-      !l.startsWith("This service") &&
-      !l.startsWith("Access to") &&
-      !l.startsWith("You agree"),
+      !isBoilerplate(l),
   );
   const filtered = filteredLines.slice(0, 20).join("\n");
 

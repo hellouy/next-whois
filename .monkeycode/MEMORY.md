@@ -440,3 +440,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - Remaining NO_SERVER_TLDS entries (hm, aq, bv, sj, eh) were re-verified as genuinely having no whois.nic.<tld> — leave them.
   - Cross-check trap: src/pages/api/iana-tlds.ts derives hasWhois from getStaticWhoisServer (which reads the bootstrap tables), so /tlds can report .tf as supported while lookup.ts rejects it. When a TLD "has a server" per IANA but lookups fail with "not available for this TLD", grep NO_SERVER_TLDS first.
   - Verification: lookupWhoisWithCache("example.tf"|"nic.tf"|"nic.pm"|"example.pm", {nocache:true}) → status true, source rdap, full fields; example.aq still correctly returns the no-server error.
+
+[Project Knowledge Summary]
+- Date: 2026-09-17
+- Context: Fixed .ac domains falsely reported as rate-limited even though whois.nic.ac answers normally
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - .ac (Ascension Island, Identity Digital registry) serves via whois.nic.ac port 43; registered domains return full Key:Value data, unregistered return "Domain not found.", reserved (example.ac) return "This name is reserved by the Registry.". It has NO RDAP config — don't look for one.
+  - Root cause was a rate-limit false positive, not a dead server: Identity Digital appends its ENTIRE Terms of Use as ONE giant line that contains the phrase "If too many queries are received from a single IP address" — this matches WHOIS_RATE_LIMIT_PATTERNS /too many (?:requests|queries)/i, so "Domain not found." was misjudged as rate-limited and setWhoisRateLimit(tldSuffix) poisoned the whole TLD.
+  - Fix in src/lib/whois/whois-patterns.ts isWhoisRateLimited: added an isBoilerplate() line filter (drops NOTICE / TERMS OF USE / Terms of Use / By submitting / This service / Access to / You agree lines) applied to BOTH allContent (the first-30-lines scan, keeps %/# comment lines) and the filtered 20-line scan. This kills policy-banner false positives while still catching genuine %-comment rate limits like whois.nic.hu.
+  - When a TLD's whois server TCP-connects + responds but every query returns "rate limited", check isWhoisRateLimited boilerplate filtering before blaming the server — single-line ToU banners from Identity Digital/NetNames-style registries trigger the regex.
+  - Verification: isWhoisRateLimited on real whois.nic.ac output → false; detectWhoisError → "Domain not found."; genuine %-comment rate-limit output still → true; lookupWhoisWithCache("nic.ac"|"google.ac", {nocache:true}) → status true; "example.ac" → registry-reserved.
