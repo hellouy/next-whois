@@ -429,3 +429,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - Do NOT re-add a nic-ps scraper: it was implemented then abandoned once the working TCP server was found. nic-ps.ts may remain on disk unregistered (like orphaned nic-bb/nic-gm/nic-tt); do not re-wire it into BUILTIN_SERVERS.
   - Lesson: when IANA's advertised WHOIS host returns 0 bytes / is Cloudflare-gated, try alternate registry hostnames (whois.registry.<tld>, whois.nic.<tld>) over port 43 before building a scraper. A custom_whois_servers DB row (source='repair') is only consumed when source='manual' — a repair entry pointing at a working host can silently never be used.
   - Verification chain for this fix: npx tsc --noEmit (exit 0) → npx vitest run src/lib/whois/ (68 passed) → live dev /api/lookup-stream?query=v.ps (registered + unregistered both correct) → pnpm build (exit 0).
+
+[Project Knowledge Summary]
+- Date: 2026-09-17
+- Context: Fixed .tf / .pm falsely rejected as "WHOIS/RDAP not available for this TLD"
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - NO_SERVER_TLDS in src/lib/whois/lookup.ts is a hardcoded fast-fail set checked BEFORE any WHOIS/RDAP attempt; a TLD listed there returns "WHOIS/RDAP not available for this TLD" without querying anything. It silently overrides whois_gtld_bootstrap.ts / rdap_gtld_bootstrap.ts / CCTLD_RDAP_OVERRIDES entries for the same TLD.
+  - .tf and .pm were wrongly in that set (comment claimed "IANA managed, no public WHOIS/RDAP") — both actually resolve via AFNIC: whois.nic.tf / whois.nic.pm over port 43 AND https://rdap.nic.tf/ / https://rdap.nic.pm/ (HTTP 200). Sibling AFNIC ccTLDs .wf/.yt were already correct (not in the set). Removed both entries.
+  - Remaining NO_SERVER_TLDS entries (hm, aq, bv, sj, eh) were re-verified as genuinely having no whois.nic.<tld> — leave them.
+  - Cross-check trap: src/pages/api/iana-tlds.ts derives hasWhois from getStaticWhoisServer (which reads the bootstrap tables), so /tlds can report .tf as supported while lookup.ts rejects it. When a TLD "has a server" per IANA but lookups fail with "not available for this TLD", grep NO_SERVER_TLDS first.
+  - Verification: lookupWhoisWithCache("example.tf"|"nic.tf"|"nic.pm"|"example.pm", {nocache:true}) → status true, source rdap, full fields; example.aq still correctly returns the no-server error.

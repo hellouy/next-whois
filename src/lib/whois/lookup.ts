@@ -500,8 +500,6 @@ const NO_SERVER_TLDS = new Set<string>([
   "bv",  // Bouvet Island — no public WHOIS/RDAP
   "sj",  // Svalbard & Jan Mayen — no public WHOIS/RDAP
   "eh",  // Western Sahara — no public WHOIS/RDAP
-  "tf",  // French Southern Territories — IANA managed, no public WHOIS/RDAP
-  "pm",  // Saint Pierre & Miquelon — no public WHOIS/RDAP
 ]);
 
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
