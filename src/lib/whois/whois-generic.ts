@@ -24,7 +24,13 @@ export async function getIanaWhoisServer(tld: string): Promise<string | null> {
   if (cached && cached.expires > now) return cached.server;
   try {
     const raw = await queryWhoisTcp("whois.iana.org", 43, tld, 5_000);
-    const m = raw.match(/^refer:\s*(\S+)/im);
+    // IANA's WHOIS server referral field is `whois:` (e.g. "whois: whois.nic.xn").
+    // `refer:` is NOT present in current IANA responses — every one of the 248
+    // queried TLDs used `whois:` and none used `refer:`. Matching only `refer:`
+    // returned null for every TLD, silently disabling the IANA fallback that
+    // auto-discovers servers for TLDs missing from our static maps. Accept both
+    // field names for forward/backward compatibility.
+    const m = raw.match(/^(?:whois|refer):[ \t]+(\S+)[ \t]*$/im);
     const server = m ? m[1].trim().toLowerCase() : null;
     if (_ianaServerCache.size >= IANA_CACHE_MAX && !_ianaServerCache.has(tld)) {
       const oldest = _ianaServerCache.keys().next().value;

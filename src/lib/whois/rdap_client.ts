@@ -240,7 +240,7 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   my: "https://rdap.mynic.my/rdap/",               // confirmed: mynic.my/rdap/
   nf: "https://rdap.nic.nf/",
   // np: removed — rdap.nic.np ENOTFOUND; no known WHOIS server for Nepal
-  // nu: removed — rdap.nic.nu ENOTFOUND; WHOIS whois.nic.nu also ENOTFOUND
+  // nu: removed — rdap.nic.nu ENOTFOUND; WHOIS via whois.iis.nu works (was whois.nic.nu which returned empty)
   // nz: removed — rdap.srs.net.nz ENOTFOUND; WHOIS via whois.srs.net.nz works
   pg: "https://rdap.nic.pg/",
   // ph: removed — rdap.dot.ph SSL/TLS error; WHOIS whois.dot.ph also times out

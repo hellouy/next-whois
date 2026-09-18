@@ -495,9 +495,15 @@ const SLOW_WHOIS_TLDS: Readonly<Record<string, number>> = {
  * "likely unregistered" with low confidence rather than hard "LOOKUP FAILED".
  */
 const NO_SERVER_TLDS = new Set<string>([
-  "hm",  // Heard Island & McDonald Islands — IANA managed, no public WHOIS/RDAP
+  // Each entry cross-checked against live IANA whois data (whois.iana.org:43)
+  // and direct TCP-43 probes on 2026-09-18.
+  // hm: IANA lists whois.registry.hm but both of its A records
+  //     (148.135.127.5, 185.10.123.5) close the connection with 0 bytes /
+  //     hang forever on TCP 43 — the service is not actually reachable, so the
+  //     TLD keeps the fast-fail (DNS-probe-only) path.
+  "hm",  // Heard Island & McDonald Islands — IANA lists WHOIS but host is unresponsive
   "aq",  // Antarctica — IANA managed, no public WHOIS/RDAP
-  "bv",  // Bouvet Island — no public WHOIS/RDAP
+  "bv",  // Bouvet Island — no public WHOIS/RDAP (IANA whois: field empty)
   "sj",  // Svalbard & Jan Mayen — no public WHOIS/RDAP
   "eh",  // Western Sahara — no public WHOIS/RDAP
 ]);
