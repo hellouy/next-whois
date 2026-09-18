@@ -45,6 +45,11 @@ describe("extractNextWhoisServer", () => {
   it("returns null when no referral field is present", () => {
     expect(extractNextWhoisServer("Domain Name: example.com\nStatus: active\n", new Set())).toBeNull();
   });
+
+  it("matches indented referral lines", () => {
+    const raw = "  Registrar WHOIS Server: whois.markmonitor.com\n";
+    expect(extractNextWhoisServer(raw, new Set())).toEqual({ host: "whois.markmonitor.com", port: 43 });
+  });
 });
 
 describe("parseSimpleWhoisLines", () => {

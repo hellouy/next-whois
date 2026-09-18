@@ -23,6 +23,7 @@ export function isPrivateHost(host: string): boolean {
   if (v4) {
     const a = Number(v4[1]);
     const b = Number(v4[2]);
+    const c = Number(v4[3]);
     return (
       a === 0 || // 0.0.0.0/8 "this network"
       a === 10 || // 10.0.0.0/8 private
@@ -30,7 +31,9 @@ export function isPrivateHost(host: string): boolean {
       a === 127 || // 127.0.0.0/8 loopback
       (a === 169 && b === 254) || // 169.254.0.0/16 link-local + metadata
       (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12 private
-      (a === 192 && (b === 168 || b === 0)) || // 192.168/16 + 192.0.0/24 + 192.0.2/24
+      (a === 192 && b === 168) || // 192.168.0.0/16 private
+      (a === 192 && b === 0 && c === 0) || // 192.0.0.0/24 IANA special registry
+      (a === 192 && b === 0 && c === 2) || // 192.0.2.0/24 TEST-NET-1
       (a === 198 && (b === 18 || b === 19)) || // 198.18.0.0/15 benchmark
       (a === 203 && b === 0) || // 203.0.113.0/24 TEST-NET-3
       a >= 224 // multicast (224/4) + reserved (240/4) + broadcast

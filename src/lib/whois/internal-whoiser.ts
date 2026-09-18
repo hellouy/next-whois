@@ -79,7 +79,7 @@ const MISSPELLED_SERVERS: Record<string, string> = {
 };
 
 const NEXT_SERVER_FIELDS =
-  /^(?:Registrar WHOIS Server|Registry WHOIS Server|ReferralServer|Registrar Whois|Whois Server|WHOIS Server):[ \t]*(\S+?)[ \t]*$/im;
+  /^[ \t]*(?:Registrar WHOIS Server|Registry WHOIS Server|ReferralServer|Registrar Whois|Whois Server|WHOIS Server):[ \t]*(\S+?)[ \t]*$/im;
 
 // Google Registry responses often omit "Registrar WHOIS Server" but carry a
 // Registrar URL pointing at domains.google — whoiser hardcodes this fallback.
