@@ -480,12 +480,6 @@ export class ScraperRequiredError extends Error {
 // Handles scraper / HTTP / TCP entries uniformly.
 // isUserServer=true → throw on failure; false → return null on failure.
 
-let _whoiserPromiseCustom: Promise<typeof import("whoiser")> | null = null;
-const getWhoiserCustom = () => {
-  if (!_whoiserPromiseCustom) _whoiserPromiseCustom = import("whoiser");
-  return _whoiserPromiseCustom;
-};
-
 async function executeServerEntry(
   customEntry: CustomServerEntry,
   domainToQuery: string,
@@ -553,9 +547,8 @@ async function executeServerEntry(
 
   const tcpHost = getTcpHost(customEntry);
   if (tcpHost) {
-    // SSRF guard: reject private/internal hosts before calling whoiser or
-    // queryWhoisTcp. queryWhoisTcp also checks internally (defense-in-depth),
-    // but the port-43 whoiser path bypasses it entirely.
+    // SSRF guard: reject private/internal hosts before opening the TCP
+    // connection. queryWhoisTcp also checks internally (defense-in-depth).
     if (await isBlockedHost(tcpHost)) {
       if (isUserServer) throw new Error(`SSRF guard: blocked WHOIS TCP host ${tcpHost}`);
       return null;
@@ -565,11 +558,7 @@ async function executeServerEntry(
         ? customEntry.port
         : 43;
     try {
-      const { whoisQuery } = await getWhoiserCustom();
-      const raw =
-        port === 43
-          ? await whoisQuery(tcpHost, domainToQuery, innerTimeout)
-          : await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
+      const raw = await queryWhoisTcp(tcpHost, port, domainToQuery, innerTimeout);
       if (raw && raw.trim().length > 0) {
         if (isUserServer && isWhoisRateLimited(raw)) {
           throw new Error(`Custom WHOIS server ${tcpHost} is rate-limiting requests — please try again later`);

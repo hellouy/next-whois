@@ -74,10 +74,6 @@ warmupDnsCache([
   "whois.nic.tr", "whois.pknic.net.pk", "whois.nic.mx",
 ]);
 
-// Pre-warm the whoiser module in the background so the first WHOIS TCP lookup
-// does not pay the module-parse cost (~30-100 ms) during the request hot path.
-import("whoiser").catch(() => {});
-
 // ── L1 in-process cache (60 s / 2 000 entries, LRU eviction) ─────────────────
 // Increased from 30 s / 500 to absorb more repeated queries between Redis
 // round-trips while keeping memory bounded.  LRU eviction keeps hot domains
