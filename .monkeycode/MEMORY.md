@@ -419,35 +419,19 @@ Entries discovered by the Agent during task execution should follow this format:
   - 本次修复的新服务器（均已验活）：whois.nic.uk / whois.registry.co / whois.dns.be / whois.kyregistry.ky / whois.sr / whois.ati.tn / whois.trabis.gov.tr / whois.ua / whois.gtld.knet.cn / whois.gtld.zdns.cn / whois.nic.icbc|ren|top|unicom|observer|realty / whois.registry.click / whois.afilias-srs.net / www.whois.fj；RDAP 回退已确认存活：rdap.nominet.uk、pubapi.registry.google、rdap.zdnsgtld.com。
 
 [Project Knowledge Summary]
-- Date: 2026-09-17
-- Context: Resolved .ps (Palestine) WHOIS by finding the working registry server, superseding the web-scraper attempt
+- Date: 2026-09-17 (merged 2026-09-18)
+- Context: WHOIS TLD 级修复：.ps 服务器纠正、.tf/.pm NO_SERVER_TLDS 误剔除、.ac 率限误报
 - Category: Troubleshooting & Debugging
 - Instructions:
-  - CORRECT .ps WHOIS server is whois.registry.ps (95.217.44.246), NOT the IANA-advertised whois.pnina.ps. It returns full "Key: Value" data in 500-800ms from cloud/datacenter egress (verified: v.ps → NETIM SARL registrar, creation/expiry dates, 4 name servers); unregistered domains return "No Object Found", already matched by WHOIS_NOT_REGISTERED_PATTERNS at whois-patterns.ts:42. Fix = whois-servers.json `"ps": "whois.registry.ps"` (iana_tlds cache key already at v6).
-  - whois.pnina.ps (65.21.199.175, IANA's advertised server) TCP-connects but silently closes with 0 bytes to cloud egress; www.pnina.ps/whois/ web WHOIS is Cloudflare bot-gated (JS challenge on datacenter IPs). Both are dead ends from Vercel/sandbox.
-  - .ps has NO RDAP (rdap.nic.ps ENOTFOUND; IANA ps record has no whois:/rdap: fields). See rdap_client.ts:213 comment.
-  - Do NOT re-add a nic-ps scraper: it was implemented then abandoned once the working TCP server was found. nic-ps.ts may remain on disk unregistered (like orphaned nic-bb/nic-gm/nic-tt); do not re-wire it into BUILTIN_SERVERS.
-  - Lesson: when IANA's advertised WHOIS host returns 0 bytes / is Cloudflare-gated, try alternate registry hostnames (whois.registry.<tld>, whois.nic.<tld>) over port 43 before building a scraper. A custom_whois_servers DB row (source='repair') is only consumed when source='manual' — a repair entry pointing at a working host can silently never be used.
-  - Verification chain for this fix: npx tsc --noEmit (exit 0) → npx vitest run src/lib/whois/ (68 passed) → live dev /api/lookup-stream?query=v.ps (registered + unregistered both correct) → pnpm build (exit 0).
+  - .ps 正确服务器是 whois.registry.ps (95.217.44.246)，非 IANA 广告的 whois.pnina.ps（对云出口静默 0 字节 + Cloudflare 风控）。可尝试 whois.registry.<tld>/whois.nic.<tld> 替代 IANA 广告主机再考虑 web scraper（scraper 曾实现后被弃用，勿重接线）。Verification chain: tsc → vitest src/lib/whois → 线上 /api/lookup-stream?query=v.ps → pnpm build。
+  - NO_SERVER_TLDS（src/lib/whois/lookup.ts 硬编码快速失败集）会静默覆盖 bootstrap/RDAP 表同 TLD 条目。.tf/.pm 误在集内已移除（AFNIC whois.nic.tf/pm + rdap.nic.tf/pm 均可用，201 OK）；hm/aq/bv/sj/eh 复核确认无服务保留。当 /api/iana-tlds.ts 报告 TLD 有服务器而 lookup 报 not available，先 grep NO_SERVER_TLDS。
+  - .ac（Identity Digital）用 whois.nic.ac 正常应答，但无 RDAP。率限误报根因：Identity Digital 把整份 ToU 作为一行追加，含 "If too many queries are received from a single IP address"，匹配 /too many (?:requests|queries)/i → 误判 rate_limited 并毒化整个 TLD。修复= isWhoisRateLimited 加 isBoilerplate() 行过滤（NOTICE/TERMS OF USE/Terms of Use/By submitting/This service/Access to/You agree 行剔除），但仍能捕获 whois.nic.hu 式 % 注释率限。
 
 [Project Knowledge Summary]
-- Date: 2026-09-17
-- Context: Fixed .tf / .pm falsely rejected as "WHOIS/RDAP not available for this TLD"
+- Date: 2026-09-18
+- Context: Discovered IANA server field name mismatch + corrected .bf/.nu servers (commit 57d5e94)
 - Category: Troubleshooting & Debugging
 - Instructions:
-  - NO_SERVER_TLDS in src/lib/whois/lookup.ts is a hardcoded fast-fail set checked BEFORE any WHOIS/RDAP attempt; a TLD listed there returns "WHOIS/RDAP not available for this TLD" without querying anything. It silently overrides whois_gtld_bootstrap.ts / rdap_gtld_bootstrap.ts / CCTLD_RDAP_OVERRIDES entries for the same TLD.
-  - .tf and .pm were wrongly in that set (comment claimed "IANA managed, no public WHOIS/RDAP") — both actually resolve via AFNIC: whois.nic.tf / whois.nic.pm over port 43 AND https://rdap.nic.tf/ / https://rdap.nic.pm/ (HTTP 200). Sibling AFNIC ccTLDs .wf/.yt were already correct (not in the set). Removed both entries.
-  - Remaining NO_SERVER_TLDS entries (hm, aq, bv, sj, eh) were re-verified as genuinely having no whois.nic.<tld> — leave them.
-  - Cross-check trap: src/pages/api/iana-tlds.ts derives hasWhois from getStaticWhoisServer (which reads the bootstrap tables), so /tlds can report .tf as supported while lookup.ts rejects it. When a TLD "has a server" per IANA but lookups fail with "not available for this TLD", grep NO_SERVER_TLDS first.
-  - Verification: lookupWhoisWithCache("example.tf"|"nic.tf"|"nic.pm"|"example.pm", {nocache:true}) → status true, source rdap, full fields; example.aq still correctly returns the no-server error.
-
-[Project Knowledge Summary]
-- Date: 2026-09-17
-- Context: Fixed .ac domains falsely reported as rate-limited even though whois.nic.ac answers normally
-- Category: Troubleshooting & Debugging
-- Instructions:
-  - .ac (Ascension Island, Identity Digital registry) serves via whois.nic.ac port 43; registered domains return full Key:Value data, unregistered return "Domain not found.", reserved (example.ac) return "This name is reserved by the Registry.". It has NO RDAP config — don't look for one.
-  - Root cause was a rate-limit false positive, not a dead server: Identity Digital appends its ENTIRE Terms of Use as ONE giant line that contains the phrase "If too many queries are received from a single IP address" — this matches WHOIS_RATE_LIMIT_PATTERNS /too many (?:requests|queries)/i, so "Domain not found." was misjudged as rate-limited and setWhoisRateLimit(tldSuffix) poisoned the whole TLD.
-  - Fix in src/lib/whois/whois-patterns.ts isWhoisRateLimited: added an isBoilerplate() line filter (drops NOTICE / TERMS OF USE / Terms of Use / By submitting / This service / Access to / You agree lines) applied to BOTH allContent (the first-30-lines scan, keeps %/# comment lines) and the filtered 20-line scan. This kills policy-banner false positives while still catching genuine %-comment rate limits like whois.nic.hu.
-  - When a TLD's whois server TCP-connects + responds but every query returns "rate limited", check isWhoisRateLimited boilerplate filtering before blaming the server — single-line ToU banners from Identity Digital/NetNames-style registries trigger the regex.
-  - Verification: isWhoisRateLimited on real whois.nic.ac output → false; detectWhoisError → "Domain not found."; genuine %-comment rate-limit output still → true; lookupWhoisWithCache("nic.ac"|"google.ac", {nocache:true}) → status true; "example.ac" → registry-reserved.
+  - getIanaWhoisServer（src/lib/whois/whois-generic.ts）曾用 /^refer:\s*(\S+)/im 匹配 IANA 响应，但扫描全部 248 个 ccTLD 记录发现 refer: 字段出现 0 次；IANA whois.iana.org:43 响应的服务器字段名是 whois:（245/248 个 TLD 有，其余空）。用 refer: 匹配导致 IANA fallback 运行时从未生效。现改为 /^(?:whois|refer):[ \t]+(\S+)[ \t]*$/im 兼容两者——以后排查"某个 TLD 应自动发现服务器却走了 no_server"时先确认 IANA 字段名。
+  - .bf（Burkina Faso）正确 WHOIS 服务器是 whois.registre.bf（实测 google.bf 返回完整 3448 字节数据，注册局 AFRIREGISTER BURKINA），旧配置 whois.ripe.net 返回错误的 RIPE 数据。.nu（Niue）正确服务器是 whois.iis.nu（实测 google.nu 完整返回，MarkMonitor Inc），旧配置 whois.nic.nu 已废旧空应答。均以 IANA 权威值 + 端口 43 实测完整数据确认；IANA 广告服务器与静态配置不同时，以实测为准并更新 whois-servers.json。
+  - 生产部署验证：git push main → Vercel projectId=next-whois 轮询 state READY → curl --resolve www.cxl.net:443:<anycast ip> "https://www.cxl.net/api/lookup?query=google.bf|google.nu" -H "Origin: https://www.cxl.net"；57d5e94 上线后 google.bf→Registrar AFRIREGISTER BURKINA、google.nu→Registrar MarkMonitor Inc，均 status true source whois。
