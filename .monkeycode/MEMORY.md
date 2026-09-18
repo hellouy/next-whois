@@ -435,3 +435,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - getIanaWhoisServer（src/lib/whois/whois-generic.ts）曾用 /^refer:\s*(\S+)/im 匹配 IANA 响应，但扫描全部 248 个 ccTLD 记录发现 refer: 字段出现 0 次；IANA whois.iana.org:43 响应的服务器字段名是 whois:（245/248 个 TLD 有，其余空）。用 refer: 匹配导致 IANA fallback 运行时从未生效。现改为 /^(?:whois|refer):[ \t]+(\S+)[ \t]*$/im 兼容两者——以后排查"某个 TLD 应自动发现服务器却走了 no_server"时先确认 IANA 字段名。
   - .bf（Burkina Faso）正确 WHOIS 服务器是 whois.registre.bf（实测 google.bf 返回完整 3448 字节数据，注册局 AFRIREGISTER BURKINA），旧配置 whois.ripe.net 返回错误的 RIPE 数据。.nu（Niue）正确服务器是 whois.iis.nu（实测 google.nu 完整返回，MarkMonitor Inc），旧配置 whois.nic.nu 已废旧空应答。均以 IANA 权威值 + 端口 43 实测完整数据确认；IANA 广告服务器与静态配置不同时，以实测为准并更新 whois-servers.json。
   - 生产部署验证：git push main → Vercel projectId=next-whois 轮询 state READY → curl --resolve www.cxl.net:443:<anycast ip> "https://www.cxl.net/api/lookup?query=google.bf|google.nu" -H "Origin: https://www.cxl.net"；57d5e94 上线后 google.bf→Registrar AFRIREGISTER BURKINA、google.nu→Registrar MarkMonitor Inc，均 status true source whois。
+
+[Project Knowledge Summary]
+- Date: 2026-09-18
+- Context: Self-hosted whoiser + SSRF guard 192.0/16 over-block fix (commits a5e596f, a8a4f2d)
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - whoiser 包已移除（pnpm remove whoiser），自建实现在 src/lib/whois/internal-whoiser.ts（getIanaWhoisServer/whoisDomainInternal/whoisIpInternal/whoisAsnInternal/extractNextWhoisServer/parseSimpleWhoisLines/MISSPELLED_SERVERS）。行为镜像 whoiser 2.0.0-beta.10：IANA whois: referral 发现、follow 链、DENIC -T dn/JPRS /e/ARIN + n/+ a 特殊格式、misspelled 主机标准化。传输层 queryWhoisTcp（src/lib/whois/whois-transport.ts）增强：SSRF 防护 + DoH DNS 回退 + 2MiB 上限 + 超时有数据则 resolve。
+  - SSRF guard（src/lib/ssrf-guard.ts isPrivateHost）曾有 192.0/16 过宽拦截 bug：a===192&&b===0 会拦截整个 192.0.0.0/16 而非仅 192.0.0/24 + 192.0.2/24。whois.iana.org 解析到 192.0.32.59（IANA 自有基础设施段）被误杀 → 整条 IANA discovery 链断裂 → 所有不在静态表/bootstrap 的 TLD 全部失败。排查"IANA 发现返回 null"时先查 whois.iana.org DNS 解析（node -e "dns.lookup('whois.iana.org')") 确认 IP 不在 192.0.0/24 或 192.0.2/24 内，再查 isPrivateHost。
+  - whoiser 内置 40 个 TLD 映射（cacheTldWhoisServer）移除后：27 个不在静态表/bootstrap 中的 TLD 依赖 IANA discovery。其中 bz/lc/vc → whois.identity.digital 已补入 whois-servers.json（IANA 无 whois: 字段，靠 whoiser 内置值确认仍可用）。.app/.dev（Google Registry）无传统 WHOIS:43 服务器（whois.nic.google NXDOMAIN），仅 RDAP（pubapi.registry.google/rdap/）→ 同 .ma 情况，靠 RDAP 兜底。
+  - whoiser v2 dist 源码可从 unpkg 下载：curl -sL https://unpkg.com/whoiser@2/dist/whoiser.js — 用于行为对齐验证（cacheTldWhoisServer 40 TLD、misspelledWhoisServer 7 项、parseSimpleWhois L29 附加 __raw）。
+  - 线上 IP 已变更：www.cxl.net → 216.198.79.65（DoH 确认）。线上验证用 curl --resolve www.cxl.net:443:216.198.79.65 + -H "Origin: https://www.cxl.net"，API 路径 /api/lookup?query=<domain>&nocache=1。
