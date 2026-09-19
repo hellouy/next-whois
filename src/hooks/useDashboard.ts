@@ -10,6 +10,8 @@ import {
 } from "@/lib/dashboard-cache";
 import type { Subscription, Stamp, Order, BalanceTx, Plan, DashboardUser } from "@/components/dashboard/types";
 
+export type DashTab = "subscriptions" | "stamps" | "account" | "membership";
+
 export function useDashboard() {
   const router = useRouter();
   const { t, locale } = useTranslation();
@@ -22,11 +24,27 @@ export function useDashboard() {
     siteSettings.payment_paypal_enabled
   );
 
-  const VALID_TABS: ReadonlyArray<"subscriptions" | "stamps" | "account" | "membership"> = ["subscriptions", "stamps", "account", "membership"];
+  const VALID_TABS: ReadonlyArray<DashTab> = ["subscriptions", "stamps", "account", "membership"];
   const urlTab = router.query.tab as string | undefined;
-  const urlTabValue = (VALID_TABS as ReadonlyArray<string>).includes(urlTab ?? "") ? (urlTab as "subscriptions" | "stamps" | "account" | "membership") : null;
+  const urlTabValue = (VALID_TABS as ReadonlyArray<string>).includes(urlTab ?? "") ? (urlTab as DashTab) : null;
 
-  const [tab, setTab] = React.useState<"subscriptions" | "stamps" | "account" | "membership">(urlTabValue ?? "stamps");
+  const [tab, setTabState] = React.useState<DashTab>(urlTabValue ?? "stamps");
+
+  // Keep ?tab= in sync both ways: internal setTab writes the query so that
+  // deep links stay accurate, and query changes (e.g. <Link href="/dashboard?tab=membership">)
+  // update the state even though the route itself does not remount.
+  const setTab = React.useCallback((next: DashTab) => {
+    setTabState(next);
+    if (router.query.tab === next) return;
+    const nextQuery = { ...router.query };
+    delete nextQuery.tab;
+    void router.replace({ pathname: router.pathname, query: { ...nextQuery, tab: next } }, undefined, { shallow: true });
+  }, [router]);
+
+  React.useEffect(() => {
+    if (urlTabValue && urlTabValue !== tab) setTabState(urlTabValue);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTabValue]);
   const [subFilter, setSubFilter] = React.useState<"all" | "expiring" | "urgent" | "expired">("all");
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
   const [stamps, setStamps] = React.useState<Stamp[]>([]);
