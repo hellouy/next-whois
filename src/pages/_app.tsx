@@ -18,9 +18,22 @@ import { RiBellLine, RiCloseLine, RiWrenchLine, RiInformationLine, RiAlertLine, 
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { RouteProgress } from "@/components/route-progress";
+import dynamic from "next/dynamic";
 import DotField from "@/components/DotField";
-import Galaxy from "@/components/Galaxy";
-import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars";
+import type GalaxyType from "@/components/Galaxy";
+
+// Heavy background components are dynamically imported so they are split into
+// separate chunks and only loaded when an admin selects that background style.
+// This keeps the main bundle lean and speeds up client-side route transitions.
+const Galaxy = dynamic(() => import("@/components/Galaxy"), { ssr: false }) as typeof GalaxyType;
+const StarsBackground = dynamic(
+  () =>
+    import("@/components/animate-ui/components/backgrounds/stars").then(
+      (m) => m.StarsBackground,
+    ),
+  { ssr: false },
+);
 import { useTheme } from "next-themes";
 
 
@@ -548,6 +561,8 @@ const STABLE_KEY_PAGES = new Set([
 ]);
 
 // Regular pages (about, login, privacy, etc.) get a subtle y slide-up on enter.
+// The exit is deliberately very short so the incoming page can start its entry
+// almost immediately, removing the blank gap that made navigation feel sluggish.
 const pageVariants = {
   initial: { opacity: 0, y: 5 },
   animate: {
@@ -557,9 +572,7 @@ const pageVariants = {
   },
   exit: {
     opacity: 0,
-    // ↓ Reduced from 0.1 → 0.05 s: shorter exit means less blank-screen gap
-    //   before the new page's entry animation starts (AnimatePresence mode="wait").
-    transition: { duration: 0.05, ease: "easeIn" as const },
+    transition: { duration: 0.04, ease: "easeIn" as const },
   },
 };
 
@@ -605,6 +618,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
         disableTransitionOnChange
       >
         <MotionConfig reducedMotion="user">
+        <RouteProgress />
         <SiteBackground />
         <MaintenanceGate>
         <div className="relative w-full min-h-screen font-sans">

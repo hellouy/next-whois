@@ -379,6 +379,24 @@ export function NavDrawer() {
   const { t, locale } = useTranslation();
   const isChinese = locale === "zh" || locale === "zh-tw";
   const logoText = settings.site_logo_text || "WHOIS";
+  const router = useRouter();
+
+  // Prefetch every drawer destination as soon as the menu opens so the first
+  // tap navigates instantly instead of waiting for the page chunk.
+  React.useEffect(() => {
+    if (!open) return;
+    const targets = [
+      ...NAV_GROUPS.flatMap(g => g.items.map(i => i.href)),
+      ...TOOLS_SUB_ITEMS.map(i => i.href),
+      "/tools",
+    ].filter((h): h is string => !!h);
+    const seen = new Set<string>();
+    for (const href of targets) {
+      if (seen.has(href)) continue;
+      seen.add(href);
+      void router.prefetch(href);
+    }
+  }, [open, router]);
 
   // ── History sub-panel state ────────────────────────────────────────────
   const [histMounted, setHistMounted] = React.useState(false);
