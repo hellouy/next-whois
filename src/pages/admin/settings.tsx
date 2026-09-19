@@ -353,6 +353,9 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
         <Field label="页脚文字" desc="显示在所有页面底部（© 版权行）">
           <Input value={s.site_footer} onChange={e => set("site_footer", e.target.value)} placeholder="© 2026 域见你 · WHOIS & RDAP Lookup Service" className="text-xs" />
         </Field>
+        <Field label="服务器信息来源" desc="注册商卡片「服务器信息」栏的归属文字（如：来自：不讲·李提供）">
+          <Input value={s.whois_server_attribution} onChange={e => set("whois_server_attribution", e.target.value)} placeholder="来自：不讲·李提供" className="text-xs" />
+        </Field>
       </div>
 
       {/* ── 站点背景 ────────────────────────────────────────── */}

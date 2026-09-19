@@ -169,6 +169,8 @@ export interface SiteSettings {
   expireddomains_prefix_list: string;
   // Site background style
   site_background: string;
+  // Attribution text shown in the registrar card's server-info section
+  whois_server_attribution: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -317,6 +319,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   expireddomains_rows: "200",
   expireddomains_prefix_list: "",
   site_background: "dot",
+  whois_server_attribution: "来自：不讲·李提供",
 };
 
 const STORAGE_KEY = "next_whois_settings_ts";

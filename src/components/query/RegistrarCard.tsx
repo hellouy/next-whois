@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { useSiteSettings } from "@/lib/site-settings";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
 import { REGISTRAR_ICONS } from "@/data/query-page/registrar-icons";
 
@@ -67,6 +68,9 @@ export function RegistrarCard({
   hasTechContact: boolean;
 }) {
   const { t } = useTranslation();
+  const settings = useSiteSettings();
+
+  const attribution = settings.whois_server_attribution?.trim();
 
   const registrarIcon = getRegistrarIcon(result.registrar, result.registrarURL);
   const registrarInitial =
@@ -154,6 +158,12 @@ export function RegistrarCard({
             <div className="flex items-start justify-between gap-3">
               <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registry_domain_id")}</span>
               <span className="text-xs font-mono text-foreground/80 break-all text-right">{result.registryDomainId}</span>
+            </div>
+          )}
+          {attribution && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "数据来源" : "Source"}</span>
+              <span className="text-[11px] text-foreground/60 break-all text-right">{attribution}</span>
             </div>
           )}
         </div>
