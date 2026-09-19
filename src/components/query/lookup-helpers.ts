@@ -166,14 +166,21 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
- * When the registry's updatedDate is today, a bare "今天/today" adds little
- * signal. If the domain's EPP status codes indicate a recent lifecycle event
- * (renewal, transfer, registration, deletion, …), surface that event instead.
+ * Produce a meaningful label for the updatedDate field.
  *
- * Priority: a pending operation beats its grace-period counterpart, and
- * deletion/redemption is more noteworthy than a plain update. Falls back to
- * getRelativeTime when no meaningful status is present or the date is older
- * than today (the generic "N天前" relative label is informative enough then).
+ * EPP status codes are a current snapshot — if the registry reports
+ * transferPeriod, pendingTransfer, renewPeriod, etc., that event is
+ * happening right now regardless of how fresh the updatedDate string is.
+ * So status codes take priority and always surface their label.
+ *
+ * When only "ok" (or nothing) is reported, fall back to heuristics keyed
+ * off the updatedDate freshness:
+ *   - a domain created today is obviously newly registered;
+ *   - an older domain updated today most likely reflects a renewal
+ *     (renewal is by far the most common trigger of a WHOIS update on an
+ *     established domain).
+ *
+ * Otherwise the generic relative label ("N天前" etc.) is shown.
  */
 export function getUpdatedDateLabel(
   dateStr: string,
@@ -189,10 +196,10 @@ export function getUpdatedDateLabel(
   const diffDays = Math.floor(
     (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
   );
-  if (diffDays < 0 || diffDays >= 1) return getRelativeTime(dateStr, t);
 
   const codes = statuses.map((s) => s.status.toLowerCase().replace(/[^a-z]/g, ""));
 
+  // ── Status-code snapshot: authoritative, not gated on updatedDate age ──
   if (codes.includes("pendingtransfer"))
     return t("relative_time.transferring");
   if (codes.includes("pendingdelete"))
@@ -212,8 +219,11 @@ export function getUpdatedDateLabel(
   if (codes.includes("pendingupdate"))
     return t("relative_time.pending_update");
 
-  // A domain created today must have been updated today too — this is the
-  // strongest signal available when the registry only reports "ok" (e.g. .bf).
+  // ── Heuristics for registries that only report "ok" (e.g. .bf) ────────
+  // Only meaningful when the update happened today; older updates show the
+  // generic relative label.
+  if (diffDays < 0 || diffDays >= 1) return getRelativeTime(dateStr, t);
+
   if (creationDate) {
     const created = parseWhoisDate(creationDate);
     if (
@@ -222,6 +232,8 @@ export function getUpdatedDateLabel(
     ) {
       return t("relative_time.newly_registered");
     }
+    // Older domain updated today: renewal is the most common cause.
+    return t("relative_time.just_renewed");
   }
 
   return getRelativeTime(dateStr, t);
