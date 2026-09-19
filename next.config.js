@@ -102,8 +102,6 @@ const nextConfig = {
         ...(Array.isArray(config.externals) ? config.externals : []),
         // These are ESM-only packages; keep as externals and load via dynamic
         // import() at runtime (CJS dynamic import() handles ESM correctly).
-        'whoiser',
-        'node-rdap',
         'ioredis',
         'nodemailer',
       ];

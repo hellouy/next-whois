@@ -1,0 +1,1640 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`analyzeWhois — golden master over every switch label > parses each label with stable output 1`] = `
+{
+  "ablauf": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "ablaufdatum": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "abuse contact phone": {
+    "abusePhone": "+1.5551234567",
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "abuse phone": {
+    "abusePhone": "+1.5551234567",
+    "domain": "probe.example",
+  },
+  "abuse-mailbox": {
+    "abuseEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "ac": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "ac e-mail": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "activation": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "activation date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "activation time": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "actualizado": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "addr": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "address": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "admin contact": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "admin contact email": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "admin contact name": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "admin contact phone": {
+    "adminPhone": "+1.5551234567",
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "admin country": {
+    "adminCountry": "US",
+    "domain": "probe.example",
+  },
+  "admin e-mail": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "admin email": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "admin id": {
+    "adminName": "1234",
+    "domain": "probe.example",
+  },
+  "admin name": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "admin org": {
+    "adminOrganization": "Example Org",
+    "domain": "probe.example",
+  },
+  "admin organisation": {
+    "adminOrganization": "Example Org",
+    "domain": "probe.example",
+  },
+  "admin organization": {
+    "adminOrganization": "Example Org",
+    "domain": "probe.example",
+  },
+  "admin phone": {
+    "adminPhone": "+1.5551234567",
+    "domain": "probe.example",
+  },
+  "admin telephone": {
+    "adminPhone": "+1.5551234567",
+    "domain": "probe.example",
+  },
+  "administrative contact": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "administrative contact name": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "administrative country": {
+    "adminCountry": "US",
+    "domain": "probe.example",
+  },
+  "administrative e-mail": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "administrative email": {
+    "adminEmail": "user@example.com",
+    "domain": "probe.example",
+  },
+  "administrative name": {
+    "adminName": "Probe Value",
+    "domain": "probe.example",
+  },
+  "administrative organisation": {
+    "adminOrganization": "Example Org",
+    "domain": "probe.example",
+  },
+  "administrative organization": {
+    "adminOrganization": "Example Org",
+    "domain": "probe.example",
+  },
+  "administrative phone": {
+    "adminPhone": "+1.5551234567",
+    "domain": "probe.example",
+  },
+  "administrative telephone": {
+    "adminPhone": "+1.5551234567",
+    "domain": "probe.example",
+  },
+  "adresse": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "anniversary": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "authorized agency": {
+    "domain": "probe.example",
+    "registrar": "Probe Value",
+  },
+  "bureau d'enregistrement": {
+    "domain": "probe.example",
+    "registrar": "Probe Value",
+  },
+  "changed": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "changed on": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "cidade": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "cidr": {
+    "cidr": "192.0.2.0/24",
+    "domain": "probe.example",
+  },
+  "city": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "ciudad": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "code postal": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "codigo postal": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "country": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "country-code": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "courriel": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "create date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "created": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "created (utc)": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "created at": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "created date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "created date (utc)": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "created on": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "creation date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "criado em": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "data de registro": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "date d'enregistrement": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "date d'expiration": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "date de creation": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "date de création": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "date de mise a jour": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "date de mise à jour": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "date expiration": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "date registered": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "date updated": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "datum registracije": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "delegated": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "delegated on": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "derniere modification": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "dernière modification": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "descr": {
+    "domain": "probe.example",
+    "registrantOrganization": "Probe Value",
+  },
+  "direccion": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "dns": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "dns1": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "dns2": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "dns3": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "dns4": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "dnssec": {
+    "dnssec": "unsigned",
+    "domain": "probe.example",
+  },
+  "dnssec status": {
+    "dnssec": "clientTransferProhibited",
+    "domain": "probe.example",
+  },
+  "domain": {
+    "domain": "probe.example",
+  },
+  "domain commencement date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "domain expiration date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "domain holder country": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "domain holder organization": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "domain holder street": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "domain id": {
+    "domain": "probe.example",
+    "registryDomainId": "1234",
+  },
+  "domain inception date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "domain name": {
+    "domain": "probe.example",
+  },
+  "domain name (ascii)": {
+    "domain": "probe.example",
+  },
+  "domain name (unicode)": {
+    "domain": "probe.example",
+  },
+  "domain name commencement date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "domain registered": {
+    "creationDate": "probe.example",
+    "domain": "probe.example",
+  },
+  "domain registration date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "domain renewal date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "domain status": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "domain updated": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "domain-id": {
+    "domain": "probe.example",
+    "registryDomainId": "1234",
+  },
+  "domaine": {
+    "domain": "probe.example",
+  },
+  "domainname": {
+    "domain": "probe.example",
+  },
+  "domainregistrierung": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "dominio": {
+    "domain": "probe.example",
+  },
+  "due date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "e-mail": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "email": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "end date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "enregistreur": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "enregistré le": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "entry created": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "estado": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "exp date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration date (utc)": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration time": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration-date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiration-date (registrar)": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expire": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expire date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expire-date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expires": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expires (utc)": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expires on": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiry": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "expiry date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "fax": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "fax no": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "fax-no": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "fecha creacion": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "fecha de alta": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "fecha de creacion": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "fecha de expiracion": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "fecha de modificacion": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "fecha de registro": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "fecha de vencimiento": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "fecha expiracion": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "first registered": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "first registration date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "giltig till": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "gyldig til": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "holder": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "host name": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "hostname": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "iana id": {
+    "domain": "probe.example",
+    "ianaId": "1234",
+  },
+  "inception date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "inet6num": {
+    "domain": "probe.example",
+    "inet6Num": "192.0.2.0 - 192.0.2.255",
+  },
+  "inetnum": {
+    "domain": "probe.example",
+    "inetNum": "192.0.2.0 - 192.0.2.255",
+  },
+  "keston loppupäivä": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last changed": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "last modification": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last modified": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "last modified date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last update": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last update date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last updated": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last updated date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last-modified": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "last-modified-date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "last-update": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "laufzeit bis": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "letzte änderung": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "locality": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "modification date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "modified": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "modified date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "modified on": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "modifié le": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "name": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "name server": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "name server (db)": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "name servers": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "nameserver": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "nameservers": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "netname": {
+    "domain": "probe.example",
+    "netName": "EXAMPLE-NET",
+  },
+  "netrange": {
+    "domain": "probe.example",
+    "netRange": "192.0.2.0 - 192.0.2.255",
+  },
+  "nettype": {
+    "domain": "probe.example",
+    "netType": "ALLOCATED",
+  },
+  "network-name": {
+    "domain": "probe.example",
+    "netName": "EXAMPLE-NET",
+  },
+  "nom": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "nom de domaine": {
+    "domain": "probe.example",
+  },
+  "nombre": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "ns": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns1": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns2": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns3": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns4": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns5": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "ns6": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "nserver": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "org-name": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "organisation": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "organization": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "orgtechphone": {
+    "domain": "probe.example",
+    "techPhone": "+1.5551234567",
+  },
+  "origin": {
+    "domain": "probe.example",
+    "originAS": "AS64500",
+  },
+  "originas": {
+    "domain": "probe.example",
+    "originAS": "AS64500",
+  },
+  "owner": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "p": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "paid till": {
+    "domain": "probe.example",
+    "expirationDate": "Probe Value",
+  },
+  "paid-till": {
+    "domain": "probe.example",
+    "expirationDate": "Probe Value",
+  },
+  "pais": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "pays": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "personname": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "phone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "postal address": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "postal code": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "postal-code": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "postalcode": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "postcode": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "primary nameserver": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "primary server": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "province": {
+    "domain": "probe.example",
+    "registrantProvince": "Example Province",
+  },
+  "record created": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "record last updated": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "record modified": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "referral url": {
+    "domain": "probe.example",
+    "registrarURL": "http://example.com",
+  },
+  "reg date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "register date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "registered": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "registered date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "registered on": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "registrador": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "registrant": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "registrant address": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "registrant city": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "registrant contact email": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "registrant contact name": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "registrant country": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "registrant country code": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "registrant country/economy": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "registrant email": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "registrant fax": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "registrant fax ext": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "registrant locality": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "registrant name": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "registrant org": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "registrant organisation": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "registrant organization": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "registrant phone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "registrant phone number": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "registrant postal code": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "registrant province": {
+    "domain": "probe.example",
+    "registrantProvince": "Example Province",
+  },
+  "registrant state": {
+    "domain": "probe.example",
+    "registrantProvince": "clientTransferProhibited",
+  },
+  "registrant state/province": {
+    "domain": "probe.example",
+    "registrantProvince": "clientTransferProhibited",
+  },
+  "registrant street": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "registrant street1": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "registrant street2": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "registrant street3": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "registrant telephone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "registrant zip": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "registrant zip code": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "registrar": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "registrar abuse contact email": {
+    "abuseEmail": "user@example.com",
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+  },
+  "registrar abuse contact phone": {
+    "abusePhone": "+1.5551234567",
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "registrar iana id": {
+    "domain": "probe.example",
+    "ianaId": "1234",
+  },
+  "registrar name": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "registrar registration expiration date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "registrar url": {
+    "domain": "probe.example",
+    "registrarURL": "http://example.com",
+  },
+  "registrar website": {
+    "domain": "probe.example",
+    "registrarURL": "http://example.com",
+  },
+  "registrar whois server": {
+    "domain": "probe.example",
+    "whoisServer": "ns1.example.com",
+  },
+  "registrar-name": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "registration date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "registration expiry date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "registration status": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "registration time": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "registreringsdato": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "registreringsdatum": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "registriert am": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "registry domain id": {
+    "domain": "probe.example",
+    "registryDomainId": "1234",
+  },
+  "registry expiration date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "registry expiry date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "rekisteröintipäivä": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "renewal date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "renewal deadline": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "roid": {
+    "domain": "probe.example",
+    "registryDomainId": "1234",
+  },
+  "secondary nameserver": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "secondary server": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "senast ändrad": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "senest opdateret": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "serveur de noms": {
+    "domain": "probe.example",
+  },
+  "serveur dns": {
+    "domain": "probe.example",
+    "nameServers": [
+      "ns1.example.com",
+    ],
+  },
+  "servidor de nombres": {
+    "domain": "probe.example",
+  },
+  "sidst ændret": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "signed": {
+    "dnssec": "unsigned",
+    "domain": "probe.example",
+  },
+  "sist endret": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "sponsoring registrar": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "start date": {
+    "creationDate": "2020-01-15T00:00:00.000Z",
+    "domain": "probe.example",
+  },
+  "state": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "status": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "statut": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "street": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "street address": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "tech contact": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "tech contact email": {
+    "domain": "probe.example",
+    "registrantEmail": "user@example.com",
+    "techEmail": "user@example.com",
+  },
+  "tech contact name": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "tech contact phone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+    "techPhone": "+1.5551234567",
+  },
+  "tech e-mail": {
+    "domain": "probe.example",
+    "techEmail": "user@example.com",
+  },
+  "tech email": {
+    "domain": "probe.example",
+    "techEmail": "user@example.com",
+  },
+  "tech name": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "tech org": {
+    "domain": "probe.example",
+    "techOrganization": "Example Org",
+  },
+  "tech organisation": {
+    "domain": "probe.example",
+    "techOrganization": "Example Org",
+  },
+  "tech organization": {
+    "domain": "probe.example",
+    "techOrganization": "Example Org",
+  },
+  "tech phone": {
+    "domain": "probe.example",
+    "techPhone": "+1.5551234567",
+  },
+  "tech telephone": {
+    "domain": "probe.example",
+    "techPhone": "+1.5551234567",
+  },
+  "technical contact": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "technical contact name": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "technical e-mail": {
+    "domain": "probe.example",
+    "techEmail": "user@example.com",
+  },
+  "technical email": {
+    "domain": "probe.example",
+    "techEmail": "user@example.com",
+  },
+  "technical name": {
+    "domain": "probe.example",
+    "techName": "Probe Value",
+  },
+  "technical organisation": {
+    "domain": "probe.example",
+    "techOrganization": "Example Org",
+  },
+  "technical organization": {
+    "domain": "probe.example",
+    "techOrganization": "Example Org",
+  },
+  "technical phone": {
+    "domain": "probe.example",
+    "techPhone": "+1.5551234567",
+  },
+  "technical telephone": {
+    "domain": "probe.example",
+    "techPhone": "+1.5551234567",
+  },
+  "telefax": {
+    "domain": "probe.example",
+    "registrantFax": "+1.5551234567",
+  },
+  "telefone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "telefono": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "telephone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "téléphone": {
+    "domain": "probe.example",
+    "registrantPhone": "+1.5551234567",
+  },
+  "update date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "updated": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "updated (utc)": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "updated date": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "updated on": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "valid through": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "valid to": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "valid until": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "valid-date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "valid-till": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "validade": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "validity": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "validity date": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "vence em": {
+    "domain": "probe.example",
+    "expirationDate": "Probe Value",
+  },
+  "verfallsdatum": {
+    "domain": "probe.example",
+    "expirationDate": "2020-01-15T00:00:00.000Z",
+  },
+  "viimeksi muokattu": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "ville": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "whois": {
+    "domain": "probe.example",
+    "whoisServer": "Probe Value",
+  },
+  "whois server": {
+    "domain": "probe.example",
+    "whoisServer": "ns1.example.com",
+  },
+  "zip": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "zip code": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+  "zuletzt geaendert am": {
+    "domain": "probe.example",
+    "updatedDate": "2020-01-15T00:00:00.000Z",
+  },
+  "última atualização": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "última modificación": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "организация": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "организация-владелец": {
+    "domain": "probe.example",
+    "registrantName": "Example Org",
+  },
+  "регистратор": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "телефон": {
+    "domain": "probe.example",
+    "registrantPhone": "Probe Value",
+  },
+  "ドメイン名": {
+    "domain": "probe.example",
+  },
+  "ドメイン情報": {
+    "domain": "probe.example",
+  },
+  "ネームサーバ": {
+    "domain": "probe.example",
+  },
+  "ロック状態": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "主办单位": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "主办单位名称": {
+    "domain": "probe.example",
+    "registrantName": "Example Org",
+  },
+  "住所": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "名前": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "国家": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "国家/地区": {
+    "domain": "probe.example",
+    "registrantCountry": "US",
+  },
+  "城市": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "域名持有者": {
+    "domain": "probe.example",
+    "registrantName": "probe.example",
+  },
+  "市": {
+    "domain": "probe.example",
+    "registrantCity": "Exampleville",
+  },
+  "持有人": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "最終更新": {
+    "domain": "probe.example",
+    "updatedDate": "Probe Value",
+  },
+  "有効期限": {
+    "domain": "probe.example",
+    "expirationDate": "Probe Value",
+  },
+  "注册人": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "注册单位": {
+    "domain": "probe.example",
+    "registrantOrganization": "Example Org",
+  },
+  "注册商": {
+    "domain": "probe.example",
+    "registrar": "Example Registrar",
+  },
+  "注册服务商": {
+    "domain": "probe.example",
+    "registrar": "Probe Value",
+  },
+  "注册机构": {
+    "domain": "probe.example",
+    "registrar": "Probe Value",
+  },
+  "注册者": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "注册者联系人邮箱": {
+    "domain": "probe.example",
+    "registrantEmail": "Probe Value",
+  },
+  "注册者邮箱": {
+    "domain": "probe.example",
+    "registrantEmail": "Probe Value",
+  },
+  "状態": {
+    "domain": "probe.example",
+    "status": [
+      {
+        "status": "clientTransferProhibited",
+        "url": "",
+      },
+    ],
+  },
+  "电子邮件": {
+    "domain": "probe.example",
+    "registrantEmail": "Probe Value",
+  },
+  "登録年月日": {
+    "creationDate": "Probe Value",
+    "domain": "probe.example",
+  },
+  "登録者名": {
+    "domain": "probe.example",
+    "registrantName": "Probe Value",
+  },
+  "省/市": {
+    "domain": "probe.example",
+    "registrantProvince": "Exampleville",
+  },
+  "省份": {
+    "domain": "probe.example",
+    "registrantProvince": "Example Province",
+  },
+  "联系人邮箱": {
+    "domain": "probe.example",
+    "registrantEmail": "Probe Value",
+  },
+  "联系地址": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "联系电话": {
+    "domain": "probe.example",
+    "registrantPhone": "Probe Value",
+  },
+  "详细地址": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "通讯地址": {
+    "domain": "probe.example",
+    "registrantAddress": "1 Example Street",
+  },
+  "邮政编码": {
+    "domain": "probe.example",
+    "registrantPostalCode": "Probe Value",
+  },
+  "邮箱": {
+    "domain": "probe.example",
+    "registrantEmail": "Probe Value",
+  },
+  "邮编": {
+    "domain": "probe.example",
+    "registrantPostalCode": "12345",
+  },
+}
+`;

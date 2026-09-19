@@ -490,9 +490,13 @@ const SLOW_WHOIS_TLDS: Readonly<Record<string, number>> = {
  * When DNS is also unreachable for these TLDs, we treat the domain as
  * "likely unregistered" with low confidence rather than hard "LOOKUP FAILED".
  */
-const NO_SERVER_TLDS = new Set<string>([
+export const NO_SERVER_TLDS = new Set<string>([
   // Each entry cross-checked against live IANA whois data (whois.iana.org:43)
   // and direct TCP-43 probes on 2026-09-18.
+  // Batch: IANA queried all 1436 delegated TLDs on 2026-09-18; entries below
+  // are the ccTLDs whose IANA whois: field is EMPTY (no WHOIS service
+  // registered with IANA) — verified against the batch results file.  These
+  // skip the WHOIS/RDAP timeout cycle and go straight to DNS-probe fast path.
   // hm: IANA lists whois.registry.hm but both of its A records
   //     (148.135.127.5, 185.10.123.5) close the connection with 0 bytes /
   //     hang forever on TCP 43 — the service is not actually reachable, so the
@@ -502,6 +506,44 @@ const NO_SERVER_TLDS = new Set<string>([
   "bv",  // Bouvet Island — no public WHOIS/RDAP (IANA whois: field empty)
   "sj",  // Svalbard & Jan Mayen — no public WHOIS/RDAP
   "eh",  // Western Sahara — no public WHOIS/RDAP
+  // ── ccTLDs with empty IANA whois: field (batch scan 2026-09-18) ────────
+  "al",  // Albania — no WHOIS/RDAP registered with IANA
+  "ao",  // Angola — no WHOIS/RDAP registered with IANA
+  "bd",  // Bangladesh — no WHOIS/RDAP registered with IANA
+  "bs",  // Bahamas — no WHOIS/RDAP registered with IANA
+  "bt",  // Bhutan — no WHOIS/RDAP registered with IANA
+  "cg",  // Congo (Brazzaville) — no WHOIS/RDAP registered with IANA
+  "cu",  // Cuba — no WHOIS/RDAP registered with IANA
+  "cw",  // Curaçao — no WHOIS/RDAP registered with IANA
+  "dj",  // Djibouti — no WHOIS/RDAP registered with IANA
+  "er",  // Eritrea — no WHOIS/RDAP registered with IANA
+  "fk",  // Falkland Islands — no WHOIS/RDAP registered with IANA
+  "ga",  // Gabon — no WHOIS/RDAP registered with IANA
+  "gb",  // United Kingdom (ccTLD) — reserved, no WHOIS/RDAP registered with IANA
+  "gm",  // Gambia — no WHOIS/RDAP registered with IANA
+  "gt",  // Guatemala — no WHOIS/RDAP registered with IANA
+  "gu",  // Guam — no WHOIS/RDAP registered with IANA
+  "jm",  // Jamaica — no WHOIS/RDAP registered with IANA
+  "kh",  // Cambodia — no WHOIS/RDAP registered with IANA
+  "km",  // Comoros — no WHOIS/RDAP registered with IANA
+  "kp",  // North Korea — no WHOIS/RDAP registered with IANA
+  "lr",  // Liberia — no WHOIS/RDAP registered with IANA
+  "mh",  // Marshall Islands — no WHOIS/RDAP registered with IANA
+  "mp",  // Northern Mariana Islands — no WHOIS/RDAP registered with IANA
+  "mv",  // Maldives — no WHOIS/RDAP registered with IANA
+  "ne",  // Niger — no WHOIS/RDAP registered with IANA
+  "ni",  // Nicaragua — no WHOIS/RDAP registered with IANA
+  "np",  // Nepal — no WHOIS/RDAP registered with IANA
+  "nr",  // Nauru — no WHOIS/RDAP registered with IANA
+  "pa",  // Panama — no WHOIS/RDAP registered with IANA
+  "py",  // Paraguay — no WHOIS/RDAP registered with IANA
+  "sv",  // El Salvador — no WHOIS/RDAP registered with IANA
+  "sz",  // Eswatini — no WHOIS/RDAP registered with IANA
+  "tj",  // Tajikistan — no WHOIS/RDAP registered with IANA
+  "tt",  // Trinidad & Tobago — no WHOIS/RDAP registered with IANA
+  "va",  // Vatican City — no WHOIS/RDAP registered with IANA
+  "zw",  // Zimbabwe — no WHOIS/RDAP registered with IANA
+  "xn--54b7fta0cc",  // .বাংলা (Bangla, Bangladesh) — IANA whois: field empty
 ]);
 
 type RdapResult = RdapResponse | { errorCode: number; title?: string };
@@ -945,7 +987,7 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
   const rdapPromise = withTimeout(lookupRdap(domain), RDAP_OUTER_TIMEOUT_MS) as Promise<RdapResult>;
   // Attach a no-op rejection handler immediately. Between this creation and the
   // race section below, queryManualServerRacing may await a DB/TCP round-trip
-  // (100 ms–8 s). With a warm node-rdap bootstrap cache, lookupRdap can reject
+  // (100 ms–8 s). With a warm RDAP bootstrap cache, lookupRdap can reject
   // in ~50 ms (e.g. "No RDAP server found for <tld>") — before the race attaches
   // its own handlers — which Node flags as unhandledRejection and can crash the
   // process. Early-return paths (manual server success) also abandon this

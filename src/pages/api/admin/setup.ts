@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ok:   connSource !== "none",
     detail: connSource !== "none"
       ? `${connSource} → ${connHost}`
-      : "Missing POSTGRES_URL_NON_POOLING secret",
+      : "Missing DB secret (set SUPABASE_DATABASE_URL or POSTGRES_URL_NON_POOLING)",
   });
 
   if (connSource === "none") return res.status(500).json({ ok: false, steps });

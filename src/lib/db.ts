@@ -788,7 +788,7 @@ export function getDb(): Pool | null {
   if (existing) return existing;
   const cs = getConnectionString();
   if (!cs) {
-    logger.error("[db] No PostgreSQL connection URL found. Set POSTGRES_URL_NON_POOLING as a secret.");
+    logger.error("[db] No PostgreSQL connection URL found. Set SUPABASE_DATABASE_URL (canonical) or POSTGRES_URL_NON_POOLING as a secret.");
     return null;
   }
   logger.info(`[db] Connecting via ${cs.source} → ${getConnectionHost()}`);

@@ -9,6 +9,7 @@ import { lookupNicBa } from "@/lib/whois/http-scrapers/nic-ba";
 import { lookupNicPh } from "@/lib/whois/http-scrapers/nic-ph";
 import { lookupNicGw } from "@/lib/whois/http-scrapers/nic-gw";
 import { getGtldWhoisServer } from "@/lib/whois/whois_gtld_bootstrap";
+import whoisServersStatic from "@/data/whois-servers.json";
 
 export type TcpServerEntry = {
   type: "tcp";
@@ -43,13 +44,25 @@ const DATA_FILE  = path.join(process.cwd(), "src/data/custom-tld-servers.json");
 
 let _whoisFileCache: Record<string, string | null> | null = null;
 
+/**
+ * The canonical ccTLD WHOIS server map.  whois-servers.json is imported at
+ * build time (bundled into the artifact) so it survives serverless/deploy
+ * environments where src/data/ is absent from disk.  getStaticWhoisServer
+ * uses this in-memory copy only.
+ */
+const WHOIS_SERVERS_JSON: Record<string, string | null> =
+  whoisServersStatic as Record<string, string | null>;
+
 function readWhoisServers(): Record<string, string | null> {
   if (_whoisFileCache) return _whoisFileCache;
   try {
     _whoisFileCache = JSON.parse(fs.readFileSync(WHOIS_FILE, "utf-8")) as Record<string, string | null>;
     return _whoisFileCache;
   } catch {
-    return {};
+    // Bundled copy (see WHOIS_SERVERS_JSON) is authoritative; disk read is a
+    // development-time convenience so hot edits to src/data/whois-servers.json
+    // are picked up without a rebuild.  Deployments use the import above.
+    return WHOIS_SERVERS_JSON;
   }
 }
 

@@ -5,11 +5,13 @@
  *
  * Sources: IANA RDAP bootstrap (data.iana.org/rdap/dns.json) + known registry mappings
  * Generated: 2026-04-08, WHOIS-host audit 2026-09-16 (IANA whois.iana.org authoritative re-verification)
- * Entries: 1069
+ * 2026-09-18: batch scan of all 1436 delegated TLDs; added aco/gea/gop (IANA whois: field)
+ * Entries: 1072
  */
 export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "aaa": "whois.nic.aaa",
   "aarp": "whois.nic.aarp",
+  "aco": "whois.nic.aco",
   "abb": "whois.identity.digital",
   "abbott": "whois.identity.digital",
   "abc": "whois.identity.digital",
@@ -368,6 +370,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "gap": "whois.nic.gap",
   "garden": "whois.nic.garden",
   "gay": "whois.nic.gay",
+  "gea": "whois.nic.gea",
   "gd": "whois.centralnic.com",
   "gent": "whois.centralnic.com",
   "genting": "whois.identity.digital",
@@ -389,6 +392,7 @@ export const GTLD_WHOIS_BOOTSTRAP: Record<string, string> = {
   "goldpoint": "whois.gmoregistry.net",
   "golf": "whois.donuts.co",
   "goodyear": "whois.identity.digital",
+  "gop": "whois.nic.gop",
   "grainger": "whois.nic.grainger",
   "graphics": "whois.donuts.co",
   "gratis": "whois.donuts.co",

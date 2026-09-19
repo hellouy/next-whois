@@ -114,6 +114,27 @@ Registrant Email: ops@realcompany.com
 `);
     expect(r.registrantPrivacy).toBeFalsy();
   });
+
+  it("does NOT treat registrar contact/support fields as the registrar name", async () => {
+    const cases = [
+      "Registrar Customer Service: support@reg.example",
+      "Registrar Support: help@reg.example",
+      "Registrar Contact: John Doe",
+    ];
+    for (const line of cases) {
+      const r = await analyzeWhois(`Domain Name: example.com\n${line}\n`);
+      expect(r.registrar).toBe("Unknown");
+    }
+  });
+
+  it("still extracts registrar from Sponsoring Registrar Organization (.id)", async () => {
+    const r = await analyzeWhois(`
+Domain Name: example.id
+Sponsoring Registrar Organization: PT Registrasi Nama Domain
+Sponsoring Registrar IANA ID: 1234
+`);
+    expect(r.registrar).toBe("PT Registrasi Nama Domain");
+  });
 });
 
 describe("detectPrivacyProxy", () => {

@@ -1,9 +1,9 @@
-// node-rdap is ESM-only; use dynamic import() so CJS serverless can load it.
-// Pre-warm at module load time so the first request doesn't pay import cost.
-let _rdapModuleCache: typeof import("node-rdap") | null = null;
-void import("node-rdap").then(m => { _rdapModuleCache = m; }).catch(() => {});
-const getRdap = () => _rdapModuleCache ? Promise.resolve(_rdapModuleCache) : import("node-rdap");
 import { WhoisAnalyzeResult, DomainStatusProps } from "./types";
+import {
+  getRdapServerForIpv4,
+  getRdapServerForIpv6,
+  getRdapServerForAsn,
+} from "./rdap-bootstrap";
 import { extractDomain } from "@/lib/utils";
 import { applyParams } from "./common_parser";
 import { domainToASCII } from "url";
@@ -150,10 +150,10 @@ const CCTLD_RDAP_OVERRIDES: Record<string, string> = {
   sk: "https://rdap.sk-nic.sk/",
   uk: "https://rdap.nominet.uk/uk/",
   // ── Eastern Europe / CIS ────────────────────────────────────────────────
-  // al: removed — rdap.nic.al NXDOMAIN; WHOIS via whoiser/IANA fallback
+  // al: removed — rdap.nic.al NXDOMAIN; WHOIS via IANA fallback
   // am: removed — rdap.nic.am NXDOMAIN; WHOIS via whois.amnic.net works
   // az: removed — rdap.nic.az NXDOMAIN; WHOIS via whois.ripe.net works
-  // ba: removed — rdap.nic.ba NXDOMAIN; WHOIS via whoiser/IANA fallback
+  // ba: removed — rdap.nic.ba NXDOMAIN; WHOIS via IANA fallback
   by: "https://rdap.cctld.by/",                   // confirmed: rdap.cctld.by
   // cy: removed — rdap.nic.cy NXDOMAIN; WHOIS via whois.ripe.net works
   cz: "https://rdap.nic.cz/",
@@ -375,8 +375,9 @@ async function tryRdapWithUrl(
   baseUrl: string,
   domainToQuery: string,
   timeoutMs = 4000,
+  resourceType: "domain" | "ip" | "autnum" = "domain",
 ): Promise<any | null> {
-  const url = `${baseUrl}domain/${domainToQuery}`;
+  const url = `${baseUrl}${resourceType}/${domainToQuery}`;
   try {
     const res = await safeFetchWithRedirectGuard(url, {
       headers: { Accept: "application/rdap+json, application/json" },
@@ -407,42 +408,42 @@ export async function lookupRdap(query: string): Promise<any> {
   const cleanQuery = query.trim().toLowerCase();
 
   if (isIPAddress(cleanQuery)) {
-    const { ip } = await getRdap();
-    return await ip(cleanQuery);
+    const ip = cleanQuery;
+    const server = ip.includes(":")
+      ? getRdapServerForIpv6(ip)
+      : getRdapServerForIpv4(ip);
+    if (!server) throw new Error(`No RDAP server found for ${ip}`);
+    const result = await tryRdapWithUrl(server, ip, 4000, "ip");
+    if (result !== null) return result;
+    throw new Error(`No RDAP server found for ${ip}`);
   } else if (isASNumber(cleanQuery)) {
     const asNumber = cleanQuery.replace(/^as/i, "");
-    const { autnum } = await getRdap();
-    return await autnum(parseInt(asNumber));
+    const server = getRdapServerForAsn(parseInt(asNumber));
+    if (!server) throw new Error(`No RDAP server found for ${cleanQuery}`);
+    const result = await tryRdapWithUrl(server, asNumber, 4000, "autnum");
+    if (result !== null) return result;
+    throw new Error(`No RDAP server found for ${cleanQuery}`);
   } else {
     const domainToQuery = extractDomain(cleanQuery) || cleanQuery;
     const tld = domainToQuery.split(".").pop()?.toLowerCase() ?? "";
 
     // ── Local bootstrap fast path ─────────────────────────────────────────
     // Check our local maps first (ccTLD overrides + embedded IANA gTLD bootstrap).
-    // This bypasses the node-rdap IANA-bootstrap network round-trip entirely for
-    // any TLD we know about locally (130+ ccTLDs + 1128+ gTLDs = ~1260 TLDs total).
+    // This bypasses any IANA-bootstrap network round-trip entirely — the maps
+    // are fully static since 4a (rdap-bootstrap.ts).
     const localServer = CCTLD_RDAP_OVERRIDES[tld] ?? getGtldRdapServer(tld);
     if (localServer) {
       const timeoutMs = RDAP_TLD_TIMEOUT_MS[tld] ?? 4000;
       const result = await tryRdapWithUrl(localServer, domainToQuery, timeoutMs);
       if (result !== null) return result;
-      // Network/timeout failure on the local-bootstrap server.
-      // For ccTLDs: we committed to this server — fail immediately (no fallback).
-      // For gTLDs:  fall through to node-rdap which may know an alternate path.
-      if (CCTLD_RDAP_OVERRIDES[tld]) {
-        throw new Error(`No RDAP server found for ${domainToQuery}`);
-      }
     }
 
-    // ── node-rdap fallback (unknown or new TLDs) ──────────────────────────
-    try {
-      const { domain } = await getRdap();
-      const result = await domain(domainToQuery);
-      if (result && result.errorCode) throw new Error(`RDAP error ${result.errorCode}`);
-      return result;
-    } catch {
-      throw new Error(`No RDAP server found for ${domainToQuery}`);
-    }
+    // ── No known RDAP server for this TLD ──────────────────────────────────
+    // Previously this called node-rdap which fetched the live IANA dns.json
+    // bootstrap.  Since 4a (rdap-bootstrap.ts) the gTLD map is fully static —
+    // a TLD that misses both CCTLD_RDAP_OVERRIDES and GTLD_RDAP_BOOTSTRAP has
+    // no RDAP server known to us; the WHOIS path in lookup.ts handles it.
+    throw new Error(`No RDAP server found for ${domainToQuery}`);
   }
 }
 

@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { extractNextWhoisServer, parseSimpleWhoisLines } from "./internal-whoiser";
+import { extractNextWhoisServer, parseSimpleWhoisLines, getKnownDiscoveryServer } from "./internal-whoiser";
+
+describe("getKnownDiscoveryServer", () => {
+  it("maps IANA-omitted servers locally without a network round-trip", () => {
+    expect(getKnownDiscoveryServer("mil")).toBe("whois.nic.mil");
+  });
+
+  it("returns null for unknown TLDs", () => {
+    expect(getKnownDiscoveryServer("com")).toBeNull();
+    expect(getKnownDiscoveryServer("definitely-not-a-tld")).toBeNull();
+  });
+});
 
 describe("extractNextWhoisServer", () => {
   it("follows Registrar WHOIS Server referrals", () => {
