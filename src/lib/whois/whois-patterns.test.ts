@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { classifyQueryOutcome, isWhoisRateLimited, isIanaFallback } from "./whois-patterns";
+import {
+  classifyQueryOutcome,
+  isWhoisRateLimited,
+  isIanaFallback,
+  detectWhoisError,
+  isNotRegisteredWhoisResponse,
+} from "./whois-patterns";
 
 // The Identity Digital / Afilias family of registries (.ac, .gi, .sh, .io, …)
 // append the ENTIRE terms-of-use block after the real answer as ONE giant line
@@ -85,5 +91,39 @@ describe("classifyQueryOutcome", () => {
     expect(classifyQueryOutcome(false, "too many requests (429)")).toBe("error");
     expect(classifyQueryOutcome(false, undefined)).toBe("error");
     expect(classifyQueryOutcome(false, "")).toBe("error");
+  });
+});
+
+// .ug (and other registries using the same "generic" WHOIS server software)
+// place the "Domain not Found" verdict on a ">>>" marker line. Before the fix
+// the whole ">>>" line was discarded, hiding the unregistered signal and
+// causing the domain to be misreported as registered.
+const UG_NOT_FOUND = `**********************************************************
+*            The UG ccTLD Registry Database              *
+**********************************************************
+
+Domain Name: whois.ug
+>>> Domain not Found
+>>> Last update of WHOIS database: 2026-09-19T15:27:22 <<<`;
+
+describe("detectWhoisError — >>> marker lines", () => {
+  it("detects 'Domain not Found' on a >>> line (.ug)", () => {
+    const err = detectWhoisError(UG_NOT_FOUND);
+    expect(err).not.toBeNull();
+    expect(isNotRegisteredWhoisResponse(err!)).toBe(true);
+  });
+
+  it("does NOT false-positive on a registered domain with >>> boilerplate", () => {
+    const registered = `Domain Name: GOOGLE.COM
+Registry Domain ID: 12345
+Registrar: MarkMonitor Inc.
+>>> Last update of WHOIS database: 2026-09-19T15:27:22 <<<`;
+    expect(detectWhoisError(registered)).toBeNull();
+  });
+
+  it("detects rate-limit messages on >>> lines", () => {
+    const rateLimited = `Domain Name: test.ug
+>>> Query rate limit exceeded`;
+    expect(isWhoisRateLimited(rateLimited)).toBe(true);
   });
 });

@@ -80,13 +80,17 @@ export function isWhoisRateLimited(raw: string): boolean {
     .join("\n");
 
   // Also check only non-boilerplate content lines for other servers.
-  const filteredLines = allLines.filter(
-    (l) =>
-      !l.startsWith("%") &&
-      !l.startsWith("#") &&
-      !l.startsWith(">>>") &&
-      !isBoilerplate(l),
-  );
+  // Strip ">>>" prefixes (same rationale as detectWhoisError) so rate-limit
+  // messages on marker lines are not missed.
+  const filteredLines = allLines
+    .map((l) => (l.startsWith(">>>") ? l.replace(/^>>>\s*/, "").trim() : l))
+    .filter(
+      (l) =>
+        l.length > 0 &&
+        !l.startsWith("%") &&
+        !l.startsWith("#") &&
+        !isBoilerplate(l),
+    );
   const filtered = filteredLines.slice(0, 20).join("\n");
 
   return WHOIS_RATE_LIMIT_PATTERNS.some((p) => p.test(filtered) || p.test(allContent));
@@ -120,10 +124,18 @@ export function isIanaFallback(raw: string): boolean {
 }
 
 export function detectWhoisError(raw: string): string | null {
+  // Strip the ">>>" prefix (RFC-3912-style marker lines) instead of discarding
+  // those lines entirely. Some registries (e.g. .ug) place the actual
+  // "Domain not Found" verdict on a ">>>" line; dropping the whole line hid
+  // the unregistered signal and caused the domain to be misreported as
+  // registered. Marker lines like ">>> Last update of WHOIS database" do not
+  // match any error pattern, so stripping is safe.
   const allLines = raw
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith(">>>"));
+    .filter((l) => l.length > 0)
+    .map((l) => (l.startsWith(">>>") ? l.replace(/^>>>\s*/, "").trim() : l))
+    .filter((l) => l.length > 0);
 
   // RFC 3912 comment lines (% / #). Some registries ONLY report the empty /
   // not-registered state inside comments — e.g. whois.nic.sn answers with
