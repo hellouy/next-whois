@@ -502,6 +502,12 @@ export const NO_SERVER_TLDS = new Set<string>([
   //     hang forever on TCP 43 — the service is not actually reachable, so the
   //     TLD keeps the fast-fail (DNS-probe-only) path.
   "hm",  // Heard Island & McDonald Islands — IANA lists WHOIS but host is unresponsive
+  // uy: IANA lists whois.nic.org.uy but it accepts the TCP connection, never
+  //     sends a single data byte, and only closes after ~10-11s — for both
+  //     registered domains and non-existent ones. The service delivers no WHOIS
+  //     data from cloud/datacenter egress, so queries go straight to the
+  //     DNS-probe fast path instead of stalling for the WHOIS timeout.
+  "uy",  // Uruguay — IANA lists WHOIS but the server is silent (0 bytes, ~10s hang)
   "aq",  // Antarctica — IANA managed, no public WHOIS/RDAP
   "bv",  // Bouvet Island — no public WHOIS/RDAP (IANA whois: field empty)
   "sj",  // Svalbard & Jan Mayen — no public WHOIS/RDAP

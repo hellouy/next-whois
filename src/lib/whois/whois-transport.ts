@@ -12,6 +12,7 @@ export async function queryWhoisTcp(
   port: number,
   query: string,
   timeoutMs: number,
+  firstByteTimeoutMs?: number,
 ): Promise<string> {
   const { resolveWithDohFallback } = await import("./dns-resolver");
   let resolvedHost = host;
@@ -45,8 +46,35 @@ export async function queryWhoisTcp(
       // and closes the connection — matching whoiser's behaviour here.
       socket.write(query + "\r\n");
     });
+
+    // First-byte idle guard: once the connection is established we expect the
+    // WHOIS server to start streaming a reply almost immediately (well-behaved
+    // servers respond in 1–3s). Some registries accept the connection but then
+    // return zero bytes and only close much later (e.g. whois.nic.org.uy —
+    // ~10.8s hold with no reply), which would otherwise burn the whole
+    // WHOIS_TIMEOUT wait on a server that will never answer. If the query was
+    // sent and no data byte arrives within firstByteTimeoutMs we fail fast with
+    // an explicit error instead of stalling for the full budget.
+    const firstByteMs = firstByteTimeoutMs ?? 3_000;
+    let firstByteIdleTimer: ReturnType<typeof setTimeout> | null = null;
+    const onConnected = () => {
+      if (firstByteIdleTimer) return;
+      firstByteIdleTimer = setTimeout(() => {
+        if (data.length === 0) {
+          socket.destroy(new Error(`TCP WHOIS first-byte timeout (no reply bytes from ${host} within ${firstByteMs}ms)`));
+        }
+      }, firstByteMs);
+    };
+
     socket.setTimeout(timeoutMs);
+    socket.on("connect", onConnected);
     socket.on("data", (chunk: Buffer) => {
+      // First real byte arrived — cancel the idle guard; the total-socket
+      // timeout (timeoutMs) continues to bound a server that never closes.
+      if (firstByteIdleTimer) {
+        clearTimeout(firstByteIdleTimer);
+        firstByteIdleTimer = null;
+      }
       if (data.length >= MAX_RESPONSE_BYTES) {
         socket.destroy(new Error(`WHOIS response from ${host} exceeded ${MAX_RESPONSE_BYTES} bytes`));
         return;
