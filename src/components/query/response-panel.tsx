@@ -232,6 +232,17 @@ export function ResponsePanel({
     hasWhois ? "whois" : "rdap",
   );
 
+  // Keep the visible tab in sync with available content. During streaming, a
+  // partial RDAP-only chunk may arrive after a cached SSR render that already
+  // had WHOIS text — without this, activeTab stays on "whois" while
+  // whoisContent is momentarily empty, rendering a blank panel. Auto-switch to
+  // whichever tab still has content; a user's manual tab choice is preserved
+  // as long as its content remains available.
+  React.useEffect(() => {
+    if (activeTab === "whois" && !hasWhois && hasRdap) setActiveTab("rdap");
+    else if (activeTab === "rdap" && !hasRdap && hasWhois) setActiveTab("whois");
+  }, [hasWhois, hasRdap, activeTab]);
+
   const currentContent =
     activeTab === "whois" ? whoisContent : rdapContent || "";
 
