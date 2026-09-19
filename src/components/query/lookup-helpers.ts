@@ -168,19 +168,11 @@ export function formatDate(dateStr: string): string {
 /**
  * Produce a meaningful label for the updatedDate field.
  *
- * EPP status codes are a current snapshot — if the registry reports
- * transferPeriod, pendingTransfer, renewPeriod, etc., that event is
- * happening right now regardless of how fresh the updatedDate string is.
- * So status codes take priority and always surface their label.
- *
- * When only "ok" (or nothing) is reported, fall back to heuristics keyed
- * off the updatedDate freshness:
- *   - a domain created today is obviously newly registered;
- *   - an older domain updated today most likely reflects a renewal
- *     (renewal is by far the most common trigger of a WHOIS update on an
- *     established domain).
- *
- * Otherwise the generic relative label ("N天前" etc.) is shown.
+ * Only the registry data itself is used — no inference:
+ *   - EPP status codes are a current snapshot, so transferPeriod,
+ *     pendingTransfer, renewPeriod, etc. always surface their label;
+ *   - a domain whose creationDate is today IS newly registered;
+ *   - otherwise the generic relative label ("今天" / "N天前") is shown.
  */
 export function getUpdatedDateLabel(
   dateStr: string,
@@ -219,9 +211,10 @@ export function getUpdatedDateLabel(
   if (codes.includes("pendingupdate"))
     return t("relative_time.pending_update");
 
-  // ── Heuristics for registries that only report "ok" (e.g. .bf) ────────
-  // Only meaningful when the update happened today; older updates show the
-  // generic relative label.
+  // ── Fact-based fallback ───────────────────────────────────────────────
+  // Only the registry data itself is used: a domain whose creationDate is
+  // today IS newly registered. No inference about renewal/transfer is made
+  // from an 'ok' status — the generic relative label is shown instead.
   if (diffDays < 0 || diffDays >= 1) return getRelativeTime(dateStr, t);
 
   if (creationDate) {
@@ -232,8 +225,6 @@ export function getUpdatedDateLabel(
     ) {
       return t("relative_time.newly_registered");
     }
-    // Older domain updated today: renewal is the most common cause.
-    return t("relative_time.just_renewed");
   }
 
   return getRelativeTime(dateStr, t);
