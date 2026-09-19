@@ -1569,11 +1569,9 @@ exports[`analyzeWhois — golden master over every switch label > parses each la
   },
   "注册者联系人邮箱": {
     "domain": "probe.example",
-    "registrantEmail": "Probe Value",
   },
   "注册者邮箱": {
     "domain": "probe.example",
-    "registrantEmail": "Probe Value",
   },
   "状態": {
     "domain": "probe.example",
@@ -1586,7 +1584,6 @@ exports[`analyzeWhois — golden master over every switch label > parses each la
   },
   "电子邮件": {
     "domain": "probe.example",
-    "registrantEmail": "Probe Value",
   },
   "登録年月日": {
     "creationDate": "Probe Value",
@@ -1606,7 +1603,6 @@ exports[`analyzeWhois — golden master over every switch label > parses each la
   },
   "联系人邮箱": {
     "domain": "probe.example",
-    "registrantEmail": "Probe Value",
   },
   "联系地址": {
     "domain": "probe.example",
@@ -1630,7 +1626,6 @@ exports[`analyzeWhois — golden master over every switch label > parses each la
   },
   "邮箱": {
     "domain": "probe.example",
-    "registrantEmail": "Probe Value",
   },
   "邮编": {
     "domain": "probe.example",

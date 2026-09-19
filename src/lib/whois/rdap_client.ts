@@ -10,6 +10,7 @@ import { domainToASCII } from "url";
 import { getGtldRdapServer } from "./rdap_gtld_bootstrap";
 import { resolveRegistrarIanaId, findRegistrarInfo } from "@/data/query-page/registrar-library";
 import { safeFetchWithRedirectGuard } from "@/lib/ssrf-guard";
+import { isRedactedValue, isEmailLike } from "./parsers/utils";
 
 /**
  * True when a link points at an RDAP resource served by the registry's own
@@ -586,8 +587,8 @@ function parseRdapEntity(entities: RdapEntity[]): {
           if (sub.roles?.includes("abuse") && sub.vcardArray?.[1]) {
             const email = extractVcardField(sub.vcardArray[1], "email");
             const phone = extractVcardField(sub.vcardArray[1], "tel");
-            if (email && email !== "Unknown") abuseEmail = email;
-            if (phone && phone !== "Unknown") abusePhone = phone.replace(/^tel:/i, "").trim();
+            if (email && email !== "Unknown" && isEmailLike(email)) abuseEmail = email;
+            if (phone && phone !== "Unknown" && !isRedactedValue(phone)) abusePhone = phone.replace(/^tel:/i, "").trim();
           }
         }
       }
@@ -597,8 +598,8 @@ function parseRdapEntity(entities: RdapEntity[]): {
     if (entity.roles?.includes("abuse") && entity.vcardArray?.[1]) {
       const email = extractVcardField(entity.vcardArray[1], "email");
       const phone = extractVcardField(entity.vcardArray[1], "tel");
-      if (email && email !== "Unknown") abuseEmail = email;
-      if (phone && phone !== "Unknown") abusePhone = phone.replace(/^tel:/i, "").trim();
+      if (email && email !== "Unknown" && isEmailLike(email)) abuseEmail = email;
+      if (phone && phone !== "Unknown" && !isRedactedValue(phone)) abusePhone = phone.replace(/^tel:/i, "").trim();
     }
 
     if (entity.roles?.includes("registrant") && entity.vcardArray?.[1]) {
@@ -624,10 +625,11 @@ function parseRdapEntity(entities: RdapEntity[]): {
       if (province && province !== "Unknown") registrantProvince = province;
       if (city && city !== "Unknown") registrantCity = city;
       if (address && address !== "Unknown") registrantAddress = address;
-      if (postal && postal !== "Unknown") registrantPostalCode = postal;
-      if (phone && phone !== "Unknown") registrantPhone = phone.replace(/^tel:/i, "").trim();
-      if (fax && fax !== "Unknown") registrantFax = fax;
-      if (email && email !== "Unknown") registrantEmail = email;
+      if (postal && postal !== "Unknown" && !isRedactedValue(postal)) registrantPostalCode = postal;
+      if (phone && phone !== "Unknown" && !isRedactedValue(phone))
+        registrantPhone = phone.replace(/^tel:/i, "").trim();
+      if (fax && fax !== "Unknown" && !isRedactedValue(fax)) registrantFax = fax;
+      if (email && email !== "Unknown" && isEmailLike(email)) registrantEmail = email;
     }
 
     // Administrative contact
@@ -644,9 +646,9 @@ function parseRdapEntity(entities: RdapEntity[]): {
       if (fn && fn !== "Unknown" && adminName === "Unknown") adminName = fn;
       if (org && org !== "Unknown" && adminOrganization === "Unknown") adminOrganization = org;
       if (country && country !== "Unknown" && adminCountry === "Unknown") adminCountry = country;
-      if (phone && phone !== "Unknown" && adminPhone === "Unknown")
+      if (phone && phone !== "Unknown" && adminPhone === "Unknown" && !isRedactedValue(phone))
         adminPhone = phone.replace(/^tel:/i, "").trim();
-      if (email && email !== "Unknown" && adminEmail === "Unknown") adminEmail = email;
+      if (email && email !== "Unknown" && adminEmail === "Unknown" && isEmailLike(email)) adminEmail = email;
     }
 
     // Technical contact
@@ -659,9 +661,9 @@ function parseRdapEntity(entities: RdapEntity[]): {
 
       if (fn && fn !== "Unknown" && techName === "Unknown") techName = fn;
       if (org && org !== "Unknown" && techOrganization === "Unknown") techOrganization = org;
-      if (phone && phone !== "Unknown" && techPhone === "Unknown")
+      if (phone && phone !== "Unknown" && techPhone === "Unknown" && !isRedactedValue(phone))
         techPhone = phone.replace(/^tel:/i, "").trim();
-      if (email && email !== "Unknown" && techEmail === "Unknown") techEmail = email;
+      if (email && email !== "Unknown" && techEmail === "Unknown" && isEmailLike(email)) techEmail = email;
     }
   }
 

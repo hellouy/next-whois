@@ -136,7 +136,46 @@ export function isRedactedValue(value: string): boolean {
   if (/REDACTED|WITHHELD|PRIVACY|NOT DISCLOSED/i.test(value)) return true;
   // .tg (NICTogo JWhoisServer) redacts every contact field with "[PRIVEE]".
   if (/^\[?PRIVEE\]?$/i.test(value)) return true;
+
+  // Registry placeholder / instructional text that is NOT a real field value.
+  // Some registries (e.g. .in via RDDS) replace contact email/postal with a
+  // full sentence telling you to query the Registrar of Record instead.
+  // These are privacy redactions just like "REDACTED FOR PRIVACY" and must
+  // not leak into the contact fields or the raw display.
+  if (
+    /RDDS service|Registrar of Record|Please query|queried domain name/i.test(
+      value,
+    )
+  ) {
+    return true;
+  }
+  // A "value" that is really a long instructional sentence (no phone/email/
+  // code/date signature) is placeholder boilerplate, not data.
+  if (
+    value.length > 80 &&
+    /[a-z]{4,}/i.test(value) &&
+    !/[+@]/.test(value) &&
+    !/\d{2,}[-.\s]\d{2,}/.test(value)
+  ) {
+    return true;
+  }
+  // A value containing a "mailto:" URI (URL-encoded or not) is a link to a
+  // form, not the contact data itself.
+  if (/\(?mailto:/i.test(value)) return true;
   return false;
+}
+
+/**
+ * True when the value looks like a genuine email address. Used to guard
+ * contact-email fields: some registries substitute instructional prose or a
+ * URL where the address should be, which isRedactedValue() may not catch.
+ */
+export function isEmailLike(value: string): boolean {
+  if (!value) return false;
+  // "Select Request Email Form at https://..." → has @ in the domain part but
+  // is a sentence, not an address. Require a bare addr-spec: text@text.text.
+  const bare = value.trim().replace(/^<?/, "").replace(/>?$/, "");
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(bare);
 }
 
 // ── Status helpers ───────────────────────────────────────────────────────────

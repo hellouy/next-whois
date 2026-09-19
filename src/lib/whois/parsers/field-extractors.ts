@@ -16,6 +16,7 @@ import { WhoisAnalyzeResult } from "@/lib/whois/types";
 import {
   isDomainLike,
   isRedactedValue,
+  isEmailLike,
   analyzeDomainStatus,
 } from "@/lib/whois/parsers/utils";
 import { analyzeTime } from "@/lib/whois/parsers/date";
@@ -188,14 +189,14 @@ const registrantExtractors: Record<string, FieldExtractor> = {
       result.registrantFax = stripTel(value);
   },
   "registrant email": (value, result) => {
-    if (!isRedactedValue(value))
+    if (!isRedactedValue(value) && isEmailLike(value))
       result.registrantEmail = value.replace(
         "Select Request Email Form at ",
         "",
       );
   },
   email: (value, result) => {
-    if (!isRedactedValue(value) && result.registrantEmail === "Unknown")
+    if (!isRedactedValue(value) && isEmailLike(value) && result.registrantEmail === "Unknown")
       result.registrantEmail = value;
   },
 };
@@ -212,7 +213,7 @@ const adminExtractors: Record<string, FieldExtractor> = {
       result.adminOrganization = value;
   },
   "admin email": (value, result) => {
-    if (!isRedactedValue(value) && result.adminEmail === "Unknown")
+    if (!isRedactedValue(value) && isEmailLike(value) && result.adminEmail === "Unknown")
       result.adminEmail = value;
   },
   "admin phone": (value, result) => {
@@ -237,7 +238,7 @@ const techExtractors: Record<string, FieldExtractor> = {
       result.techOrganization = value;
   },
   "tech email": (value, result) => {
-    if (!isRedactedValue(value) && result.techEmail === "Unknown")
+    if (!isRedactedValue(value) && isEmailLike(value) && result.techEmail === "Unknown")
       result.techEmail = value;
   },
   "tech phone": (value, result) => {
@@ -258,7 +259,7 @@ const abuseExtractors: Record<string, FieldExtractor> = {
     if (!isRedactedValue(value)) result.abusePhone = stripTel(value);
   },
   "registrar abuse contact email": (value, result) => {
-    if (!isRedactedValue(value)) result.abuseEmail = value;
+    if (!isRedactedValue(value) && isEmailLike(value)) result.abuseEmail = value;
   },
 };
 
