@@ -241,7 +241,15 @@
     "years_ago": "{{years}}년 전",
     "in_days": "{{days}}일 후",
     "in_months": "{{months}}개월 후",
-    "in_years": "{{years}}년 후"
+    "in_years": "{{years}}년 후",
+    "just_renewed": "방금 갱신됨",
+    "transferring": "이전 중",
+    "recently_transferred": "최근 이전됨",
+    "newly_registered": "새로 등록됨",
+    "pending_deletion": "삭제 대기 중",
+    "in_redemption": "복구 기간",
+    "restoring": "복원 중",
+    "pending_update": "업데이트 처리 중"
   },
   "docs": {
     "title": "API 문서",

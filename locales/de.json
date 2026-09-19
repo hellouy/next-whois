@@ -241,7 +241,15 @@
     "years_ago": "vor {{years}}J",
     "in_days": "in {{days}}T",
     "in_months": "in {{months}}Mo",
-    "in_years": "in {{years}}J"
+    "in_years": "in {{years}}J",
+    "just_renewed": "gerade verlängert",
+    "transferring": "Übertragung läuft",
+    "recently_transferred": "kürzlich übertragen",
+    "newly_registered": "neu registriert",
+    "pending_deletion": "Löschung ausstehend",
+    "in_redemption": "in Rücknahmefrist",
+    "restoring": "Wiederherstellung läuft",
+    "pending_update": "Update ausstehend"
   },
   "docs": {
     "title": "API-Dokumentation",

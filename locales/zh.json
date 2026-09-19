@@ -241,7 +241,15 @@
     "years_ago": "{{years}}年前",
     "in_days": "{{days}}天后",
     "in_months": "{{months}}个月后",
-    "in_years": "{{years}}年后"
+    "in_years": "{{years}}年后",
+    "just_renewed": "刚刚续费",
+    "transferring": "正在转移",
+    "recently_transferred": "近日转移",
+    "newly_registered": "新近注册",
+    "pending_deletion": "待删除",
+    "in_redemption": "赎回期",
+    "restoring": "恢复中",
+    "pending_update": "更新待处理"
   },
   "docs": {
     "title": "API 文档",

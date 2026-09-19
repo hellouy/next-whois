@@ -144,6 +144,7 @@ import {
   getRegistrarFallbackColor,
   parseWhoisDate,
   getRelativeTime,
+  getUpdatedDateLabel,
   formatDate,
   translateDnssecValue,
   buildOgUrl,
@@ -2248,7 +2249,7 @@ export default function LookupPage({
                                 {formatDate(result.updatedDate)}
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
-                                {getRelativeTime(result.updatedDate, t)}
+                                {getUpdatedDateLabel(result.updatedDate, result.status, t, result.creationDate)}
                               </p>
                             </div>
                           )}

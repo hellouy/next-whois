@@ -241,7 +241,15 @@
     "years_ago": "{{years}}y ago",
     "in_days": "in {{days}}d",
     "in_months": "in {{months}}mo",
-    "in_years": "in {{years}}y"
+    "in_years": "in {{years}}y",
+    "just_renewed": "just renewed",
+    "transferring": "transfer in progress",
+    "recently_transferred": "recently transferred",
+    "newly_registered": "newly registered",
+    "pending_deletion": "pending deletion",
+    "in_redemption": "in redemption",
+    "restoring": "restore in progress",
+    "pending_update": "update pending"
   },
   "docs": {
     "title": "API Documentation",

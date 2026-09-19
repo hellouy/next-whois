@@ -240,7 +240,15 @@
     "years_ago": "{{years}}年前",
     "in_days": "{{days}}日後",
     "in_months": "{{months}}ヶ月後",
-    "in_years": "{{years}}年後"
+    "in_years": "{{years}}年後",
+    "just_renewed": "更新直後",
+    "transferring": "移転中",
+    "recently_transferred": "最近移転",
+    "newly_registered": "新規登録",
+    "pending_deletion": "削除予定",
+    "in_redemption": "復旧期間",
+    "restoring": "復元中",
+    "pending_update": "更新処理中"
   },
   "docs": {
     "title": "APIドキュメント",

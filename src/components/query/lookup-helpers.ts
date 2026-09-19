@@ -166,6 +166,67 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
+ * When the registry's updatedDate is today, a bare "今天/today" adds little
+ * signal. If the domain's EPP status codes indicate a recent lifecycle event
+ * (renewal, transfer, registration, deletion, …), surface that event instead.
+ *
+ * Priority: a pending operation beats its grace-period counterpart, and
+ * deletion/redemption is more noteworthy than a plain update. Falls back to
+ * getRelativeTime when no meaningful status is present or the date is older
+ * than today (the generic "N天前" relative label is informative enough then).
+ */
+export function getUpdatedDateLabel(
+  dateStr: string,
+  statuses: readonly { status: string }[],
+  t: (key: TranslationKey, values?: Record<string, string | number>) => string,
+  creationDate?: string,
+): string {
+  if (!dateStr || dateStr === "Unknown") return "";
+  const date = parseWhoisDate(dateStr);
+  if (!date) return getRelativeTime(dateStr, t);
+
+  const now = new Date();
+  const diffDays = Math.floor(
+    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diffDays < 0 || diffDays >= 1) return getRelativeTime(dateStr, t);
+
+  const codes = statuses.map((s) => s.status.toLowerCase().replace(/[^a-z]/g, ""));
+
+  if (codes.includes("pendingtransfer"))
+    return t("relative_time.transferring");
+  if (codes.includes("pendingdelete"))
+    return t("relative_time.pending_deletion");
+  if (codes.includes("redemptionperiod"))
+    return t("relative_time.in_redemption");
+  if (codes.includes("pendingrenew"))
+    return t("relative_time.just_renewed");
+  if (codes.includes("renewperiod") || codes.includes("autorenewperiod"))
+    return t("relative_time.just_renewed");
+  if (codes.includes("transferperiod"))
+    return t("relative_time.recently_transferred");
+  if (codes.includes("addperiod") || codes.includes("pendingcreate"))
+    return t("relative_time.newly_registered");
+  if (codes.includes("pendingrestore"))
+    return t("relative_time.restoring");
+  if (codes.includes("pendingupdate"))
+    return t("relative_time.pending_update");
+
+  // A domain created today must have been updated today too — this is the
+  // strongest signal available when the registry only reports "ok" (e.g. .bf).
+  if (creationDate) {
+    const created = parseWhoisDate(creationDate);
+    if (
+      created &&
+      Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)) < 1
+    ) {
+      return t("relative_time.newly_registered");
+    }
+  }
+
+  return getRelativeTime(dateStr, t);
+}
+/**
  * Translate DNSSEC field values and embedded technical terms.
  * For zh/zh-tw locales, known DNSSEC terms are replaced with Chinese equivalents.
  * For all other locales the original value is returned unchanged.

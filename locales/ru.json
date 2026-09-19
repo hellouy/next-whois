@@ -240,7 +240,15 @@
     "years_ago": "{{years}}г назад",
     "in_days": "через {{days}}д",
     "in_months": "через {{months}}мес",
-    "in_years": "через {{years}}г"
+    "in_years": "через {{years}}г",
+    "just_renewed": "только что продлён",
+    "transferring": "идёт передача",
+    "recently_transferred": "недавно передан",
+    "newly_registered": "недавно зарегистрирован",
+    "pending_deletion": "ожидает удаления",
+    "in_redemption": "в периоде возврата",
+    "restoring": "идёт восстановление",
+    "pending_update": "ожидает обновления"
   },
   "docs": {
     "title": "Документация API",
