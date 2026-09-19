@@ -66,8 +66,6 @@ export function useDashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [deleteConfirmEmail, setDeleteConfirmEmail] = React.useState("");
   const [deletingAccount, setDeletingAccount] = React.useState(false);
-  const [inviteCodeInput, setInviteCodeInput] = React.useState("");
-  const [applyingCode, setApplyingCode] = React.useState(false);
   const [editingName, setEditingName] = React.useState(false);
   const [nameValue, setNameValue] = React.useState("");
   const [savingName, setSavingName] = React.useState(false);
@@ -480,43 +478,6 @@ export function useDashboard() {
     }
   }
 
-  async function handleApplyInviteCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!inviteCodeInput.trim()) { toast.error(t("dashboard.enter_invite_code")); return; }
-    setApplyingCode(true);
-    try {
-      const res = await fetch("/api/user/apply-invite-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inviteCode: inviteCodeInput.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const errMsg = data.error || t("dashboard.invite_code_invalid");
-        if (data.code === "ALREADY_HAS_ACCESS") {
-          setSubscriptionAccessDB(true);
-          await updateSession({ refreshSubscription: true });
-          setInviteCodeInput("");
-          setTab("subscriptions");
-          toast.success(t("dashboard.already_has_access"));
-          return;
-        }
-        toast.error(errMsg);
-        return;
-      }
-      toast.success(t("dashboard.invite_code_success"));
-      setSubscriptionAccessDB(true);
-      invalidateDashCache();
-      await updateSession({ refreshSubscription: true });
-      setInviteCodeInput("");
-      setTab("subscriptions");
-    } catch {
-      toast.error(t("dashboard.op_failed_retry"));
-    } finally {
-      setApplyingCode(false);
-    }
-  }
-
   return {
     session, status, locale, t, siteSettings, paymentEnabled,
     tab, setTab,
@@ -555,8 +516,6 @@ export function useDashboard() {
     showDeleteConfirm, setShowDeleteConfirm,
     deleteConfirmEmail, setDeleteConfirmEmail,
     deletingAccount,
-    inviteCodeInput, setInviteCodeInput,
-    applyingCode,
     editingName, setEditingName,
     nameValue, setNameValue,
     savingName,
@@ -578,7 +537,7 @@ export function useDashboard() {
     refreshData, retryLoad,
     cancelSubscription, deleteSubscription, togglePauseSubscription, bulkImport, saveDaysBefore, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
-    handleRedeemCode, handleApplyInviteCode,
+    handleRedeemCode,
     showBulkImport, setShowBulkImport,
     togglingPause, bulkImporting,
   };

@@ -9,7 +9,7 @@ import {
   RiDeleteBinLine, RiEdit2Line, RiFireLine, RiTimeLine, RiTimerLine,
   RiCheckLine, RiSearchLine, RiCloseLine, RiGlobalLine, RiShieldCheckLine,
   RiDownloadLine, RiBellLine, RiMailLine, RiInformationLine, RiVipCrownLine,
-  RiKeyLine, RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
+  RiBankCardLine, RiArrowDownSLine, RiArrowUpSLine, RiUploadCloud2Line,
   RiPauseLine, RiPlayLine, RiCalendarScheduleLine, RiScanLine,
   RiArrowRightSLine, RiAddLine, RiMore2Line, RiWalletLine,
 } from "@remixicon/react";
@@ -46,8 +46,6 @@ export type SubscriptionsTabProps = {
   urgentSubs: Subscription[];
   postExpirySubs: Subscription[];
   cancelling: string | null;
-  inviteCodeInput: string;
-  applyingCode: boolean;
   paymentEnabled: boolean;
   user: DashboardUser;
   locale: string;
@@ -63,8 +61,6 @@ export type SubscriptionsTabProps = {
   onShowBulkImport: () => void;
   togglingPause: string | null;
   bulkImporting: boolean;
-  onApplyInviteCode: (e: React.FormEvent) => void;
-  setInviteCodeInput: (v: string) => void;
   onRetryLoad: () => void;
 };
 
@@ -72,11 +68,10 @@ export function SubscriptionsTab({
   subscriptionAccessDB, freeLimit, subscriptions, filteredSubscriptions, loadingData, dashError,
   subSearch, subFilter, subscriptionExpiresAt,
   activeSubs, expiringSoon, urgentSubs, postExpirySubs,
-  cancelling, inviteCodeInput, applyingCode, paymentEnabled, user, locale, t,
+  cancelling, paymentEnabled, user, locale, t,
   setSubSearch, setSubFilter, onShowSubscribeGuide, onExportCSV,
   onCancelSubscription, onDeleteSubscription, onEditSubscription, onTogglePause, onShowBulkImport,
   togglingPause, bulkImporting,
-  onApplyInviteCode, setInviteCodeInput,
   onRetryLoad,
 }: SubscriptionsTabProps) {
   const router = useRouter();
@@ -231,48 +226,25 @@ export function SubscriptionsTab({
               <RiBankCardLine className="w-6 h-6 text-amber-500" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-bold">{t("dashboard.needs_invite")}</p>
+              <p className="text-sm font-bold">{t("dashboard.needs_membership")}</p>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px] mx-auto">
-                {t("dashboard.needs_invite_desc")}
+                {t("dashboard.needs_membership_desc")}
               </p>
             </div>
           </div>
-          {paymentEnabled && (
+          {paymentEnabled ? (
             <Link href="/payment/checkout">
               <Button className="w-full h-9 rounded-xl gap-1.5 text-xs bg-violet-600 hover:bg-violet-700 text-white">
                 <RiBankCardLine className="w-3.5 h-3.5" />{t("dashboard.buy_plan_unlock")}
               </Button>
             </Link>
+          ) : (
+            <Link href="/dashboard?tab=membership">
+              <Button variant="outline" className="w-full h-9 rounded-xl gap-1.5 text-xs">
+                <RiVipCrownLine className="w-3.5 h-3.5" />{t("dashboard.view_all_plans")}
+              </Button>
+            </Link>
           )}
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50 justify-center select-none">
-            <span>{t("dashboard.or_invite_code")}</span>
-          </div>
-          <form onSubmit={onApplyInviteCode} className="space-y-2">
-            <div className="relative">
-              <RiKeyLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-              <input
-                type="text"
-                placeholder={t("dashboard.invite_code_placeholder")}
-                value={inviteCodeInput}
-                onChange={e => setInviteCodeInput(e.target.value.toUpperCase())}
-                disabled={applyingCode}
-                maxLength={24}
-                autoComplete="off"
-                className="w-full h-10 pl-9 pr-3 rounded-xl border border-border bg-muted/30 text-xs font-mono font-semibold tracking-wider focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition disabled:opacity-50"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={applyingCode || !inviteCodeInput.trim()}
-              size="sm"
-              className="w-full h-9 rounded-xl gap-1.5 text-xs"
-            >
-              {applyingCode
-                ? <><RiLoader4Line className="w-3.5 h-3.5 animate-spin" />{t("dashboard.verifying")}</>
-                : <><RiKeyLine className="w-3.5 h-3.5" />{t("dashboard.verify_unlock")}</>
-              }
-            </Button>
-          </form>
         </div>
       )}
       {(subscriptionAccessDB ?? user.subscriptionAccess) && <>

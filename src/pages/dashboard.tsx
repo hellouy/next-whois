@@ -3,13 +3,12 @@ import Head from "next/head";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
-import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   RiLoader4Line, RiCalendarLine, RiShieldCheckLine,
-  RiUserLine, RiLogoutBoxLine, RiFireLine,
-  RiVipCrownLine, RiShieldUserLine, RiSearchLine, RiHistoryLine,
+  RiUserLine, RiFireLine,
+  RiVipCrownLine, RiSearchLine, RiHistoryLine,
   RiExternalLinkLine,
 } from "@remixicon/react";
 import { useSiteSettings } from "@/lib/site-settings";
@@ -92,8 +91,6 @@ export default function DashboardPage() {
     showDeleteConfirm, setShowDeleteConfirm,
     deleteConfirmEmail, setDeleteConfirmEmail,
     deletingAccount,
-    inviteCodeInput, setInviteCodeInput,
-    applyingCode,
     editingName, setEditingName,
     nameValue, setNameValue,
     savingName,
@@ -115,7 +112,7 @@ export default function DashboardPage() {
     refreshData, retryLoad,
     cancelSubscription, deleteSubscription, togglePauseSubscription, bulkImport, deleteStamp, exportSubscriptionsCSV,
     saveName, sendEmailChangeCode, saveEmail, deleteAccount, changePassword, saveAvatarColor,
-    handleRedeemCode, handleApplyInviteCode,
+    handleRedeemCode,
   } = useDashboard();
 
   if (status === "unauthenticated" || status === "loading") {
@@ -208,32 +205,11 @@ export default function DashboardPage() {
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
           </div>
-          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary active:opacity-70 touch-manipulation">
-              <RiSearchLine className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{t("not_found.back_home")}</span>
-            </button>
-            {isAdminUser && (
-              <Link href="/admin"
-                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30 active:scale-[0.96]">
-                <RiShieldUserLine className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t("nav_admin")}</span>
-              </Link>
-            )}
-            <button onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-[0.96]">
-              <RiLogoutBoxLine className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{t("sign_out")}</span>
-            </button>
-          </div>
         </div>
 
         {/* Stats overview bar */}
-        {!loadingData && (activeSubs.length > 0 || stamps.length > 0 || !!searchStats) && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {!loadingData && (activeSubs.length > 0 || stamps.length > 0 || (isAdminUser && !!searchStats)) && (
+          <div className={cn("grid grid-cols-2 gap-2", isAdminUser ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
             <button
               type="button"
               onClick={() => { setTab("subscriptions"); setSubFilter("all"); }}
@@ -286,24 +262,26 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_verified_brands")}</p>
               </div>
             </button>
-            <button
-              type="button"
-              onClick={() => setTab("account")}
-              className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left hover:border-sky-400/40 hover:bg-sky-50/20 dark:hover:bg-sky-950/10 transition-colors"
-            >
-              <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/40 flex items-center justify-center shrink-0">
-                <RiSearchLine className="w-3.5 h-3.5 text-sky-500" />
-              </div>
-              <div>
-                <p className="text-base font-bold leading-none">{searchStats?.total ?? 0}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_history")}</p>
-              </div>
-            </button>
+            {isAdminUser && (
+              <button
+                type="button"
+                onClick={() => setTab("account")}
+                className="glass-panel border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left hover:border-sky-400/40 hover:bg-sky-50/20 dark:hover:bg-sky-950/10 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/40 flex items-center justify-center shrink-0">
+                  <RiSearchLine className="w-3.5 h-3.5 text-sky-500" />
+                </div>
+                <div>
+                  <p className="text-base font-bold leading-none">{searchStats?.total ?? 0}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.stat_history")}</p>
+                </div>
+              </button>
+            )}
           </div>
         )}
 
-        {/* Recent searches mini-list */}
-        {!loadingData && recentSearches.length > 0 && (
+        {/* Recent searches mini-list (admin-only; regular users see browser-local history on the home page instead) */}
+        {!loadingData && isAdminUser && recentSearches.length > 0 && (
           <div className="glass-panel border border-border rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[11px] font-bold flex items-center gap-1.5 text-muted-foreground">
@@ -380,8 +358,6 @@ export default function DashboardPage() {
               urgentSubs={urgentSubs}
               postExpirySubs={postExpirySubs}
               cancelling={cancelling}
-              inviteCodeInput={inviteCodeInput}
-              applyingCode={applyingCode}
               paymentEnabled={paymentEnabled}
               user={user}
               locale={locale}
@@ -397,8 +373,6 @@ export default function DashboardPage() {
               onShowBulkImport={() => setShowBulkImport(true)}
               togglingPause={togglingPause}
               bulkImporting={bulkImporting}
-              onApplyInviteCode={handleApplyInviteCode}
-              setInviteCodeInput={setInviteCodeInput}
               onRetryLoad={retryLoad}
             />
           )}

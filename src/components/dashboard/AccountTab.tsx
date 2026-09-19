@@ -323,8 +323,8 @@ export function AccountTab({
         ))}
       </div>
 
-      {/* Search stats */}
-      {searchStats && searchStats.total > 0 && (
+      {/* Search stats (admin-only; backend keeps recording stats for everyone) */}
+      {isAdminUser && searchStats && searchStats.total > 0 && (
         <div className="glass-panel border border-border rounded-2xl overflow-hidden">
           <div className="px-4 pt-3 pb-2 border-b border-border/60 flex items-center gap-2">
             <RiSearchLine className="w-3.5 h-3.5 text-muted-foreground" />
