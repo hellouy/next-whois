@@ -1338,7 +1338,19 @@
     "result_login_required": "결제 상태를 확인하려면 로그인해 주세요",
     "result_login_btn": "로그인",
     "checkout_load_failed": "플랜을 불러오지 못했습니다. 다시 시도해 주세요.",
-    "checkout_retry": "다시 시도"
+    "checkout_retry": "다시 시도",
+    "recharge_title": "잔액 충전",
+    "recharge_subtitle": "금액을 입력하고 결제하면 잔액에 충전됩니다",
+    "recharge_amount_label": "충전 금액",
+    "recharge_amount_placeholder": "금액 입력",
+    "recharge_quick_amounts": "빠른 선택",
+    "recharge_min_hint": "최소 충전 금액은 {{min}}입니다",
+    "recharge_max_hint": "최대 충전 금액은 {{max}}입니다",
+    "recharge_balance_after": "충전 후 잔액",
+    "recharge_pay_amount": "{{amount}} 결제",
+    "recharge_success_title": "충전 완료!",
+    "recharge_success_desc": "잔액이 계정에 충전되었습니다",
+    "recharge_back": "대시보드로 돌아가기"
   },
   "dashboard": {
     "phase_active": "활성",

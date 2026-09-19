@@ -16,6 +16,7 @@ import {
 type Order = {
   id: string; status: string; amount: number; currency: string;
   plan_name: string; provider: string; paid_at: string | null;
+  is_recharge?: boolean;
 };
 
 export default function PaymentResult() {
@@ -115,15 +116,19 @@ export default function PaymentResult() {
                 <RiCheckLine className="w-8 h-8 text-emerald-500" />
               </div>
               <div>
-                <h1 className="text-xl font-black">{t("payment.result_paid_title")}</h1>
+                <h1 className="text-xl font-black">
+                  {order?.is_recharge ? t("payment.recharge_success_title") : t("payment.result_paid_title")}
+                </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {t("payment.result_paid_desc")}
+                  {order?.is_recharge ? t("payment.recharge_success_desc") : t("payment.result_paid_desc")}
                 </p>
               </div>
               {order && (
                 <div className="rounded-2xl border border-emerald-200/50 dark:border-emerald-700/30 bg-emerald-50 dark:bg-emerald-950/20 p-4 text-sm space-y-1.5 text-left">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("payment.result_plan_label")}</span>
+                    <span className="text-muted-foreground">
+                      {order.is_recharge ? t("payment.recharge_title") : t("payment.result_plan_label")}
+                    </span>
                     <span className="font-semibold">{order.plan_name}</span>
                   </div>
                   <div className="flex justify-between">
@@ -143,7 +148,7 @@ export default function PaymentResult() {
                 </div>
               )}
               <div className="flex flex-col gap-2">
-                <Link href="/dashboard">
+                <Link href={order?.is_recharge ? "/dashboard?tab=account" : "/dashboard"}>
                   <Button className="w-full rounded-xl h-10 font-semibold">
                     <RiArrowRightLine className="w-4 h-4 mr-2" />
                     {t("payment.result_go_dashboard")}

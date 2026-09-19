@@ -90,6 +90,65 @@ export async function createOrder(params: {
   return { order: order!, plan };
 }
 
+export const RECHARGE_MIN_CENTS = 100;
+export const RECHARGE_MAX_CENTS = 5_000_000;
+
+/**
+ * Create a free-amount balance top-up order. Unlike plan purchases this order
+ * has no payment_plans row: the credit equals the paid amount and is carried
+ * on the order itself (balance_grant_cents), which markOrderPaid already
+ * supports as a fallback. No subscription entitlement is granted.
+ */
+export async function createRechargeOrder(params: {
+  userId: string | null;
+  userEmail: string;
+  amountCents: number;
+  currency: string;
+  provider: PaymentProvider;
+}): Promise<{ order: PaymentOrder; plan: PaymentPlan }> {
+  if (!Number.isInteger(params.amountCents) || params.amountCents < RECHARGE_MIN_CENTS) {
+    throw new Error("充值金额过低");
+  }
+  if (params.amountCents > RECHARGE_MAX_CENTS) {
+    throw new Error("充值金额过高");
+  }
+
+  const id = genOrderId();
+  const expiredAt = new Date(Date.now() + 30 * 60 * 1000);
+  const price = params.amountCents / 100;
+
+  await run(
+    `INSERT INTO payment_orders
+       (id, user_id, user_email, plan_id, plan_name, amount, currency, provider, status, expired_at, balance_grant_cents)
+     VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,'pending',$8,$9)`,
+    [id, params.userId, params.userEmail, "余额充值", price,
+     params.currency, params.provider, expiredAt.toISOString(), params.amountCents]
+  );
+
+  const order = await one<PaymentOrder>(
+    `SELECT id, user_id, user_email, plan_id, plan_name, amount::float AS amount,
+            currency, provider, provider_order_id, status, paid_at, created_at
+     FROM payment_orders WHERE id = $1`,
+    [id]
+  );
+
+  const plan: PaymentPlan = {
+    id: "",
+    name: "余额充值",
+    description: null,
+    price,
+    currency: params.currency,
+    duration_days: null,
+    is_recurring: false,
+    grants_subscription: false,
+    balance_grant_cents: params.amountCents,
+    is_active: true,
+    sort_order: 0,
+  };
+
+  return { order: order!, plan };
+}
+
 export async function markOrderPaid(params: {
   orderId: string;
   providerOrderId?: string;
@@ -272,9 +331,12 @@ export async function markOrderPaid(params: {
     // Confirmation email — outside the DB transaction (SMTP must not hold a
     // transaction open), but its failure never voids the payment.
     const siteName = await getSiteLabel();
+    const isTopUp = !grantsSubscription && balanceGrantCents > 0;
     void sendEmail({
       to: order.user_email,
-      subject: `支付成功 — 您的会员订阅已开通 | ${siteName}`,
+      subject: isTopUp
+        ? `支付成功 — 您的余额充值已到账 | ${siteName}`
+        : `支付成功 — 您的会员订阅已开通 | ${siteName}`,
       html: paymentConfirmHtml({
         name: userRow?.name ?? null,
         email: order.user_email,

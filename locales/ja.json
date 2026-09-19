@@ -1337,7 +1337,19 @@
     "result_login_required": "支払い状況を確認するにはログインしてください",
     "result_login_btn": "ログイン",
     "checkout_load_failed": "プランの読み込みに失敗しました。再試行してください。",
-    "checkout_retry": "再試行"
+    "checkout_retry": "再試行",
+    "recharge_title": "残高チャージ",
+    "recharge_subtitle": "金額を入力して支払うと、残高に加算されます",
+    "recharge_amount_label": "チャージ金額",
+    "recharge_amount_placeholder": "金額を入力",
+    "recharge_quick_amounts": "クイック選択",
+    "recharge_min_hint": "最低チャージ額は {{min}} です",
+    "recharge_max_hint": "最高チャージ額は {{max}} です",
+    "recharge_balance_after": "チャージ後の残高",
+    "recharge_pay_amount": "{{amount}} を支払う",
+    "recharge_success_title": "チャージ完了！",
+    "recharge_success_desc": "残高がアカウントに加算されました",
+    "recharge_back": "ダッシュボードに戻る"
   },
   "dashboard": {
     "phase_active": "有効",

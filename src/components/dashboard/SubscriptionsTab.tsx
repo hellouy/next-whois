@@ -695,7 +695,7 @@ export function SubscriptionsTab({
                     <RiWalletLine className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">需充值 ¥{(((sub.snipe.service_cents ?? 0) - (sub.snipe.frozen_cents ?? 0)) / 100).toFixed(2)} 启动抢注</span>
                   </p>
-                  <Link href="/payment/checkout" className="shrink-0">
+                  <Link href="/payment/recharge" className="shrink-0">
                     <Button size="sm" className="h-7 rounded-lg px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white gap-1">
                       <RiWalletLine className="w-3 h-3" />去充值
                     </Button>

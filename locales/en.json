@@ -1338,7 +1338,19 @@
     "result_login_required": "Please sign in to view your payment status",
     "result_login_btn": "Sign in",
     "checkout_load_failed": "Failed to load plans. Please retry.",
-    "checkout_retry": "Retry"
+    "checkout_retry": "Retry",
+    "recharge_title": "Balance Top-up",
+    "recharge_subtitle": "Enter an amount, pay, and it lands in your balance",
+    "recharge_amount_label": "Top-up amount",
+    "recharge_amount_placeholder": "Enter amount",
+    "recharge_quick_amounts": "Quick select",
+    "recharge_min_hint": "Minimum top-up is {{min}}",
+    "recharge_max_hint": "Maximum top-up is {{max}}",
+    "recharge_balance_after": "Balance after top-up",
+    "recharge_pay_amount": "Pay {{amount}}",
+    "recharge_success_title": "Top-up successful!",
+    "recharge_success_desc": "The balance has been credited to your account",
+    "recharge_back": "Back to dashboard"
   },
   "dashboard": {
     "phase_active": "Active",

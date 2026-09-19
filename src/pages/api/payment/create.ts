@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { createOrder, type PaymentProvider } from "@/lib/payment";
+import { createOrder, createRechargeOrder, type PaymentProvider } from "@/lib/payment";
 import { isDbReady, one } from "@/lib/db-query";
 import { many } from "@/lib/db-query";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -33,8 +33,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   );
   if (!dbUser) return res.status(404).json({ error: "User not found" });
 
-  const { planId, provider } = req.body as { planId: string; provider: PaymentProvider };
-  if (!planId || !provider) return res.status(400).json({ error: "Missing required parameters" });
+  const { planId, provider, amountCents } = req.body as {
+    planId?: string;
+    provider: PaymentProvider;
+    amountCents?: number;
+  };
+  if (!provider) return res.status(400).json({ error: "Missing required parameters" });
+
+  const isRecharge = amountCents !== undefined && amountCents !== null;
+  if (!isRecharge && !planId) return res.status(400).json({ error: "Missing required parameters" });
 
   const validProviders = ["stripe", "xunhupay", "alipay", "paypal", "wechat"];
   if (!validProviders.includes(provider)) return res.status(400).json({ error: "Unsupported payment method" });
@@ -43,12 +50,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (providerEnabled !== "1") return res.status(400).json({ error: "This payment method is not enabled" });
 
   try {
-    const { order, plan } = await createOrder({
-      userId: dbUser.id,
-      userEmail,
-      planId,
-      provider,
-    });
+    let order, plan;
+    if (isRecharge) {
+      const currency = (await getSetting("payment_currency")) || "CNY";
+      ({ order, plan } = await createRechargeOrder({
+        userId: dbUser.id,
+        userEmail,
+        amountCents: Math.round(Number(amountCents)),
+        currency,
+        provider,
+      }));
+    } else {
+      ({ order, plan } = await createOrder({
+        userId: dbUser.id,
+        userEmail,
+        planId: planId!,
+        provider,
+      }));
+    }
 
     const dbSiteUrl = await getSiteUrl().catch(() => "");
     const proto = req.headers["x-forwarded-proto"] ?? "https";

@@ -455,7 +455,7 @@ export default function DashboardPage() {
               stamps={stamps}
               searchStats={searchStats ?? null}
               balanceCents={balanceCents}
-              onGoRecharge={() => router.push("/payment/checkout")}
+              onGoRecharge={() => router.push("/payment/recharge")}
               onGoOrders={() => {
                 setTab("membership");
                 setShowBalanceTxs(true);

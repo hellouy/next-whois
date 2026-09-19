@@ -29,5 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     provider: order.provider,
     paid_at: order.paid_at,
     created_at: order.created_at,
+    is_recharge: !order.plan_id,
   }});
 }

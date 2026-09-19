@@ -1338,7 +1338,19 @@
     "result_login_required": "請登入後查看支付結果",
     "result_login_btn": "去登入",
     "checkout_load_failed": "方案載入失敗，請重試。",
-    "checkout_retry": "重試"
+    "checkout_retry": "重試",
+    "recharge_title": "餘額儲值",
+    "recharge_subtitle": "輸入金額完成支付，款項將充入帳戶餘額",
+    "recharge_amount_label": "儲值金額",
+    "recharge_amount_placeholder": "請輸入儲值金額",
+    "recharge_quick_amounts": "快速選擇",
+    "recharge_min_hint": "最低儲值 {{min}}",
+    "recharge_max_hint": "最高儲值 {{max}}",
+    "recharge_balance_after": "儲值後餘額",
+    "recharge_pay_amount": "支付 {{amount}}",
+    "recharge_success_title": "儲值成功！",
+    "recharge_success_desc": "餘額已充入你的帳戶",
+    "recharge_back": "返回用戶中心"
   },
   "dashboard": {
     "phase_active": "有效",

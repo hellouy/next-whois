@@ -1338,7 +1338,19 @@
     "result_login_required": "Veuillez vous connecter pour voir votre statut de paiement",
     "result_login_btn": "Se connecter",
     "checkout_load_failed": "Échec du chargement des offres. Veuillez réessayer.",
-    "checkout_retry": "Réessayer"
+    "checkout_retry": "Réessayer",
+    "recharge_title": "Recharger le solde",
+    "recharge_subtitle": "Saisissez un montant, payez, et il est crédité sur votre solde",
+    "recharge_amount_label": "Montant de la recharge",
+    "recharge_amount_placeholder": "Saisir le montant",
+    "recharge_quick_amounts": "Sélection rapide",
+    "recharge_min_hint": "La recharge minimale est de {{min}}",
+    "recharge_max_hint": "La recharge maximale est de {{max}}",
+    "recharge_balance_after": "Solde après recharge",
+    "recharge_pay_amount": "Payer {{amount}}",
+    "recharge_success_title": "Recharge réussie !",
+    "recharge_success_desc": "Le solde a été crédité sur votre compte",
+    "recharge_back": "Retour au tableau de bord"
   },
   "dashboard": {
     "phase_active": "Actif",

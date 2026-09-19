@@ -1338,7 +1338,19 @@
     "result_login_required": "请登录后查看支付结果",
     "result_login_btn": "去登录",
     "checkout_load_failed": "套餐加载失败，请重试。",
-    "checkout_retry": "重试"
+    "checkout_retry": "重试",
+    "recharge_title": "余额充值",
+    "recharge_subtitle": "输入金额完成支付，款项将充入账户余额",
+    "recharge_amount_label": "充值金额",
+    "recharge_amount_placeholder": "请输入充值金额",
+    "recharge_quick_amounts": "快捷选择",
+    "recharge_min_hint": "最低充值 {{min}}",
+    "recharge_max_hint": "最高充值 {{max}}",
+    "recharge_balance_after": "充值后余额",
+    "recharge_pay_amount": "支付 {{amount}}",
+    "recharge_success_title": "充值成功！",
+    "recharge_success_desc": "余额已充入你的账户",
+    "recharge_back": "返回用户中心"
   },
   "dashboard": {
     "phase_active": "有效",

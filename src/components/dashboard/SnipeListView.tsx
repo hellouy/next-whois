@@ -212,7 +212,7 @@ export function SnipeListView({
                     <RiWalletLine className="w-3 h-3 shrink-0" />
                     需充值 {SNIPE_BALANCE_SYM}{formatCents(Math.max(0, shortfall))} 后开始抢占
                   </p>
-                  <Link href="/payment/checkout" onClick={e => e.stopPropagation()}>
+                  <Link href="/payment/recharge" onClick={e => e.stopPropagation()}>
                     <Button size="sm" className="h-7 rounded-lg px-2 text-[11px] bg-amber-500 hover:bg-amber-600 text-white">
                       去充值
                     </Button>

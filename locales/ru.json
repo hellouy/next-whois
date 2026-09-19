@@ -1337,7 +1337,19 @@
     "result_login_required": "Войдите, чтобы увидеть статус платежа",
     "result_login_btn": "Войти",
     "checkout_load_failed": "Не удалось загрузить тарифы. Повторите попытку.",
-    "checkout_retry": "Повторить"
+    "checkout_retry": "Повторить",
+    "recharge_title": "Пополнение баланса",
+    "recharge_subtitle": "Введите сумму, оплатите, и она зачислится на баланс",
+    "recharge_amount_label": "Сумма пополнения",
+    "recharge_amount_placeholder": "Введите сумму",
+    "recharge_quick_amounts": "Быстрый выбор",
+    "recharge_min_hint": "Минимальное пополнение — {{min}}",
+    "recharge_max_hint": "Максимальное пополнение — {{max}}",
+    "recharge_balance_after": "Баланс после пополнения",
+    "recharge_pay_amount": "Оплатить {{amount}}",
+    "recharge_success_title": "Пополнение успешно!",
+    "recharge_success_desc": "Средства зачислены на ваш счёт",
+    "recharge_back": "Вернуться в панель"
   },
   "dashboard": {
     "phase_active": "Активный",
