@@ -2000,32 +2000,36 @@ export default function LookupPage({
                       </div>
                     </div>
 
-                    {tianhuTranslation && tianhuTranslation.dst && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 px-3 py-2 rounded-lg bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-800/30"
-                      >
-                        <span className="text-[11px] font-mono text-muted-foreground/60 shrink-0">
-                          {isChinese ? "含义" : "Meaning"}
-                        </span>
-                        <span className="text-[13px] font-semibold text-violet-700 dark:text-violet-300">
-                          {tianhuTranslation.dst}
-                        </span>
-                        {tianhuTranslation.parts.flatMap((p, pi) =>
-                          p.means.slice(0, 3).map((m, i) => (
-                            <span key={`${pi}-${i}`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                              {i === 0 && p.part_name && (
-                                <span className="text-[10px] font-medium text-muted-foreground/50 border border-border/40 rounded px-1 py-px">
-                                  {p.part_name}
-                                </span>
-                              )}
-                              {m}
-                            </span>
-                          ))
-                        )}
-                      </motion.div>
+                    {settings.meaning_enabled === "1" ? (
+                      tianhuTranslation && tianhuTranslation.dst && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.2 }}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 px-3 py-2 rounded-lg bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-800/30"
+                        >
+                          <span className="text-[11px] font-mono text-muted-foreground/60 shrink-0">
+                            {isChinese ? "含义" : "Meaning"}
+                          </span>
+                          <span className="text-[13px] font-semibold text-violet-700 dark:text-violet-300">
+                            {tianhuTranslation.dst}
+                          </span>
+                          {tianhuTranslation.parts.flatMap((p, pi) =>
+                            p.means.slice(0, 3).map((m, i) => (
+                              <span key={`${pi}-${i}`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                {i === 0 && p.part_name && (
+                                  <span className="text-[10px] font-medium text-muted-foreground/50 border border-border/40 rounded px-1 py-px">
+                                    {p.part_name}
+                                  </span>
+                                )}
+                                {m}
+                              </span>
+                            ))
+                          )}
+                        </motion.div>
+                      )
+                    ) : (
+                      <ResultTextAd variant="card" loading={loading} />
                     )}
 
                     {officialPopoverOpen && officialPopoverPos && typeof window !== "undefined" && ReactDOM.createPortal(

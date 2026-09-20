@@ -536,6 +536,26 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
         </div>
       </div>
 
+      {/* ── 域名含义 ─────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiBook2Line}
+          title="域名含义"
+          effect="结果页"
+          desc="在 WHOIS 查询结果页顶部显示域名含义（基于 tian.hu 翻译数据）。关闭后，原含义位置将显示下方「结果页推广条」的广告内容"
+        />
+        <Toggle
+          label="启用域名含义"
+          checked={s.meaning_enabled === "1"}
+          onChange={v => set("meaning_enabled", v ? "1" : "")}
+        />
+        {s.meaning_enabled !== "1" && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+            含义已关闭：查询结果页原「含义」位置会展示下方「结果页推广条」内容（需同时启用结果页推广条才会显示广告）。
+          </p>
+        )}
+      </div>
+
       {/* ── 结果页推广 ───────────────────────────────────────── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
         <SectionTitle

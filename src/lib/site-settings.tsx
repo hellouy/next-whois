@@ -47,6 +47,8 @@ export interface SiteSettings {
   drop_calendar_public: string;
   enable_changelog: string;
   enable_docs: string;
+  // Result page domain meaning (tian.hu translation)
+  meaning_enabled: string;
   // Home page content
   home_hero_title: string;
   home_hero_subtitle: string;
@@ -215,6 +217,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   drop_calendar_public: "1",
   enable_changelog: "1",
   enable_docs: "1",
+  meaning_enabled: "1",
   home_hero_title: "",
   home_hero_subtitle: "",
   home_hero_title_size: "",

@@ -22,7 +22,7 @@ export function parseAdItems(raw: string): AdRichItem[] {
   return trimmed.split("|").map(s => s.trim()).filter(Boolean).map(t => ({ text: t }));
 }
 
-export function ResultTextAd({ loading = false, inline = false }: { loading?: boolean; inline?: boolean }) {
+export function ResultTextAd({ loading = false, inline = false, variant = "bar" }: { loading?: boolean; inline?: boolean; variant?: "bar" | "card" }) {
   const settings = useSiteSettings();
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
@@ -60,7 +60,8 @@ export function ResultTextAd({ loading = false, inline = false }: { loading?: bo
         src={imgUrl}
         alt={imgAlt}
         className={cn(
-          "max-w-full max-h-24 object-contain rounded-xl mx-auto block",
+          "max-w-full object-contain rounded-xl mx-auto block",
+          variant === "card" ? "max-h-40" : "max-h-24",
           url && "hover:opacity-80 transition-opacity cursor-pointer",
         )}
         onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -70,6 +71,9 @@ export function ResultTextAd({ loading = false, inline = false }: { loading?: bo
       ? <Link href={url} target="_blank" rel="noopener noreferrer sponsored">{imgEl}</Link>
       : imgEl;
 
+    if (variant === "card") {
+      return <div className="mt-3 px-3 py-2 rounded-lg border border-border/60 bg-card flex items-center justify-center">{wrapped}</div>;
+    }
     if (inline) return <div className="sm:hidden mt-4 px-1 text-center">{wrapped}</div>;
     return <div className="hidden sm:block mt-5 text-center">{wrapped}</div>;
   }
@@ -89,6 +93,9 @@ export function ResultTextAd({ loading = false, inline = false }: { loading?: bo
         dangerouslySetInnerHTML={{ __html: sanitized }}
       />
     );
+    if (variant === "card") {
+      return <div className="mt-3 px-3 py-2 rounded-lg border border-border/60 bg-card">{div}</div>;
+    }
     if (inline) return <div className="sm:hidden mt-4 px-1">{div}</div>;
     return <div className="hidden sm:block mt-5">{div}</div>;
   }
@@ -136,6 +143,9 @@ export function ResultTextAd({ loading = false, inline = false }: { loading?: bo
     ? <Link href={url} target="_blank" rel="noopener noreferrer sponsored" className="block">{content}</Link>
     : content;
 
+  if (variant === "card") {
+    return <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 px-3 py-2 rounded-lg border border-border/60 bg-card">{wrapper}</div>;
+  }
   if (inline) return <div className="sm:hidden mt-4 px-1">{wrapper}</div>;
   return <div className="hidden sm:block mt-5 text-center">{wrapper}</div>;
 }
