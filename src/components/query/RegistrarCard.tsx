@@ -146,9 +146,9 @@ export function RegistrarCard({
       </div>
 
       {/* Registrar technical info */}
-      {(isValidField(result.whoisServer) || isValidField(result.registryDomainId)) && (
+      {(attribution || isValidField(result.whoisServer) || isValidField(result.registryDomainId)) && (
         <div className="border-t border-border/50 px-5 py-3 space-y-2.5">
-          {isValidField(result.whoisServer) && (
+          {(attribution || isValidField(result.whoisServer)) && (
             <div className="flex items-start justify-between gap-3">
               <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.whois_server")}</span>
               <span className="text-xs font-mono text-foreground/80 break-all text-right">

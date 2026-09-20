@@ -806,7 +806,10 @@ export async function convertRdapToWhoisResult(
       ? entityData.ianaId
       : libraryIanaId ?? null,
     ianaIdFromLibrary: !hasExplicitIanaId && libraryIanaId !== null,
-    whoisServer: "https://rdap.org",
+    // RDAP responses carry no WHOIS server hint; leave "Unknown" so the WHOIS
+    // fallback path and mergeResults can fill in the real referral server
+    // instead of a bootstrap placeholder.
+    whoisServer: "Unknown",
     registryDomainId: rdapData.handle || "Unknown",
     updatedDate,
     creationDate,
