@@ -1219,73 +1219,6 @@ export default function LookupPage({
               style={{ pointerEvents: loading ? "none" : undefined }}
             >
 
-          {/* Premium names take over the aggregate-price row: authoritative
-              registry prices (register/renew) appear exactly where the
-              nazhumi/miqingju tags would otherwise render. */}
-          {result && premium?.isPremium === true && (
-            <div
-              className="hidden sm:flex items-center flex-wrap gap-2 mb-6"
-            >
-              {typeof premium.price === "number" && premium.price > 0 && (
-                <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
-                  <RiVipCrownLine className="w-3 h-3 shrink-0 text-rose-500" />
-                  <span className="text-[11px] sm:text-xs font-normal text-rose-600 dark:text-rose-400">
-                    {t("register_price")}
-                    {formatRegistrarPrice(premium.price, premium.currency)}
-                  </span>
-                </div>
-              )}
-              {typeof premium.renewalPrice === "number" &&
-                premium.renewalPrice > 0 && (
-                  <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
-                    <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-rose-500" />
-                    <span className="text-[11px] sm:text-xs font-normal text-rose-600 dark:text-rose-400">
-                      {t("renew_price")}
-                      {formatRegistrarPrice(premium.renewalPrice, premium.currency)}
-                    </span>
-                  </div>
-                )}
-              <div className="flex-grow" />
-            </div>
-          )}
-          {result && premium?.isPremium !== true && (
-            <div
-              className="hidden sm:flex items-center flex-wrap gap-2 mb-6"
-            >
-              {result.registerPrice &&
-                result.registerPrice.new !== -1 &&
-                result.registerPrice.currency !== "Unknown" && (
-                  <Link
-                    target="_blank"
-                    href={result.registerPrice.externalLink}
-                    className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-                  >
-                    <RiBillLine className="w-3 h-3 shrink-0 text-muted-foreground" />
-                    <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
-                      {t("register_price")}
-                      {formatRegistrarPrice(result.registerPrice.new as number, result.registerPrice.currency)}
-                    </span>
-                  </Link>
-                )}
-              {result.renewPrice &&
-                result.renewPrice.renew !== -1 &&
-                result.renewPrice.currency !== "Unknown" && (
-                  <Link
-                    href={result.renewPrice.externalLink}
-                    target="_blank"
-                    className="flex px-2 py-0.5 rounded-md border bg-background items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-                  >
-                    <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-muted-foreground" />
-                    <span className="text-[11px] sm:text-xs font-normal text-muted-foreground">
-                      {t("renew_price")}
-                      {formatRegistrarPrice(result.renewPrice.renew as number, result.renewPrice.currency)}
-                    </span>
-                  </Link>
-                )}
-              <div className="flex-grow" />
-            </div>
-          )}
-
           <AnimatePresence initial={false}>
           {loading && !status && (
             <QueryLoadingSkeleton domain={displayTarget} />
@@ -1867,12 +1800,14 @@ export default function LookupPage({
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
-                        {/* Mobile-only price tags (moved from above on mobile).
-                            Premium names replace the aggregate tags with the
-                            authoritative register/renew prices in the same spot. */}
+                        {/* Register/renew price tags — shown on all breakpoints
+                            inside the result panel (no separate desktop row
+                            above the panel). Premium names replace the
+                            aggregate tags with the authoritative register/renew
+                            prices in the same spot. */}
                         {premium?.isPremium === true && (<>
                           {typeof premium.price === "number" && premium.price > 0 && (
-                            <div className="sm:hidden flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                            <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
                               <RiVipCrownLine className="w-3 h-3 shrink-0 text-rose-500" />
                               <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
                                 {t("register_price")}
@@ -1882,7 +1817,7 @@ export default function LookupPage({
                           )}
                           {typeof premium.renewalPrice === "number" &&
                             premium.renewalPrice > 0 && (
-                              <div className="sm:hidden flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
+                              <div className="flex px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/10 dark:bg-rose-500/5 items-center space-x-1">
                                 <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-rose-500" />
                                 <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
                                   {t("renew_price")}
@@ -1913,7 +1848,7 @@ export default function LookupPage({
                             <Link
                               href={result.renewPrice.externalLink}
                               target="_blank"
-                              className="sm:hidden px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                              className="px-2 py-0.5 rounded-md border bg-background flex items-center space-x-1 cursor-pointer hover:border-muted-foreground/50 transition-colors"
                             >
                               <RiExchangeDollarFill className="w-3 h-3 shrink-0 text-muted-foreground" />
                               <span className="text-[11px] font-normal text-muted-foreground">
