@@ -3,6 +3,7 @@ import {
   cn,
   getWindowHref,
   isValidDomainTld,
+  isValidField,
   isSearchRoute,
   toSearchURI,
   useClipboard,
@@ -1019,14 +1020,6 @@ export default function LookupPage({
       (result.originAS && result.originAS !== "Unknown") ||
       (result.inetNum && result.inetNum !== "Unknown") ||
       (result.inet6Num && result.inet6Num !== "Unknown"));
-
-  const INVALID_FIELD_VALUES = new Set([
-    "unknown", "n/a", "na", "none", "null", "undefined", "-", "--",
-  ]);
-  const isValidField = (v: string | null | undefined): boolean => {
-    if (!v || !v.trim()) return false;
-    return !INVALID_FIELD_VALUES.has(v.trim().toLowerCase());
-  };
 
   const hasRegistrant =
     result &&
@@ -2528,7 +2521,6 @@ export default function LookupPage({
                     {isValidField(result.registrar) && (
                       <RegistrarCard
                         result={result}
-                        isZh={isZh}
                         hasAdminContact={!!hasAdminContact}
                         hasTechContact={!!hasTechContact}
                       />

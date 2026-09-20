@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, isValidField } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useSiteSettings } from "@/lib/site-settings";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
@@ -48,22 +48,12 @@ function getRegistrarFallbackColor(registrar: string): string {
   return `hsl(${hue}, 65%, 50%)`;
 }
 
-function isValidField(v: string | null | undefined): boolean {
-  if (!v || !v.trim()) return false;
-  const INVALID_FIELD_VALUES = new Set([
-    "unknown", "n/a", "na", "none", "null", "undefined", "-", "--",
-  ]);
-  return !INVALID_FIELD_VALUES.has(v.trim().toLowerCase());
-}
-
 export function RegistrarCard({
   result,
-  isZh,
   hasAdminContact,
   hasTechContact,
 }: {
   result: WhoisAnalyzeResult;
-  isZh: boolean;
   hasAdminContact: boolean;
   hasTechContact: boolean;
 }) {
@@ -133,7 +123,7 @@ export function RegistrarCard({
             <p className="font-semibold text-sm leading-tight">{result.registrar}</p>
             {isValidField(result.registrarURL) && (
               <a
-                href={result.registrarURL.startsWith("http") ? result.registrarURL : `http://${result.registrarURL}`}
+                href={result.registrarURL.startsWith("http") ? result.registrarURL : `https://${result.registrarURL}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline break-all"
@@ -169,18 +159,18 @@ export function RegistrarCard({
       {hasAbuseContact && (
         <div className="border-t border-border/50 px-5 py-3">
           <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider mb-2">
-            {isZh ? "滥用联系" : "Abuse Contact"}
+            {t("whois_fields.abuse_contact")}
           </p>
           <div className="space-y-2">
             {isValidField(result.abuseEmail) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "邮箱" : "Email"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.contact_email")}</span>
                 <a href={`mailto:${result.abuseEmail}`} className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{result.abuseEmail}</a>
               </div>
             )}
             {isValidField(result.abusePhone) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "电话" : "Phone"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.contact_phone")}</span>
                 <span className="text-xs font-mono text-foreground/80 text-right">{result.abusePhone}</span>
               </div>
             )}
@@ -192,24 +182,24 @@ export function RegistrarCard({
       {hasRegistrantContact && (
         <div className="border-t border-border/50 px-5 py-3">
           <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider mb-2">
-            {isZh ? "注册人信息" : "Registrant"}
+            {t("whois_fields.registrant")}
           </p>
           <div className="space-y-2">
             {isValidField(result.registrantName) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "姓名" : "Name"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registrant_name")}</span>
                 <span className="text-xs text-foreground/80 text-right break-all">{result.registrantName}</span>
               </div>
             )}
             {isValidField(result.registrantOrganization) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "机构" : "Org"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registrant_organization")}</span>
                 <span className="text-xs text-foreground/80 text-right break-all">{result.registrantOrganization}</span>
               </div>
             )}
             {(isValidField(result.registrantCountry) || isValidField(result.registrantProvince)) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "地区" : "Location"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registrant_location")}</span>
                 <span className="text-xs text-foreground/80 text-right">
                   {[result.registrantProvince, result.registrantCountry].filter(v => isValidField(v)).join(", ")}
                 </span>
@@ -217,13 +207,13 @@ export function RegistrarCard({
             )}
             {isValidField(result.registrantEmail) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "邮箱" : "Email"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registrant_email")}</span>
                 <a href={`mailto:${result.registrantEmail}`} className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline break-all text-right">{result.registrantEmail}</a>
               </div>
             )}
             {isValidField(result.registrantPhone) && (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{isZh ? "电话" : "Phone"}</span>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.registrant_phone")}</span>
                 <span className="text-xs font-mono text-foreground/80 text-right">{result.registrantPhone}</span>
               </div>
             )}
