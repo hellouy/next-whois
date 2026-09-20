@@ -80,12 +80,13 @@ function pageToResponse(p: MiitIcpPage, type: IcpType, search: string): IcpRespo
   };
 }
 
-// Legacy fallback: ICP_API_BASE (e.g. api.ong:16181 or a custom proxy).
-// Vercel blocks non-standard ports, so this only works if ICP_API_BASE points
-// to an HTTPS endpoint on port 443 that proxies MIIT data.
-const UPSTREAM_BASE = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
+// Primary ICP data source — a self-hosted ICP_Query instance (HG-ha/ICP_Query)
+// that wraps the MIIT filing database and solves its captcha. Defaults to the
+// shared deployment at https://icp.ng; set ICP_API_BASE to point at your own
+// instance (e.g. http://127.0.0.1:16181).
+const UPSTREAM_BASE = (process.env.ICP_API_BASE ?? "https://icp.ng").replace(/\/$/, "");
 
-async function fetchLegacyUpstream(
+async function fetchIcpQuery(
   type: IcpType,
   search: string,
   pageNum: number,
@@ -139,7 +140,7 @@ async function fetchLegacyUpstream(
     hasNextPage: p.hasNextPage ?? false,
     hasPreviousPage: p.hasPreviousPage ?? false,
     list,
-    source: "legacy",
+    source: "icpq",
   };
 }
 
@@ -236,30 +237,27 @@ export default async function handler(
   return res.status(result.ok ? 200 : 502).json(result);
 }
 
-// Shared single-term lookup: MIIT primary + legacy fallback.
+// Shared single-term lookup: ICP_Query (icp.ng) primary + direct MIIT fallback.
 async function queryOne(type: IcpType, search: string, pageNum: number, pageSize: number): Promise<IcpResponse> {
-  const miitResult = await queryMiitIcp({ type, search, pageNum, pageSize, timeoutMs: 12_000 });
+  // ── Primary: ICP_Query service (https://icp.ng by default) ────────────────
+  const icpQuery = await fetchIcpQuery(type, search, pageNum, pageSize);
+  if (icpQuery) {
+    return icpQuery;
+  }
 
+  // ── Fallback: direct MIIT database client ─────────────────────────────────
+  const miitResult = await queryMiitIcp({ type, search, pageNum, pageSize, timeoutMs: 12_000 });
   if (miitResult.ok) {
     return pageToResponse(miitResult.data, type, search);
   }
 
-  // Transient MIIT errors (server down, timeout, token issue) → try legacy fallback
+  // ── Both sources failed: return best error ────────────────────────────────
   const miitErr = miitResult.error;
   const miitCode = miitResult.code ?? 0;
   const miitTransient = miitCode === 500 || miitCode === -1 || miitCode === 401;
 
-  if (miitTransient) {
-    const legacy = await fetchLegacyUpstream(type, search, pageNum, pageSize);
-    if (legacy) {
-      return legacy;
-    }
-  }
-
-  // ── All sources failed: return best error ────────────────────────────────
-  const hasCustomBase = process.env.ICP_API_BASE && process.env.ICP_API_BASE !== "http://api.ong:16181";
   const finalError = miitTransient
-    ? miitErr + (hasCustomBase ? "" : "。如有自建代理，请设置 ICP_API_BASE 环境变量")
+    ? `ICP 查询服务（${UPSTREAM_BASE}）不可用，回退 MIIT 直连也失败。${miitErr}`
     : miitErr;
 
   return {

@@ -142,7 +142,7 @@ function BatchItemCard({ item, isBlacklist, retrying, onRetry }: {
             {t("icp.batch_failed")}
           </Badge>
         )}
-        {item.source === "legacy" && (
+        {item.source === "miit" && (
           <Badge variant="outline" className="text-[9px] text-muted-foreground shrink-0">{t("icp.source_legacy")}</Badge>
         )}
         <span className="ml-auto text-[10px] text-muted-foreground">

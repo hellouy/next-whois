@@ -7,13 +7,14 @@ export type IcpHealthResponse = {
   online: boolean;
   latencyMs: number | null;
   checkedAt: string;
-  source?: "miit" | "legacy";
+  source?: "miit" | "icpq";
   error?: string;
 };
 
 const MIIT_AUTH_URL = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/auth";
 const CACHE_KEY = "icp:health:status";
-const CACHE_TTL = 300; // 5 minutes — MIIT health rarely flips
+const CACHE_TTL = 300; // 5 minutes — ICP 查询服务状态极少变化
+const ICP_BASE = (process.env.ICP_API_BASE ?? "https://icp.ng").replace(/\/$/, "");
 
 export default async function handler(
   req: NextApiRequest,
@@ -37,8 +38,45 @@ export default async function handler(
 
   const checkedAt = new Date().toISOString();
 
-  // ── Check MIIT direct access (primary source) ────────────────────────────
+  // ── Check ICP_Query service (primary source: icp.ng) ──────────────────────
   const t0 = Date.now();
+  let icpOnline = false;
+  let icpLatency: number | null = null;
+  let icpErr = "不可用";
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let icpRes: Response;
+    try {
+      icpRes = await fetch(
+        `${ICP_BASE}/query/web?search=miit.gov.cn&pageNum=1&pageSize=1`,
+        {
+          signal: controller.signal,
+          headers: { Accept: "application/json", "User-Agent": "NextWhois/3.0" },
+        },
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    icpLatency = Date.now() - t0;
+    const icpData = await icpRes.json().catch(() => null);
+    icpOnline = icpData?.success === true || icpData?.code === 200;
+    if (!icpOnline) icpErr = String(icpData?.msg || icpData?.message || `HTTP ${icpRes.status}`);
+
+    if (icpOnline) {
+      const payload: IcpHealthResponse = { online: true, latencyMs: icpLatency, checkedAt, source: "icpq" };
+      void cacheResult(payload);
+      return res.status(200).json(payload);
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    icpErr = msg.includes("abort") || msg.includes("timeout") ? "连接超时" : msg.slice(0, 60);
+  }
+
+  // ── Check MIIT direct access (fallback source) ────────────────────────────
+  const t1 = Date.now();
+  let miitLatency: number | null = null;
+  let miitErr = "不可用";
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
@@ -60,82 +98,41 @@ export default async function handler(
     } finally {
       clearTimeout(timer);
     }
-    const latencyMs = Date.now() - t0;
+    miitLatency = Date.now() - t1;
     const data = await authRes.json().catch(() => null);
     const miitOnline = data?.success === true || data?.code === 200;
 
     if (miitOnline) {
-      const payload: IcpHealthResponse = { online: true, latencyMs, checkedAt, source: "miit" };
+      const payload: IcpHealthResponse = { online: true, latencyMs: miitLatency, checkedAt, source: "miit" };
       void cacheResult(payload);
       return res.status(200).json(payload);
     }
 
-    // code 500 = MIIT server error (service down); fall through to legacy check
+    // code 500 = MIIT server error (service down); definite non-500 errors get
+    // reported straight away since the fallback is clearly broken too.
     if (data?.code !== 500 && data?.code !== undefined) {
       const payload: IcpHealthResponse = {
-        online: false, latencyMs, checkedAt, source: "miit",
-        error: `MIIT: ${String(data?.msg || data?.code || "异常")}`,
+        online: false, latencyMs: miitLatency, checkedAt, source: "miit",
+        error: `ICP_Query（${ICP_BASE}）: ${icpErr}；MIIT: ${String(data?.msg || data?.code || "异常")}`,
       };
       void cacheResult(payload);
       return res.status(200).json(payload);
     }
-
-    // code 500 means MIIT backend down → check legacy fallback
-    const miitLatency = latencyMs;
-
-    const icpBase = (process.env.ICP_API_BASE ?? "http://api.ong:16181").replace(/\/$/, "");
-    const t1 = Date.now();
-    const controller2 = new AbortController();
-    const timer2 = setTimeout(() => controller2.abort(), 8000);
-    let legacyOnline = false;
-    let legacyErr = "不可用";
-    try {
-      const legacyRes = await fetch(
-        `${icpBase}/query/web?search=miit.gov.cn&pageNum=1&pageSize=1`,
-        {
-          signal: controller2.signal,
-          headers: { Accept: "application/json", "User-Agent": "NextWhois/3.0" },
-        },
-      );
-      const legacyData = await legacyRes.json().catch(() => null);
-      legacyOnline = legacyData?.success === true || legacyData?.code === 200;
-      if (!legacyOnline) legacyErr = String(legacyData?.msg || legacyData?.message || `HTTP ${legacyRes.status}`);
-    } catch (e: unknown) {
-      legacyErr = e instanceof Error ? e.message.slice(0, 60) : "连接失败";
-    } finally {
-      clearTimeout(timer2);
-    }
-    const legacyLatency = Date.now() - t1;
-
-    if (legacyOnline) {
-      const payload: IcpHealthResponse = { online: true, latencyMs: legacyLatency, checkedAt, source: "legacy" };
-      void cacheResult(payload);
-      return res.status(200).json(payload);
-    }
-
-    const payload: IcpHealthResponse = {
-      online: false,
-      latencyMs: miitLatency,
-      checkedAt,
-      source: "miit",
-      error: `MIIT 服务异常（code 500），备用服务: ${legacyErr}`,
-    };
-    void cacheResult(payload);
-    return res.status(200).json(payload);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "unknown";
-    const latencyMs = Date.now() - t0;
-    const isTimeout = msg.includes("abort") || msg.includes("timeout");
-    const payload: IcpHealthResponse = {
-      online: false,
-      latencyMs: isTimeout ? null : latencyMs,
-      checkedAt,
-      source: "miit",
-      error: isTimeout ? "MIIT 连接超时" : msg.slice(0, 80),
-    };
-    // Don't cache error/timeout results — let next request retry
-    return res.status(200).json(payload);
+    miitErr = String(data?.msg || data?.code || "不可用");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    miitErr = msg.includes("abort") || msg.includes("timeout") ? "连接超时" : msg.slice(0, 60);
   }
+
+  const payload: IcpHealthResponse = {
+    online: false,
+    latencyMs: icpLatency ?? miitLatency,
+    checkedAt,
+    source: "miit",
+    error: `ICP 查询服务（${ICP_BASE}）不可用，MIIT 直连也不可用。ICP_Query: ${icpErr}；MIIT: ${miitErr}`,
+  };
+  void cacheResult(payload);
+  return res.status(200).json(payload);
 }
 
 async function cacheResult(payload: IcpHealthResponse) {
