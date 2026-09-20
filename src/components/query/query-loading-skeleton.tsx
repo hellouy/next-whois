@@ -51,8 +51,10 @@ export function QueryLoadingSkeleton({ domain, overlay }: QueryLoadingSkeletonPr
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
       transition={{ duration: 0.18 }}
-      className={`absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 pointer-events-none ${
-        overlay ? "bg-background/70 backdrop-blur-[2px]" : ""
+      className={`flex flex-col items-center justify-center gap-5 pointer-events-none ${
+        overlay
+          ? "fixed inset-0 z-50 bg-background/70 backdrop-blur-[2px]"
+          : "absolute inset-0 z-10"
       }`}
     >
       {/* Radar motif: expanding ping, two static rings, rotating sweep, core dot */}
