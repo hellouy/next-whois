@@ -152,8 +152,7 @@ export function RegistrarCard({
             <div className="flex items-start justify-between gap-3">
               <span className="text-[10px] uppercase font-medium text-muted-foreground/70 tracking-wide shrink-0 pt-0.5">{t("whois_fields.whois_server")}</span>
               <span className="text-xs font-mono text-foreground/80 break-all text-right">
-                {result.whoisServer}
-                {attribution && <span className="text-[10px] text-muted-foreground/70 ml-2">{attribution}</span>}
+                {attribution || result.whoisServer}
               </span>
             </div>
           )}
