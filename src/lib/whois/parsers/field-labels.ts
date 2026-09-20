@@ -232,6 +232,8 @@ export const LABEL_ALIASES: Readonly<Record<string, string>> = {
   "registrar-name": "registrar",
   "registration date": "creation date",
   "registration expiry date": "expiration date",
+  "registration service provider": "registrar",
+  "registration service url": "registrar url",
   "registration status": "status",
   "registration time": "creation date",
   "registreringsdato": "creation date",
