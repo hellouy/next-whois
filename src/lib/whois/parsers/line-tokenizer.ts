@@ -27,15 +27,48 @@ export function isCommentLine(line: string): boolean {
 }
 
 /**
- * Split a line into its key and value at the first colon.
+ * True when the colon at index i is a clock/offset separator inside a time
+ * value ("07:57:05", "+08:00", the "10:20:30" in an ISO "…T10:20:30Z" stamp)
+ * rather than the key/value boundary.
  *
- * Returns null for blank lines, lines without a colon, and lines where the
- * key or value is empty after trimming — callers treat those as free text.
+ * The digit run before the colon must stand alone — start of line, preceded by
+ * a non-alphanumeric char, or (for a 2-digit hour) by the ISO "T" separator —
+ * so a label such as "Address1: 123" is not mistaken for a time.
+ */
+function isTimeColon(s: string, i: number): boolean {
+  if (!/\d/.test(s[i - 1] ?? "") || !/\d/.test(s[i + 1] ?? "")) return false;
+  let j = i - 1;
+  while (j >= 0 && /\d/.test(s[j])) j--;
+  const before = j >= 0 ? s[j] : "";
+  if (before === "" || !/[0-9A-Za-z]/.test(before)) return true;
+  const digitRun = i - 1 - j;
+  return (before === "T" || before === "t") && digitRun === 2;
+}
+
+/**
+ * Split a line into its key and value at the first colon that is not part of
+ * a time value.
+ *
+ * Some registries (e.g. TWNIC) write dates as free text without a key:
+ *   "Record created on 2022-07-30 07:57:05 (UTC+8)"
+ * Splitting at the clock colon would yield key "…on 2022-07-30 07" and value
+ * "57:05 (UTC+8)", which date parsers misread as year 2057. Skipping time
+ * colons leaves such lines as free text so the date-keyword fallback handles
+ * them correctly.
+ *
+ * Returns null for blank lines, lines without a usable colon, and lines where
+ * the key or value is empty after trimming — callers treat those as free text.
  */
 export function splitWhoisLine(line: string): WhoIsPair | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
-  const idx = trimmed.indexOf(":");
+  let idx = -1;
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] !== ":") continue;
+    if (isTimeColon(trimmed, i)) continue;
+    idx = i;
+    break;
+  }
   if (idx <= 0) return null;
   const key = trimmed.slice(0, idx).trim();
   const value = trimmed.slice(idx + 1).trim();

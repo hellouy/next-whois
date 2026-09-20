@@ -55,6 +55,32 @@ describe("splitWhoisLine", () => {
     expect(splitWhoisLine("Key:")).toBeNull();
     expect(splitWhoisLine("Key:   ")).toBeNull();
   });
+
+  it("ignores clock colons so free-text date lines stay unsplit", () => {
+    // TWNIC writes "Record created on 2022-07-30 07:57:05 (UTC+8)" without a
+    // key; splitting at the clock colon produced the bogus value "57:05".
+    expect(
+      splitWhoisLine("Record created on 2022-07-30 07:57:05 (UTC+8)"),
+    ).toBeNull();
+    expect(
+      splitWhoisLine("Record expires on 2027-07-30 07:57:05 (UTC+8)"),
+    ).toBeNull();
+  });
+
+  it("ignores timezone-offset colons", () => {
+    expect(splitWhoisLine("Updated 2024-01-01T10:20:30+08:00")).toBeNull();
+  });
+
+  it("still splits a labelled date whose value starts with digits", () => {
+    expect(splitWhoisLine("Address1: 123 Main St")).toEqual({
+      key: "Address1",
+      value: "123 Main St",
+    });
+    expect(splitWhoisLine("Created: 2022-07-30 07:57:05")).toEqual({
+      key: "Created",
+      value: "2022-07-30 07:57:05",
+    });
+  });
 });
 
 describe("stripNetworkPrefix", () => {
