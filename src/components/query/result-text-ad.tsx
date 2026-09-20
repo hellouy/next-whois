@@ -22,13 +22,19 @@ export function parseAdItems(raw: string): AdRichItem[] {
   return trimmed.split("|").map(s => s.trim()).filter(Boolean).map(t => ({ text: t }));
 }
 
-export function ResultTextAd({ loading = false, inline = false, variant = "bar" }: { loading?: boolean; inline?: boolean; variant?: "bar" | "card" }) {
+export function ResultTextAd({
+  loading = false,
+  inline = false,
+  variant = "bar",
+  prefix = "result_ad",
+}: { loading?: boolean; inline?: boolean; variant?: "bar" | "card"; prefix?: "result_ad" | "result_slot1" }) {
   const settings = useSiteSettings();
+  const cfg = settings as unknown as Record<string, string>;
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [fading, setFading] = React.useState(false);
 
-  const mode    = settings.result_ad_mode || "text";
-  const rawText = settings.result_ad_text || "";
+  const mode    = cfg[`${prefix}_mode`] || "text";
+  const rawText = cfg[`${prefix}_text`] || "";
   const items   = React.useMemo(() => parseAdItems(rawText), [rawText]);
 
   React.useEffect(() => {
@@ -44,15 +50,15 @@ export function ResultTextAd({ loading = false, inline = false, variant = "bar" 
     return () => clearInterval(timer);
   }, [mode, items.length, rawText]);
 
-  if (settings.result_ad_enabled !== "1") return null;
+  if (cfg[`${prefix}_enabled`] !== "1") return null;
   if (loading) return null;
 
-  const url = settings.result_ad_url;
+  const url = cfg[`${prefix}_url`];
 
   // ── IMAGE mode ─────────────────────────────────────────────────────────────
   if (mode === "image") {
-    const imgUrl = settings.result_ad_image_url;
-    const imgAlt = settings.result_ad_image_alt || "广告";
+    const imgUrl = cfg[`${prefix}_image_url`];
+    const imgAlt = cfg[`${prefix}_image_alt`] || "广告";
     if (!imgUrl) return null;
 
     const imgEl = (
@@ -80,7 +86,7 @@ export function ResultTextAd({ loading = false, inline = false, variant = "bar" 
 
   // ── HTML mode ──────────────────────────────────────────────────────────────
   if (mode === "html") {
-    const html = settings.result_ad_html;
+    const html = cfg[`${prefix}_html`];
     if (!html) return null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sanitized = typeof window !== "undefined"
@@ -102,7 +108,7 @@ export function ResultTextAd({ loading = false, inline = false, variant = "bar" 
 
   // ── TEXT mode (default) ────────────────────────────────────────────────────
   if (items.length === 0) return null;
-  const label   = settings.result_ad_label || "广告";
+  const label   = cfg[`${prefix}_label`] || "广告";
   const current = items[activeIdx] ?? items[0];
 
   const content = (

@@ -62,7 +62,16 @@ export interface SiteSettings {
   home_announcement_type: string;
   home_announcement_url: string;
   home_announcement_deadline: string; // ISO datetime, empty = no countdown
-  // Result page ad
+  // Result page ad slot 1 (domain meaning position)
+  result_slot1_enabled: string;
+  result_slot1_mode: string;      // "text" | "image" | "html"
+  result_slot1_text: string;
+  result_slot1_url: string;
+  result_slot1_label: string;
+  result_slot1_image_url: string;
+  result_slot1_image_alt: string;
+  result_slot1_html: string;
+  // Result page ad slot 2 (bottom bar)
   result_ad_enabled: string;
   result_ad_mode: string;      // "text" | "image" | "html"
   result_ad_text: string;
@@ -229,6 +238,14 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   home_announcement_type: "info",
   home_announcement_url: "",
   home_announcement_deadline: "",
+  result_slot1_enabled: "",
+  result_slot1_mode: "text",
+  result_slot1_text: "",
+  result_slot1_url: "",
+  result_slot1_label: "广告",
+  result_slot1_image_url: "",
+  result_slot1_image_alt: "",
+  result_slot1_html: "",
   result_ad_enabled: "",
   result_ad_mode: "text",
   result_ad_text: "",

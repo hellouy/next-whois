@@ -2029,7 +2029,7 @@ export default function LookupPage({
                         </motion.div>
                       )
                     ) : (
-                      <ResultTextAd variant="card" loading={loading} />
+                      <ResultTextAd variant="card" prefix="result_slot1" loading={loading} />
                     )}
 
                     {officialPopoverOpen && officialPopoverPos && typeof window !== "undefined" && ReactDOM.createPortal(
