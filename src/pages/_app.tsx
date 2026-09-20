@@ -27,12 +27,17 @@ import type GalaxyType from "@/components/Galaxy";
 // separate chunks and only loaded when an admin selects that background style.
 // This keeps the main bundle lean and speeds up client-side route transitions.
 const Galaxy = dynamic(() => import("@/components/Galaxy"), { ssr: false }) as typeof GalaxyType;
+// StarsBackground is plain CSS box-shadow + framer-motion and is safe to
+// server-render: SSR emits the markup into the first HTML round-trip so the
+// starfield appears immediately on paint instead of waiting for a lazy chunk
+// to download after hydration. (generateStars runs in useEffect on the client;
+// until then the container is transparent, which reads as the intended empty
+// night-sky layer.) Keep Galaxy ssr:false — it requires WebGL at mount time.
 const StarsBackground = dynamic(
   () =>
     import("@/components/animate-ui/components/backgrounds/stars").then(
       (m) => m.StarsBackground,
     ),
-  { ssr: false },
 );
 import { useTheme } from "next-themes";
 

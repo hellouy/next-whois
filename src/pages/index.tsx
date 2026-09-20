@@ -434,7 +434,7 @@ export const getStaticProps: GetStaticProps = async () => {
         "home_show_stats", "home_hero_title", "home_hero_subtitle", "home_hero_title_size",
         "home_hero_subtitle_size", "home_placeholder",
         "home_announcement_enabled", "home_announcement_text", "home_announcement_type",
-        "home_announcement_url",
+        "home_announcement_url", "site_background",
       ]),
       new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 3000)),
     ]);
@@ -505,6 +505,7 @@ export const getStaticProps: GetStaticProps = async () => {
     home_announcement_text:      s["home_announcement_text"]    || "",
     home_announcement_type:      s["home_announcement_type"]    || "info",
     home_announcement_url:       s["home_announcement_url"]     || "",
+    site_background:             s["site_background"]           || "",
   };
 
   return {
