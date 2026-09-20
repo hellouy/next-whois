@@ -68,7 +68,15 @@ const domainExtractors: Record<string, FieldExtractor> = {
     result.whoisServer = value;
   },
   "registrar url": (value, result) => {
-    if (result.registrarURL === "Unknown") result.registrarURL = value;
+    if (result.registrarURL === "Unknown") {
+      // WHOIS text frequently pollutes the URL with trailing punctuation,
+      // parenthetical annotations, or trailing prose — keep the bare URL.
+      const cleaned = value
+        .trim()
+        .split(/\s+/)[0]
+        ?.replace(/[.,;:)\]]+$/, "");
+      if (cleaned) result.registrarURL = cleaned;
+    }
   },
 };
 

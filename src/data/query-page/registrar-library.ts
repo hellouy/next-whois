@@ -265,6 +265,11 @@ const NORMALIZED_REGISTRAR_CACHE = REGISTRAR_LIBRARY.map((r) => ({
   keys: r.matchKeys.map((k) => k.toLowerCase().replace(/[\s.,\-_()]+/g, "")),
 }));
 
+const IANA_ID_CACHE = new Map<string, RegistrarInfo>();
+for (const r of REGISTRAR_LIBRARY) {
+  if (r.ianaId && r.ianaId !== "N/A") IANA_ID_CACHE.set(r.ianaId, r);
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[\s.,\-_()]+/g, "");
 }
@@ -273,12 +278,21 @@ function normalize(s: string): string {
  * Look up a registrar by name. Returns the matching RegistrarInfo or null.
  * Substring match against aliases; the cache is pre-normalized so callers
  * pass the raw registrar string.
+ *
+ * Keys of 3+ chars may match anywhere (curated list, low collision risk).
+ * Shorter aliases (e.g. Chinese "万网"/"新网") only match as the whole
+ * normalized name, so "新网" cannot falsely hit "新网数码".
  */
 export function findRegistrarInfo(registrar: string): RegistrarInfo | null {
   if (!registrar || registrar === "Unknown") return null;
   const normalized = normalize(registrar);
   for (const { info, keys } of NORMALIZED_REGISTRAR_CACHE) {
-    if (keys.some((k) => k.length > 3 && normalized.includes(k))) return info;
+    if (
+      keys.some(
+        (k) => (k.length >= 3 && normalized.includes(k)) || normalized === k,
+      )
+    )
+      return info;
     if (normalized.includes(normalize(info.name))) return info;
   }
   return null;
@@ -290,4 +304,14 @@ export function findRegistrarInfo(registrar: string): RegistrarInfo | null {
  */
 export function resolveRegistrarIanaId(registrar: string): string | null {
   return findRegistrarInfo(registrar)?.ianaId ?? null;
+}
+
+/**
+ * Look up a registrar by its canonical IANA Registrar ID — the most precise
+ * key available (RDAP exposes it via entity publicIds, WHOIS via the
+ * "Registrar IANA ID" field). Returns the matching RegistrarInfo or null.
+ */
+export function findRegistrarInfoByIanaId(ianaId: string): RegistrarInfo | null {
+  if (!ianaId) return null;
+  return IANA_ID_CACHE.get(ianaId.trim()) ?? null;
 }

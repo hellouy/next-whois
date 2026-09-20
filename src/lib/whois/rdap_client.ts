@@ -8,7 +8,7 @@ import { extractDomain } from "@/lib/utils";
 import { applyParams } from "./common_parser";
 import { domainToASCII } from "url";
 import { getGtldRdapServer } from "./rdap_gtld_bootstrap";
-import { resolveRegistrarIanaId, findRegistrarInfo } from "@/data/query-page/registrar-library";
+import { resolveRegistrarIanaId, findRegistrarInfo, findRegistrarInfoByIanaId, type RegistrarInfo } from "@/data/query-page/registrar-library";
 import { safeFetchWithRedirectGuard } from "@/lib/ssrf-guard";
 import { isRedactedValue, isEmailLike } from "./parsers/utils";
 
@@ -23,10 +23,54 @@ function isRdapInternalLink(l: { href?: string; type?: string; rel?: string }): 
   if (l.type && l.type !== "application/rdap+json") return false;
   if (l.rel === "self") return true;
   try {
-    const path = new URL(l.href).pathname;
-    return /(^|\/)(domain|entity|nameserver|ip|autnum|network)\//i.test(path);
+    const u = new URL(l.href);
+    // RDAP/WHOIS protocol service hosts (rdap.tucows.com, opensrs.rdap.tucows.com,
+    // whois.nic.xx, rdap.org) are lookup infrastructure — never the registrar's
+    // website, even when operated by the registrar itself.
+    const labels = u.hostname.toLowerCase().split(".");
+    if (labels.includes("rdap") || labels.includes("whois")) return true;
+    return /(^|\/)(domain|entity|nameserver|ip|autnum|network|whois)\//i.test(u.pathname);
   } catch {
     return true;
+  }
+}
+
+/** Registrable domain approximation: last two hostname labels (com / co.uk alike). */
+function registrableDomain(host: string): string {
+  const parts = host.toLowerCase().split(".");
+  return parts.length >= 2 ? parts.slice(-2).join(".") : host.toLowerCase();
+}
+
+/**
+ * True when the RDAP-provided registrar link plausibly belongs to the
+ * registrar itself: it shares the curated library website's registrable
+ * domain, contains a curated match key, or contains a token from the
+ * registrar's own name. An unrelated host (registry RDAP/WHOIS service,
+ * registry web Whois) is treated as untrusted so the curated library
+ * website wins.
+ */
+function registrarUrlMatchesIdentity(
+  url: string,
+  lib: RegistrarInfo | null,
+  registrar: string,
+): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (lib?.website) {
+      try {
+        if (registrableDomain(host) === registrableDomain(new URL(lib.website).hostname)) {
+          return true;
+        }
+      } catch { /* malformed library website — ignore */ }
+    }
+    if (lib?.matchKeys?.some((k) => k.length > 3 && host.includes(k))) return true;
+    const tokens = registrar
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 3);
+    return tokens.some((t) => host.includes(t));
+  } catch {
+    return false;
   }
 }
 
@@ -670,9 +714,19 @@ function parseRdapEntity(entities: RdapEntity[]): {
   // When RDAP exposed no usable website link (most ccTLD registries only serve
   // RDAP-internal links), fall back to the curated registrar library so the
   // registrar card still links to the actual registrar website.
-  if (registrarURL === "Unknown") {
-    const lib = findRegistrarInfo(registrar);
-    if (lib?.website) registrarURL = lib.website;
+  // Additionally, when RDAP DID provide a link, keep it only if it plausibly
+  // belongs to the registrar itself — "about" links frequently point at the
+  // registry's RDAP/WHOIS service host or web Whois instead (e.g. whois.org
+  // surfaced https://opensrs.rdap.tucows.com/ as Tucows' website).
+  {
+    const lib =
+      findRegistrarInfo(registrar) ??
+      (ianaId !== "N/A" && ianaId !== "" ? findRegistrarInfoByIanaId(ianaId) : null);
+    if (lib?.website) {
+      if (registrarURL === "Unknown" || !registrarUrlMatchesIdentity(registrarURL, lib, registrar)) {
+        registrarURL = lib.website;
+      }
+    }
   }
 
   return {
