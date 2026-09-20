@@ -99,6 +99,32 @@ export function includeArgs(from: string, ...args: string[]): boolean {
   return args.some((arg) => from.toLowerCase().includes(arg.toLowerCase()));
 }
 
+/**
+ * Placeholder values that carry no real information and must not be rendered.
+ * Only whole-value matches are filtered, so names like "Na Li" survive.
+ */
+const INVALID_FIELD_VALUES = new Set([
+  "unknown", "n/a", "na", "none", "null", "undefined", "-", "--",
+  "redacted for privacy", "not disclosed", "withheld for privacy",
+]);
+
+/**
+ * True when a parsed WHOIS/RDAP field value is worth displaying.
+ *
+ * Shared by the result table, registrar card and the section-visibility
+ * checks on the query page so a section is never shown with every row
+ * filtered out (e.g. a registrant whose only value is "Redacted for
+ * Privacy").
+ */
+export function isValidField(v: string | null | undefined): boolean {
+  if (!v || !v.trim()) return false;
+  const lower = v.trim().toLowerCase();
+  if (INVALID_FIELD_VALUES.has(lower)) return false;
+  // "n/a" variants with a trailing dot ("n/a.") are placeholders too.
+  if (/^n\/?a\.?$/i.test(lower)) return false;
+  return true;
+}
+
 export function toErrorMessage(e: any): string {
   return e.message || "Unknown error";
 }

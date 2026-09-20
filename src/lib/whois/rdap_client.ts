@@ -663,8 +663,8 @@ function parseRdapEntity(entities: RdapEntity[]): {
       const fax = extractVcardFax(vc);
       const email = extractVcardField(vc, "email");
 
-      if (fn && fn !== "Unknown") registrantName = fn;
-      if (org && org !== "Unknown") registrantOrganization = org;
+      if (fn && fn !== "Unknown" && !isRedactedValue(fn)) registrantName = fn;
+      if (org && org !== "Unknown" && !isRedactedValue(org)) registrantOrganization = org;
       if (country && country !== "Unknown") registrantCountry = country;
       if (province && province !== "Unknown") registrantProvince = province;
       if (city && city !== "Unknown") registrantCity = city;
@@ -687,8 +687,8 @@ function parseRdapEntity(entities: RdapEntity[]): {
       const phone = extractVcardField(vc, "tel");
       const email = extractVcardField(vc, "email");
 
-      if (fn && fn !== "Unknown" && adminName === "Unknown") adminName = fn;
-      if (org && org !== "Unknown" && adminOrganization === "Unknown") adminOrganization = org;
+      if (fn && fn !== "Unknown" && adminName === "Unknown" && !isRedactedValue(fn)) adminName = fn;
+      if (org && org !== "Unknown" && adminOrganization === "Unknown" && !isRedactedValue(org)) adminOrganization = org;
       if (country && country !== "Unknown" && adminCountry === "Unknown") adminCountry = country;
       if (phone && phone !== "Unknown" && adminPhone === "Unknown" && !isRedactedValue(phone))
         adminPhone = phone.replace(/^tel:/i, "").trim();
@@ -703,8 +703,8 @@ function parseRdapEntity(entities: RdapEntity[]): {
       const phone = extractVcardField(vc, "tel");
       const email = extractVcardField(vc, "email");
 
-      if (fn && fn !== "Unknown" && techName === "Unknown") techName = fn;
-      if (org && org !== "Unknown" && techOrganization === "Unknown") techOrganization = org;
+      if (fn && fn !== "Unknown" && techName === "Unknown" && !isRedactedValue(fn)) techName = fn;
+      if (org && org !== "Unknown" && techOrganization === "Unknown" && !isRedactedValue(org)) techOrganization = org;
       if (phone && phone !== "Unknown" && techPhone === "Unknown" && !isRedactedValue(phone))
         techPhone = phone.replace(/^tel:/i, "").trim();
       if (email && email !== "Unknown" && techEmail === "Unknown" && isEmailLike(email)) techEmail = email;

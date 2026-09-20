@@ -1,22 +1,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n";
 import { WhoisAnalyzeResult } from "@/lib/whois/types";
-
-// Exact-match invalid values — only filter when the entire trimmed value matches
-const INVALID_FIELD_VALUES = new Set([
-  "unknown", "n/a", "none", "null", "undefined", "-", "--", "redacted for privacy",
-  "not disclosed", "withheld for privacy",
-]);
-
-function isValidField(v: string | null | undefined): boolean {
-  if (!v || !v.trim()) return false;
-  const lower = v.trim().toLowerCase();
-  // Only filter if the whole value is an invalid placeholder (not substrings like "na" in a name)
-  if (INVALID_FIELD_VALUES.has(lower)) return false;
-  // Filter standalone "n/a" variants but not names like "Na Li"
-  if (/^n\/?a\.?$/i.test(lower)) return false;
-  return true;
-}
+import { isValidField } from "@/lib/utils";
 
 function CountryFlag({ code }: { code: string }) {
   if (!/^[A-Z]{2}$/i.test(code.trim())) return null;

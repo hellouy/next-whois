@@ -100,3 +100,44 @@ describe("convertRdapToWhoisResult — registrar URL extraction", () => {
     expect(r.registrarURL).toBe("https://www.godaddy.com");
   });
 });
+
+describe("convertRdapToWhoisResult — privacy placeholder filtering", () => {
+  it("does not leak REDACTED FOR PRIVACY placeholders into registrant/admin/tech names", async () => {
+    const r = await convertRdapToWhoisResult(mkRdap({
+      entities: [
+        {
+          roles: ["registrant"], handle: "reg-1",
+          vcardArray: ["vcard", [["version", {}, "text", "4.0"],
+            ["fn", {}, "text", "REDACTED FOR PRIVACY"],
+            ["org", {}, "text", "Not Disclosed"],
+            ["email", {}, "text", "whois@example.com"],
+          ]],
+        },
+        {
+          roles: ["administrative"], handle: "admin-1",
+          vcardArray: ["vcard", [["version", {}, "text", "4.0"],
+            ["fn", {}, "text", "REDACTED FOR PRIVACY"],
+            ["org", {}, "text", "Privacy Protection"],
+            ["email", {}, "text", "admin@example.com"],
+          ]],
+        },
+        {
+          roles: ["technical"], handle: "tech-1",
+          vcardArray: ["vcard", [["version", {}, "text", "4.0"],
+            ["fn", {}, "text", "DNS Admin"],
+            ["org", {}, "text", "REDACTED FOR PRIVACY"],
+            ["email", {}, "text", "tech@example.com"],
+          ]],
+        },
+      ],
+    }), "test.example");
+
+    expect(r.registrantName).toBe("Unknown");
+    expect(r.registrantOrganization).toBe("Unknown");
+    expect(r.adminName).toBe("Unknown");
+    expect(r.adminOrganization).toBe("Unknown");
+    expect(r.techName).toBe("DNS Admin");
+    expect(r.techOrganization).toBe("Unknown");
+    expect(r.registrantEmail).toBe("whois@example.com");
+  });
+});
