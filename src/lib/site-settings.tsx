@@ -80,6 +80,9 @@ export interface SiteSettings {
   result_ad_image_url: string;
   result_ad_image_alt: string;
   result_ad_html: string;
+  // Result page ads — JSON: { slot1: ResultAdItem[], slot2: ResultAdItem[] }
+  // Each slot holds a list of ads; each ad is edited in one full-field editor.
+  result_ads: string;
   // About page
   about_title: string;
   about_content: string;
@@ -254,6 +257,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   result_ad_image_url: "",
   result_ad_image_alt: "",
   result_ad_html: "",
+  result_ads: "",
   about_title: "",
   about_content: "",
   about_intro_en: "",
@@ -341,6 +345,47 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   site_background: "dot",
   whois_server_attribution: "来自：不讲·李提供",
 };
+
+// ── Result page ads (multi-ad management) ────────────────────────────────────
+export type ResultAdItem = {
+  id: string;
+  /** Management name shown in the admin editor (optional). */
+  name?: string;
+  /** "1" = enabled. */
+  enabled?: string;
+  /** Ad text, JSON array of rich items or |-separated plain strings. */
+  text?: string;
+  image_url?: string;
+  image_alt?: string;
+  /** Click-through / jump URL. */
+  url?: string;
+  /** Small label shown next to the text ad, e.g. 「广告」「推广」. */
+  label?: string;
+  /** Custom HTML; when set it takes precedence over image/text. */
+  html?: string;
+};
+
+export type ResultAdSlot = "slot1" | "slot2";
+export type ResultAdsMap = { slot1: ResultAdItem[]; slot2: ResultAdItem[] };
+
+/** Parse the `result_ads` JSON string. Never throws; returns empty slots on bad input. */
+export function parseResultAds(raw?: string): ResultAdsMap {
+  if (!raw) return { slot1: [], slot2: [] };
+  try {
+    const p = JSON.parse(raw) as Partial<ResultAdsMap>;
+    return {
+      slot1: Array.isArray(p.slot1) ? p.slot1 : [],
+      slot2: Array.isArray(p.slot2) ? p.slot2 : [],
+    };
+  } catch {
+    return { slot1: [], slot2: [] };
+  }
+}
+
+/** Serialize the ad map back to the `result_ads` JSON string. */
+export function serializeResultAds(map: ResultAdsMap): string {
+  return JSON.stringify(map);
+}
 
 const STORAGE_KEY = "next_whois_settings_ts";
 const SESSION_CACHE_KEY = "next_whois_settings_cache";

@@ -2029,7 +2029,7 @@ export default function LookupPage({
                         </motion.div>
                       )
                     ) : (
-                      <ResultTextAd variant="card" prefix="result_slot1" loading={loading} />
+                      <ResultTextAd variant="card" slot="slot1" loading={loading} />
                     )}
 
                     {officialPopoverOpen && officialPopoverPos && typeof window !== "undefined" && ReactDOM.createPortal(
@@ -2246,7 +2246,7 @@ export default function LookupPage({
                   </div>
 
                   {/* Mobile-only inline ad — above status / nameservers cards */}
-                  <ResultTextAd loading={loading} inline />
+                  <ResultTextAd loading={loading} inline slot="slot2" />
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {result.status.length > 0 && (
@@ -2522,7 +2522,7 @@ export default function LookupPage({
                       regStatusType={result ? getDomainRegistrationStatus(result, locale).type : undefined}
                     />
                     )}
-          <ResultTextAd loading={loading} />
+          <ResultTextAd loading={loading} slot="slot2" />
 
             </motion.div>
           </div>

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { DEFAULT_SETTINGS, type SiteSettings, notifySettingsUpdated } from "@/lib/site-settings";
+import { DEFAULT_SETTINGS, type SiteSettings, notifySettingsUpdated, parseResultAds, serializeResultAds, type ResultAdItem, type ResultAdSlot } from "@/lib/site-settings";
 import Link from "next/link";
 import {
   RiLoader4Line, RiCheckLine, RiToggleLine, RiToggleFill,
@@ -21,7 +21,7 @@ import {
   RiShareLine, RiServerLine, RiMapPin2Line, RiFileList3Line,
   RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
   RiArrowRightLine, RiTimerLine, RiWifiLine, RiCalendarLine,
-  RiPaintLine, RiPaintFill,
+  RiPaintLine, RiPaintFill, RiArrowDownSLine, RiArrowRightSLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -324,110 +324,174 @@ function SelectField({ label, desc, value, onChange, options }: {
   );
 }
 
-function AdPanel({
-  s, set, prefix, icon: Icon, title, desc,
+function AdEditor({
+  ad, index, onUpdate, onRemove,
+}: {
+  ad: ResultAdItem;
+  index: number;
+  onUpdate: (patch: Partial<ResultAdItem>) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = React.useState(index === 0);
+  const enabled = ad.enabled === "1";
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-muted/20 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          {open
+            ? <RiArrowDownSLine className="w-4 h-4 text-muted-foreground shrink-0" />
+            : <RiArrowRightSLine className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <span className="w-5 h-5 rounded-md border border-border/60 bg-background flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 tabular-nums">
+            {index + 1}
+          </span>
+          <span className="text-xs font-semibold truncate">
+            {ad.name?.trim() ? ad.name.trim() : `广告 ${index + 1}`}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onUpdate({ enabled: enabled ? "" : "1" })}
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors shrink-0 ${enabled ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "text-muted-foreground border-border"}`}
+        >
+          {enabled ? <RiCheckLine className="w-3 h-3" /> : <RiToggleLine className="w-3 h-3" />}
+          {enabled ? "启用中" : "已停用"}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          title="删除此广告"
+          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive shrink-0"
+        >
+          <RiDeleteBinLine className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-3 border-t border-border/60 pt-3">
+          <Field label="广告名称" desc="仅后台管理用，帮助区分多条广告（可选）">
+            <Input value={ad.name || ""} onChange={e => onUpdate({ name: e.target.value })} placeholder={`广告 ${index + 1}`} className="text-xs" />
+          </Field>
+          <Field label="推广文字" desc="支持多条，自动循环轮播；可设置颜色、大小、加粗">
+            <MultiItemInput
+              value={ad.text || ""}
+              onChange={v => onUpdate({ text: v })}
+              placeholder="推广/广告文字，多条用 | 分隔…"
+            />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="图片 URL" desc="广告图片地址（横版横幅建议宽度 600–1200px；含义位可放更高的海报图）">
+              <Input value={ad.image_url || ""} onChange={e => onUpdate({ image_url: e.target.value })} placeholder="https://example.com/banner.png" className="text-xs" />
+            </Field>
+            <Field label="图片 Alt 文字" desc="图片无法加载时显示的替代文字（同时用于 SEO）">
+              <Input value={ad.image_alt || ""} onChange={e => onUpdate({ image_alt: e.target.value })} placeholder="广告" className="text-xs" />
+            </Field>
+          </div>
+          {ad.image_url?.trim() && (
+            <div className="rounded-xl border border-border/60 overflow-hidden bg-muted/30 p-2">
+              <p className="text-[10px] text-muted-foreground mb-2">图片预览：</p>
+              <img
+                src={ad.image_url}
+                alt={ad.image_alt || "广告预览"}
+                className="max-w-full max-h-28 object-contain rounded-lg mx-auto block"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="点击跳转链接" desc="点击广告时跳转的 URL（可选）">
+              <Input value={ad.url || ""} onChange={e => onUpdate({ url: e.target.value })} placeholder="https://..." className="text-xs" />
+            </Field>
+            <Field label="推广标签文字" desc="显示在文字左侧的小标签，如「广告」「推广」「合作」">
+              <Input value={ad.label || ""} onChange={e => onUpdate({ label: e.target.value })} placeholder="广告" className="text-xs" />
+            </Field>
+          </div>
+          <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/8 border border-amber-500/20">
+            <RiAlertLine className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+              自定义 HTML 会直接渲染且优先于图片/文字，请确保内容来源可信。支持嵌入第三方广告脚本（如 Google AdSense 等）。
+            </p>
+          </div>
+          <TextareaField
+            label="自定义 HTML 代码（可选）"
+            desc="填入后本广告直接渲染 HTML，不再显示图片与文字"
+            value={ad.html || ""}
+            onChange={v => onUpdate({ html: v })}
+            rows={4}
+            placeholder={'<!-- 示例：Google AdSense -->\n<ins class="adsbygoogle"\n  style="display:block"\n  data-ad-client="ca-pub-XXXXXXXX"\n  data-ad-slot="XXXXXXXX"\n  data-ad-format="auto"></ins>'}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdSlotManager({
+  s, set, slot, icon: Icon, title, desc,
 }: {
   s: SiteSettings;
   set: (k: keyof SiteSettings, v: string) => void;
-  prefix: "result_ad" | "result_slot1";
+  slot: ResultAdSlot;
   icon: React.ElementType;
   title: string;
   desc: string;
 }) {
-  const cfg = s as unknown as Record<string, string>;
-  const setK = (k: string, v: string) => set(k as keyof SiteSettings, v);
-  const enabled = cfg[`${prefix}_enabled`] === "1";
-  const mode = cfg[`${prefix}_mode`] || "text";
+  const map = parseResultAds(s.result_ads);
+  const ads = map[slot];
+  const persist = (next: ResultAdItem[]) => {
+    const m = parseResultAds(s.result_ads);
+    m[slot] = next;
+    set("result_ads", serializeResultAds(m));
+  };
+  const update = (id: string, patch: Partial<ResultAdItem>) =>
+    persist(ads.map(a => a.id === id ? { ...a, ...patch } : a));
+  const remove = (id: string) => {
+    if (typeof window !== "undefined" && window.confirm("确定删除这条广告？")) {
+      persist(ads.filter(a => a.id !== id));
+    }
+  };
+  const add = () => {
+    persist([...ads, {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Date.now()) + Math.random().toString(36).slice(2, 7),
+      enabled: "1", name: "", text: "", image_url: "", image_alt: "", url: "", label: "广告", html: "",
+    }]);
+  };
 
   return (
     <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
       <SectionTitle icon={Icon} title={title} effect="结果页" desc={desc} />
-      <Toggle
-        label="启用此广告位"
-        checked={enabled}
-        onChange={v => setK(`${prefix}_enabled`, v ? "1" : "")}
-      />
-
-      {enabled && (
-        <>
-          <SelectField
-            label="推广内容模式"
-            value={mode}
-            onChange={v => setK(`${prefix}_mode`, v)}
-            options={[
-              { value: "text",  label: "纯文字 — 滚动文字条（支持多条轮播）" },
-              { value: "image", label: "图片横幅 — 显示一张广告图片" },
-              { value: "html",  label: "自定义 HTML — 嵌入任意 HTML 代码" },
-            ]}
-          />
-
-          {mode === "text" && (
-            <>
-              <Field label="推广文字" desc="支持多条，自动循环轮播；可设置颜色、大小、加粗">
-                <MultiItemInput
-                  value={cfg[`${prefix}_text`]}
-                  onChange={v => setK(`${prefix}_text`, v)}
-                  placeholder="推广/广告文字，多条用 | 分隔…"
-                />
-              </Field>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="点击跳转链接" desc="点击广告时跳转的 URL（可选）">
-                  <Input value={cfg[`${prefix}_url`]} onChange={e => setK(`${prefix}_url`, e.target.value)} placeholder="https://..." className="text-xs" />
-                </Field>
-                <Field label="推广标签文字" desc="显示在左侧的小标签，如「广告」「推广」「合作」">
-                  <Input value={cfg[`${prefix}_label`]} onChange={e => setK(`${prefix}_label`, e.target.value)} placeholder="广告" className="text-xs" />
-                </Field>
-              </div>
-            </>
-          )}
-
-          {mode === "image" && (
-            <>
-              <Field label="图片 URL" desc="广告图片地址（横版横幅建议宽度 600–1200px；含义位可放更高的海报图）">
-                <Input value={cfg[`${prefix}_image_url`]} onChange={e => setK(`${prefix}_image_url`, e.target.value)} placeholder="https://example.com/banner.png" className="text-xs" />
-              </Field>
-              {cfg[`${prefix}_image_url`] && (
-                <div className="rounded-xl border border-border/60 overflow-hidden bg-muted/30 p-2">
-                  <p className="text-[10px] text-muted-foreground mb-2">预览：</p>
-                  <img
-                    src={cfg[`${prefix}_image_url`]}
-                    alt={cfg[`${prefix}_image_alt`] || "广告预览"}
-                    className="max-w-full max-h-28 object-contain rounded-lg mx-auto block"
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="图片 Alt 文字" desc="图片无法加载时显示的替代文字（同时用于 SEO）">
-                  <Input value={cfg[`${prefix}_image_alt`]} onChange={e => setK(`${prefix}_image_alt`, e.target.value)} placeholder="广告" className="text-xs" />
-                </Field>
-                <Field label="点击跳转链接" desc="点击图片时跳转的 URL（可选）">
-                  <Input value={cfg[`${prefix}_url`]} onChange={e => setK(`${prefix}_url`, e.target.value)} placeholder="https://..." className="text-xs" />
-                </Field>
-              </div>
-            </>
-          )}
-
-          {mode === "html" && (
-            <>
-              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                <RiAlertLine className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                  HTML 模式会直接渲染代码，请确保内容来源可信。支持嵌入第三方广告脚本（如 Google AdSense、Carbon Ads 等）。
-                </p>
-              </div>
-              <TextareaField
-                label="自定义 HTML 代码"
-                desc="直接渲染到结果页广告位，支持 <script>、<img>、<a> 等所有 HTML 标签"
-                value={cfg[`${prefix}_html`]}
-                onChange={v => setK(`${prefix}_html`, v)}
-                rows={6}
-                placeholder={'<!-- 示例：Google AdSense -->\n<ins class="adsbygoogle"\n  style="display:block"\n  data-ad-client="ca-pub-XXXXXXXX"\n  data-ad-slot="XXXXXXXX"\n  data-ad-format="auto"></ins>'}
-              />
-            </>
-          )}
-        </>
+      {ads.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground/70 bg-muted/30 border border-dashed border-border rounded-xl px-3 py-4 text-center">
+          此广告位暂无广告，点击下方按钮添加第一条
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {ads.map((ad, i) => (
+            <AdEditor
+              key={ad.id}
+              ad={ad}
+              index={i}
+              onUpdate={patch => update(ad.id, patch)}
+              onRemove={() => remove(ad.id)}
+            />
+          ))}
+        </div>
       )}
+      <button
+        type="button"
+        onClick={add}
+        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-muted/40 transition-all"
+      >
+        <RiAddLine className="w-3.5 h-3.5" />
+        添加广告
+      </button>
     </div>
   );
 }
@@ -650,7 +714,7 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           icon={RiBook2Line}
           title="域名含义"
           effect="结果页"
-          desc="在 WHOIS 查询结果页顶部显示域名含义（基于 tian.hu 翻译数据）。关闭后，原含义位置将显示下方「结果页推广条」的广告内容"
+          desc="在 WHOIS 查询结果页顶部显示域名含义（基于 tian.hu 翻译数据）。关闭后，原含义位置将显示下方「广告位 1 · 含义位置」的广告内容"
         />
         <Toggle
           label="启用域名含义"
@@ -659,29 +723,29 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
         />
         {s.meaning_enabled !== "1" && (
           <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
-            含义已关闭：查询结果页原「含义」位置会展示下方「结果页推广条」内容（需同时启用结果页推广条才会显示广告）。
+            含义已关闭：查询结果页原「含义」位置会展示「广告位 1 · 含义位置」的广告（需该广告位存在启用状态的广告才会显示）。
           </p>
         )}
       </div>
 
       {/* ── 广告位 1 · 含义位置 ─────────────────────────────────── */}
-      <AdPanel
+      <AdSlotManager
         s={s}
         set={set}
-        prefix="result_slot1"
+        slot="slot1"
         icon={RiImageLine}
         title="广告位 1 · 含义位置"
-        desc="显示在查询结果面板顶部。当「域名含义」关闭时，此广告位展示在原来的含义位置"
+        desc="显示在查询结果面板顶部。当「域名含义」关闭时，此广告位展示在原来的含义位置。可添加多条广告"
       />
 
       {/* ── 广告位 2 · 结果页底部 ────────────────────────────────── */}
-      <AdPanel
+      <AdSlotManager
         s={s}
         set={set}
-        prefix="result_ad"
+        slot="slot2"
         icon={RiLinksLine}
         title="广告位 2 · 结果页底部"
-        desc="显示在 WHOIS 查询结果页底部，支持纯文字、图片横幅、自定义 HTML 三种模式"
+        desc="显示在 WHOIS 查询结果页底部。每条广告支持文字、图片、跳转链接、自定义 HTML 组合，可添加多条"
       />
 
       {/* ── SEO ──────────────────────────────────────────────── */}
