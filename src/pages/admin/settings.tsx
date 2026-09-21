@@ -698,7 +698,7 @@ function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v
 
       {/* ── 注册与登录 ── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-        <SectionTitle icon={RiUserLine} title="注册与登录" desc="控制用户注册方式和访问入口" />
+        <SectionTitle icon={RiUserLine} title="注册与登录" effect="登录与验证" desc="控制用户注册方式和访问入口" />
         <Toggle label="开放注册" desc="允许新用户通过邮箱注册账号" checked={s.allow_registration === "1"} onChange={v => set("allow_registration", v ? "1" : "")} />
         <Toggle label="需要邀请码注册" desc="开启后注册时需要填写有效的邀请码" checked={s.require_invite_code === "1"} onChange={v => set("require_invite_code", v ? "1" : "")} />
         <Toggle label="登录后才能查询" desc="未登录用户无法进行任何查询" checked={s.require_login === "1"} onChange={v => set("require_login", v ? "1" : "")} />
@@ -707,7 +707,7 @@ function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v
 
       {/* ── 站点状态 ── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-        <SectionTitle icon={RiLockLine} title="站点状态" desc="紧急管控与维护模式" />
+        <SectionTitle icon={RiLockLine} title="站点状态" effect="全站" desc="紧急管控与维护模式" />
         <Toggle label="维护模式" desc="开启后所有访问者将看到维护提示页面" checked={s.maintenance_mode === "1"} onChange={v => set("maintenance_mode", v ? "1" : "")} />
         <Field label="维护提示文字" desc="维护模式下显示给访问者的说明文字">
           <Input value={s.maintenance_message} onChange={e => set("maintenance_message", e.target.value)} placeholder="站点维护中，请稍后再来..." className="text-xs" />
@@ -734,7 +734,7 @@ function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v
       </div>
 
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiShieldCheckLine} title="人机验证 (CAPTCHA)" desc='防止机器人和恶意请求；选择"不启用"关闭所有验证' />
+        <SectionTitle icon={RiShieldCheckLine} title="人机验证 (CAPTCHA)" effect="登录与验证" desc='防止机器人和恶意请求；选择"不启用"关闭所有验证' />
         <SelectField
           label="验证码提供商"
           value={captchaProvider}
@@ -758,7 +758,7 @@ function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v
 
       {captchaProvider === "turnstile" && (
         <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="Cloudflare Turnstile 密钥" desc="在 Cloudflare Dashboard → Turnstile 获取" />
+          <SectionTitle icon={RiShieldCheckLine} title="Cloudflare Turnstile 密钥" effect="登录与验证" desc="在 Cloudflare Dashboard → Turnstile 获取" />
           <Field label="Site Key（公开密钥）">
             <Input value={s.captcha_turnstile_site_key} onChange={e => set("captcha_turnstile_site_key", e.target.value)} placeholder="0x..." className="text-xs" />
           </Field>
@@ -767,14 +767,14 @@ function AccessTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v
       )}
       {captchaProvider === "hcaptcha" && (
         <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="hCaptcha 密钥" desc="在 hcaptcha.com 后台获取" />
+          <SectionTitle icon={RiShieldCheckLine} title="hCaptcha 密钥" effect="登录与验证" desc="在 hcaptcha.com 后台获取" />
           <Field label="Site Key"><Input value={s.captcha_hcaptcha_site_key} onChange={e => set("captcha_hcaptcha_site_key", e.target.value)} placeholder="your-site-key" className="text-xs" /></Field>
           <PasswordField label="Secret Key" value={s.captcha_hcaptcha_secret_key} onChange={v => set("captcha_hcaptcha_secret_key", v)} />
         </div>
       )}
       {captchaProvider === "mtcaptcha" && (
         <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-          <SectionTitle icon={RiShieldCheckLine} title="MTCaptcha 密钥" desc="在 mtcaptcha.com 后台获取" />
+          <SectionTitle icon={RiShieldCheckLine} title="MTCaptcha 密钥" effect="登录与验证" desc="在 mtcaptcha.com 后台获取" />
           <Field label="Site Key"><Input value={s.captcha_mtcaptcha_site_key} onChange={e => set("captcha_mtcaptcha_site_key", e.target.value)} placeholder="MTPublic-..." className="text-xs" /></Field>
           <PasswordField label="Secret Key" value={s.captcha_mtcaptcha_secret_key} onChange={v => set("captcha_mtcaptcha_secret_key", v)} />
         </div>
@@ -867,13 +867,13 @@ function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
   return (
     <div className="space-y-6">
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-        <SectionTitle icon={RiSearchLine} title="查询结果页功能" desc="在 WHOIS 查询结果页中显示的附加功能标签页和操作" />
+        <SectionTitle icon={RiSearchLine} title="查询结果页功能" effect="结果页" desc="在 WHOIS 查询结果页中显示的附加功能标签页和操作" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {RESULT_FEATURES.map(f => <FeatureCard key={f.key as string} f={f} />)}
         </div>
       </div>
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-3">
-        <SectionTitle icon={RiLinksLine} title="导航与独立页面" desc="在导航栏显示的功能入口页面" />
+        <SectionTitle icon={RiLinksLine} title="导航与独立页面" effect="全站" desc="在导航栏显示的功能入口页面" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {NAV_FEATURES.map(f => <FeatureCard key={f.key as string} f={f} />)}
         </div>
@@ -886,7 +886,7 @@ function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings
   return (
     <div className="space-y-6">
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBarChartLine} title="统计分析" desc="集成第三方统计服务" />
+        <SectionTitle icon={RiBarChartLine} title="统计分析" effect="全站" desc="集成第三方统计服务" />
         <Field label="Google Analytics ID" desc="格式：G-XXXXXXXXXX">
           <Input value={s.analytics_google} onChange={e => set("analytics_google", e.target.value)} placeholder="G-XXXXXXXXXX" className="text-xs" />
         </Field>
@@ -898,7 +898,7 @@ function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings
         </Field>
       </div>
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiCodeBoxLine} title="自定义 Head 脚本" desc="会被注入到每个页面 <head> 中的自定义代码（请谨慎填写）" />
+        <SectionTitle icon={RiCodeBoxLine} title="自定义 Head 脚本" effect="全站" desc="会被注入到每个页面 <head> 中的自定义代码（请谨慎填写）" />
         <TextareaField
           label="自定义脚本"
           desc='支持 <script>、<link>、<meta> 等任何 HTML 标签'
