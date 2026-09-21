@@ -22,10 +22,12 @@ import {
   RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
   RiArrowRightLine, RiTimerLine, RiWifiLine, RiCalendarLine,
   RiPaintLine, RiPaintFill, RiArrowDownSLine, RiArrowRightSLine,
+  RiMegaphoneLine, RiArrowUpDownLine, RiAdvertisementLine, RiArrowUpSLine,
 } from "@remixicon/react";
 
 type TabKey =
   | "branding"
+  | "ads"
   | "access"
   | "features"
   | "analytics"
@@ -34,6 +36,7 @@ type TabKey =
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "branding",  label: "外观与首页", icon: RiPaletteLine },
+  { key: "ads",       label: "广告管理",   icon: RiMegaphoneLine },
   { key: "access",    label: "安全防护",   icon: RiShieldCheckLine },
   { key: "features",  label: "功能开关",   icon: RiSettings4Line },
   { key: "analytics", label: "统计分析",   icon: RiBarChartLine },
@@ -325,12 +328,15 @@ function SelectField({ label, desc, value, onChange, options }: {
 }
 
 function AdEditor({
-  ad, index, onUpdate, onRemove,
+  ad, index, length, onUpdate, onRemove, onMoveUp, onMoveDown,
 }: {
   ad: ResultAdItem;
   index: number;
+  length: number;
   onUpdate: (patch: Partial<ResultAdItem>) => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const [open, setOpen] = React.useState(index === 0);
   const enabled = ad.enabled === "1";
@@ -338,7 +344,7 @@ function AdEditor({
   return (
     <div className="rounded-xl border border-border/70 bg-muted/20 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5">
+      <div className="flex items-center gap-1 px-3 py-2.5">
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
@@ -362,6 +368,26 @@ function AdEditor({
           {enabled ? <RiCheckLine className="w-3 h-3" /> : <RiToggleLine className="w-3 h-3" />}
           {enabled ? "启用中" : "已停用"}
         </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={index === 0}
+            title="上移"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
+          >
+            <RiArrowUpSLine className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={index === length - 1}
+            title="下移"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
+          >
+            <RiArrowDownSLine className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <button
           type="button"
           onClick={onRemove}
@@ -455,6 +481,13 @@ function AdSlotManager({
       persist(ads.filter(a => a.id !== id));
     }
   };
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= ads.length) return;
+    const next = [...ads];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    persist(next);
+  };
   const add = () => {
     persist([...ads, {
       id: typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -463,10 +496,26 @@ function AdSlotManager({
       enabled: "1", name: "", text: "", image_url: "", image_alt: "", url: "", label: "广告", html: "",
     }]);
   };
+  const enabledCount = ads.filter(a => a.enabled === "1").length;
 
   return (
     <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
       <SectionTitle icon={Icon} title={title} effect="结果页" desc={desc} />
+      {ads.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted/50 border border-border text-[10px] font-semibold text-muted-foreground">
+            <RiAdvertisementLine className="w-3 h-3" />
+            共 {ads.length} 条
+          </span>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-semibold ${enabledCount > 0 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "text-muted-foreground border-border"}`}>
+            <RiCheckLine className="w-3 h-3" />
+            启用 {enabledCount} 条
+          </span>
+          {enabledCount === 0 && (
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">暂无可展示广告，页面不会显示此广告位</span>
+          )}
+        </div>
+      )}
       {ads.length === 0 ? (
         <p className="text-[11px] text-muted-foreground/70 bg-muted/30 border border-dashed border-border rounded-xl px-3 py-4 text-center">
           此广告位暂无广告，点击下方按钮添加第一条
@@ -478,8 +527,11 @@ function AdSlotManager({
               key={ad.id}
               ad={ad}
               index={i}
+              length={ads.length}
               onUpdate={patch => update(ad.id, patch)}
               onRemove={() => remove(ad.id)}
+              onMoveUp={() => move(i, -1)}
+              onMoveDown={() => move(i, 1)}
             />
           ))}
         </div>
@@ -492,6 +544,92 @@ function AdSlotManager({
         <RiAddLine className="w-3.5 h-3.5" />
         添加广告
       </button>
+    </div>
+  );
+}
+
+function AdsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
+  return (
+    <div className="space-y-6">
+
+      {/* ── 广告位说明 ─────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiAdvertisementLine}
+          title="广告位说明"
+          effect="结果页"
+          desc="了解两个广告位的展示位置与时机，便于配置"
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <RiImageLine className="w-3.5 h-3.5 text-primary" />
+              <p className="text-xs font-semibold">广告位 1 · 含义位置</p>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              位于查询结果面板顶部。「域名含义」开启时此处显示含义说明，广告位 1 隐藏；关闭时广告位 1 的广告展示在原来的含义位置。
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <RiLinksLine className="w-3.5 h-3.5 text-primary" />
+              <p className="text-xs font-semibold">广告位 2 · 结果页底部</p>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              位于 WHOIS 查询结果页底部（桌面端居中横条；移动端在状态卡片上方内联）。始终展示。
+            </p>
+          </div>
+        </div>
+        <ul className="text-[11px] text-muted-foreground leading-relaxed list-disc list-inside space-y-0.5">
+          <li>每条广告可同时配置文字、图片、跳转链接与自定义 HTML；填入 HTML 后优先渲染 HTML，其次是图片（可搭配文字），再是纯文字。</li>
+          <li>同一广告位内的多条启用广告自上而下堆叠展示，可用每条的上下移按钮调整顺序。</li>
+          <li>文字支持多条自动循环轮播（用 | 分隔，或 JSON 富文本设置颜色/字号/加粗）。</li>
+        </ul>
+      </div>
+
+      {/* ── 域名含义 ─────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiBook2Line}
+          title="域名含义"
+          effect="结果页"
+          desc="在 WHOIS 查询结果页顶部显示域名含义（基于 tian.hu 翻译数据）。关闭后，原含义位置将显示「广告位 1 · 含义位置」的广告内容"
+        />
+        <Toggle
+          label="启用域名含义"
+          checked={s.meaning_enabled === "1"}
+          onChange={v => set("meaning_enabled", v ? "1" : "")}
+        />
+        {s.meaning_enabled !== "1" ? (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+            含义已关闭：查询结果页原「含义」位置会展示「广告位 1 · 含义位置」的广告（需该广告位存在启用状态的广告才会显示）。
+          </p>
+        ) : (
+          <p className="text-[11px] text-sky-600 dark:text-sky-400 leading-relaxed">
+            含义已开启：查询结果页顶部显示域名含义，「广告位 1 · 含义位置」暂不展示。若需在此处投放广告，请关闭域名含义。
+          </p>
+        )}
+      </div>
+
+      {/* ── 广告位 1 · 含义位置 ─────────────────────────────────── */}
+      <AdSlotManager
+        s={s}
+        set={set}
+        slot="slot1"
+        icon={RiImageLine}
+        title="广告位 1 · 含义位置"
+        desc="显示在查询结果面板顶部。当「域名含义」关闭时，此广告位展示在原来的含义位置。可添加多条广告"
+      />
+
+      {/* ── 广告位 2 · 结果页底部 ────────────────────────────────── */}
+      <AdSlotManager
+        s={s}
+        set={set}
+        slot="slot2"
+        icon={RiLinksLine}
+        title="广告位 2 · 结果页底部"
+        desc="显示在 WHOIS 查询结果页底部。每条广告支持文字、图片、跳转链接、自定义 HTML 组合，可添加多条"
+      />
     </div>
   );
 }
@@ -707,46 +845,6 @@ function BrandingTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           </div>
         </div>
       </div>
-
-      {/* ── 域名含义 ─────────────────────────────────────── */}
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle
-          icon={RiBook2Line}
-          title="域名含义"
-          effect="结果页"
-          desc="在 WHOIS 查询结果页顶部显示域名含义（基于 tian.hu 翻译数据）。关闭后，原含义位置将显示下方「广告位 1 · 含义位置」的广告内容"
-        />
-        <Toggle
-          label="启用域名含义"
-          checked={s.meaning_enabled === "1"}
-          onChange={v => set("meaning_enabled", v ? "1" : "")}
-        />
-        {s.meaning_enabled !== "1" && (
-          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
-            含义已关闭：查询结果页原「含义」位置会展示「广告位 1 · 含义位置」的广告（需该广告位存在启用状态的广告才会显示）。
-          </p>
-        )}
-      </div>
-
-      {/* ── 广告位 1 · 含义位置 ─────────────────────────────────── */}
-      <AdSlotManager
-        s={s}
-        set={set}
-        slot="slot1"
-        icon={RiImageLine}
-        title="广告位 1 · 含义位置"
-        desc="显示在查询结果面板顶部。当「域名含义」关闭时，此广告位展示在原来的含义位置。可添加多条广告"
-      />
-
-      {/* ── 广告位 2 · 结果页底部 ────────────────────────────────── */}
-      <AdSlotManager
-        s={s}
-        set={set}
-        slot="slot2"
-        icon={RiLinksLine}
-        title="广告位 2 · 结果页底部"
-        desc="显示在 WHOIS 查询结果页底部。每条广告支持文字、图片、跳转链接、自定义 HTML 组合，可添加多条"
-      />
 
       {/* ── SEO ──────────────────────────────────────────────── */}
       <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
@@ -1489,6 +1587,7 @@ export default function AdminSettingsPage() {
       ) : (
         <>
           {tab === "branding"  && <BrandingTab {...tabProps} />}
+          {tab === "ads"       && <AdsTab {...tabProps} />}
           {tab === "access"    && <AccessTab {...tabProps} />}
           {tab === "features"  && <FeaturesTab {...tabProps} />}
           {tab === "analytics" && <AnalyticsTab {...tabProps} />}
