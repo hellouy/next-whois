@@ -1,7 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
-import { PageTabs } from "@/components/page-tabs";
+import { PaymentTabs } from "@/components/admin/payment-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +15,6 @@ import {
   RiAlipayLine, RiPaypalLine, RiBankCardLine, RiExternalLinkLine,
 } from "@remixicon/react";
 import Link from "next/link";
-
-const PAYMENT_TABS = [
-  { href: "/admin/payment/plans",  label: "套餐管理" },
-  { href: "/admin/payment/orders", label: "订单管理" },
-];
 
 type Plan = {
   id: string;
@@ -259,7 +254,7 @@ export default function PaymentPlansAdmin() {
     <AdminLayout title="支付管理">
       <Head><title>套餐管理 · 后台</title></Head>
       <div className="space-y-4">
-        <PageTabs tabs={PAYMENT_TABS} />
+        <PaymentTabs />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-500">

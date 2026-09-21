@@ -1805,7 +1805,12 @@
     "nav_db_export": "Экспорт БД",
     "nav_server_test": "Тест сервера",
     "nav_whois_servers": "Управление WHOIS-серверами",
-    "nav_link_applications": "Заявки на ссылки"
+    "nav_link_applications": "Заявки на ссылки",
+    "nav_group_ops": "Пользователи и эксплуатация",
+    "nav_group_notify": "Уведомления",
+    "nav_tld_hub": "Источник данных TLD",
+    "nav_email_settings": "Настройка почты",
+    "nav_payment_settings": "Настройка оплаты"
   },
   "common": {
     "retry": "Повторить",

@@ -1806,7 +1806,12 @@
     "nav_db_export": "DB-Export",
     "nav_server_test": "Server-Test",
     "nav_whois_servers": "WHOIS-Server-Verwaltung",
-    "nav_link_applications": "Link-Anfragen"
+    "nav_link_applications": "Link-Anfragen",
+    "nav_group_ops": "Nutzer & Betrieb",
+    "nav_group_notify": "Benachrichtigungen",
+    "nav_tld_hub": "TLD-Datenquelle",
+    "nav_email_settings": "E-Mail-Konfiguration",
+    "nav_payment_settings": "Zahlungskonfiguration"
   },
   "common": {
     "retry": "Wiederholen",

@@ -1806,7 +1806,12 @@
     "nav_domain_access": "網域接入",
     "nav_db_export": "資料匯出",
     "nav_server_test": "伺服器測試",
-    "nav_link_applications": "友鏈申請"
+    "nav_link_applications": "友鏈申請",
+    "nav_group_ops": "使用者與營運",
+    "nav_group_notify": "通知",
+    "nav_tld_hub": "TLD 資料源",
+    "nav_email_settings": "郵件設定",
+    "nav_payment_settings": "付款設定"
   },
   "common": {
     "retry": "重試",

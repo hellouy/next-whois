@@ -1806,7 +1806,12 @@
     "nav_db_export": "DB 내보내기",
     "nav_server_test": "서버 테스트",
     "nav_whois_servers": "WHOIS 서버 관리",
-    "nav_link_applications": "링크 신청"
+    "nav_link_applications": "링크 신청",
+    "nav_group_ops": "사용자 및 운영",
+    "nav_group_notify": "알림",
+    "nav_tld_hub": "TLD 데이터 소스",
+    "nav_email_settings": "이메일 설정",
+    "nav_payment_settings": "결제 설정"
   },
   "common": {
     "retry": "재시도",

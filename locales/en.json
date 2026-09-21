@@ -1806,7 +1806,12 @@
     "nav_notify_service": "Push Channels",
     "nav_expired_domains": "Expired Domain Leads",
     "nav_domain_access": "Domain Access",
-    "nav_link_applications": "Link Applications"
+    "nav_link_applications": "Link Applications",
+    "nav_group_ops": "Users & Operations",
+    "nav_group_notify": "Notifications",
+    "nav_tld_hub": "TLD Data Source",
+    "nav_email_settings": "Email Config",
+    "nav_payment_settings": "Payment Config"
   },
   "common": {
     "retry": "Retry",

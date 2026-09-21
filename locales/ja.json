@@ -1805,7 +1805,12 @@
     "nav_db_export": "DBエクスポート",
     "nav_server_test": "サーバーテスト",
     "nav_whois_servers": "WHOISサーバー管理",
-    "nav_link_applications": "リンク申請"
+    "nav_link_applications": "リンク申請",
+    "nav_group_ops": "ユーザーと運営",
+    "nav_group_notify": "通知",
+    "nav_tld_hub": "TLD データ源",
+    "nav_email_settings": "メール設定",
+    "nav_payment_settings": "決済設定"
   },
   "common": {
     "retry": "再試行",

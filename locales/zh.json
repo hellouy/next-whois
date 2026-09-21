@@ -1806,7 +1806,12 @@
     "nav_notify_service": "推送渠道",
     "nav_expired_domains": "过期域名挖掘",
     "nav_domain_access": "域名接入",
-    "nav_link_applications": "友链申请"
+    "nav_link_applications": "友链申请",
+    "nav_group_ops": "用户与运营",
+    "nav_group_notify": "通知",
+    "nav_tld_hub": "TLD 数据源",
+    "nav_email_settings": "邮件配置",
+    "nav_payment_settings": "支付配置"
   },
   "common": {
     "retry": "重试",

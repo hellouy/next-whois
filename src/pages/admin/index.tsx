@@ -26,6 +26,8 @@ type Stats = {
   activeReminders: number;
   searches: number;
   feedback: number;
+  linkApplications: number;
+  expiredLeadsNew: number;
   anonSearches: number;
   loggedSearches: number;
   todaySearches: number;
@@ -253,6 +255,14 @@ export default function AdminIndexPage() {
     loadStats();
   }, []);
 
+  const pendingItems: { label: string; count: number; href: string; icon: React.ElementType; tint: string }[] = [];
+  if (stats) {
+    if (stats.feedback > 0)           pendingItems.push({ label: "未处理反馈", count: stats.feedback, href: "/admin/feedback", icon: RiFeedbackLine, tint: "text-rose-500 bg-rose-100 dark:bg-rose-950/40" });
+    if (stats.linkApplications > 0)   pendingItems.push({ label: "友链待审批", count: stats.linkApplications, href: "/admin/links/applications", icon: RiLinksLine, tint: "text-blue-500 bg-blue-100 dark:bg-blue-950/40" });
+    if (stats.expiredLeadsNew > 0)    pendingItems.push({ label: "新过期线索", count: stats.expiredLeadsNew, href: "/admin/expired-domains", icon: RiGlobalLine, tint: "text-emerald-500 bg-emerald-100 dark:bg-emerald-950/40" });
+    if ((stats.topFailingTlds?.length ?? 0) > 0) pendingItems.push({ label: "高频失败 TLD", count: stats.topFailingTlds.length, href: "/admin/tlds-hub?tab=failures", icon: RiBarChartLine, tint: "text-amber-500 bg-amber-100 dark:bg-amber-950/40" });
+  }
+
   return (
     <AdminLayout title="概览">
       <div className="space-y-5">
@@ -321,6 +331,36 @@ export default function AdminIndexPage() {
                 {stats.feedback} 条待处理反馈
               </button>
             )}
+          </div>
+        )}
+
+        {/* Pending items card */}
+        {pendingItems.length > 0 && (
+          <div className="glass-panel border border-amber-200/50 dark:border-amber-900/30 rounded-2xl p-3">
+            <div className="flex items-center gap-2 mb-2 px-0.5">
+              <RiNotification3Line className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-bold">待处理</span>
+              <span className="text-[10px] text-muted-foreground">需要管理员关注</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {pendingItems.map(item => (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => router.push(item.href, undefined, { locale: false })}
+                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-left hover:bg-primary/5 hover:border-primary/30 border border-transparent transition-all min-w-0 group"
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.tint}`}>
+                    <item.icon className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-foreground truncate">{item.count}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{item.label}</p>
+                  </div>
+                  <RiArrowRightLine className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary shrink-0 ml-auto" />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

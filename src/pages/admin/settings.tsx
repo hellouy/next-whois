@@ -1,28 +1,30 @@
 import React from "react";
+import { useRouter } from "next/router";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DEFAULT_SETTINGS, type SiteSettings, notifySettingsUpdated, parseResultAds, serializeResultAds, type ResultAdItem, type ResultAdSlot } from "@/lib/site-settings";
+import {
+  EffectBadge, Field, MultiItemInput, PasswordField, SectionTitle, SelectField, TextareaField, Toggle, useUnsavedGuard,
+} from "@/components/admin/settings-ui";
 import Link from "next/link";
 import {
   RiLoader4Line, RiCheckLine, RiToggleLine, RiToggleFill,
   RiGlobalLine, RiShieldCheckLine, RiSettings4Line,
   RiHomeLine, RiMailLine, RiBarChartLine, RiLockLine,
   RiMoneyDollarCircleLine, RiBankCardLine, RiImageLine,
-  RiEyeLine, RiEyeOffLine, RiSaveLine, RiRefreshLine,
+  RiSaveLine, RiRefreshLine,
   RiCodeBoxLine, RiBellLine, RiUserLine, RiLinksLine,
   RiPaletteLine, RiSendPlane2Line, RiAlertLine, RiInformationLine,
   RiAddLine, RiDeleteBinLine, RiSearchLine,
-  // Feature icons
   RiExternalLinkLine, RiMessage3Line, RiMedalLine, RiHeartLine,
   RiShareLine, RiServerLine, RiMapPin2Line, RiFileList3Line,
   RiToolsLine, RiAlarmLine, RiHistoryLine, RiBook2Line,
   RiArrowRightLine, RiTimerLine, RiWifiLine, RiCalendarLine,
   RiPaintLine, RiPaintFill, RiArrowDownSLine, RiArrowRightSLine,
-  RiMegaphoneLine, RiArrowUpDownLine, RiAdvertisementLine, RiArrowUpSLine,
+  RiMegaphoneLine, RiAdvertisementLine, RiArrowUpSLine,
 } from "@remixicon/react";
 
 type TabKey =
@@ -30,9 +32,7 @@ type TabKey =
   | "ads"
   | "access"
   | "features"
-  | "analytics"
-  | "email"
-  | "payment";
+  | "analytics";
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "branding",  label: "外观与首页", icon: RiPaletteLine },
@@ -40,292 +40,7 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "access",    label: "安全防护",   icon: RiShieldCheckLine },
   { key: "features",  label: "功能开关",   icon: RiSettings4Line },
   { key: "analytics", label: "统计分析",   icon: RiBarChartLine },
-  { key: "email",     label: "邮件配置",   icon: RiMailLine },
-  { key: "payment",   label: "支付配置",   icon: RiBankCardLine },
 ];
-
-// ── Effect-location badge — shows admins where a setting takes effect ─────────
-type EffectScope = "全站" | "首页" | "结果页" | "SEO" | "社交分享" | "后台" | "顶部公告";
-const EFFECT_COLORS: Record<EffectScope, string> = {
-  "全站":   "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/40",
-  "首页":   "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40",
-  "结果页": "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/40",
-  "SEO":    "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border-orange-200/60 dark:border-orange-800/40",
-  "社交分享":"bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 border-cyan-200/60 dark:border-cyan-800/40",
-  "后台":   "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200/60 dark:border-red-800/40",
-  "顶部公告":"bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40",
-};
-function EffectBadge({ scope }: { scope: EffectScope }) {
-  return (
-    <span className={cn(
-      "inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold border shrink-0 tracking-wide",
-      EFFECT_COLORS[scope],
-    )}>
-      {scope}
-    </span>
-  );
-}
-
-function SectionTitle({
-  icon: Icon, title, desc, effect,
-}: { icon: React.ElementType; title: string; desc?: string; effect?: EffectScope }) {
-  return (
-    <div className="flex items-start gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon className="w-4 h-4 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-sm font-bold">{title}</h3>
-          {effect && <EffectBadge scope={effect} />}
-        </div>
-        {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-semibold text-foreground">{label}</Label>
-      {desc && <p className="text-[11px] text-muted-foreground -mt-0.5">{desc}</p>}
-      {children}
-    </div>
-  );
-}
-
-function Toggle({
-  label, desc, checked, onChange,
-}: { label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-all group"
-    >
-      <div className="text-left min-w-0">
-        <p className="text-xs font-semibold">{label}</p>
-        {desc && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{desc}</p>}
-      </div>
-      {checked
-        ? <RiToggleFill className="w-8 h-8 text-primary shrink-0" />
-        : <RiToggleLine className="w-8 h-8 text-muted-foreground/40 shrink-0" />}
-    </button>
-  );
-}
-
-function PasswordField({ label, desc, value, onChange, placeholder }: {
-  label: string; desc?: string; value: string;
-  onChange: (v: string) => void; placeholder?: string;
-}) {
-  const [show, setShow] = React.useState(false);
-  return (
-    <Field label={label} desc={desc}>
-      <div className="relative">
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder || "留空表示未配置"}
-          className="text-xs pr-9"
-        />
-        <button
-          type="button"
-          onClick={() => setShow(v => !v)}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-        >
-          {show ? <RiEyeOffLine className="w-3.5 h-3.5" /> : <RiEyeLine className="w-3.5 h-3.5" />}
-        </button>
-      </div>
-    </Field>
-  );
-}
-
-function TextareaField({ label, desc, value, onChange, rows = 3, placeholder }: {
-  label: string; desc?: string; value: string;
-  onChange: (v: string) => void; rows?: number; placeholder?: string;
-}) {
-  return (
-    <Field label={label} desc={desc}>
-      <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        rows={rows}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-y min-h-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      />
-    </Field>
-  );
-}
-
-type RichItem = { text: string; color?: string; size?: "xs" | "sm" | "base"; bold?: boolean };
-function parseRichItems(raw: string): RichItem[] {
-  const trimmed = (raw || "").trim();
-  if (trimmed.startsWith("[")) {
-    try {
-      const p = JSON.parse(trimmed);
-      if (Array.isArray(p)) {
-        const r = p.filter((i: unknown) => i && typeof (i as RichItem).text === "string");
-        if (r.length > 0) return r as RichItem[];
-      }
-    } catch {}
-  }
-  const parts = trimmed.split("|").map(s => s.trim()).filter(Boolean);
-  return parts.length > 0 ? parts.map(t => ({ text: t })) : [{ text: "" }];
-}
-
-function MultiItemInput({ value, onChange, placeholder }: {
-  value: string; onChange: (v: string) => void; placeholder?: string;
-}) {
-  const [items, setItems] = React.useState<RichItem[]>(() => parseRichItems(value));
-  const prevVal = React.useRef(value);
-
-  React.useEffect(() => {
-    if (value === prevVal.current) return;
-    prevVal.current = value;
-    setItems(parseRichItems(value));
-  }, [value]);
-
-  const propagate = (next: RichItem[]) => {
-    setItems(next);
-    const hasRich = next.some(i => i.color || i.size || i.bold);
-    const nonEmpty = next.filter(i => i.text.trim());
-    if (hasRich) {
-      onChange(nonEmpty.length > 0 ? JSON.stringify(nonEmpty) : "");
-    } else {
-      onChange(nonEmpty.map(i => i.text).join(" | "));
-    }
-  };
-
-  const update = (idx: number, field: keyof RichItem, v: string | boolean | undefined) => {
-    const n = [...items];
-    n[idx] = { ...n[idx], [field]: v };
-    propagate(n);
-  };
-  const add = () => propagate([...items, { text: "" }]);
-  const remove = (idx: number) => {
-    const n = items.filter((_, i) => i !== idx);
-    propagate(n.length ? n : [{ text: "" }]);
-  };
-
-  return (
-    <div className="space-y-2">
-      {items.map((item, idx) => (
-        <div key={idx} className="space-y-1">
-          <div className="flex items-center gap-1.5">
-            {/* Row number */}
-            <div className="w-6 h-6 rounded-md border border-border/60 bg-muted/30 flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 tabular-nums select-none">
-              {idx + 1}
-            </div>
-
-            {/* Text input */}
-            <Input
-              value={item.text}
-              onChange={e => update(idx, "text", e.target.value)}
-              placeholder={placeholder}
-              className="text-xs flex-1"
-              style={{
-                color: item.color || undefined,
-                fontWeight: item.bold ? "700" : undefined,
-                fontSize: item.size === "xs" ? "11px" : item.size === "base" ? "14px" : undefined,
-              }}
-            />
-
-            {/* Color swatch — click to open native color picker */}
-            <label className="relative shrink-0 cursor-pointer" title="文字颜色">
-              <div
-                className="w-6 h-6 rounded-md border border-border/60 overflow-hidden flex items-center justify-center"
-                style={{ background: item.color ? item.color + "33" : undefined }}
-              >
-                <RiPaletteLine
-                  className="w-3.5 h-3.5 transition-colors"
-                  style={{ color: item.color || "currentColor", opacity: item.color ? 1 : 0.4 }}
-                />
-              </div>
-              <input
-                type="color"
-                value={item.color || "#888888"}
-                onChange={e => update(idx, "color", e.target.value)}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              />
-            </label>
-
-            {/* Clear color */}
-            {item.color && (
-              <button
-                type="button"
-                onClick={() => update(idx, "color", undefined)}
-                title="清除颜色"
-                className="w-5 h-5 rounded border border-border/50 text-muted-foreground/60 hover:text-destructive hover:border-destructive/40 flex items-center justify-center text-xs transition-colors shrink-0"
-              >×</button>
-            )}
-
-            {/* Size selector */}
-            <select
-              value={item.size || "sm"}
-              onChange={e => update(idx, "size", e.target.value as "xs" | "sm" | "base")}
-              title="字体大小"
-              className="h-6 text-[10px] rounded-md border border-border/60 bg-background px-1 shrink-0 text-muted-foreground"
-            >
-              <option value="xs">小</option>
-              <option value="sm">中</option>
-              <option value="base">大</option>
-            </select>
-
-            {/* Bold toggle */}
-            <button
-              type="button"
-              onClick={() => update(idx, "bold", !item.bold)}
-              title="粗体"
-              className={`w-6 h-6 rounded-md border text-xs font-bold shrink-0 transition-colors ${item.bold ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:border-border"}`}
-            >B</button>
-
-            {/* Delete */}
-            <button
-              type="button"
-              onClick={() => remove(idx)}
-              disabled={items.length === 1 && !items[0].text}
-              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:pointer-events-none shrink-0"
-            >
-              <RiDeleteBinLine className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <button
-        type="button"
-        onClick={add}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted/50"
-      >
-        <RiAddLine className="w-3.5 h-3.5" />
-        添加一条
-      </button>
-      {items.filter(i => i.text).length > 1 && (
-        <p className="text-[10px] text-muted-foreground/50 pl-8">多条内容将自动循环淡入淡出展示，每条可单独设置颜色、字号和粗体</p>
-      )}
-    </div>
-  );
-}
-
-function SelectField({ label, desc, value, onChange, options }: {
-  label: string; desc?: string; value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <Field label={label} desc={desc}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </Field>
-  );
-}
 
 function AdEditor({
   ad, index, length, onUpdate, onRemove, onMoveUp, onMoveDown,
@@ -1197,280 +912,24 @@ function AnalyticsTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings
   );
 }
 
-type EmailConfigStatus = {
-  status: "ok" | "partial" | "unconfigured";
-  provider: string;
-  hint: string;
-  smtpEnabled: boolean;
-  smtpHost: string;
-  smtpUser: string;
-  smtpPass: boolean;
-  resendApiKey: boolean;
-};
-
-type TestEmailResult = { key: string; subject: string; ok: boolean; error?: string };
-
-function EmailTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
-  const [configStatus, setConfigStatus] = React.useState<EmailConfigStatus | null>(null);
-  const [checking, setChecking] = React.useState(false);
-  const [testTo, setTestTo] = React.useState("");
-  const [testing, setTesting] = React.useState(false);
-  const [testResults, setTestResults] = React.useState<TestEmailResult[] | null>(null);
-
-  const checkConfig = React.useCallback(async () => {
-    setChecking(true);
-    try {
-      const res = await fetch("/api/admin/test-email");
-      if (res.ok) {
-        const data = await res.json();
-        setConfigStatus(data);
-      } else {
-        toast.error("检查邮件配置失败");
-      }
-    } catch {
-      toast.error("网络错误，请重试");
-    } finally {
-      setChecking(false);
-    }
-  }, []);
-
-  React.useEffect(() => { checkConfig(); }, [checkConfig]);
-
-  const sendTestEmail = async () => {
-    if (!testTo.trim()) { toast.error("请输入收件人邮箱"); return; }
-    setTesting(true);
-    setTestResults(null);
-    try {
-      const res = await fetch("/api/admin/test-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testTo.trim(), template: "welcome" }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        toast.success(`测试邮件已发送至 ${testTo.trim()}`);
-      } else {
-        toast.error("发送失败：" + (data.results?.[0]?.error || data.error || "未知错误"));
-      }
-      if (data.results) setTestResults(data.results);
-    } catch {
-      toast.error("网络错误，请重试");
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const statusColor = configStatus?.status === "ok"
-    ? "text-green-600 bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800/40"
-    : configStatus?.status === "partial"
-      ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40"
-      : "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800/40";
-
-  const StatusIcon = configStatus?.status === "ok" ? RiCheckLine
-    : configStatus?.status === "partial" ? RiInformationLine
-    : RiAlertLine;
-
-  return (
-    <div className="space-y-6">
-      {/* Config status panel */}
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <SectionTitle icon={RiMailLine} title="邮件发送状态" desc="当前邮件服务配置诊断" />
-          <Button size="sm" variant="outline" onClick={checkConfig} disabled={checking} className="shrink-0 text-xs h-7 px-2.5">
-            {checking ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}
-            <span className="ml-1">{checking ? "检查中…" : "刷新"}</span>
-          </Button>
-        </div>
-        {configStatus ? (
-          <div className={cn("flex items-start gap-3 p-3 rounded-xl border text-xs", statusColor)}>
-            <StatusIcon className="w-4 h-4 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold">{configStatus.provider}</p>
-              <p className="mt-0.5 opacity-80">{configStatus.hint}</p>
-            </div>
-          </div>
-        ) : checking ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground p-3">
-            <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> 检查中…
-          </div>
-        ) : null}
-
-        {/* Send test email */}
-        <div className="space-y-2 pt-2 border-t border-border">
-          <p className="text-xs font-semibold">发送测试邮件</p>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              value={testTo}
-              onChange={e => setTestTo(e.target.value)}
-              placeholder="收件邮箱（默认发送 Welcome 模板）"
-              className="text-xs flex-1"
-              onKeyDown={e => { if (e.key === "Enter") sendTestEmail(); }}
-            />
-            <Button size="sm" onClick={sendTestEmail} disabled={testing || !testTo.trim()} className="shrink-0 text-xs">
-              {testing ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin mr-1" /> : <RiSendPlane2Line className="w-3.5 h-3.5 mr-1" />}
-              {testing ? "发送中…" : "发送"}
-            </Button>
-          </div>
-          {testResults && (
-            <div className="space-y-1">
-              {testResults.map(r => (
-                <div key={r.key} className={cn("flex items-start gap-2 text-[11px] p-2 rounded-lg border", r.ok ? "border-green-200 bg-green-50 text-green-700 dark:bg-green-950/30 dark:border-green-800/40 dark:text-green-400" : "border-red-200 bg-red-50 text-red-700 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-400")}>
-                  {r.ok ? <RiCheckLine className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <RiAlertLine className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
-                  <span>{r.ok ? `已发送：${r.subject}` : `失败：${r.error}`}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiMailLine} title="SMTP 邮件配置" desc="用于发送注册验证、密码重置等系统邮件" />
-        <Toggle
-          label="启用 SMTP"
-          checked={s.smtp_enabled === "1"}
-          onChange={v => set("smtp_enabled", v ? "1" : "")}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="SMTP 主机">
-            <Input value={s.smtp_host} onChange={e => set("smtp_host", e.target.value)} placeholder="smtp.example.com" className="text-xs" />
-          </Field>
-          <Field label="SMTP 端口">
-            <Input value={s.smtp_port} onChange={e => set("smtp_port", e.target.value)} placeholder="465" type="number" className="text-xs" />
-          </Field>
-          <Field label="SMTP 用户名">
-            <Input value={s.smtp_user} onChange={e => set("smtp_user", e.target.value)} placeholder="noreply@example.com" className="text-xs" />
-          </Field>
-          <PasswordField label="SMTP 密码" value={s.smtp_pass} onChange={v => set("smtp_pass", v)} />
-          <Field label="发件人地址">
-            <Input value={s.smtp_from} onChange={e => set("smtp_from", e.target.value)} placeholder="域见你 <noreply@example.com>" className="text-xs" />
-          </Field>
-          <SelectField
-            label="加密方式"
-            value={s.smtp_secure}
-            onChange={v => set("smtp_secure", v)}
-            options={[
-              { value: "ssl",      label: "SSL/TLS（端口 465）" },
-              { value: "starttls", label: "STARTTLS（端口 587）" },
-              { value: "none",     label: "不加密（不推荐）" },
-            ]}
-          />
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiMailLine} title="Resend 邮件配置" desc="使用 Resend 服务发送邮件（与 SMTP 二选一）" />
-        <PasswordField label="Resend API Key" desc="从 resend.com 后台获取" value={s.resend_api_key} onChange={v => set("resend_api_key", v)} placeholder="re_..." />
-        <Field label="发件人地址">
-          <Input value={s.resend_from_email} onChange={e => set("resend_from_email", e.target.value)} placeholder="域见你 <noreply@example.com>" className="text-xs" />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
-function PaymentTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings, v: string) => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiMoneyDollarCircleLine} title="通用支付设置" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <SelectField
-            label="支付货币"
-            value={s.payment_currency}
-            onChange={v => set("payment_currency", v)}
-            options={[
-              { value: "CNY", label: "CNY — 人民币" },
-              { value: "USD", label: "USD — 美元" },
-              { value: "EUR", label: "EUR — 欧元" },
-              { value: "HKD", label: "HKD — 港币" },
-            ]}
-          />
-          <Field label="支付成功跳转 URL">
-            <Input value={s.payment_success_url} onChange={e => set("payment_success_url", e.target.value)} placeholder="https://yourdomain.com/dashboard" className="text-xs" />
-          </Field>
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="Stripe" />
-        <Toggle label="启用 Stripe 支付" checked={s.payment_stripe_enabled === "1"} onChange={v => set("payment_stripe_enabled", v ? "1" : "")} />
-        <Field label="Publishable Key (pk_)">
-          <Input value={s.payment_stripe_pk} onChange={e => set("payment_stripe_pk", e.target.value)} placeholder="pk_live_..." className="text-xs" />
-        </Field>
-        <PasswordField label="Secret Key (sk_)" value={s.payment_stripe_sk} onChange={v => set("payment_stripe_sk", v)} placeholder="sk_live_..." />
-        <PasswordField label="Webhook Secret" value={s.payment_stripe_webhook_secret} onChange={v => set("payment_stripe_webhook_secret", v)} placeholder="whsec_..." />
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="PayPal" />
-        <Toggle label="启用 PayPal 支付" checked={s.payment_paypal_enabled === "1"} onChange={v => set("payment_paypal_enabled", v ? "1" : "")} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Client ID">
-            <Input value={s.payment_paypal_client_id} onChange={e => set("payment_paypal_client_id", e.target.value)} placeholder="AXxx..." className="text-xs" />
-          </Field>
-          <PasswordField label="Client Secret" value={s.payment_paypal_client_secret} onChange={v => set("payment_paypal_client_secret", v)} />
-          <Field label="Webhook ID">
-            <Input value={s.payment_paypal_webhook_id} onChange={e => set("payment_paypal_webhook_id", e.target.value)} placeholder="Webhook ID" className="text-xs" />
-          </Field>
-          <SelectField
-            label="环境"
-            value={s.payment_paypal_env}
-            onChange={v => set("payment_paypal_env", v)}
-            options={[
-              { value: "live",    label: "live — 生产环境" },
-              { value: "sandbox", label: "sandbox — 沙盒测试" },
-            ]}
-          />
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="虎皮椒 (XunhuPay · 支付宝渠道)" />
-        <Toggle label="启用虎皮椒支付宝" checked={s.payment_xunhupay_enabled === "1"} onChange={v => set("payment_xunhupay_enabled", v ? "1" : "")} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="AppID">
-            <Input value={s.payment_xunhupay_appid} onChange={e => set("payment_xunhupay_appid", e.target.value)} placeholder="AppID" className="text-xs" />
-          </Field>
-          <PasswordField label="AppSecret" value={s.payment_xunhupay_secret} onChange={v => set("payment_xunhupay_secret", v)} />
-        </div>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="微信支付 (WeChat Pay · 虎皮椒网关)" />
-        <Toggle label="启用微信支付" checked={s.payment_wechat_enabled === "1"} onChange={v => set("payment_wechat_enabled", v ? "1" : "")} />
-        <p className="text-xs text-muted-foreground">微信支付通过虎皮椒网关处理，复用上方配置的虎皮椒 AppID 和 AppSecret，无需重复填写。启用前请确保虎皮椒账户已开通微信支付渠道。</p>
-      </div>
-
-      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
-        <SectionTitle icon={RiBankCardLine} title="支付宝 (Alipay)" />
-        <Toggle label="启用支付宝支付" checked={s.payment_alipay_enabled === "1"} onChange={v => set("payment_alipay_enabled", v ? "1" : "")} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="AppID">
-            <Input value={s.payment_alipay_appid} onChange={e => set("payment_alipay_appid", e.target.value)} placeholder="2021000000..." className="text-xs" />
-          </Field>
-          <Field label="异步通知 URL">
-            <Input value={s.payment_alipay_notify_url} onChange={e => set("payment_alipay_notify_url", e.target.value)} placeholder="https://yourdomain.com/api/payment/alipay/notify" className="text-xs" />
-          </Field>
-          <div className="sm:col-span-2">
-            <TextareaField label="支付宝公钥" value={s.payment_alipay_public_key} onChange={v => set("payment_alipay_public_key", v)} placeholder="-----BEGIN PUBLIC KEY-----..." rows={3} />
-          </div>
-          <div className="sm:col-span-2">
-            <PasswordField label="应用私钥" value={s.payment_alipay_private_key} onChange={v => set("payment_alipay_private_key", v)} placeholder="-----BEGIN PRIVATE KEY-----..." />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminSettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = React.useState<SiteSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
-  const [tab, setTab] = React.useState<TabKey>("branding");
+  useUnsavedGuard(dirty);
+  const [tab, setTab] = React.useState<TabKey>(() => {
+    const t = router.query.tab;
+    return (typeof t === "string" && (TABS.some(x => x.key === t))) ? (t as TabKey) : "branding";
+  });
+
+  React.useEffect(() => {
+    const t = router.query.tab;
+    if (typeof t === "string" && t !== tab && TABS.some(x => x.key === t)) {
+      setTab(t as TabKey);
+    }
+  }, [router.query.tab]);
 
   React.useEffect(() => {
     setLoading(true);
@@ -1591,8 +1050,6 @@ export default function AdminSettingsPage() {
           {tab === "access"    && <AccessTab {...tabProps} />}
           {tab === "features"  && <FeaturesTab {...tabProps} />}
           {tab === "analytics" && <AnalyticsTab {...tabProps} />}
-          {tab === "email"     && <EmailTab {...tabProps} />}
-          {tab === "payment"   && <PaymentTab {...tabProps} />}
         </>
       )}
 

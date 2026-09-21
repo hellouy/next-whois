@@ -31,6 +31,9 @@ import {
   RiNetworkLine,
   RiAlertLine,
   RiBarChartLine,
+  RiPriceTag3Line,
+  RiMailLine,
+  RiArrowRightLine,
 } from "@remixicon/react";
 
 type NavItem = {
@@ -43,48 +46,54 @@ type NavItem = {
 
 const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
   {
-    titleKey: "admin.nav_core",
+    titleKey: "admin.nav_group_ops",
     items: [
-      { href: "/admin",                  labelKey: "admin.nav_overview",  icon: RiDashboardLine,  activeIcon: RiDashboardFill,  exact: true },
-      { href: "/admin/users",            labelKey: "admin.nav_users",     icon: RiUserLine,       activeIcon: RiUserFill },
-      { href: "/admin/stamps",           labelKey: "admin.nav_stamps",    icon: RiShieldCheckLine,activeIcon: RiShieldCheckFill },
-      { href: "/admin/payment/plans",    labelKey: "admin.nav_plans",     icon: RiBankCardLine,   activeIcon: RiBankCardFill },
-      { href: "/admin/payment/orders",   labelKey: "admin.nav_orders",    icon: RiBillLine,       activeIcon: RiBillLine },
-      { href: "/admin/access-control",   labelKey: "admin.nav_access_control", icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
+      { href: "/admin",                     labelKey: "admin.nav_overview",       icon: RiDashboardLine,   activeIcon: RiDashboardFill,   exact: true },
+      { href: "/admin/users",               labelKey: "admin.nav_users",          icon: RiUserLine,        activeIcon: RiUserFill },
+      { href: "/admin/stamps",              labelKey: "admin.nav_stamps",         icon: RiShieldCheckLine, activeIcon: RiShieldCheckFill },
+      { href: "/admin/access-control",      labelKey: "admin.nav_access_control", icon: RiShieldUserLine, activeIcon: RiShieldUserLine },
+      { href: "/admin/search-records",      labelKey: "admin.nav_search_records", icon: RiSearchLine,     activeIcon: RiSearchFill },
+      { href: "/admin/query-logs",          labelKey: "admin.nav_query_logs",     icon: RiHistoryLine,     activeIcon: RiHistoryLine },
+      { href: "/admin/feedback",            labelKey: "admin.nav_feedback",       icon: RiFeedbackLine,   activeIcon: RiFeedbackFill },
+      { href: "/admin/reminders",           labelKey: "admin.nav_reminders",      icon: RiBellLine,        activeIcon: RiBellFill },
+      { href: "/admin/expired-domains",     labelKey: "admin.nav_expired_domains", icon: RiGlobalLine,   activeIcon: RiGlobalLine },
     ],
   },
   {
-    titleKey: "admin.nav_content",
+    titleKey: "admin.nav_payment",
     items: [
-      { href: "/admin/search-records",  labelKey: "admin.nav_search_records",  icon: RiSearchLine,        activeIcon: RiSearchFill },
-      { href: "/admin/query-logs",      labelKey: "admin.nav_query_logs",      icon: RiHistoryLine,       activeIcon: RiHistoryLine },
-      { href: "/admin/feedback",        labelKey: "admin.nav_feedback",        icon: RiFeedbackLine,      activeIcon: RiFeedbackFill },
-      { href: "/admin/reminders",       labelKey: "admin.nav_reminders",       icon: RiBellLine,          activeIcon: RiBellFill },
-      { href: "/admin/notify",          labelKey: "admin.nav_notify",          icon: RiMailSendLine,      activeIcon: RiMailSendLine },
-      { href: "/admin/notify-service",  labelKey: "admin.nav_notify_service",  icon: RiNotification3Line, activeIcon: RiNotification3Line },
-      { href: "/admin/expired-domains", labelKey: "admin.nav_expired_domains", icon: RiGlobalLine,        activeIcon: RiGlobalLine },
+      { href: "/admin/payment/settings",    labelKey: "admin.nav_payment_settings", icon: RiBankCardLine, activeIcon: RiBankCardFill },
+      { href: "/admin/payment/plans",       labelKey: "admin.nav_plans",            icon: RiPriceTag3Line, activeIcon: RiPriceTag3Line },
+      { href: "/admin/payment/orders",      labelKey: "admin.nav_orders",           icon: RiBillLine,      activeIcon: RiBillLine },
+      { href: "/admin/sponsors",            labelKey: "admin.nav_sponsors",         icon: RiHeart3Line,    activeIcon: RiHeart3Fill },
     ],
   },
   {
     titleKey: "admin.nav_config",
     items: [
-      { href: "/admin/domain-access",  labelKey: "admin.nav_domain_access",  icon: RiNetworkLine,    activeIcon: RiNetworkLine },
-      { href: "/admin/tlds-hub",     labelKey: "admin.nav_tld_rules",      icon: RiCodeBoxLine,    activeIcon: RiCodeBoxLine },
-      { href: "/admin/tlds-hub?tab=failures",  labelKey: "admin.nav_tld_failures",   icon: RiBarChartLine,   activeIcon: RiBarChartLine },
-      { href: "/admin/tlds-hub?tab=whois",     labelKey: "admin.nav_whois_servers",  icon: RiGlobalLine,     activeIcon: RiGlobalLine },
-      { href: "/admin/access-control?tab=providers", labelKey: "admin.nav_api",            icon: RiPlugLine,       activeIcon: RiPlugFill },
+      { href: "/admin/tlds-hub",      labelKey: "admin.nav_tld_hub",       icon: RiCodeBoxLine,  activeIcon: RiCodeBoxLine },
+      { href: "/admin/domain-access", labelKey: "admin.nav_domain_access", icon: RiNetworkLine,  activeIcon: RiNetworkLine },
+      { href: "/admin/access-control?tab=providers", labelKey: "admin.nav_api", icon: RiPlugLine, activeIcon: RiPlugFill },
     ],
   },
   {
     titleKey: "admin.nav_brand",
     items: [
-      { href: "/admin/stamp-styles",   labelKey: "admin.nav_stamp_styles",   icon: RiPaletteLine,  activeIcon: RiPaletteLine },
-      { href: "/admin/og-styles",      labelKey: "admin.nav_og_styles",      icon: RiImageLine,    activeIcon: RiImageLine },
-      { href: "/admin/hot-prefixes",   labelKey: "admin.nav_hot_prefixes",   icon: RiFireLine,     activeIcon: RiFireLine },
-      { href: "/admin/links",          labelKey: "admin.nav_links",          icon: RiLinksLine,    activeIcon: RiLinksLine },
+      { href: "/admin/settings",      labelKey: "admin.nav_settings",      icon: RiSettings4Line, activeIcon: RiSettings4Fill },
+      { href: "/admin/stamp-styles",  labelKey: "admin.nav_stamp_styles",  icon: RiPaletteLine,  activeIcon: RiPaletteLine },
+      { href: "/admin/og-styles",     labelKey: "admin.nav_og_styles",     icon: RiImageLine,    activeIcon: RiImageLine },
+      { href: "/admin/hot-prefixes",  labelKey: "admin.nav_hot_prefixes",  icon: RiFireLine,     activeIcon: RiFireLine },
+      { href: "/admin/links",         labelKey: "admin.nav_links",         icon: RiLinksLine,    activeIcon: RiLinksLine },
       { href: "/admin/links/applications", labelKey: "admin.nav_link_applications", icon: RiAddBoxLine, activeIcon: RiAddBoxLine },
-      { href: "/admin/sponsors",       labelKey: "admin.nav_sponsors",       icon: RiHeart3Line,   activeIcon: RiHeart3Fill },
-      { href: "/admin/changelog",      labelKey: "admin.nav_changelog",      icon: RiHistoryLine,  activeIcon: RiHistoryLine },
+      { href: "/admin/changelog",     labelKey: "admin.nav_changelog",     icon: RiHistoryLine,  activeIcon: RiHistoryLine },
+    ],
+  },
+  {
+    titleKey: "admin.nav_group_notify",
+    items: [
+      { href: "/admin/notify-service", labelKey: "admin.nav_notify_service", icon: RiNotification3Line, activeIcon: RiNotification3Line },
+      { href: "/admin/notify",         labelKey: "admin.nav_notify",         icon: RiMailSendLine,      activeIcon: RiMailSendLine },
+      { href: "/admin/email-settings", labelKey: "admin.nav_email_settings", icon: RiMailLine,         activeIcon: RiMailLine },
     ],
   },
   {
@@ -94,12 +103,106 @@ const NAV_GROUPS: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/tld-speed",   labelKey: "admin.nav_tld_speed",     icon: RiTimeLine,      activeIcon: RiTimeLine },
       { href: "/admin/server-test", labelKey: "admin.nav_server_test",   icon: RiWifiLine,      activeIcon: RiWifiLine },
       { href: "/admin/db-export",   labelKey: "admin.nav_db_export",     icon: RiDownloadLine,  activeIcon: RiDownloadLine },
-      { href: "/admin/settings",    labelKey: "admin.nav_settings",      icon: RiSettings4Line, activeIcon: RiSettings4Fill },
     ],
   },
 ];
 
 const NAV_FLAT: NavItem[] = NAV_GROUPS.flatMap(g => g.items);
+
+type SearchEntry = { label: string; keywords: string; href: string };
+
+const SEARCH_EXTRAS: SearchEntry[] = [
+  { label: "站点设置 — 外观与首页", keywords: "settings branding name logo seo meta title", href: "/admin/settings?tab=branding" },
+  { label: "站点设置 — 广告管理",    keywords: "settings ads slots banner megaphone ad", href: "/admin/settings?tab=ads" },
+  { label: "站点设置 — 安全防护",    keywords: "settings access security shield captcha ip", href: "/admin/settings?tab=access" },
+  { label: "站点设置 — 功能开关",    keywords: "settings features toggles switch", href: "/admin/settings?tab=features" },
+  { label: "站点设置 — 统计分析",    keywords: "settings analytics stats chart", href: "/admin/settings?tab=analytics" },
+  { label: "支付配置 — Stripe / PayPal / 虎皮椒 / 微信 / 支付宝", keywords: "payment stripe paypal xunhupay wechat alipay currency", href: "/admin/payment/settings" },
+  { label: "邮件配置 — SMTP / Resend / 测试邮件", keywords: "email smtp resend mail test", href: "/admin/email-settings" },
+  { label: "TLD 失败列表",   keywords: "tld failures errors", href: "/admin/tlds-hub?tab=failures" },
+  { label: "WHOIS 服务器覆盖", keywords: "whois server override", href: "/admin/tlds-hub?tab=whois" },
+];
+
+function AdminSearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const [q, setQ] = React.useState("");
+  const [sel, setSel] = React.useState(0);
+  const [entries, setEntries] = React.useState<SearchEntry[]>([]);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setQ("");
+      setSel(0);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const nav = NAV_GROUPS.flatMap(g => g.items).map(n => ({
+      label: t(n.labelKey as any),
+      keywords: "",
+      href: n.href,
+    }));
+    setEntries([...nav, ...SEARCH_EXTRAS]);
+  }, [open, t]);
+
+  if (!open) return null;
+  const ql = q.trim().toLowerCase();
+  const items = ql
+    ? entries.filter(e => `${e.label} ${e.keywords}`.toLowerCase().includes(ql))
+    : entries;
+  const flat = items.slice(0, 12);
+
+  function go(href: string) {
+    onClose();
+    router.push(href, undefined, { locale: false });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden />
+      <div className="relative w-full max-w-lg bg-background border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
+          <RiSearchLine className="w-4 h-4 text-muted-foreground" />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => { setQ(e.target.value); setSel(0); }}
+            onKeyDown={e => {
+              if (e.key === "ArrowDown") { e.preventDefault(); setSel(s => Math.min(s + 1, flat.length - 1)); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setSel(s => Math.max(s - 1, 0)); }
+              else if (e.key === "Enter" && flat[sel]) go(flat[sel].href);
+              else if (e.key === "Escape") onClose();
+            }}
+            placeholder="搜索后台页面 / 设置项…"
+            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
+          />
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground shrink-0">ESC</kbd>
+        </div>
+        <div className="max-h-72 overflow-y-auto p-1.5">
+          {flat.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">无匹配结果</p>
+          ) : flat.map((it, i) => (
+            <button
+              key={it.href + it.label}
+              onClick={() => go(it.href)}
+              onMouseEnter={() => setSel(i)}
+              className={cn("w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors",
+                i === sel ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted")}
+            >
+              <RiArrowRightLine className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 truncate font-medium">{it.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const BOTTOM_PINNED: NavItem[] = [
   { href: "/admin",               labelKey: "admin.nav_overview",       icon: RiDashboardLine,  activeIcon: RiDashboardFill,  exact: true },
@@ -115,6 +218,18 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
   const email = (session?.user as any)?.email as string | undefined;
   const isAdmin = (session?.user as any)?.isAdmin === true;
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [searchOpen, setSearchOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(o => !o);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   React.useEffect(() => {
     if (drawerOpen) setDrawerOpen(false);
@@ -198,6 +313,15 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
             </div>
           </div>
 
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted border border-border/60 mb-2 transition-all"
+          >
+            <RiSearchLine className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">搜索后台页面…</span>
+            <kbd className="ml-auto text-[9px] px-1.5 py-0.5 rounded border border-border shrink-0">Ctrl K</kbd>
+          </button>
+
           {NAV_GROUPS.map(group => (
             <div key={group.titleKey} className="mb-2">
               <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest px-3 py-1.5">
@@ -255,6 +379,13 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <RiArrowLeftLine className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            aria-label="搜索"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <RiSearchLine className="w-4 h-4" />
           </button>
           <button
             onClick={() => setDrawerOpen(true)}
@@ -394,6 +525,8 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
           <div className="h-safe-bottom shrink-0" />
         </div>
       </div>
+
+      <AdminSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }

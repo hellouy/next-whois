@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // ── Aggregate all search_history stats in ONE query ────────────────────
-    const [searchAgg, userAgg, paymentAgg, misc] = await Promise.all([
+    const [searchAgg, userAgg, paymentAgg, misc, linkApps, newExpiredLeads] = await Promise.all([
       one<{
         total: string; anon: string; logged: string;
         today: string; today_anon: string; today_logged: string;
@@ -108,6 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (SELECT COUNT(*) FROM tld_failure_events
              WHERE created_at > NOW() - INTERVAL '90 days')::text                             AS tld_failures
       `).catch(() => ({ stamps: "0", verified_stamps: "0", reminders: "0", feedback: "0", tld_failures: "0" })),
+      one<{ total: string }>(`SELECT COUNT(*)::text AS total FROM friendly_link_applications WHERE status = 'review'`).catch(() => ({ total: "0" })),
+      one<{ total: string }>(`SELECT COUNT(*)::text AS total FROM expired_domain_leads WHERE seen = false`).catch(() => ({ total: "0" })),
     ]);
 
     // ── List queries (small result sets) ──────────────────────────────────
@@ -163,6 +165,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       activeReminders:     parseInt(misc?.reminders        ?? "0"),
       searches:            parseInt(searchAgg?.total        ?? "0"),
       feedback:            parseInt(misc?.feedback          ?? "0"),
+      linkApplications:    parseInt(linkApps?.total        ?? "0"),
+      expiredLeadsNew:     parseInt(newExpiredLeads?.total ?? "0"),
       anonSearches:        parseInt(searchAgg?.anon         ?? "0"),
       loggedSearches:      parseInt(searchAgg?.logged       ?? "0"),
       todaySearches:       parseInt(searchAgg?.today        ?? "0"),
