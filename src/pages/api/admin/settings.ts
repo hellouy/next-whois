@@ -111,10 +111,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = req.body as Partial<SiteSettings>;
     try {
       const keys = (Object.keys(DEFAULT_SETTINGS) as (keyof SiteSettings)[]).filter(k => k in body);
-      if (keys.length > 0) {
+      // Empty server-only secrets mean "unchanged" — skip them so a stale page
+      // snapshot can never wipe a key that was configured elsewhere.
+      const effective = keys.filter(
+        k => !(SERVER_ONLY_KEYS.has(k) && String(body[k] ?? "") === ""),
+      );
+      if (effective.length > 0) {
         // Single multi-row batch upsert — far cheaper than N individual round-trips.
-        const placeholders = keys.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, NOW())`).join(", ");
-        const values = keys.flatMap(key => [key, String(body[key] ?? "")]);
+        const placeholders = effective.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, NOW())`).join(", ");
+        const values = effective.flatMap(key => [key, String(body[key] ?? "")]);
         await run(
           `INSERT INTO site_settings (key, value, updated_at)
            VALUES ${placeholders}
@@ -123,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       }
       invalidateCache();
-      return res.json({ ok: true, updated: keys.length });
+      return res.json({ ok: true, updated: effective.length });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
