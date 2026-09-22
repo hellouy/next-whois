@@ -128,7 +128,6 @@ function AdminSearchModal({ open, onClose }: { open: boolean; onClose: () => voi
   const { t } = useTranslation();
   const [q, setQ] = React.useState("");
   const [sel, setSel] = React.useState(0);
-  const [entries, setEntries] = React.useState<SearchEntry[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -139,17 +138,13 @@ function AdminSearchModal({ open, onClose }: { open: boolean; onClose: () => voi
     }
   }, [open]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const nav = NAV_GROUPS.flatMap(g => g.items).map(n => ({
-      label: t(n.labelKey as any),
-      keywords: "",
-      href: n.href,
-    }));
-    setEntries([...nav, ...SEARCH_EXTRAS]);
-  }, [open, t]);
-
   if (!open) return null;
+  const nav = NAV_GROUPS.flatMap(g => g.items).map(n => ({
+    label: t(n.labelKey as any),
+    keywords: "",
+    href: n.href,
+  }));
+  const entries: SearchEntry[] = [...nav, ...SEARCH_EXTRAS];
   const ql = q.trim().toLowerCase();
   const items = ql
     ? entries.filter(e => `${e.label} ${e.keywords}`.toLowerCase().includes(ql))
