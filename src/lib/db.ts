@@ -20,7 +20,7 @@ function setPool(p: Pool | null) { global.__pgPool = p ?? undefined; }
 function getMigrated(): boolean { return global.__pgMigrated ?? false; }
 function setMigrated(v: boolean) { global.__pgMigrated = v; }
 
-const CREATE_TABLES = [
+export const CREATE_TABLES = [
   `CREATE TABLE IF NOT EXISTS users (
     id                    VARCHAR(16)  PRIMARY KEY,
     email                 TEXT         UNIQUE NOT NULL,
@@ -356,7 +356,7 @@ const CREATE_TABLES = [
   )`,
 ];
 
-const ALTER_COLUMNS = [
+export const ALTER_COLUMNS = [
   `ALTER TABLE users         ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ`,
   `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS phase_flags          TEXT`,
   `ALTER TABLE reminders    ADD COLUMN IF NOT EXISTS notify_email         TEXT`,
@@ -428,7 +428,7 @@ const ALTER_COLUMNS = [
   `ALTER TABLE balance_transactions ADD COLUMN IF NOT EXISTS meta          TEXT`,
 ];
 
-const CREATE_INDEXES = [
+export const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_users_email              ON users (email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_subscription       ON users (subscription_access)`,
   `CREATE INDEX IF NOT EXISTS idx_reminders_email          ON reminders (email)`,
@@ -579,6 +579,25 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_sld     ON expired_domain_leads (sld text_pattern_ops)`,
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_starred ON expired_domain_leads (starred) WHERE starred = true`,
   `CREATE INDEX IF NOT EXISTS idx_expired_domain_leads_unseen  ON expired_domain_leads (seen) WHERE seen = false`,
+  // ── Domain drop calendar ───────────────────────────────────────────────────
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS drop_date     DATE`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS expiry_date   DATE`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS stage         TEXT NOT NULL DEFAULT 'deleted'`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS date_type     TEXT NOT NULL DEFAULT 'source'`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS value_score   INT`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS value_tier    TEXT`,
+  `ALTER TABLE expired_domain_leads ADD COLUMN IF NOT EXISTS value_reasons JSONB`,
+  `CREATE INDEX IF NOT EXISTS idx_edl_drop_date ON expired_domain_leads (drop_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_edl_stage     ON expired_domain_leads (stage)`,
+  `CREATE INDEX IF NOT EXISTS idx_edl_value     ON expired_domain_leads (value_score DESC NULLS LAST)`,
+  `CREATE TABLE IF NOT EXISTS drop_source_status (
+    source          TEXT         PRIMARY KEY,
+    enabled         BOOLEAN      NOT NULL DEFAULT true,
+    last_success_at TIMESTAMPTZ,
+    last_error      TEXT,
+    last_error_at   TIMESTAMPTZ,
+    items_last_run  INT          NOT NULL DEFAULT 0
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_fev_tld_created ON tld_failure_events (tld, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_fev_created     ON tld_failure_events (created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_fev_reason      ON tld_failure_events (fail_reason)`,

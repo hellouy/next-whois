@@ -33,7 +33,7 @@ export const ALERT_KEYWORDS = new Set([
 // ── Keyword categories (for scoring) ─────────────────────────────────────────
 
 /** AI / LLM / ML ecosystem — hottest segment */
-const AI_TECH_WORDS = new Set([
+export const AI_TECH_WORDS = new Set([
   // Core AI terms
   "ai", "gpt", "llm", "llms", "ml", "agi", "agi", "slm", "vlm", "nlp",
   "rag", "bot", "agi", "grok", "claude", "gemini", "openai", "sora", "dalle",
@@ -55,7 +55,7 @@ const AI_TECH_WORDS = new Set([
 ]);
 
 /** Web3 / Crypto / DeFi ecosystem */
-const WEB3_CRYPTO_WORDS = new Set([
+export const WEB3_CRYPTO_WORDS = new Set([
   // Core concepts
   "crypto", "web3", "defi", "nft", "dao", "dex", "dapp", "cefi",
   "wallet", "coin", "token", "chain", "layer", "rollup", "evm", "erc",
@@ -78,7 +78,7 @@ const WEB3_CRYPTO_WORDS = new Set([
 ]);
 
 /** Finance / Payments / Fintech */
-const FINANCE_WORDS = new Set([
+export const FINANCE_WORDS = new Set([
   "pay", "payment", "payments", "bank", "banking", "finance", "fintech",
   "invest", "fund", "asset", "wealth", "money", "cash", "forex",
   "stock", "trade", "trading", "market", "exchange", "brokerage",
@@ -88,7 +88,7 @@ const FINANCE_WORDS = new Set([
 ]);
 
 /** SaaS / B2B / Enterprise Software */
-const SAAS_WORDS = new Set([
+export const SAAS_WORDS = new Set([
   "saas", "paas", "iaas", "caas", "xaas", "crm", "erp", "hrm",
   "oms", "wms", "cms", "lms", "rms", "pms", "bpm", "rpa",
   "ecommerce", "commerce", "cart", "checkout", "fulfillment",
@@ -100,7 +100,7 @@ const SAAS_WORDS = new Set([
 ]);
 
 /** Cloud / Infrastructure / DevOps */
-const CLOUD_INFRA_WORDS = new Set([
+export const CLOUD_INFRA_WORDS = new Set([
   "cloud", "infra", "infrastructure", "devops", "devsecops",
   "k8s", "kubernetes", "docker", "container", "helm", "istio",
   "terraform", "pulumi", "ansible", "chef", "puppet", "salt",
@@ -119,7 +119,7 @@ const CLOUD_INFRA_WORDS = new Set([
 ]);
 
 /** Consumer / Brand / Commerce */
-const CONSUMER_BRAND_WORDS = new Set([
+export const CONSUMER_BRAND_WORDS = new Set([
   "shop", "store", "mall", "mart", "market", "buy", "sell", "deal",
   "startup", "venture", "global", "world", "inter", "pro", "plus",
   "max", "ultra", "prime", "top", "best", "first", "one", "now",
@@ -138,7 +138,7 @@ const CONSUMER_BRAND_WORDS = new Set([
 ]);
 
 // ── TLD value scores (0-20) ───────────────────────────────────────────────────
-const TLD_SCORES: Record<string, number> = {
+export const TLD_SCORES: Record<string, number> = {
   com: 20, ai: 19, io: 16, net: 14, org: 13,
   co: 13, app: 12, dev: 11, me: 10, gg: 10,
   so: 9, to: 9, ly: 8, sh: 8,
@@ -157,7 +157,7 @@ function isVowel(c: string) { return VOWELS.has(c); }
 function isConsonant(c: string) { return /[a-z]/.test(c) && !VOWELS.has(c); }
 
 /** CVCV / VCVC / CVVC pattern — pronounceable, more brandable */
-function pronounceabilityScore(name: string): number {
+export function pronounceabilityScore(name: string): number {
   if (!/^[a-z]+$/.test(name)) return 0;
   const len = name.length;
   if (len < 2 || len > 8) return 0;
@@ -175,7 +175,7 @@ function pronounceabilityScore(name: string): number {
 }
 
 /** Chinese market: numbers 8, 6, 9 are lucky (higher value) */
-function chineseNumberBonus(name: string): number {
+export function chineseNumberBonus(name: string): number {
   if (!/^\d+$/.test(name)) return 0;
   let score = 0;
   const lucky = name.split("").filter(c => c === "8" || c === "6" || c === "9").length;
@@ -349,7 +349,7 @@ export function scoreDomain(query: string, queryType: string): DomainValueResult
 }
 
 /** Extract candidate sub-words from a domain name (minLen: minimum subword length) */
-function extractSubwords(name: string, minLen = 2): string[] {
+export function extractSubwords(name: string, minLen = 2): string[] {
   const words: string[] = [];
   const maxLen = Math.min(name.length, 12);
   for (let len = minLen; len <= maxLen; len++) {

@@ -25,86 +25,11 @@ const logger = createLogger("api/admin/expired-domains-crawl");
 
 export const config = { maxDuration: 60 };
 
-const BASE = "https://member.expireddomains.net";
-const LOGIN_URL = "https://www.expireddomains.net/login/";
-const LOGIN_CHECK_URL = "https://www.expireddomains.net/logincheck/";
-const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
-// ── Cookie helpers ────────────────────────────────────────────────────────────
-
-function extractCookies(res: Response): string[] {
-  if (typeof (res.headers as any).getSetCookie === "function") {
-    return (res.headers as any).getSetCookie().map((c: string) => c.split(";")[0].trim());
-  }
-  const raw = res.headers.get("set-cookie");
-  if (!raw) return [];
-  return raw.split(/,(?=\s*\w+=)/).map((c) => c.split(";")[0].trim());
-}
-
-function cookieHeader(cookies: string[]): string {
-  const map = new Map<string, string>();
-  for (const c of cookies) {
-    const [name] = c.split("=");
-    map.set(name.trim(), c);
-  }
-  return Array.from(map.values()).join("; ");
-}
-
-// ── Login ─────────────────────────────────────────────────────────────────────
-
-async function loginToExpiredDomains(username: string, password: string): Promise<string> {
-  // The site migrated to www.expireddomains.net and its login form now posts to
-  // /logincheck/ with fields `login`, `password`, `rememberme` (no CSRF token).
-  const getRes = await fetch(LOGIN_URL, {
-    headers: { "User-Agent": UA },
-    redirect: "follow",
-  });
-  const loginCookies = extractCookies(getRes);
-
-  const postRes = await fetch(LOGIN_CHECK_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie": cookieHeader(loginCookies),
-      "Referer": LOGIN_URL,
-      "User-Agent": UA,
-      "Origin": BASE,
-    },
-    body: new URLSearchParams({ login: username, password, rememberme: "1" }).toString(),
-    redirect: "manual",
-  });
-
-  const postCookies = extractCookies(postRes);
-  const allCookies = cookieHeader([...loginCookies, ...postCookies]);
-
-  // New flow: /logincheck/ 302s to member.expireddomains.net/auth/?token=… which
-  // sets the member-subdomain sessionid cookie. Follow it before judging success.
-  const authUrl = postRes.headers.get("location");
-  let authCookies: string[] = [];
-  if (authUrl && authUrl.includes("/auth/")) {
-    try {
-      const authRes = await fetch(authUrl, {
-        headers: {
-          "Cookie": cookieHeader([...loginCookies, ...postCookies]),
-          "User-Agent": UA,
-        },
-        redirect: "manual",
-      });
-      authCookies = extractCookies(authRes);
-    } catch { /* cookie may still arrive on the logincheck response */ }
-  }
-  const sessionCookies = cookieHeader([...loginCookies, ...postCookies, ...authCookies]);
-
-  // The member subdomain sets the session cookie as `ExpiredDomainssessid`.
-  if (!sessionCookies.includes("ExpiredDomainssessid")) {
-    const hint =
-      postRes.status !== 302 && postRes.status !== 200
-        ? ` (unexpected HTTP ${postRes.status} after POST)`
-        : "";
-    throw new Error(`Login failed — check your expireddomains.net username and password${hint}`);
-  }
-  return sessionCookies;
-}
+import {
+  EXPIREDDOMAINS_BASE as BASE,
+  EXPIREDDOMAINS_UA as UA,
+  loginToExpiredDomains,
+} from "@/lib/drop-sources/expireddomains-auth";
 
 // ── Parse listing page ────────────────────────────────────────────────────────
 

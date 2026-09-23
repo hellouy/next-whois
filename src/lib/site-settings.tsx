@@ -181,6 +181,8 @@ export interface SiteSettings {
   expireddomains_tld_filter: string;
   expireddomains_rows: string;
   expireddomains_prefix_list: string;
+  // Domain drop calendar — whoisds daily list URLs (comma separated, optional)
+  whoisds_list_urls: string;
   // Site background style
   site_background: string;
   // Attribution text shown in the registrar card's server-info section
@@ -342,6 +344,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   expireddomains_tld_filter: "",
   expireddomains_rows: "200",
   expireddomains_prefix_list: "",
+  whoisds_list_urls: "",
   site_background: "dot",
   whois_server_attribution: "来自：不讲·李提供",
 };
