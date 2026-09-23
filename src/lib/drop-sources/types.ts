@@ -2,7 +2,7 @@
  * Shared contracts for the drop-calendar source adapters.
  */
 
-import type { DropStage } from "@/lib/drop-types";
+import type { DropStage, RegStatus } from "@/lib/drop-types";
 
 /** One normalized row produced by a source adapter, before lifecycle/valuation. */
 export interface RawDropRow {
@@ -14,6 +14,8 @@ export interface RawDropRow {
   dropDate?: string | null;
   /** Expiry date used to derive the drop date via lifecycle rules. */
   expiryDate?: string | null;
+  /** Registration restriction reported by the source, if known. */
+  regStatus?: RegStatus;
   bl?: number | null;
   dp?: number | null;
   sourceDateType: "source" | "derived";

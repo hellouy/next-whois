@@ -2046,7 +2046,11 @@
     "stats_total": "Total sur la période",
     "stats_today": "Drops aujourd'hui",
     "stats_tlds": "TLD principaux",
-    "stats_top": "Meilleure valeur"
+    "stats_top": "Meilleure valeur",
+    "reg_reserved": "Réservé",
+    "reg_reserved_note": "Nom réservé par le registre — enregistrement standard fermé",
+    "reg_prohibited": "Interdit",
+    "reg_prohibited_note": "L'enregistrement de ce nom est interdit"
   },
   "nav_drops": "Calendrier des drops",
   "nav_drops_desc": "Domaines bientôt libérés"

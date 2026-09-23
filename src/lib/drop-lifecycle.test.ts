@@ -55,6 +55,16 @@ describe("enrichDropRow", () => {
     expect(enrichDropRow(row({ expiryDate: "2026-10-01" }), ["clientHold"])).toBeNull();
   });
 
+  it("carries the registration status through, defaulting to available", () => {
+    expect(enrichDropRow(row({ dropDate: "2026-10-01", sourceDateType: "source" }))!.regStatus).toBe("available");
+    expect(
+      enrichDropRow(row({ dropDate: "2026-10-01", sourceDateType: "source", regStatus: "reserved" }))!.regStatus,
+    ).toBe("reserved");
+    expect(
+      enrichDropRow(row({ dropDate: "2026-10-01", sourceDateType: "source", regStatus: "prohibited" }))!.regStatus,
+    ).toBe("prohibited");
+  });
+
   it("returns null when no date can be resolved", () => {
     expect(enrichDropRow(row({}))).toBeNull();
   });

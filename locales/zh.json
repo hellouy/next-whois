@@ -2046,7 +2046,11 @@
     "stats_total": "窗口总数",
     "stats_today": "今日掉落",
     "stats_tlds": "热门后缀",
-    "stats_top": "最高价值"
+    "stats_top": "最高价值",
+    "reg_reserved": "保留域名",
+    "reg_reserved_note": "注册局保留域名，通常不开放常规注册",
+    "reg_prohibited": "禁止注册",
+    "reg_prohibited_note": "该域名当前被禁止注册"
   },
   "nav_drops": "掉落日历",
   "nav_drops_desc": "即将掉落的域名"

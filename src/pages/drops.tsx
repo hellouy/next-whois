@@ -19,8 +19,9 @@ import {
   RiGlobalLine,
   RiFilter3Line,
   RiRadarLine,
+  RiForbidLine,
 } from "@remixicon/react";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type TranslationKey } from "@/lib/i18n";
 import { format } from "date-fns";
 
 type SortKey = "value" | "date" | "bl";
@@ -35,6 +36,7 @@ interface DropLead {
   valueScore: number;
   valueTier: string;
   reasons: string[];
+  regStatus?: "reserved" | "prohibited";
   reminder_id?: string;
 }
 
@@ -68,6 +70,31 @@ const TIER_COLOR: Record<string, string> = {
   medium: "#7c3aed",
   normal: "#64748b",
   low: "#94a3b8",
+};
+
+/** Restricted-registration leads get their own card treatment, distinct from normal registerable ones. */
+const REG_STATUS_META: Record<
+  NonNullable<DropLead["regStatus"]>,
+  { labelKey: TranslationKey; noteKey: TranslationKey; bar: string; accent: string; chip: string; lockChip: string; Icon: typeof RiLockLine }
+> = {
+  reserved: {
+    labelKey: "drops.reg_reserved",
+    noteKey: "drops.reg_reserved_note",
+    bar: "border-l-2 bg-amber-500/[0.04]",
+    accent: "rgba(245,158,11,0.75)",
+    chip: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+    lockChip: "border-amber-400/40 text-amber-600 dark:text-amber-400",
+    Icon: RiLockLine,
+  },
+  prohibited: {
+    labelKey: "drops.reg_prohibited",
+    noteKey: "drops.reg_prohibited_note",
+    bar: "border-l-2 bg-rose-500/[0.04]",
+    accent: "rgba(244,63,94,0.75)",
+    chip: "text-rose-600 dark:text-rose-400 bg-rose-500/10",
+    lockChip: "border-rose-400/40 text-rose-600 dark:text-rose-400",
+    Icon: RiForbidLine,
+  },
 };
 
 const WINDOWS = [7, 30, 90];
@@ -509,13 +536,25 @@ export default function DropsPage() {
                           const monitored = monitoredSet.has(dm.domain);
                           const busy = !!subscribing[dm.domain];
                           const isUser = !!dm.reminder_id;
+                          const regMeta = dm.regStatus ? REG_STATUS_META[dm.regStatus] : undefined;
+                          const RegIcon = regMeta?.Icon;
                           return (
-                            <div key={dm.domain} className="px-4 py-2.5">
+                            <div
+                              key={dm.domain}
+                              className={cn("px-4 py-2.5", regMeta && regMeta.bar)}
+                              style={regMeta ? { borderLeftColor: regMeta.accent } : undefined}
+                            >
                               <div className="flex items-center gap-2">
                                 <RiGlobalLine className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                                 <span className="flex-1 min-w-0">
                                   <span className="flex items-center gap-1.5 flex-wrap">
                                     <span className="truncate text-xs font-medium">{dm.domain}</span>
+                                    {regMeta && RegIcon && (
+                                      <span className={cn("shrink-0 inline-flex items-center gap-1 text-[9px] font-bold rounded-full px-1.5 py-0.5", regMeta.chip)}>
+                                        <RegIcon className="w-2.5 h-2.5" />
+                                        {t(regMeta.labelKey)}
+                                      </span>
+                                    )}
                                     <span
                                       className="shrink-0 text-[9px] font-bold rounded-full px-1.5 py-0.5"
                                       style={{ color: TIER_COLOR[dm.valueTier] ?? TIER_COLOR.low, backgroundColor: `${TIER_COLOR[dm.valueTier] ?? TIER_COLOR.low}1a` }}
@@ -535,6 +574,12 @@ export default function DropsPage() {
                                     {dm.source}
                                     {dm.dropTime ? ` · ${t("drops.drop_time")} ${dm.dropTime}` : ""}
                                   </span>
+                                  {regMeta && RegIcon && (
+                                    <span className="flex items-start gap-1 mt-1 text-[9px] text-muted-foreground">
+                                      <RegIcon className="w-2.5 h-2.5 shrink-0 mt-px" />
+                                      {t(regMeta.noteKey)}
+                                    </span>
+                                  )}
                                   {dm.reasons.length > 0 && (
                                     <span className="flex flex-wrap gap-1 mt-1">
                                       {dm.reasons.slice(0, 4).map((r, ri) => (
@@ -555,7 +600,12 @@ export default function DropsPage() {
                                       {sniping[dm.domain] ? t("drops.sniping") : t("drops.snipe")}
                                     </button>
                                   )}
-                                  {monitored ? (
+                                  {regMeta && RegIcon ? (
+                                    <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-2 py-1 opacity-90", regMeta.lockChip)}>
+                                      <RegIcon className="w-3 h-3" />
+                                      {t(regMeta.labelKey)}
+                                    </span>
+                                  ) : monitored ? (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 rounded-full px-2 py-1">
                                       <RiCheckLine className="w-3 h-3" />
                                       {t("drops.monitored")}

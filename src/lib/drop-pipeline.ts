@@ -11,7 +11,7 @@ import { enrichDropRow } from "@/lib/drop-lifecycle";
 import { scoreDomainExtended, type ValueContext } from "@/lib/drop-value";
 import { loadValueContext } from "@/lib/server/drop-value-context";
 import { invalidateDropCache } from "@/lib/server/drop-cache";
-import type { DateType, DropStage } from "@/lib/drop-types";
+import type { DateType, DropStage, RegStatus } from "@/lib/drop-types";
 
 /** Map an adapter id to the `source` label persisted on leads. */
 export const SOURCE_LABELS: Record<string, string> = {
@@ -30,6 +30,7 @@ export interface UpsertLeadInput {
   expiryDate: string | null;
   stage: DropStage;
   dateType: DateType;
+  regStatus: RegStatus;
   valueScore: number;
   valueTier: string;
   valueReasons: string[];
@@ -54,8 +55,8 @@ async function defaultUpsertLead(lead: UpsertLeadInput): Promise<void> {
   await run(
     `INSERT INTO expired_domain_leads
        (domain, tld, sld, char_count, bl, dp, drop_date, expiry_date, stage, date_type,
-        value_score, value_tier, value_reasons, source, crawled_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,NOW())
+        status, value_score, value_tier, value_reasons, source, crawled_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,NOW())
      ON CONFLICT (domain) DO UPDATE SET
        tld           = EXCLUDED.tld,
        sld           = EXCLUDED.sld,
@@ -66,6 +67,7 @@ async function defaultUpsertLead(lead: UpsertLeadInput): Promise<void> {
        expiry_date   = EXCLUDED.expiry_date,
        stage         = EXCLUDED.stage,
        date_type     = EXCLUDED.date_type,
+       status        = EXCLUDED.status,
        value_score   = EXCLUDED.value_score,
        value_tier    = EXCLUDED.value_tier,
        value_reasons = EXCLUDED.value_reasons,
@@ -74,7 +76,7 @@ async function defaultUpsertLead(lead: UpsertLeadInput): Promise<void> {
     [
       lead.domain, lead.tld, lead.sld, lead.charCount, lead.bl, lead.dp,
       lead.dropDate, lead.expiryDate, lead.stage, lead.dateType,
-      lead.valueScore, lead.valueTier, JSON.stringify(lead.valueReasons), lead.source,
+      lead.regStatus, lead.valueScore, lead.valueTier, JSON.stringify(lead.valueReasons), lead.source,
     ],
   );
 }
@@ -152,6 +154,7 @@ export async function runDropPipeline(
       expiryDate: enriched.expiryDate,
       stage: enriched.stage,
       dateType: enriched.dateType,
+      regStatus: enriched.regStatus,
       valueScore: value?.score ?? 0,
       valueTier: value?.tierEn ?? "low",
       valueReasons: value?.reasons ?? [],

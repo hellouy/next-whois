@@ -2046,7 +2046,11 @@
     "stats_total": "視窗總數",
     "stats_today": "今日掉落",
     "stats_tlds": "熱門後綴",
-    "stats_top": "最高價值"
+    "stats_top": "最高價值",
+    "reg_reserved": "保留網域",
+    "reg_reserved_note": "註冊局保留網域，通常不開放常規註冊",
+    "reg_prohibited": "禁止註冊",
+    "reg_prohibited_note": "該網域目前被禁止註冊"
   },
   "nav_drops": "掉落日曆",
   "nav_drops_desc": "即將掉落的網域"

@@ -2046,7 +2046,11 @@
     "stats_total": "Gesamt im Zeitraum",
     "stats_today": "Heutige Drops",
     "stats_tlds": "Top-TLDs",
-    "stats_top": "Höchster Wert"
+    "stats_top": "Höchster Wert",
+    "reg_reserved": "Reserviert",
+    "reg_reserved_note": "Von der Registry reserviert — reguläre Registrierung geschlossen",
+    "reg_prohibited": "Gesperrt",
+    "reg_prohibited_note": "Die Registrierung dieses Namens ist untersagt"
   },
   "nav_drops": "Drop-Kalender",
   "nav_drops_desc": "Bevorstehende Domain-Drops"

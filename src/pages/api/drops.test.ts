@@ -115,6 +115,26 @@ describe("api/drops GET", () => {
     expect(result.body.user_drops).toEqual([]);
   });
 
+  it("exposes the registration status only for restricted leads", async () => {
+    const reserved = { ...row, domain: "keep.com", status: "reserved" };
+    const prohibited = { ...row, domain: "banned.com", status: "PROHIBITED" };
+    const normal = { ...row, status: "available" };
+    const legacy = { ...row, domain: "old.com" }; // no status column value at all
+    mocks.many
+      .mockResolvedValueOnce([reserved, prohibited, normal, legacy])
+      .mockResolvedValueOnce([{ total: 4, today: 0 }])
+      .mockResolvedValueOnce([{ tld: "com", count: 4 }])
+      .mockResolvedValueOnce([reserved])
+      .mockResolvedValueOnce([]);
+
+    const result = await callHandler({});
+    const leads = result.body.drops[0].domains;
+    expect(leads.find((d: any) => d.domain === "keep.com").regStatus).toBe("reserved");
+    expect(leads.find((d: any) => d.domain === "banned.com").regStatus).toBe("prohibited");
+    expect(leads.find((d: any) => d.domain === "car.com").regStatus).toBeUndefined();
+    expect(leads.find((d: any) => d.domain === "old.com").regStatus).toBeUndefined();
+  });
+
   it("locks the calendar when public access is disabled", async () => {
     mocks.setting = "0";
     const result = await callHandler({});

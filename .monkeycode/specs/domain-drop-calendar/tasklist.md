@@ -165,3 +165,12 @@
 - [x] 14. 检查点 - 最终验证
   - 运行 `npx tsc --noEmit`、`npx vitest run`、`node scripts/check-locale-keys.mjs` 全部通过
   - 确保所有测试通过,如有疑问请询问用户
+
+- [x] 15. 增量需求 - 受限注册状态卡片区分
+  - [x] 15.1 打通注册状态数据通路
+    - `RegStatus` 类型（available/reserved/prohibited）；`RawDropRow`/`EnrichedDropRow`/`UpsertLeadInput` 透传；管线 upsert 写入 `status` 列；`/api/drops` 仅在非 available 时返回 `regStatus`
+  - [x] 15.2 实现受限卡片独立样式
+    - 保留域名（琥珀）/禁止注册（玫红）使用独立左边条、底色、状态徽章与说明文案；受限域名隐藏监控入口，抢注入口仅管理员可见
+  - [x] 15.3 补充状态文案与测试
+    - 4 个 `drops.reg_*` key × 8 语言；lifecycle/pipeline/API 透传测试
+

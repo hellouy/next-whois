@@ -36,6 +36,7 @@ interface LeadRow {
   date_type: string;
   source: string;
   stage: string;
+  status: string;
   value_score: number | null;
   value_tier: string | null;
   value_reasons: unknown;
@@ -55,7 +56,7 @@ function parseReasons(raw: unknown): string[] {
 }
 
 function toLead(row: LeadRow): DropLeadView {
-  return {
+  const lead: DropLeadView = {
     domain: row.domain,
     tld: row.tld,
     dropDate: row.drop_date,
@@ -66,6 +67,9 @@ function toLead(row: LeadRow): DropLeadView {
     valueTier: row.value_tier ?? "low",
     reasons: parseReasons(row.value_reasons),
   };
+  const reg = String(row.status ?? "available").toLowerCase();
+  if (reg === "reserved" || reg === "prohibited") lead.regStatus = reg;
+  return lead;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -120,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (publicEnabled || email) {
     try {
       const rows = await many<LeadRow>(
-        `SELECT domain, tld, drop_date::text AS drop_date, date_type, source, stage,
+        `SELECT domain, tld, drop_date::text AS drop_date, date_type, source, stage, status,
                 value_score, value_tier, value_reasons, bl, dp
          FROM expired_domain_leads
          WHERE ${where}
@@ -159,7 +163,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           params,
         ),
         many<LeadRow>(
-          `SELECT domain, tld, drop_date::text AS drop_date, date_type, source, stage,
+          `SELECT domain, tld, drop_date::text AS drop_date, date_type, source, stage, status,
                   value_score, value_tier, value_reasons, bl, dp
            FROM expired_domain_leads WHERE ${where}
            ORDER BY value_score DESC NULLS LAST LIMIT ${TOP_LIMIT}`,

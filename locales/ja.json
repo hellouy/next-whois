@@ -2046,7 +2046,11 @@
     "stats_total": "期間内合計",
     "stats_today": "本日のドロップ",
     "stats_tlds": "人気TLD",
-    "stats_top": "最高価値"
+    "stats_top": "最高価値",
+    "reg_reserved": "予約ドメイン",
+    "reg_reserved_note": "レジストリ保留ドメインは通常の登録ができません",
+    "reg_prohibited": "登録禁止",
+    "reg_prohibited_note": "このドメインは現在登録が禁止されています"
   },
   "nav_drops": "ドロップカレンダー",
   "nav_drops_desc": "まもなくドロップするドメイン"

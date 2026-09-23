@@ -11,6 +11,14 @@ export type DropStage = "pending_delete" | "expiring" | "deleted";
 
 export type DateType = "source" | "derived";
 
+/**
+ * Registration availability of a lead:
+ *   available  — name drops and anyone can register it
+ *   reserved   — registry-reserved name, closed to regular registration
+ *   prohibited — registration explicitly prohibited for this name
+ */
+export type RegStatus = "available" | "reserved" | "prohibited";
+
 export interface DropLeadView {
   domain: string;
   tld: string;
@@ -21,6 +29,8 @@ export interface DropLeadView {
   valueScore: number;
   valueTier: string;
   reasons: string[];
+  /** Omitted for "available" so normal leads stay unchanged on the wire. */
+  regStatus?: Exclude<RegStatus, "available">;
 }
 
 export interface DropSourceStatusView {

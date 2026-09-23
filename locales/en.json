@@ -2046,7 +2046,11 @@
     "stats_total": "Total in window",
     "stats_today": "Drops today",
     "stats_tlds": "Top TLDs",
-    "stats_top": "Top value"
+    "stats_top": "Top value",
+    "reg_reserved": "Reserved",
+    "reg_reserved_note": "Registry-reserved name — closed to regular registration",
+    "reg_prohibited": "Prohibited",
+    "reg_prohibited_note": "Registration prohibited for this name"
   },
   "nav_drops": "Drop Calendar",
   "nav_drops_desc": "Upcoming domain drops"

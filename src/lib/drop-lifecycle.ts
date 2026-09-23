@@ -14,7 +14,7 @@ import {
   type TldLifecycle,
 } from "@/lib/lifecycle";
 import { resolveDropDate } from "@/lib/drop-normalize";
-import type { DateType, DropStage } from "@/lib/drop-types";
+import type { DateType, DropStage, RegStatus } from "@/lib/drop-types";
 import type { RawDropRow } from "@/lib/drop-sources/types";
 
 const BLOCKING_EPP = ["hold", "prohibited", "disputed", "suspicious"];
@@ -35,6 +35,7 @@ export interface EnrichedDropRow {
   dropTime: string | null;
   expiryDate: string | null;
   dateType: DateType;
+  regStatus: RegStatus;
   confidence: "high" | "low";
   deviationDays: number | null;
   bl: number | null;
@@ -83,6 +84,7 @@ export function enrichDropRow(
     dropTime,
     expiryDate: expiry,
     dateType: resolved.dateType,
+    regStatus: row.regStatus ?? "available",
     confidence,
     deviationDays: resolved.deviationDays,
     bl: row.bl ?? null,

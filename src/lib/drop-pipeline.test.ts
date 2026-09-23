@@ -65,6 +65,21 @@ describe("runDropPipeline", () => {
     expect(h.invalidations).toBe(1);
   });
 
+  it("persists the registration status onto the lead", async () => {
+    const h = harness(
+      [
+        { domain: "keep.com", stage: "deleted", dropDate: "2026-10-01", sourceDateType: "source", source: "whoisds", regStatus: "reserved" },
+        { domain: "free.com", stage: "deleted", dropDate: "2026-10-01", sourceDateType: "source", source: "whoisds" },
+      ],
+      [{ source: "whoisds", ok: true, items: 2, skipped: 0, error: null }],
+    );
+
+    await runDropPipeline(h.deps);
+
+    expect(h.leads.find((l) => l.domain === "keep.com")!.regStatus).toBe("reserved");
+    expect(h.leads.find((l) => l.domain === "free.com")!.regStatus).toBe("available");
+  });
+
   it("maps every known adapter id to its persisted label", () => {
     expect(SOURCE_LABELS.expireddomains).toBe("expireddomains.net");
     expect(SOURCE_LABELS.whoisds).toBe("whoisds.com");
