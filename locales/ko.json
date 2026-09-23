@@ -2050,7 +2050,11 @@
     "reg_reserved": "예약 도메인",
     "reg_reserved_note": "레지스트리 예약 도메인은 일반 등록이 불가합니다",
     "reg_prohibited": "등록 금지",
-    "reg_prohibited_note": "해당 도메인은 현재 등록이 금지되어 있습니다"
+    "reg_prohibited_note": "해당 도메인은 현재 등록이 금지되어 있습니다",
+    "reg_available": "등록 가능",
+    "reg_mark": "등록 상태 변경",
+    "reg_saved": "상태가 업데이트되었습니다",
+    "reg_save_failed": "상태 업데이트 실패"
   },
   "nav_drops": "드롭 캘린더",
   "nav_drops_desc": "곧 드롭될 도메인"

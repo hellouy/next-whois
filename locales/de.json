@@ -2050,7 +2050,11 @@
     "reg_reserved": "Reserviert",
     "reg_reserved_note": "Von der Registry reserviert — reguläre Registrierung geschlossen",
     "reg_prohibited": "Gesperrt",
-    "reg_prohibited_note": "Die Registrierung dieses Namens ist untersagt"
+    "reg_prohibited_note": "Die Registrierung dieses Namens ist untersagt",
+    "reg_available": "Verfügbar",
+    "reg_mark": "Registrierungsstatus ändern",
+    "reg_saved": "Status aktualisiert",
+    "reg_save_failed": "Status konnte nicht aktualisiert werden"
   },
   "nav_drops": "Drop-Kalender",
   "nav_drops_desc": "Bevorstehende Domain-Drops"

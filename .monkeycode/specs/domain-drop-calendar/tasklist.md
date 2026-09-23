@@ -173,4 +173,6 @@
     - 保留域名（琥珀）/禁止注册（玫红）使用独立左边条、底色、状态徽章与说明文案；受限域名隐藏监控入口，抢注入口仅管理员可见
   - [x] 15.3 补充状态文案与测试
     - 4 个 `drops.reg_*` key × 8 语言；lifecycle/pipeline/API 透传测试
+  - [x] 15.4 管理端手动标记入口
+    - 新增 `POST /api/admin/drop-lead-status`（requireAdmin，校验 domain/status，写 `expired_domain_leads.status` 并失效缓存）；`drops.tsx` 管理员操作区加入状态下拉（available/reserved/prohibited），含 4 个 `drops.reg_*` key × 8 语言与端点单测（6 例）
 

@@ -2050,7 +2050,11 @@
     "reg_reserved": "保留域名",
     "reg_reserved_note": "注册局保留域名，通常不开放常规注册",
     "reg_prohibited": "禁止注册",
-    "reg_prohibited_note": "该域名当前被禁止注册"
+    "reg_prohibited_note": "该域名当前被禁止注册",
+    "reg_available": "可注册",
+    "reg_mark": "标记注册状态",
+    "reg_saved": "状态已更新",
+    "reg_save_failed": "状态更新失败"
   },
   "nav_drops": "掉落日历",
   "nav_drops_desc": "即将掉落的域名"

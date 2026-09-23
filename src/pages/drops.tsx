@@ -22,6 +22,7 @@ import {
   RiForbidLine,
 } from "@remixicon/react";
 import { useTranslation, type TranslationKey } from "@/lib/i18n";
+import type { RegStatus } from "@/lib/drop-types";
 import { format } from "date-fns";
 
 type SortKey = "value" | "date" | "bl";
@@ -124,6 +125,7 @@ export default function DropsPage() {
   const [monitoredSet, setMonitoredSet] = React.useState<Set<string>>(new Set());
   const [subscribing, setSubscribing] = React.useState<Record<string, boolean>>({});
   const [sniping, setSniping] = React.useState<Record<string, boolean>>({});
+  const [savingStatus, setSavingStatus] = React.useState<Record<string, boolean>>({});
 
   const isAdmin = !!(session?.user as any)?.isAdmin;
 
@@ -235,6 +237,28 @@ export default function DropsPage() {
       toast.error(t("drops.failed"));
     } finally {
       setSubscribing(prev => { const n = { ...prev }; delete n[domain]; return n; });
+    }
+  };
+
+  const handleRegStatus = async (domain: string, status: RegStatus) => {
+    if (savingStatus[domain]) return;
+    setSavingStatus(prev => ({ ...prev, [domain]: true }));
+    try {
+      const res = await fetch("/api/admin/drop-lead-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, status }),
+      });
+      if (res.ok) {
+        toast.success(t("drops.reg_saved"));
+        await load();
+      } else {
+        toast.error(t("drops.reg_save_failed"));
+      }
+    } catch {
+      toast.error(t("drops.reg_save_failed"));
+    } finally {
+      setSavingStatus(prev => { const n = { ...prev }; delete n[domain]; return n; });
     }
   };
 
@@ -589,6 +613,23 @@ export default function DropsPage() {
                                   )}
                                 </span>
                                 <div className="flex items-center gap-1.5 shrink-0">
+                                  {isAdmin && (
+                                    <select
+                                      value={dm.regStatus ?? "available"}
+                                      disabled={!!savingStatus[dm.domain]}
+                                      onChange={(e) => handleRegStatus(dm.domain, e.target.value as RegStatus)}
+                                      aria-label={t("drops.reg_mark")}
+                                      title={t("drops.reg_mark")}
+                                      className={cn(
+                                        "text-[10px] rounded-full border px-1.5 py-1 bg-transparent outline-none touch-manipulation disabled:opacity-50",
+                                        regMeta ? regMeta.lockChip : "border-border text-muted-foreground",
+                                      )}
+                                    >
+                                      <option value="available">{t("drops.reg_available")}</option>
+                                      <option value="reserved">{t("drops.reg_reserved")}</option>
+                                      <option value="prohibited">{t("drops.reg_prohibited")}</option>
+                                    </select>
+                                  )}
                                   {isAdmin && (
                                     <button
                                       type="button"

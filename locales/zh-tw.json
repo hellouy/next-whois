@@ -2050,7 +2050,11 @@
     "reg_reserved": "保留網域",
     "reg_reserved_note": "註冊局保留網域，通常不開放常規註冊",
     "reg_prohibited": "禁止註冊",
-    "reg_prohibited_note": "該網域目前被禁止註冊"
+    "reg_prohibited_note": "該網域目前被禁止註冊",
+    "reg_available": "可註冊",
+    "reg_mark": "標記註冊狀態",
+    "reg_saved": "狀態已更新",
+    "reg_save_failed": "狀態更新失敗"
   },
   "nav_drops": "掉落日曆",
   "nav_drops_desc": "即將掉落的網域"

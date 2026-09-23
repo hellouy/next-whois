@@ -2050,7 +2050,11 @@
     "reg_reserved": "Réservé",
     "reg_reserved_note": "Nom réservé par le registre — enregistrement standard fermé",
     "reg_prohibited": "Interdit",
-    "reg_prohibited_note": "L'enregistrement de ce nom est interdit"
+    "reg_prohibited_note": "L'enregistrement de ce nom est interdit",
+    "reg_available": "Disponible",
+    "reg_mark": "Modifier le statut d'enregistrement",
+    "reg_saved": "Statut mis à jour",
+    "reg_save_failed": "Échec de la mise à jour du statut"
   },
   "nav_drops": "Calendrier des drops",
   "nav_drops_desc": "Domaines bientôt libérés"
