@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/snipe-probe",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/drop-sources",
+      "schedule": "30 4,16 * * *"
     }
   ],
   "functions": {
@@ -74,6 +78,9 @@
       "maxDuration": 300
     },
     "src/pages/api/cron/snipe-probe.ts": {
+      "maxDuration": 300
+    },
+    "src/pages/api/cron/drop-sources.ts": {
       "maxDuration": 300
     },
     "src/pages/api/admin/subscription-sync.ts": {
