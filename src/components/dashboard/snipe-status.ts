@@ -3,7 +3,9 @@
  * canonical map in @/lib/snipe-status so list, detail, admin and email views
  * render identical Chinese wording.
  */
-import { SNIPE_STATUS_LABELS } from "@/lib/snipe-status";
+import { SNIPE_STATUS_LABELS, snipeFailReasonLabel } from "@/lib/snipe-status";
+
+export { snipeFailReasonLabel };
 
 export const SNIPE_STATUS_META: Record<string, { label: string; cls: string; dot: string }> = {
   watching:        { label: SNIPE_STATUS_LABELS.watching,        cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300", dot: "bg-gray-400" },

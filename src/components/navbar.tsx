@@ -37,6 +37,7 @@ import {
   RiPauseCircleLine,
   RiStarLine,
   RiCalendarLine,
+  RiShieldCheckLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -767,6 +768,7 @@ const NOTIF_TYPE_ICON: Record<string, React.ReactNode> = {
   dropped: <RiCloseCircleLine className="w-3.5 h-3.5" />,
   hold: <RiPauseCircleLine className="w-3.5 h-3.5" />,
   reserved: <RiLockLine className="w-3.5 h-3.5" />,
+  snipe: <RiShieldCheckLine className="w-3.5 h-3.5" />,
   membership: <RiStarLine className="w-3.5 h-3.5" />,
 };
 
@@ -787,7 +789,7 @@ function NotificationBell() {
 
   const fetchNotifications = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/user/notifications?limit=8");
+      const res = await fetch("/api/user/notifications?limit=20");
       if (!res.ok) return;
       const data = await res.json();
       setItems(Array.isArray(data.notifications) ? data.notifications : []);

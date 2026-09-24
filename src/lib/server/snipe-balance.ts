@@ -12,6 +12,7 @@ import type { TxClient } from "@/lib/db-query";
 import { one, many, run, withTransaction } from "@/lib/db-query";
 import { sendEmail } from "@/lib/email";
 import { snipeArmedHtml } from "@/lib/email";
+import { recordNotification } from "@/lib/notifications";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("server/snipe-balance");
@@ -221,13 +222,18 @@ export async function createUserSnipeTarget(tx: TxClient, params: {
     [domain],
   );
   if (existing) {
+    // A cancelled/failed preorder no longer occupies the domain, so any user
+    // may claim it (R2.3). Live preorders stay first-come-first-served.
+    const terminated =
+      existing.status === "cancelled" || existing.status === "failed";
     const occupied =
-      !existing.user_email ||
-      existing.user_email !== userEmail ||
-      SNIPE_OCCUPIED_STATUSES.includes(existing.status);
+      !terminated &&
+      (!existing.user_email ||
+        existing.user_email !== userEmail ||
+        SNIPE_OCCUPIED_STATUSES.includes(existing.status));
     if (occupied) throw new SnipeTakenError(domain);
 
-    // Reuse the orphaned row owned by this user (cancelled/failed).
+    // Reuse the row (orphaned by this user or released by another user).
     await tx.run(
       `UPDATE snipe_targets
          SET status = 'watching', user_email = $2, tld = $3,
@@ -326,6 +332,13 @@ export async function autoArmBlockedTargets(userEmail: string): Promise<number> 
         subject: `[抢注预定] ${target.domain} 已进入竞速`,
         html: snipeArmedHtml({ domain: target.domain, serviceCents: service }),
       }).catch((e) => logger.error(`[snipe-balance] armed email failed: ${e.message}`));
+      void recordNotification({
+        email: userEmail,
+        type: "snipe",
+        title: `抢注已进入竞速：${target.domain}`,
+        body: "冻结完成，域名释放后将自动为你发起注册抢占。",
+        domain: target.domain,
+      }).catch((e) => logger.error(`[snipe-balance] armed notification failed: ${e.message}`));
     } catch (e) {
       logger.error(`[snipe-balance] auto-arm failed for ${target.domain}: ${(e as Error).message}`);
     }

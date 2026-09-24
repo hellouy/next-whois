@@ -18,7 +18,7 @@ vi.mock("@/lib/db-query", () => ({
 }));
 
 vi.mock("@/lib/email", () => ({
-  sendEmail: (...a: unknown[]) => mocks.sendEmail(...a),
+  sendEmail: async (...a: unknown[]) => mocks.sendEmail(...a),
   snipeArmedHtml: () => "<html></html>",
 }));
 
@@ -377,6 +377,66 @@ describe("snipe-balance", () => {
         domain: "admin.example",
         tld: "example",
         userEmail: "user@example.com",
+        serviceCents: 5000,
+        expirationDate: null,
+      })).rejects.toBeInstanceOf(SnipeTakenError);
+    });
+
+    it("lets a new user claim a domain whose previous preorder was cancelled by someone else (R2.3)", async () => {
+      const tx = makeTx({
+        targets: new Map([["t0", {
+          id: "t0",
+          domain: "released.example",
+          status: "cancelled",
+          user_email: "previous@example.com",
+          frozen_cents: 0,
+        }]]),
+      });
+      const id = await createUserSnipeTarget(tx, {
+        domain: "released.example",
+        tld: "example",
+        userEmail: "newcomer@example.com",
+        serviceCents: 5000,
+        expirationDate: null,
+      });
+      expect(id).toBe("t0");
+      expect(tx.state.targets.get("t0")?.status).toBe("watching");
+    });
+
+    it("lets a new user claim a domain whose previous preorder failed (R2.3)", async () => {
+      const tx = makeTx({
+        targets: new Map([["t0", {
+          id: "t0",
+          domain: "failed.example",
+          status: "failed",
+          user_email: "previous@example.com",
+          frozen_cents: 0,
+        }]]),
+      });
+      const id = await createUserSnipeTarget(tx, {
+        domain: "failed.example",
+        tld: "example",
+        userEmail: "newcomer@example.com",
+        serviceCents: 5000,
+        expirationDate: null,
+      });
+      expect(id).toBe("t0");
+    });
+
+    it("still blocks a new user when the previous owner holds a live preorder", async () => {
+      const tx = makeTx({
+        targets: new Map([["t0", {
+          id: "t0",
+          domain: "live.example",
+          status: "blocked_balance",
+          user_email: "previous@example.com",
+          frozen_cents: 0,
+        }]]),
+      });
+      await expect(createUserSnipeTarget(tx, {
+        domain: "live.example",
+        tld: "example",
+        userEmail: "newcomer@example.com",
         serviceCents: 5000,
         expirationDate: null,
       })).rejects.toBeInstanceOf(SnipeTakenError);

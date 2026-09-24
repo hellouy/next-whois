@@ -173,7 +173,23 @@ export const CREATE_TABLES = [
     scrape_status          TEXT         NOT NULL DEFAULT 'pending',
     failure_reason         TEXT,
     fetch_strategy         TEXT,
-    scrape_attempts        INTEGER      NOT NULL DEFAULT 0
+    scrape_attempts        INTEGER      NOT NULL DEFAULT 0,
+    channels               TEXT
+  )`,
+  `CREATE TABLE IF NOT EXISTS tld_crawl_progress (
+    run_key      TEXT        PRIMARY KEY,
+    status       TEXT        NOT NULL DEFAULT 'idle',
+    done         INTEGER     NOT NULL DEFAULT 0,
+    total        INTEGER     NOT NULL DEFAULT 0,
+    ok           INTEGER     NOT NULL DEFAULT 0,
+    skipped      INTEGER     NOT NULL DEFAULT 0,
+    errors       INTEGER     NOT NULL DEFAULT 0,
+    default_only INTEGER     NOT NULL DEFAULT 0,
+    iana_total   INTEGER,
+    current_tld  TEXT,
+    pid          INTEGER,
+    started_at   TIMESTAMPTZ,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
   `CREATE TABLE IF NOT EXISTS tld_lifecycle_overrides (
     id             VARCHAR(16)  PRIMARY KEY,
@@ -409,6 +425,7 @@ export const ALTER_COLUMNS = [
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS needs_admin_review   BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS processing_at        TIMESTAMPTZ`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS processing_from      TEXT`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS channels             TEXT`,
   `ALTER TABLE payment_plans ADD COLUMN IF NOT EXISTS balance_grant_cents INTEGER NOT NULL DEFAULT 0`,
   /* Drop overly-restrictive confidence check — scraper uses high/medium/low/ai */
   `ALTER TABLE tld_rules DROP CONSTRAINT IF EXISTS tld_rules_confidence_check`,

@@ -208,6 +208,10 @@ export function DomainReminderDialog({
         const errData = await res.json().catch(() => ({}));
         if (errData.code === "ALREADY_SUBSCRIBED") {
           setAlreadySubscribed(true);
+        } else if (errData.code === "SNIPE_TAKEN") {
+          setSnipeEnabled(false);
+          setSnipeResult({ status: "failed", reason: errData.error || "该域名已被其他用户预定抢注" });
+          toast.error(isZh ? "该域名已被其他用户预定抢注" : "This domain is already preordered by another user");
         } else {
           toast.error(errData.error || (isZh ? "提交失败，请重试" : "Submission failed"));
         }

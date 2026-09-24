@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { UserSnipeTargetDto } from "@/pages/api/user/snipe-targets";
 import {
   SNIPE_STATUS_META, SNIPE_FILTERS, SNIPE_BALANCE_SYM,
+  snipeFailReasonLabel,
   type SnipeFilter,
 } from "./snipe-status";
 
@@ -224,7 +225,7 @@ export function SnipeListView({
                   {target.status === "watching" && "正在等待参与竞速"}
                   {target.status === "sniping" && "竞速进行中 · 系统正在抢注"}
                   {target.status === "succeeded" && "抢注成功 · 域名已注册"}
-                  {target.status === "failed" && (target.failReason ? `抢注失败 · ${target.failReason}` : "抢注失败")}
+                  {target.status === "failed" && (target.failReason ? `抢注失败 · ${snipeFailReasonLabel(target.failReason)}` : "抢注失败")}
                   {target.status === "cancelled" && "已取消 · 冻结金额已退还"}
                   {target.status === "paused" && "已暂停"}
                 </p>

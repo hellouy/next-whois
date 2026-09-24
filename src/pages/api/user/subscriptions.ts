@@ -481,12 +481,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
+      const userEmail = session.user.email;
+      const sub = await one<{ domain: string }>(
+        "SELECT domain FROM reminders WHERE id = $1 AND email = $2",
+        [id as string, userEmail],
+      );
       await run(
         `UPDATE reminders
          SET active = false, cancelled_at = $1, cancel_reason = 'user_dashboard'
          WHERE id = $2 AND email = $3`,
-        [new Date().toISOString(), id as string, session.user.email],
+        [new Date().toISOString(), id as string, userEmail],
       );
+      // Cancelling a subscription also ends its preorder and refunds any hold,
+      // so users are not trapped paying for a domain they just unsubscribed.
+      if (sub?.domain) {
+        await withTransaction((tx) =>
+          cancelUserSnipeTarget(tx, { domain: sub.domain, userEmail }),
+        );
+      }
     } catch (err) {
       logger.error("[subscriptions] DELETE error:", err instanceof Error ? err.message : String(err));
       return res.status(500).json({ error: "Cancellation failed, please try again" });

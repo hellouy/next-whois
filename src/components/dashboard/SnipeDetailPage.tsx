@@ -13,7 +13,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { SNIPE_BALANCE_SYM, getSnipeStatusMeta } from "./snipe-status";
+import { SNIPE_BALANCE_SYM, getSnipeStatusMeta, snipeFailReasonLabel } from "./snipe-status";
 
 export type SnipeTargetDetail = {
   id: string;
@@ -70,6 +70,16 @@ function stepStateFor(status: string, index: number): "done" | "current" | "todo
     return "current";
   }
   return "todo";
+}
+
+function fmtDateTime(v: string | null | undefined): string {
+  if (!v) return "-";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return d.toLocaleString("zh-CN", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export function SnipeFlowSteps({ status }: { status: string }) {
@@ -199,6 +209,45 @@ export function SnipeDetailPage({
         <p className="text-[11px] font-bold text-muted-foreground mb-2">抢注流程</p>
         <SnipeFlowSteps status={target.status} />
       </div>
+
+      {/* Hunt window */}
+      {(target.dropEta || target.huntStart || target.huntEnd) && (
+        <div className="glass-panel border border-border rounded-2xl p-3.5 space-y-2">
+          <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+            <RiTimeLine className="w-3.5 h-3.5" />竞速窗口
+          </p>
+          <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+            {target.dropEta && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">预计释放</span>
+                <span className="font-medium text-right">{fmtDateTime(target.dropEta)}</span>
+              </div>
+            )}
+            {target.huntStart && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">竞速开始</span>
+                <span className="font-medium text-right">{fmtDateTime(target.huntStart)}</span>
+              </div>
+            )}
+            {target.huntEnd && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">竞速截止</span>
+                <span className="font-medium text-right">{fmtDateTime(target.huntEnd)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Failure explanation */}
+      {target.status === "failed" && target.failReason && (
+        <div className="glass-panel border border-rose-200 dark:border-rose-900/40 rounded-2xl p-3.5 space-y-1">
+          <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+            <RiErrorWarningLine className="w-3.5 h-3.5" />抢注未成功
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{snipeFailReasonLabel(target.failReason)}</p>
+        </div>
+      )}
 
       {/* Key numbers */}
       <div className="grid grid-cols-2 gap-2">

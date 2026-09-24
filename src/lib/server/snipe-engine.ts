@@ -44,6 +44,7 @@ import { sendEmail } from "@/lib/email";
 import { snipeNotifyHtml, snipeArmedHtml, snipeSettledHtml, snipeReleasedHtml, snipeInsufficientHtml } from "@/lib/email";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
 import { snipeStatusLabel } from "@/lib/snipe-status";
+import { recordNotification } from "@/lib/notifications";
 import { createLogger } from "@/lib/logger";
 import { freezeForSnipe, settleSnipeCharge, releaseSnipeHold } from "@/lib/server/snipe-balance";
 import { snipeServicePrice } from "@/lib/server/snipe-pricing";
@@ -381,6 +382,13 @@ async function notifySnipeInsufficient(t: SnipeTargetRow, serviceCents: number):
       siteName: "WHOIS",
     }),
   }).catch((e) => logger.error(`[snipe] user insufficient email failed: ${e.message}`));
+  await recordNotification({
+    email: t.user_email,
+    type: "snipe",
+    title: `抢注预定余额不足：${t.domain}`,
+    body: "余额不足以覆盖抢注服务费，充值后将自动恢复竞速。",
+    domain: t.domain,
+  });
   await run(`UPDATE snipe_targets SET recharge_alerted_at = NOW() WHERE id = $1`, [t.id]);
 }
 
@@ -404,6 +412,13 @@ async function settleUserCharge(t: SnipeTargetRow, opeId: string | undefined): P
     subject: `[抢注成功] ${t.domain}`,
     html: snipeSettledHtml({ domain: t.domain, serviceCents: amount, opeId, siteName: "WHOIS" }),
   }).catch((e) => logger.error(`[snipe] user settled email failed: ${e.message}`));
+  await recordNotification({
+    email: t.user_email,
+    type: "snipe",
+    title: `抢注成功：${t.domain}`,
+    body: `域名已注册成功，已扣收服务费 ¥${(amount / 100).toFixed(2)}。`,
+    domain: t.domain,
+  });
 }
 
 /**
@@ -425,6 +440,13 @@ async function releaseUserHold(t: SnipeTargetRow): Promise<void> {
     subject: `[抢注未成功] ${t.domain}`,
     html: snipeReleasedHtml({ domain: t.domain, releasedCents: amount, siteName: "WHOIS" }),
   }).catch((e) => logger.error(`[snipe] user released email failed: ${e.message}`));
+  await recordNotification({
+    email: t.user_email,
+    type: "snipe",
+    title: `抢注未成功：${t.domain}`,
+    body: `本次抢注未成功，冻结的服务费 ¥${(amount / 100).toFixed(2)} 已全额解冻退回余额。`,
+    domain: t.domain,
+  });
 }
 
 /**

@@ -13,6 +13,7 @@ export type NotificationType =
   | "dropped"
   | "hold"
   | "reserved"
+  | "snipe"
   | "membership";
 
 /**

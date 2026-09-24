@@ -14,6 +14,7 @@ import { snipeServicePrice } from "@/lib/server/snipe-pricing";
 import {
   createUserSnipeTarget,
   freezeForSnipe,
+  SNIPE_OCCUPIED_STATUSES,
   SnipeTakenError,
 } from "@/lib/server/snipe-balance";
 
@@ -157,6 +158,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cancelToken  = randomBytes(20).toString("hex");
   const id           = randomBytes(8).toString("hex");
 
+  // ── Preorder first-come-first-served guard ────────────────────────────────
+  // Reject the whole submission before writing anything when the domain is
+  // already occupied by another user's active preorder (R2.1).
+  if (snipeRequested) {
+    const taken = await one<{ id: string }>(
+      `SELECT id FROM snipe_targets
+        WHERE domain = $1
+          AND (user_email IS NULL OR user_email <> $2)
+          AND status = ANY($3)`,
+      [cleanDomain, cleanEmail, SNIPE_OCCUPIED_STATUSES],
+    ).catch(() => null);
+    if (taken) {
+      return res.status(409).json({
+        code: "SNIPE_TAKEN",
+        error: "该域名已被其他用户预定抢注",
+      });
+    }
+  }
+
   let reminderId: string;
   let cancelTok: string;
 
@@ -294,6 +314,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             expirationDate: verifiedExpDate,
           });
           const hold = await freezeForSnipe(tx, targetId, cleanEmail, serviceCents);
+          // Persist the resulting lifecycle status so downstream jobs
+          // (auto-arm on recharge, list badges, engine state machine) can see
+          // it. Without this the target would stay `watching` forever.
+          await tx.run(
+            `UPDATE snipe_targets SET status = $2, updated_at = NOW() WHERE id = $1`,
+            [targetId, hold.ok ? "armed" : "blocked_balance"],
+          );
           return { targetId, hold };
         });
 
@@ -309,7 +336,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       } catch (e) {
         if (e instanceof SnipeTakenError) {
-          snipeInfo = { status: "failed", reason: "该域名已被其他用户预定抢注" };
+          // A concurrent request claimed the domain between the pre-check and
+          // now. Reject the preorder portion with the same contract.
+          return res.status(409).json({
+            code: "SNIPE_TAKEN",
+            error: "该域名已被其他用户预定抢注",
+          });
         } else {
           logger.error("[remind/submit] snipe target creation failed:", e);
           snipeInfo = { status: "failed", reason: "抢注预定创建失败，请稍后重试" };

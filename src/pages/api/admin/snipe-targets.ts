@@ -10,12 +10,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { many, one, run, isDbReady } from "@/lib/db-query";
+import { many, one, run, withTransaction, isDbReady } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { computeLifecycle } from "@/lib/lifecycle";
 import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { HUNT_PRE_DAYS, HUNT_POST_DAYS } from "@/lib/server/snipe-engine";
+import { releaseSnipeHold } from "@/lib/server/snipe-balance";
 
 export const config = { maxDuration: 60 };
 
@@ -156,10 +157,21 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
       break;
     }
     case "cancel": {
-      await run(
-        `UPDATE snipe_targets SET status = 'cancelled', probe_lock_at = NULL, updated_at = NOW() WHERE id = $1`,
+      const target = await one<{ user_email: string | null; frozen_cents: number }>(
+        `SELECT user_email, frozen_cents FROM snipe_targets WHERE id = $1`,
         [id],
       );
+      await withTransaction(async (tx) => {
+        // Return any frozen hold before the target is cancelled so an admin
+        // cancellation never silently keeps the user's money.
+        if (target?.user_email && (target.frozen_cents ?? 0) > 0) {
+          await releaseSnipeHold(tx, id, target.user_email, target.frozen_cents);
+        }
+        await tx.run(
+          `UPDATE snipe_targets SET status = 'cancelled', probe_lock_at = NULL, updated_at = NOW() WHERE id = $1`,
+          [id],
+        );
+      });
       break;
     }
     case "max_price": {
