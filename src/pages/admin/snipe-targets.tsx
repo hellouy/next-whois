@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Head from "next/head";
 import { AdminLayout } from "@/components/admin-layout";
+import { SNIPE_STATUS_LABELS } from "@/lib/snipe-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,14 +54,14 @@ interface SnipeTarget {
 }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
-  watching:        { label: "观察中",      cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  armed:           { label: "已就绪",      cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
-  blocked_balance: { label: "余额不足",    cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
-  sniping:         { label: "抢注中",      cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-  succeeded:       { label: "已注册",      cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
-  failed:          { label: "失败",        cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" },
-  cancelled:       { label: "已取消",      cls: "bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
-  paused:          { label: "已暂停",      cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  watching:        { label: SNIPE_STATUS_LABELS.watching,        cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  armed:           { label: SNIPE_STATUS_LABELS.armed,           cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  blocked_balance: { label: SNIPE_STATUS_LABELS.blocked_balance, cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  sniping:         { label: SNIPE_STATUS_LABELS.sniping,         cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  succeeded:       { label: SNIPE_STATUS_LABELS.succeeded,       cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  failed:          { label: SNIPE_STATUS_LABELS.failed,          cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" },
+  cancelled:       { label: SNIPE_STATUS_LABELS.cancelled,       cls: "bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+  paused:          { label: SNIPE_STATUS_LABELS.paused,          cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
 };
 
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);

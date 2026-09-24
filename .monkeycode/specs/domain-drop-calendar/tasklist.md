@@ -186,4 +186,12 @@
   - [x] 16.4 验证
     - 采集 100 条/次（deleted+expired）；DB 253 条、203 条有 drop_date；`/api/drops` 返回 136 条今日掉落；Playwright 界面渲染正常；新增 `parseMetric`/`parseListedDate`/`parsePublicListing`/批量 upsert 测试（全量 691 通过）
 
+- [x] 17. 修复 - 抢注邮件与 DATE 列渲染
+  - [x] 17.1 统一 DATE 列返回值为 `YYYY-MM-DD` 字符串
+    - 根因：pg 默认将 DATE(1082) 解析为 JS `Date`，`String()` 后成为英文 GMT 串并写入邮件/JSON；在 `db.ts` 注册 `types.setTypeParser(1082, v => v)` 全局修正，同时清理管理端 `drop_eta`/`expiration_date` 的 ISO 串显示；新增 `db-date-parser.test.ts`
+  - [x] 17.2 邮件状态枚举中文化
+    - 新增 `src/lib/snipe-status.ts`（`SNIPE_STATUS_LABELS`/`snipeStatusLabel`）作为唯一文案源，服务端邮件与仪表盘/后台徽章共用；抢注邮件中 `目标状态` 由原始枚举（如 `blocked_balance`）改为中文（余额不足）
+  - [x] 17.3 修正管理员邮件文案
+    - `notifyStaleTarget` 用 `toDate` 归一化 `drop_eta`；滞留提示由过时的「GitHub Actions 触发器」改为「定时采集任务」；充值提示「armed 状态」改为「已就绪」
+
 

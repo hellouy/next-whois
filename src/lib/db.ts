@@ -1,7 +1,13 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("db");
+
+// node-postgres parses DATE (OID 1082) columns into JS Date objects, which
+// serialize to verbose English GMT strings ("Sun Sep 06 2026 00:00:00 GMT+0000
+// ...") and leak into emails / JSON. Every date column in this schema is
+// consumed as a plain "YYYY-MM-DD" string, so hand back the raw wire value.
+types.setTypeParser(1082, (v) => v);
 
 declare global {
   // eslint-disable-next-line no-var

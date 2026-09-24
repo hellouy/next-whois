@@ -43,6 +43,7 @@ import { loadLifecycleOverrides } from "@/lib/server/lifecycle-overrides";
 import { sendEmail } from "@/lib/email";
 import { snipeNotifyHtml, snipeArmedHtml, snipeSettledHtml, snipeReleasedHtml, snipeInsufficientHtml } from "@/lib/email";
 import { ADMIN_EMAIL } from "@/lib/admin-shared";
+import { snipeStatusLabel } from "@/lib/snipe-status";
 import { createLogger } from "@/lib/logger";
 import { freezeForSnipe, settleSnipeCharge, releaseSnipeHold } from "@/lib/server/snipe-balance";
 import { snipeServicePrice } from "@/lib/server/snipe-pricing";
@@ -291,7 +292,7 @@ async function notifySuccess(t: SnipeTargetRow, opeId: string | undefined, price
         ["状态", "已注册"],
         ["注册价", price != null ? `€ ${price}` : "未知"],
         ["操作号", opeId ?? "—"],
-        ["目标状态", "succeeded"],
+        ["目标状态", snipeStatusLabel("succeeded")],
       ],
     }),
   }).catch((e) => logger.error(`[snipe] success email failed: ${e.message}`));
@@ -308,7 +309,7 @@ async function notifyFailed(t: SnipeTargetRow, reason: string | null, outcome: s
       lines: [
         ["原因", reason ?? outcome],
         ["操作号", t.netim_ope_id ?? "—"],
-        ["目标状态", t.status],
+        ["目标状态", snipeStatusLabel(t.status)],
       ],
     }),
   }).catch((e) => logger.error(`[snipe] failure email failed: ${e.message}`));
@@ -349,7 +350,7 @@ async function notifyRecharge(t: SnipeTargetRow, balance: number, needed: number
         ["账户余额", `€ ${balance.toFixed(2)}`],
         ["注册预估", `€ ${needed.toFixed(2)}`],
         ["缺口", `€ ${(needed - balance).toFixed(2)}`],
-        ["提示", "请为 Netim 账户充值后，目标将自动恢复 armed 状态"],
+        ["提示", "请为 Netim 账户充值后，目标将自动恢复为「已就绪」状态"],
       ],
     }),
   }).catch((e) => logger.error(`[snipe] recharge email failed: ${e.message}`));
@@ -447,7 +448,7 @@ async function notifyWhoisFailing(t: SnipeTargetRow, fails: number): Promise<voi
       domain: t.domain,
       lines: [
         ["连续失败次数", `${fails} 次`],
-        ["目标状态", t.status],
+        ["目标状态", snipeStatusLabel(t.status)],
         ["提示", "WHOIS 源不可用时保留上次成功结果；请核查网络后重试"],
       ],
     }),
@@ -457,8 +458,8 @@ async function notifyWhoisFailing(t: SnipeTargetRow, fails: number): Promise<voi
 
 /**
  * A target has stayed armed/blocked_balance well past its drop ETA (no
- * release observed for 7+ days) — likely the GitHub Actions trigger stalled or
- * the lifecycle rules are off. Alert the admin once per 24h.
+ * release observed for 7+ days) — likely the scheduled trigger stalled or the
+ * lifecycle rules are off. Alert the admin once per 24h.
  */
 async function notifyStaleTarget(t: SnipeTargetRow): Promise<void> {
   if (!ADMIN_EMAIL) return;
@@ -468,7 +469,8 @@ async function notifyStaleTarget(t: SnipeTargetRow): Promise<void> {
   ) {
     return;
   }
-  const eta = t.drop_eta ? new Date(t.drop_eta + "T00:00:00Z") : null;
+  const etaStr = toDate(t.drop_eta);
+  const eta = etaStr ? new Date(etaStr + "T00:00:00Z") : null;
   const daysOver = eta && !isNaN(eta.getTime())
     ? Math.max(1, Math.round((Date.now() - eta.getTime()) / 86_400_000))
     : 1;
@@ -479,10 +481,10 @@ async function notifyStaleTarget(t: SnipeTargetRow): Promise<void> {
       title: "目标疑似滞留（超期未释放）",
       domain: t.domain,
       lines: [
-        ["预计掉落", t.drop_eta ?? "—"],
+        ["预计掉落", etaStr ?? "—"],
         ["超期", `${daysOver} 天`],
-        ["目标状态", t.status],
-        ["提示", "请核查 GitHub Actions 触发器是否停摆，或生命周期规则是否需调整"],
+        ["目标状态", snipeStatusLabel(t.status)],
+        ["提示", "请核查定时采集任务是否正常执行，或 TLD 生命周期规则是否需调整"],
       ],
     }),
   }).catch((e) => logger.error(`[snipe] stale email failed: ${e.message}`));
@@ -912,7 +914,7 @@ async function probeTarget(t: SnipeTargetRow): Promise<TargetOutcome> {
 
 async function runProbe(mode: "daily" | "hunt"): Promise<ProbeSummary> {
   // Surface targets stuck armed/blocked_balance past their drop ETA before
-  // the regular pass — a stalled GitHub Actions trigger must not go unnoticed.
+  // the regular pass — a stalled scheduled trigger must not go unnoticed.
   await alertStaleTargets();
 
   let rows: SnipeTargetRow[];

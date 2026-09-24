@@ -30,6 +30,10 @@ graph TD
     J --> K["月历视图 drops.tsx"]
 ```
 
+### 数据访问与日期约定
+
+`db.ts` 在建立连接池前注册 `pg` 的 DATE(1082) 类型解析器，使所有 DATE 列（`drop_date`、`expiry_date`、`drop_eta`、`expiration_date`、`sponsor_date`、`entry_date`）统一以 `YYYY-MM-DD` 字符串返回，而非默认的 JS `Date` 对象。避免出现「英文 GMT 串写入邮件/JSON」以及管理端显示 ISO 时间戳的同类问题；原先 API 层的 `drop_date::text` 强制转换因此变为冗余但无害。状态类枚举（如抢注 `blocked_balance`）经 `src/lib/snipe-status.ts` 的 `SNIPE_STATUS_LABELS` 统一映射为中文文案，服务端邮件与前端徽章共用同一文案源。
+
 ### 评分维度构成
 
 ```mermaid
