@@ -15,6 +15,7 @@ import type { DateType, DropStage, RegStatus } from "@/lib/drop-types";
 
 /** Map an adapter id to the `source` label persisted on leads. */
 export const SOURCE_LABELS: Record<string, string> = {
+  "expireddomains-public": "expireddomains.net (public)",
   expireddomains: "expireddomains.net",
   whoisds: "whoisds.com",
 };
@@ -40,7 +41,7 @@ export interface UpsertLeadInput {
 export interface DropPipelineDeps {
   collect: () => Promise<CollectedRows>;
   loadContext: () => Promise<ValueContext>;
-  upsertLead: (lead: UpsertLeadInput) => Promise<void>;
+  upsertLeads: (leads: UpsertLeadInput[]) => Promise<void>;
   recordSourceStatus: (outcome: SourceRunOutcome) => Promise<void>;
   invalidateCache: () => Promise<void>;
 }
@@ -51,34 +52,51 @@ export interface DropPipelineResult {
   skipped: number;
 }
 
-async function defaultUpsertLead(lead: UpsertLeadInput): Promise<void> {
-  await run(
-    `INSERT INTO expired_domain_leads
-       (domain, tld, sld, char_count, bl, dp, drop_date, expiry_date, stage, date_type,
-        status, value_score, value_tier, value_reasons, source, crawled_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,NOW())
-     ON CONFLICT (domain) DO UPDATE SET
-       tld           = EXCLUDED.tld,
-       sld           = EXCLUDED.sld,
-       char_count    = EXCLUDED.char_count,
-       bl            = COALESCE(EXCLUDED.bl, expired_domain_leads.bl),
-       dp            = COALESCE(EXCLUDED.dp, expired_domain_leads.dp),
-       drop_date     = EXCLUDED.drop_date,
-       expiry_date   = EXCLUDED.expiry_date,
-       stage         = EXCLUDED.stage,
-       date_type     = EXCLUDED.date_type,
-       status        = EXCLUDED.status,
-       value_score   = EXCLUDED.value_score,
-       value_tier    = EXCLUDED.value_tier,
-       value_reasons = EXCLUDED.value_reasons,
-       source        = EXCLUDED.source,
-       crawled_at    = NOW()`,
-    [
-      lead.domain, lead.tld, lead.sld, lead.charCount, lead.bl, lead.dp,
-      lead.dropDate, lead.expiryDate, lead.stage, lead.dateType,
-      lead.regStatus, lead.valueScore, lead.valueTier, JSON.stringify(lead.valueReasons), lead.source,
-    ],
-  );
+/** Rows per multi-row INSERT — keeps the statement well under the param limit. */
+const UPSERT_CHUNK = 50;
+
+function leadValues(lead: UpsertLeadInput): unknown[] {
+  return [
+    lead.domain, lead.tld, lead.sld, lead.charCount, lead.bl, lead.dp,
+    lead.dropDate, lead.expiryDate, lead.stage, lead.dateType,
+    lead.regStatus, lead.valueScore, lead.valueTier, JSON.stringify(lead.valueReasons), lead.source,
+  ];
+}
+
+export async function defaultUpsertLeads(leads: UpsertLeadInput[]): Promise<void> {
+  for (let i = 0; i < leads.length; i += UPSERT_CHUNK) {
+    const chunk = leads.slice(i, i + UPSERT_CHUNK);
+    const params: unknown[] = [];
+    const tuples = chunk.map((lead) => {
+      const base = params.length;
+      params.push(...leadValues(lead));
+      return `(${Array.from({ length: 15 }, (_, k) => `$${base + k + 1}`).join(",")},NOW())`;
+    });
+
+    await run(
+      `INSERT INTO expired_domain_leads
+         (domain, tld, sld, char_count, bl, dp, drop_date, expiry_date, stage, date_type,
+          status, value_score, value_tier, value_reasons, source, crawled_at)
+       VALUES ${tuples.join(",")}
+       ON CONFLICT (domain) DO UPDATE SET
+         tld           = EXCLUDED.tld,
+         sld           = EXCLUDED.sld,
+         char_count    = EXCLUDED.char_count,
+         bl            = COALESCE(EXCLUDED.bl, expired_domain_leads.bl),
+         dp            = COALESCE(EXCLUDED.dp, expired_domain_leads.dp),
+         drop_date     = EXCLUDED.drop_date,
+         expiry_date   = EXCLUDED.expiry_date,
+         stage         = EXCLUDED.stage,
+         date_type     = EXCLUDED.date_type,
+         status        = EXCLUDED.status,
+         value_score   = EXCLUDED.value_score,
+         value_tier    = EXCLUDED.value_tier,
+         value_reasons = EXCLUDED.value_reasons,
+         source        = EXCLUDED.source,
+         crawled_at    = NOW()`,
+      params,
+    );
+  }
 }
 
 async function defaultRecordSourceStatus(o: SourceRunOutcome): Promise<void> {
@@ -104,7 +122,7 @@ async function defaultRecordSourceStatus(o: SourceRunOutcome): Promise<void> {
 const DEFAULT_DEPS: DropPipelineDeps = {
   collect: () => collectDropRows(),
   loadContext: () => loadValueContext(),
-  upsertLead: defaultUpsertLead,
+  upsertLeads: defaultUpsertLeads,
   recordSourceStatus: defaultRecordSourceStatus,
   invalidateCache: () => invalidateDropCache(),
 };
@@ -117,7 +135,7 @@ export async function runDropPipeline(
   const context = await d.loadContext();
 
   const seen = new Set<string>();
-  let upserted = 0;
+  const pending: UpsertLeadInput[] = [];
   let skipped = 0;
 
   for (const row of rows) {
@@ -143,7 +161,7 @@ export async function runDropPipeline(
     const tld = parts.pop() ?? "";
     const sld = parts.join(".");
 
-    await d.upsertLead({
+    pending.push({
       domain: enriched.domain,
       tld,
       sld,
@@ -160,8 +178,9 @@ export async function runDropPipeline(
       valueReasons: value?.reasons ?? [],
       source: SOURCE_LABELS[row.source ?? ""] ?? row.source ?? "unknown",
     });
-    upserted++;
   }
+
+  if (pending.length) await d.upsertLeads(pending);
 
   for (const outcome of outcomes) {
     await d.recordSourceStatus(outcome);
@@ -169,5 +188,5 @@ export async function runDropPipeline(
 
   await d.invalidateCache();
 
-  return { sources: outcomes, upserted, skipped };
+  return { sources: outcomes, upserted: pending.length, skipped };
 }

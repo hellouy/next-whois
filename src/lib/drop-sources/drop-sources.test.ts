@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseWhoisdsText, stageFromUrl } from "./whoisds";
 import { parsePendingDelete } from "./expireddomains";
+import { parseMetric, parseListedDate, parsePublicListing } from "./expireddomains-public";
 import { runDropSources } from "./registry";
 import type { DropSourceAdapter } from "./types";
 
@@ -85,6 +86,80 @@ describe("parsePendingDelete", () => {
 
   it("returns nothing when the listing table is absent", () => {
     expect(parsePendingDelete("<html><body>login</body></html>")).toEqual({ rows: [], skipped: 0 });
+  });
+});
+
+describe("parseMetric", () => {
+  it("parses compact and comma-grouped metrics", () => {
+    expect(parseMetric("354")).toBe(354);
+    expect(parseMetric("1,234")).toBe(1234);
+    expect(parseMetric("3.7 K")).toBe(3700);
+    expect(parseMetric("1.2M")).toBe(1200000);
+    expect(parseMetric("-")).toBeNull();
+    expect(parseMetric("")).toBeNull();
+  });
+});
+
+describe("parseListedDate", () => {
+  it("resolves relative and absolute listing dates", () => {
+    expect(parseListedDate("Today 01:31", TODAY)).toBe(TODAY);
+    expect(parseListedDate("Yesterday 23:00", TODAY)).toBe("2026-09-21");
+    expect(parseListedDate("2026-09-20", TODAY)).toBe("2026-09-20");
+    expect(parseListedDate("", TODAY)).toBeNull();
+  });
+});
+
+describe("parsePublicListing", () => {
+  const deletedHtml = `
+    <table id="listing">
+      <thead><tr><th>Domain</th><th>BL</th><th>DP</th><th>Dropped</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="field_domain"><a title="AnchorApp.dev" href="#">AnchorApp.dev</a></td>
+          <td>18</td><td>0</td><td>Today 01:31</td><td>available</td>
+        </tr>
+        <tr>
+          <td class="field_domain"><a title="Noise.com" href="#">Noise.com</a></td>
+          <td>3.7 K</td><td>-</td><td>Yesterday 12:00</td><td>available</td>
+        </tr>
+        <tr><td>not a domain</td><td>0</td><td>0</td><td>Today</td><td>available</td></tr>
+      </tbody>
+    </table>`;
+
+  const expiredHtml = `
+    <table id="listing">
+      <thead><tr><th>Domain</th><th>BL</th><th>DP</th><th>End Date</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="field_domain"><a title="118114.tv" href="#">118114.tv</a></td>
+          <td>354</td><td>50</td><td>2026-09-24</td>
+        </tr>
+      </tbody>
+    </table>`;
+
+  it("maps the deleted listing to source drop dates", () => {
+    const { rows, skipped } = parsePublicListing(deletedHtml, "deleted", TODAY);
+    expect(rows).toHaveLength(2);
+    expect(skipped).toBe(1);
+    expect(rows[0]).toMatchObject({
+      domain: "anchorapp.dev", stage: "deleted", dropDate: TODAY, expiryDate: null,
+      bl: 18, dp: 0, sourceDateType: "source",
+    });
+    expect(rows[1].bl).toBe(3700);
+    expect(rows[1].dropDate).toBe("2026-09-21");
+  });
+
+  it("maps the expired listing to expiry dates for derivation", () => {
+    const { rows } = parsePublicListing(expiredHtml, "expiring", TODAY);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      domain: "118114.tv", stage: "expiring", dropDate: null,
+      expiryDate: "2026-09-24", bl: 354, dp: 50, sourceDateType: "derived",
+    });
+  });
+
+  it("returns nothing when the listing table is absent", () => {
+    expect(parsePublicListing("<html><body>nope</body></html>", "deleted", TODAY)).toEqual({ rows: [], skipped: 0 });
   });
 });
 

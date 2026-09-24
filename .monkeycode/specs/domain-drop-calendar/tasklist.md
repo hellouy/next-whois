@@ -176,3 +176,14 @@
   - [x] 15.4 管理端手动标记入口
     - 新增 `POST /api/admin/drop-lead-status`（requireAdmin，校验 domain/status，写 `expired_domain_leads.status` 并失效缓存）；`drops.tsx` 管理员操作区加入状态下拉（available/reserved/prohibited），含 4 个 `drops.reg_*` key × 8 语言与端点单测（6 例）
 
+- [x] 16. 修复 - 掉落日历无数据（补齐可用数据源）
+  - [x] 16.1 新增免登录公开数据源
+    - `expireddomains-public.ts`：抓取 expireddomains.net 公开列表 `/deleted-domains/`（已删除，dropDate=源日期）与 `/expired-domains/`（过期，expiryDate 经生命周期推算 dropDate）；`?start=` 分页，浏览器头（Accept/Accept-Language/Referer）+ 请求间隔规避限流，缺表格时明确报错而非静默 0 行
+  - [x] 16.2 注册适配器与来源标签
+    - `DEFAULT_ADAPTERS` 加入 `expireddomains-public`（无需凭据，开箱即用）；`SOURCE_LABELS` 增加 `expireddomains.net (public)`
+  - [x] 16.3 管线批量 upsert（性能/可靠性）
+    - 逐行 upsert 改为分块（50/批）多行 `INSERT ... ON CONFLICT`，远程 DB 往返从 ~200 次降到数次，单次采集由超时（>79s）降到 ~13s
+  - [x] 16.4 验证
+    - 采集 100 条/次（deleted+expired）；DB 253 条、203 条有 drop_date；`/api/drops` 返回 136 条今日掉落；Playwright 界面渲染正常；新增 `parseMetric`/`parseListedDate`/`parsePublicListing`/批量 upsert 测试（全量 691 通过）
+
+

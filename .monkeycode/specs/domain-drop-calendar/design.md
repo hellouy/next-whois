@@ -70,6 +70,7 @@ export interface RawDropRow {
 ```
 
 - `expireddomains.ts`：复用现有 `expired-domains-crawl.ts` 的登录流程（`/logincheck/` → `member.expireddomains.net/auth/`），新增抓取待删除视图；解析表格日期列。
+- `expireddomains-public.ts`：抓取 expireddomains.net 的免登录公开列表 `/deleted-domains/`（已删除，源提供 dropDate）与 `/expired-domains/`（过期，源提供 expiryDate 由生命周期推算 dropDate）；`?start=` 分页，携带浏览器请求头并保持请求间隔以规避限流；无需凭据，开箱即用。
 - `whoisds.ts`：下载每日列表（纯文本，每行一个域名），按下载文件的类型归类阶段；无需登录。
 - `registry.ts`：按配置顺序调度各适配器，单个适配器失败不影响其他适配器，汇总错误。
 

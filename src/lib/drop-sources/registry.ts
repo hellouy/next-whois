@@ -4,10 +4,15 @@
  */
 
 import { expiredDomainsAdapter } from "./expireddomains";
+import { expiredDomainsPublicAdapter } from "./expireddomains-public";
 import { whoisdsAdapter } from "./whoisds";
 import type { DropSourceAdapter, RawDropRow, SourceRunOutcome } from "./types";
 
-export const DEFAULT_ADAPTERS: DropSourceAdapter[] = [expiredDomainsAdapter, whoisdsAdapter];
+export const DEFAULT_ADAPTERS: DropSourceAdapter[] = [
+  expiredDomainsPublicAdapter,
+  expiredDomainsAdapter,
+  whoisdsAdapter,
+];
 
 export interface CollectedRows {
   outcomes: SourceRunOutcome[];

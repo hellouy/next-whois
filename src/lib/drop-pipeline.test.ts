@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { runDropPipeline, SOURCE_LABELS, type UpsertLeadInput } from "./drop-pipeline";
+import { describe, it, expect, vi } from "vitest";
+
+const dbMock = vi.hoisted(() => ({ run: vi.fn() }));
+
+vi.mock("@/lib/db-query", () => ({ run: (...a: unknown[]) => dbMock.run(...a) }));
+
+import { runDropPipeline, defaultUpsertLeads, SOURCE_LABELS, type UpsertLeadInput } from "./drop-pipeline";
 import type { SourceRunOutcome } from "./drop-sources/types";
 import type { CollectedRows } from "./drop-sources/registry";
 
@@ -15,7 +20,7 @@ function harness(rows: CollectedRows["rows"], outcomes: SourceRunOutcome[]) {
     deps: {
       collect: async () => ({ rows, outcomes }),
       loadContext: async () => ({ hotPrefixes: new Map([["car", 20]]) }),
-      upsertLead: async (lead: UpsertLeadInput) => { leads.push(lead); },
+      upsertLeads: async (batch: UpsertLeadInput[]) => { leads.push(...batch); },
       recordSourceStatus: async (o: SourceRunOutcome) => { statuses.push(o); },
       invalidateCache: async () => { invalidations++; },
     },
@@ -82,6 +87,41 @@ describe("runDropPipeline", () => {
 
   it("maps every known adapter id to its persisted label", () => {
     expect(SOURCE_LABELS.expireddomains).toBe("expireddomains.net");
+    expect(SOURCE_LABELS["expireddomains-public"]).toBe("expireddomains.net (public)");
     expect(SOURCE_LABELS.whoisds).toBe("whoisds.com");
+  });
+});
+
+function makeLead(domain: string): UpsertLeadInput {
+  return {
+    domain, tld: "com", sld: domain.split(".")[0], charCount: 3,
+    bl: 1, dp: 2, dropDate: "2026-10-01", expiryDate: null,
+    stage: "deleted", dateType: "source", regStatus: "available",
+    valueScore: 10, valueTier: "low", valueReasons: ["x"], source: "expireddomains.net",
+  };
+}
+
+describe("defaultUpsertLeads", () => {
+  it("chunks rows into multi-row inserts with flat parameters", async () => {
+    dbMock.run.mockReset();
+    dbMock.run.mockResolvedValue(1);
+
+    await defaultUpsertLeads(Array.from({ length: 60 }, (_, i) => makeLead(`d${i}.com`)));
+
+    expect(dbMock.run).toHaveBeenCalledTimes(2);
+    const [sql0, params0] = dbMock.run.mock.calls[0];
+    const [, params1] = dbMock.run.mock.calls[1];
+    expect(String(sql0)).toContain("ON CONFLICT (domain) DO UPDATE");
+    expect(String(sql0)).toContain("VALUES ($1,");
+    expect(params0).toHaveLength(50 * 15);
+    expect(params1).toHaveLength(10 * 15);
+    expect(params0[0]).toBe("d0.com");
+    expect(params0[15]).toBe("d1.com");
+  });
+
+  it("does nothing for an empty batch", async () => {
+    dbMock.run.mockReset();
+    await defaultUpsertLeads([]);
+    expect(dbMock.run).not.toHaveBeenCalled();
   });
 });
