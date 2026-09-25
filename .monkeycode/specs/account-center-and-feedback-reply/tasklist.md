@@ -23,8 +23,11 @@
 
 ## 阶段四：独立购买记录页与充值页（R4）
 
-- [ ] 13. （暂缓）`/account/orders` 与 `/account/recharge` 独立页 — 与既有会员面板充值/订单（commit f93470c）方向重叠，保留现有方案，如后续确需独立路由再实施
+- [x] 13. `/account/orders` 独立购买记录页 — 登录态展示购买记录（`/api/user/orders`）+ 余额摘要 + 余额变动明细（`/api/user/balance-transactions`）；未登录重定向登录页
+- [x] 14. `/account/recharge` 独立充值页 — 复用 `/payment/recharge` 页面组件（默认导出直接复用），支付流程/登录守卫保持一致
+- [x] 15. dashboard 入口改跳独立页 — `onGoRecharge → /account/recharge`、`onGoOrders → /account/orders`（AccountTab 按钮语义不变）
+- [x] 16. 未登录守卫 — 两独立页均按既有 `/payment/recharge` 模式在客户端重定向 `/login?callbackUrl=...`
 
 ## 验证
 
-- [x] 14. `tsc --noEmit` 0 错误；`check-locale-keys` 8 语言同步；vitest 全量通过（含 feedback.test 6 例）
+- [x] 17. `tsc --noEmit` 0 错误；`check-locale-keys` 8 语言同步（复用既有键，无新增）；vitest 全量通过（含 feedback.test 6 例）

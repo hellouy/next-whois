@@ -455,14 +455,8 @@ export default function DashboardPage() {
               stamps={stamps}
               searchStats={searchStats ?? null}
               balanceCents={balanceCents}
-              onGoRecharge={() => router.push("/payment/recharge")}
-              onGoOrders={() => {
-                setTab("membership");
-                setShowBalanceTxs(true);
-                setTimeout(() => {
-                  document.getElementById("membership-orders")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 380);
-              }}
+              onGoRecharge={() => router.push("/account/recharge")}
+              onGoOrders={() => router.push("/account/orders")}
               t={t}
               setEditingAvatar={setEditingAvatar}
               onSaveAvatarColor={saveAvatarColor}
