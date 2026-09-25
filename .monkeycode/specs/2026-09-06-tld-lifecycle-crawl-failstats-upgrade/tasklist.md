@@ -35,4 +35,4 @@ Status: In Progress
 ## 批次 5 — 回归与部署
 
 - [x] 5.1 `npx tsc --noEmit` + `vitest run` + 本地 build + dev 冒烟
-- [ ] 5.2 部署验证（poll READY → 线上 --resolve curl + 接口冒烟）
+- [x] 5.2 部署验证（request_preview → dev server 5000 + 预览域名全页面 200 + admin 接口鉴权冒烟）
