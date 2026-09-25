@@ -984,7 +984,6 @@
     "register_closed_desc": "当前网站暂停开放注册，请联系管理员。",
     "register_closed_back": "← 去登录",
     "register_name_label": "昵称",
-    "register_name_optional": "（可选）",
     "register_name_placeholder": "你的昵称",
     "register_email_label": "邮箱地址",
     "register_send_code": "发送验证码",
@@ -1063,7 +1062,9 @@
     "reset_err_invalid_token": "无效的重置链接",
     "reset_err_failed": "重置失败，请重新申请",
     "reset_err_network": "网络错误，请重试",
-    "login_remember_me": "记住我（30天免重新登录）"
+    "login_remember_me": "记住我（30天免重新登录）",
+    "register_err_name_required": "请填写用户名",
+    "register_err_name_too_long": "用户名不能超过 50 个字符"
   },
   "tlds": {
     "no_support": "不支持",
@@ -1748,7 +1749,8 @@
     "free_usage_full": "已达免费版上限。升级会员可无限订阅。",
     "export_ics": "导出 iCal",
     "needs_membership": "需要订阅会员",
-    "needs_membership_desc": "域名订阅功能需要开通会员后使用。"
+    "needs_membership_desc": "域名订阅功能需要开通会员后使用。",
+    "set_nickname": "设置用户名"
   },
   "admin": {
     "no_access_title": "无访问权限",

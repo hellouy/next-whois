@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { many, run } from "@/lib/db-query";
+import { many, one, run } from "@/lib/db-query";
 import { requireAdmin } from "@/lib/admin";
+import { recordNotification } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireAdmin(req, res);
@@ -32,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-      const q = `SELECT id, query, query_type, issue_types, description, email, created_at, handled, handled_at FROM feedback${where} ORDER BY handled ASC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      const q = `SELECT id, query, query_type, issue_types, description, email, created_at, handled, handled_at, reply, replied_at FROM feedback${where} ORDER BY handled ASC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
       const rows = await many(q, params);
@@ -87,6 +88,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // Inline reply: persist the admin's answer, mark handled, and push a station
+  // notification to the submitter when they hold an account (R1.1-R1.5).
+  if (req.method === "POST") {
+    const { id } = req.query;
+    if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
+    const { reply } = req.body as { reply?: string };
+    const cleanReply = typeof reply === "string" ? reply.trim() : "";
+    if (!cleanReply) return res.status(400).json({ error: "回复内容不能为空" });
+    if (cleanReply.length > 2000) return res.status(400).json({ error: "回复内容不能超过 2000 个字符" });
+    try {
+      const fb = await one<{ email: string | null; query: string }>(
+        "SELECT email, query FROM feedback WHERE id = $1",
+        [id]
+      );
+      if (!fb) return res.status(404).json({ error: "反馈不存在" });
+
+      const now = new Date().toISOString();
+      await run(
+        "UPDATE feedback SET reply = $1, replied_at = $2, handled = true, handled_at = $3 WHERE id = $4",
+        [cleanReply, now, now, id]
+      );
+
+      if (fb.email) {
+        const user = await one<{ id: string }>("SELECT id FROM users WHERE email = $1", [fb.email]).catch(() => null);
+        if (user) {
+          await recordNotification({
+            email: fb.email,
+            type: "feedback_reply",
+            title: `您的反馈已回复：${fb.query}`,
+            body: cleanReply,
+            domain: fb.query,
+          });
+        }
+      }
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   if (req.method === "DELETE") {
     const { id } = req.query;
     if (!id || typeof id !== "string") return res.status(400).json({ error: "Missing id" });
@@ -98,6 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  res.setHeader("Allow", "GET, PATCH, DELETE");
+  res.setHeader("Allow", "GET, PATCH, POST, DELETE");
   res.status(405).json({ error: "Method not allowed" });
 }

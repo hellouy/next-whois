@@ -984,7 +984,6 @@
     "register_closed_desc": "L'inscription est actuellement fermée. Veuillez contacter l'administrateur.",
     "register_closed_back": "← Retour à la connexion",
     "register_name_label": "Pseudo",
-    "register_name_optional": "(facultatif)",
     "register_name_placeholder": "Votre pseudo",
     "register_email_label": "Adresse e-mail",
     "register_send_code": "Envoyer le code",
@@ -1063,7 +1062,9 @@
     "reset_err_invalid_token": "Lien de réinitialisation invalide",
     "reset_err_failed": "Réinitialisation échouée, veuillez demander à nouveau",
     "reset_err_network": "Erreur réseau, veuillez réessayer",
-    "login_remember_me": "Se souvenir de moi (30 jours)"
+    "login_remember_me": "Se souvenir de moi (30 jours)",
+    "register_err_name_required": "Veuillez saisir un nom d'utilisateur",
+    "register_err_name_too_long": "Le nom d'utilisateur ne doit pas dépasser 50 caractères"
   },
   "tlds": {
     "no_support": "Non pris en charge",
@@ -1748,7 +1749,8 @@
     "free_usage_full": "Limite gratuite atteinte. Passez à l'offre supérieure.",
     "export_ics": "Exporter iCal",
     "needs_membership": "Abonnement requis",
-    "needs_membership_desc": "Les abonnements de domaine nécessitent une adhésion active."
+    "needs_membership_desc": "Les abonnements de domaine nécessitent une adhésion active.",
+    "set_nickname": "Définir un nom"
   },
   "admin": {
     "no_access_title": "Accès Refusé",

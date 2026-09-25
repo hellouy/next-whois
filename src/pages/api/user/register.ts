@@ -42,6 +42,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (String(password).length > 128)
     return res.status(400).json({ error: "Password must not exceed 128 characters" });
 
+  // Display name is mandatory (R2.1-R2.4).
+  const cleanName = typeof name === "string" ? name.trim() : "";
+  if (!cleanName) return res.status(400).json({ error: "Display name is required" });
+  if (cleanName.length > 50) return res.status(400).json({ error: "Display name must not exceed 50 characters" });
+
   if (!(await isDbReady())) return res.status(503).json({ error: "Service temporarily unavailable, please try again" });
 
   const regSetting = await one<{ value: string }>("SELECT value FROM site_settings WHERE key = 'allow_registration'");
@@ -106,7 +111,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const id = randomBytes(8).toString("hex");
   const passwordHash = await hash(String(password), 12);
-  const cleanName = name ? String(name).trim().slice(0, 50) || null : null;
   const subscriptionAccess = codeRow !== null;
 
   const locale = localeFromCookieHeader(req.headers.cookie) ||

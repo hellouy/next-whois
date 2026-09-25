@@ -984,7 +984,6 @@
     "register_closed_desc": "Registration is currently closed. Please contact the admin.",
     "register_closed_back": "← Go to Sign In",
     "register_name_label": "Nickname",
-    "register_name_optional": "(optional)",
     "register_name_placeholder": "Your nickname",
     "register_email_label": "Email Address",
     "register_send_code": "Send Code",
@@ -1063,7 +1062,9 @@
     "reset_err_invalid_token": "Invalid reset link",
     "reset_err_failed": "Reset failed, please request again",
     "reset_err_network": "Network error, please try again",
-    "login_remember_me": "Remember me (stay signed in for 30 days)"
+    "login_remember_me": "Remember me (stay signed in for 30 days)",
+    "register_err_name_required": "Please enter a display name",
+    "register_err_name_too_long": "Display name must not exceed 50 characters"
   },
   "tlds": {
     "no_support": "No support",
@@ -1748,7 +1749,8 @@
     "free_usage_full": "You've reached the free limit. Upgrade for unlimited subscriptions.",
     "export_ics": "Export iCal",
     "needs_membership": "Membership required",
-    "needs_membership_desc": "Domain subscriptions require an active membership plan."
+    "needs_membership_desc": "Domain subscriptions require an active membership plan.",
+    "set_nickname": "Set display name"
   },
   "admin": {
     "no_access_title": "No Access",

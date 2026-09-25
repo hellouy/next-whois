@@ -984,7 +984,6 @@
     "register_closed_desc": "目前暫停開放註冊，請聯絡管理員。",
     "register_closed_back": "← 去登入",
     "register_name_label": "暱稱",
-    "register_name_optional": "（選填）",
     "register_name_placeholder": "你的暱稱",
     "register_email_label": "電子郵件",
     "register_send_code": "發送驗證碼",
@@ -1063,7 +1062,9 @@
     "reset_err_invalid_token": "無效的重置連結",
     "reset_err_failed": "重置失敗，請重新申請",
     "reset_err_network": "網路錯誤，請重試",
-    "login_remember_me": "記住我（30天免重新登入）"
+    "login_remember_me": "記住我（30天免重新登入）",
+    "register_err_name_required": "請填寫使用者名稱",
+    "register_err_name_too_long": "使用者名稱不能超過 50 個字元"
   },
   "tlds": {
     "no_support": "不支援",
@@ -1748,7 +1749,8 @@
     "free_usage_full": "已達免費版上限。升級會員可無限訂閱。",
     "export_ics": "匯出 iCal",
     "needs_membership": "需要訂閱會員",
-    "needs_membership_desc": "網域訂閱功能需要開通會員後使用。"
+    "needs_membership_desc": "網域訂閱功能需要開通會員後使用。",
+    "set_nickname": "設定使用者名稱"
   },
   "admin": {
     "no_access_title": "無訪問權限",

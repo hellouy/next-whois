@@ -126,6 +126,8 @@ export default function RegisterPage() {
     if (!password) { setError(t("auth.register_err_password_required")); return; }
     if (password.length < 8) { setError(t("auth.register_err_password_min")); return; }
     if (password !== confirm) { setError(t("auth.register_err_password_mismatch")); return; }
+    if (!name.trim()) { setError(t("auth.register_err_name_required")); return; }
+    if (name.trim().length > 50) { setError(t("auth.register_err_name_too_long")); return; }
     if (captchaRequired && !captchaToken) {
       setError(t("auth.register_err_captcha"));
       return;
@@ -138,7 +140,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
-          name: name.trim() || undefined,
+          name: name.trim(),
           inviteCode: inviteCode.trim() || undefined,
           verifyCode: verifyCode.trim() || undefined,
           captchaToken: captchaToken || undefined,
@@ -235,7 +237,7 @@ export default function RegisterPage() {
               {/* Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-xs font-semibold">
-                  {t("auth.register_name_label")} <span className="text-muted-foreground font-normal">{t("auth.register_name_optional")}</span>
+                  {t("auth.register_name_label")} <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <RiUserLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />

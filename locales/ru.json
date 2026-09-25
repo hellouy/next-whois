@@ -983,7 +983,6 @@
     "register_closed_desc": "Регистрация в данный момент закрыта. Обратитесь к администратору.",
     "register_closed_back": "← Войти",
     "register_name_label": "Никнейм",
-    "register_name_optional": "(необязательно)",
     "register_name_placeholder": "Ваш никнейм",
     "register_email_label": "Адрес электронной почты",
     "register_send_code": "Отправить код",
@@ -1062,7 +1061,9 @@
     "reset_err_invalid_token": "Недействительная ссылка для сброса",
     "reset_err_failed": "Сброс не удался, запросите снова",
     "reset_err_network": "Ошибка сети, повторите попытку",
-    "login_remember_me": "Запомнить меня (30 дней)"
+    "login_remember_me": "Запомнить меня (30 дней)",
+    "register_err_name_required": "Пожалуйста, введите имя пользователя",
+    "register_err_name_too_long": "Имя пользователя не должно превышать 50 символов"
   },
   "tlds": {
     "no_support": "Не поддерживается",
@@ -1747,7 +1748,8 @@
     "free_usage_full": "Достигнут бесплатный лимит. Обновите тариф для неограниченных подписок.",
     "export_ics": "Экспорт iCal",
     "needs_membership": "Требуется подписка",
-    "needs_membership_desc": "Подписка на домены доступна после оформления членства."
+    "needs_membership_desc": "Подписка на домены доступна после оформления членства.",
+    "set_nickname": "Задать имя"
   },
   "admin": {
     "no_access_title": "Нет доступа",

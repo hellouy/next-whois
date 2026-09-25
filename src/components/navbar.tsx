@@ -38,6 +38,7 @@ import {
   RiStarLine,
   RiCalendarLine,
   RiShieldCheckLine,
+  RiMailCheckLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -769,6 +770,7 @@ const NOTIF_TYPE_ICON: Record<string, React.ReactNode> = {
   hold: <RiPauseCircleLine className="w-3.5 h-3.5" />,
   reserved: <RiLockLine className="w-3.5 h-3.5" />,
   snipe: <RiShieldCheckLine className="w-3.5 h-3.5" />,
+  feedback_reply: <RiMailCheckLine className="w-3.5 h-3.5" />,
   membership: <RiStarLine className="w-3.5 h-3.5" />,
 };
 

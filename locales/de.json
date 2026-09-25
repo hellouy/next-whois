@@ -984,7 +984,6 @@
     "register_closed_desc": "Die Registrierung ist derzeit geschlossen. Bitte kontaktieren Sie den Administrator.",
     "register_closed_back": "← Zur Anmeldung",
     "register_name_label": "Spitzname",
-    "register_name_optional": "(optional)",
     "register_name_placeholder": "Ihr Spitzname",
     "register_email_label": "E-Mail-Adresse",
     "register_send_code": "Code senden",
@@ -1063,7 +1062,9 @@
     "reset_err_invalid_token": "Ungültiger Reset-Link",
     "reset_err_failed": "Zurücksetzen fehlgeschlagen, bitte erneut beantragen",
     "reset_err_network": "Netzwerkfehler, bitte erneut versuchen",
-    "login_remember_me": "Angemeldet bleiben (30 Tage)"
+    "login_remember_me": "Angemeldet bleiben (30 Tage)",
+    "register_err_name_required": "Bitte geben Sie einen Benutzernamen ein",
+    "register_err_name_too_long": "Der Benutzername darf höchstens 50 Zeichen haben"
   },
   "tlds": {
     "no_support": "Nicht unterstützt",
@@ -1748,7 +1749,8 @@
     "free_usage_full": "Kostenloses Limit erreicht. Für unbegrenzte Abos upgraden.",
     "export_ics": "iCal exportieren",
     "needs_membership": "Mitgliedschaft erforderlich",
-    "needs_membership_desc": "Domain-Abonnements erfordern eine aktive Mitgliedschaft."
+    "needs_membership_desc": "Domain-Abonnements erfordern eine aktive Mitgliedschaft.",
+    "set_nickname": "Namen festlegen"
   },
   "admin": {
     "no_access_title": "Kein Zugriff",

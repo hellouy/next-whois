@@ -2,6 +2,7 @@ import React from "react";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TextArea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +11,7 @@ import {
   RiFilterLine, RiReplyLine, RiAlertLine, RiCloseLine,
   RiFileCopyLine, RiExternalLinkLine,
   RiCheckboxCircleLine, RiCheckboxBlankCircleLine,
+  RiMailCheckLine,
 } from "@remixicon/react";
 
 type FeedbackItem = {
@@ -22,6 +24,8 @@ type FeedbackItem = {
   created_at: string;
   handled: boolean;
   handled_at: string | null;
+  reply: string | null;
+  replied_at: string | null;
 };
 
 const ISSUE_META: Record<string, { label: string; color: string; dot: string }> = {
@@ -53,6 +57,9 @@ export default function AdminFeedbackPage() {
   const [expanded, setExpanded] = React.useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const pendingDeleteTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [replyOpenFor, setReplyOpenFor] = React.useState<string | null>(null);
+  const [replyText, setReplyText] = React.useState("");
+  const [submittingReply, setSubmittingReply] = React.useState<string | null>(null);
 
   const PAGE_SIZE = 30;
   const [offset, setOffset] = React.useState(0);
@@ -163,6 +170,37 @@ export default function AdminFeedbackPage() {
     const subject = encodeURIComponent(`关于您反馈的域名 ${item.query}`);
     const body = encodeURIComponent(`您好，\n\n感谢您反馈了关于域名 ${item.query} 的问题。\n\n`);
     return `mailto:${item.email}?subject=${subject}&body=${body}`;
+  }
+
+  function openReplyForm(item: FeedbackItem) {
+    setReplyOpenFor(item.id);
+    setReplyText(item.reply ?? "");
+  }
+
+  async function submitReply(item: FeedbackItem) {
+    const clean = replyText.trim();
+    if (!clean) { toast.error("回复内容不能为空"); return; }
+    if (clean.length > 2000) { toast.error("回复内容不能超过 2000 个字符"); return; }
+    setSubmittingReply(item.id);
+    try {
+      const res = await fetch(`/api/admin/feedback?id=${item.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply: clean }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "回复失败");
+      setItems(prev => prev.map(f => f.id === item.id
+        ? { ...f, reply: clean, replied_at: new Date().toISOString(), handled: true, handled_at: new Date().toISOString() }
+        : f
+      ));
+      setReplyOpenFor(null);
+      toast.success("回复已保存并通知用户");
+    } catch (e: any) {
+      toast.error(e.message || "回复失败");
+    } finally {
+      setSubmittingReply(null);
+    }
   }
 
   function fmt(d: string) {
@@ -433,6 +471,62 @@ export default function AdminFeedbackPage() {
                           </a>
                         )}
                       </div>
+
+                      {/* Historical reply (if any) */}
+                      {item.reply && (
+                        <div className="mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 px-3 py-2">
+                          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                            <RiMailCheckLine className="w-3 h-3" />管理员回复
+                            {item.replied_at && (
+                              <span className="text-muted-foreground font-normal">· {fmt(item.replied_at)}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">{item.reply}</p>
+                        </div>
+                      )}
+
+                      {/* Inline reply form */}
+                      {replyOpenFor === item.id ? (
+                        <div className="mt-3 space-y-2">
+                          <TextArea
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            placeholder="输入回复内容，提交后将向用户发送站内通知…"
+                            rows={3}
+                            maxLength={2000}
+                            className="text-xs"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              className="h-8 rounded-lg text-xs"
+                              onClick={() => submitReply(item)}
+                              disabled={submittingReply === item.id}
+                            >
+                              {submittingReply === item.id
+                                ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                                : <RiMailCheckLine className="w-3.5 h-3.5" />}
+                              提交回复
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg text-xs"
+                              onClick={() => setReplyOpenFor(null)}
+                            >
+                              取消
+                            </Button>
+                            <span className="text-[10px] text-muted-foreground ml-auto">{replyText.length}/2000</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openReplyForm(item)}
+                          className="mt-2 flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+                        >
+                          <RiReplyLine className="w-3 h-3" />站内回复
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

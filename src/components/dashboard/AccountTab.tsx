@@ -118,6 +118,10 @@ export function AccountTab({
   const [historyCleared, setHistoryCleared] = React.useState(false);
   const ac = AVATAR_COLORS.find(c => c.key === avatarColor) || AVATAR_COLORS[0];
   const initial = (user.name || user.email || "U").charAt(0).toUpperCase();
+  // Display name falls back to the email local-part for legacy accounts that
+  // never set a name (R3.3). The fallback is display-only and never persisted.
+  const emailPrefix = (user.email || "").split("@")[0];
+  const displayName = user.name || emailPrefix;
 
   React.useEffect(() => {
     try {
@@ -154,8 +158,17 @@ export function AccountTab({
           </button>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-base truncate">{user.name || t("dashboard.nickname_not_set")}</p>
+          <p className="font-bold text-base truncate">{displayName}</p>
           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          {!user.name && (
+            <button
+              type="button"
+              onClick={() => { setNameValue(""); setEditingName(true); }}
+              className="inline-flex items-center gap-1 mt-1 text-[10px] text-primary hover:underline"
+            >
+              <RiPencilLine className="w-3 h-3" />{t("dashboard.set_nickname")}
+            </button>
+          )}
           {isAdminUser && (
             <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300 font-bold border border-violet-200/50 dark:border-violet-700/30 uppercase tracking-wider">
               {t("founder")}

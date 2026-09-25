@@ -2,6 +2,7 @@ import React from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +15,7 @@ import {
   RiArrowLeftSLine, RiFlagLine, RiCheckLine, RiLoader4Line,
   RiServerLine, RiLockLine, RiGlobalLine,
   RiSparkling2Line, RiCloseCircleLine,
+  RiFeedbackLine, RiMailCheckLine, RiArrowDownSLine, RiArrowUpSLine,
 } from "@remixicon/react";
 
 type QueryType = "domain" | "dns" | "ssl" | "ip" | "general";
@@ -345,8 +347,111 @@ export default function FeedbackPage() {
               </motion.form>
             )}
           </AnimatePresence>
+
+          <MyFeedback />
         </main>
       </ScrollArea>
     </>
+  );
+}
+
+type MyFeedbackRow = {
+  id: string;
+  query: string;
+  query_type: string | null;
+  issue_types: string;
+  description: string | null;
+  created_at: string;
+  handled: boolean;
+  reply: string | null;
+  replied_at: string | null;
+};
+
+function MyFeedback() {
+  const { status, data: session } = useSession();
+  const [rows, setRows] = React.useState<MyFeedbackRow[]>([]);
+  const [open, setOpen] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/feedback/mine");
+      if (!res.ok) return;
+      const data = await res.json();
+      setRows(Array.isArray(data.feedback) ? data.feedback : []);
+    } catch { /* non-fatal */ }
+    setLoaded(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (status === "authenticated" && !loaded) load();
+  }, [status, loaded, load]);
+
+  if (status !== "authenticated") return null;
+
+  function fmt(d: string) {
+    return new Date(d).toLocaleString("zh-CN", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+  function parseIssues(raw: string): string[] {
+    try {
+      const a = JSON.parse(raw);
+      return Array.isArray(a) ? a.filter(Boolean) : [];
+    } catch {
+      return raw ? [raw] : [];
+    }
+  }
+
+  return (
+    <div className="glass-panel border border-border rounded-2xl overflow-hidden mt-6">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+          <RiFeedbackLine className="w-3.5 h-3.5" />我的反馈（{rows.length}）
+        </span>
+        {open ? <RiArrowUpSLine className="w-4 h-4 text-muted-foreground" /> : <RiArrowDownSLine className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-2">
+          {!loaded ? (
+            <p className="text-xs text-muted-foreground text-center py-3"><RiLoader4Line className="w-4 h-4 animate-spin inline mr-1" />加载中…</p>
+          ) : rows.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">暂无反馈记录</p>
+          ) : rows.map(r => (
+            <div key={r.id} className="rounded-xl border border-border/60 px-3 py-2.5 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs font-semibold font-mono truncate flex-1 min-w-0">{r.query}</p>
+                {r.handled && <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400">已处理</span>}
+                <span className="text-[10px] text-muted-foreground">{fmt(r.created_at)}</span>
+              </div>
+              {r.description && (
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">{r.description}</p>
+              )}
+              <div className="flex flex-wrap gap-1">
+                {parseIssues(r.issue_types).map((it, i) => (
+                  <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{it}</span>
+                ))}
+              </div>
+              {r.reply ? (
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 px-2.5 py-1.5">
+                  <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                    <RiMailCheckLine className="w-3 h-3" />管理员回复
+                    {r.replied_at && <span className="text-muted-foreground font-normal">· {fmt(r.replied_at)}</span>}
+                  </p>
+                  <p className="text-[11px] text-foreground/80 whitespace-pre-wrap leading-relaxed mt-0.5">{r.reply}</p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground/60 italic">暂无回复</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

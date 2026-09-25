@@ -438,6 +438,8 @@ export const ALTER_COLUMNS = [
   `ALTER TABLE friendly_links ADD COLUMN IF NOT EXISTS logo_url TEXT`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled  BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS handled_at TIMESTAMPTZ`,
+  `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS reply    TEXT`,
+  `ALTER TABLE feedback        ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS repair_status  TEXT NOT NULL DEFAULT 'pending'`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS found_server   TEXT`,
   `ALTER TABLE tld_fallback_stats ADD COLUMN IF NOT EXISTS admin_notes    TEXT`,

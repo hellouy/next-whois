@@ -14,6 +14,7 @@ export type NotificationType =
   | "hold"
   | "reserved"
   | "snipe"
+  | "feedback_reply"
   | "membership";
 
 /**

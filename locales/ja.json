@@ -983,7 +983,6 @@
     "register_closed_desc": "現在、新規登録を停止しています。管理者にお問い合わせください。",
     "register_closed_back": "← ログインへ",
     "register_name_label": "ニックネーム",
-    "register_name_optional": "（任意）",
     "register_name_placeholder": "ニックネーム",
     "register_email_label": "メールアドレス",
     "register_send_code": "コードを送信",
@@ -1062,7 +1061,9 @@
     "reset_err_invalid_token": "無効なリセットリンク",
     "reset_err_failed": "リセットに失敗しました。再リクエストしてください",
     "reset_err_network": "ネットワークエラーが発生しました。再試行してください",
-    "login_remember_me": "ログイン状態を保持（30日間）"
+    "login_remember_me": "ログイン状態を保持（30日間）",
+    "register_err_name_required": "ニックネームを入力してください",
+    "register_err_name_too_long": "ニックネームは50文字以内で入力してください"
   },
   "tlds": {
     "no_support": "非対応",
@@ -1747,7 +1748,8 @@
     "free_usage_full": "無料プランの上限に達しました。アップグレードで無制限に。",
     "export_ics": "iCal をエクスポート",
     "needs_membership": "メンバーシップが必要です",
-    "needs_membership_desc": "ドメイン購読機能はメンバーシップ登録後にご利用いただけます。"
+    "needs_membership_desc": "ドメイン購読機能はメンバーシップ登録後にご利用いただけます。",
+    "set_nickname": "ニックネームを設定"
   },
   "admin": {
     "no_access_title": "アクセス権限なし",
