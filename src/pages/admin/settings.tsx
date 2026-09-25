@@ -878,6 +878,38 @@ function FeaturesTab({ s, set }: { s: SiteSettings; set: (k: keyof SiteSettings,
           {NAV_FEATURES.map(f => <FeatureCard key={f.key as string} f={f} />)}
         </div>
       </div>
+
+      {/* ── 演示数据模式 ─────────────────────────────────────────── */}
+      <div className="glass-panel border border-border rounded-2xl p-5 space-y-4">
+        <SectionTitle
+          icon={RiToolsLine}
+          title="演示数据模式"
+          effect="结果页"
+          desc="开启后，查询命中指定后缀的域名将返回一组固定的演示数据，不再发起真实 WHOIS/RDAP 查询；其他域名不受影响"
+        />
+        <Toggle
+          label="启用演示数据模式"
+          desc="开启后，符合下方后缀的域名查询将被拦截并返回演示数据"
+          checked={s.demo_mode_enabled === "1"}
+          onChange={v => set("demo_mode_enabled", v ? "1" : "")}
+        />
+        <div className={cn("space-y-3 border-t border-border/40 pt-4 transition-opacity", s.demo_mode_enabled !== "1" && "opacity-50 pointer-events-none")}>
+          <Field label="演示后缀" desc="命中即返回演示数据的后缀，多个用逗号分隔；不区分大小写与开头点号">
+            <Input
+              value={s.demo_tld}
+              onChange={e => set("demo_tld", e.target.value)}
+              placeholder="xx" className="text-xs font-mono"
+            />
+          </Field>
+          <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2">
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+              演示数据内容固定：注册人「不讲李」、国家「中国」、邮箱 domain@nic.rw、电话 15801580158、注册商 NIC.RW、
+              状态正常（ok）、NS1.NIC.RW / NS2.NIC.RW。创建时间 = 查询时间前 1 小时，过期时间 = 创建时间 + 1 年，
+              更新时间 = 查询时间。原始 WHOIS 文本同步模拟真实格式。
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

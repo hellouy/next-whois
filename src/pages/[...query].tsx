@@ -73,6 +73,11 @@ import { WhoisAnalyzeResult, WhoisResult, initialWhoisAnalyzeResult } from "@/li
 import { getCnReservedSldInfo } from "@/lib/whois/cn-reserved-sld";
 import { lookupWhoisWithCache } from "@/lib/whois/lookup";
 import { humanizeLookupError } from "@/lib/whois/error-messages";
+import {
+  isDemoTldMatch,
+  normalizeDemoTlds,
+  buildDemoWhois,
+} from "@/lib/demo-whois";
 import { getSetting as getSettingServer } from "@/lib/server/site-settings-server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -260,6 +265,46 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
     };
   }
 
+  // ── Demo-data mode ─────────────────────────────────────────────────────
+  // When enabled in admin, domains whose TLD matches the configured demo
+  // suffix are served fixed demo records instead of a real lookup.  This
+  // intercept runs BEFORE isValidDomainTld because the demo TLD is often not
+  // a real ICANN suffix (e.g. ".xx") — otherwise it would be rejected as
+  // INVALID_DOMAIN_TLD before reaching the demo path.
+  {
+    const [enabledRaw, tldsRaw] = await Promise.all([
+      getSettingServer("demo_mode_enabled"),
+      getSettingServer("demo_tld", "xx"),
+    ]);
+    if (enabledRaw === "1") {
+      const demoMatch = isDemoTldMatch(
+        target,
+        normalizeDemoTlds(tldsRaw || "xx"),
+      );
+      if (demoMatch) {
+        const built = buildDemoWhois(target);
+        const demoData: WhoisResult = {
+          time: 0,
+          status: true,
+          cached: false,
+          source: built.source,
+          result: built.result,
+          dnsProbe: built.dnsProbe,
+        };
+        // Demo output is dynamic (timestamps derive from query time) — never cache.
+        context.res.setHeader("Cache-Control", "no-store");
+        return {
+          props: {
+            data: JSON.parse(JSON.stringify(demoData)),
+            target: target.toLowerCase(),
+            displayTarget: targetToDisplayName(target.toLowerCase()),
+            origin,
+          },
+        };
+      }
+    }
+  }
+
   // Server-side TLD validation — reject clearly invalid domains before lookup
   if (!isValidDomainTld(target)) {
     return {
@@ -276,8 +321,6 @@ async function _getServerSidePropsImpl(context: GetServerSidePropsContext) {
       },
     };
   }
-
-  // ── IDNA / encoding safety check ────────────────────────────────────────
   // Guard against domain labels that contain control characters, surrogates,
   // or other byte sequences that would cause Net/DNS modules to throw.
   // Note: emoji ARE handled by Node.js domainToASCII (converts to punycode),
@@ -597,7 +640,12 @@ export default function LookupPage({
     //       ref-based approach would silently miss this case)
     // Updating `data` here ensures the error card is visible even on a shallow
     // navigation where SSR props are not refreshed.
-    const targetIsInvalid = !looksLikeDomainQuery(target) || !isValidDomainTld(target);
+    // Demo-data mode (admin enabled) uses non-ICANN TLDs like ".xx" that are
+    // deliberately allowed through so /api/lookup-stream serves the demo record.
+    const demoEnabled  = settings.demo_mode_enabled === "1";
+    const demoTlds     = demoEnabled ? normalizeDemoTlds(settings.demo_tld || "xx") : [];
+    const isDemoTarget = demoEnabled && isDemoTldMatch(target, demoTlds);
+    const targetIsInvalid = !looksLikeDomainQuery(target) || (!isDemoTarget && !isValidDomainTld(target));
     if (targetIsInvalid) {
       firstLoadDone.current = true;
       setLoading(false);

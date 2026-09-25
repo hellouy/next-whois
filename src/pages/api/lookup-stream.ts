@@ -166,6 +166,38 @@ export default async function handler(
     return res.end();
   }
 
+  // ── Demo-data mode ─────────────────────────────────────────────────────────
+  // Same interception as the SSR page + non-stream API: demo TLDs return a
+  // fixed record as a single NDJSON line instead of any real registry lookup.
+  {
+    const [demoEnabled, demoTld] = await Promise.all([
+      getSetting("demo_mode_enabled"),
+      getSetting("demo_tld", "xx"),
+    ]);
+    if (demoEnabled === "1") {
+      const { isDemoTldMatch, normalizeDemoTlds, buildDemoWhois } = await import("@/lib/demo-whois");
+      if (isDemoTldMatch(trimmed, normalizeDemoTlds(demoTld || "xx"))) {
+        const built = buildDemoWhois(trimmed);
+        const tldParts = trimmed.toLowerCase().split(".");
+        const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
+        await logQuery({
+          domain: trimmed, tld, success: true, cached: false,
+          durationMs: 0, errorCode: null, source: "whois",
+          outcome: "registered", userId, userEmail, ip,
+        }).catch(e => logger.error("[lookup-stream] demo logQuery failed:", e.message));
+        await saveSearchRecord(trimmed, built.result, built.dnsProbe, userId, userEmail)
+          .catch(e => logger.error("[lookup-stream] demo saveSearchRecord failed:", e.message));
+        res.setHeader("Content-Type", "application/x-ndjson");
+        res.setHeader("Cache-Control", "no-store");
+        res.write(JSON.stringify({
+          time: 0, status: true, cached: false, source: "whois",
+          result: built.result, dnsProbe: built.dnsProbe, partial: false,
+        }) + "\n");
+        return res.end();
+      }
+    }
+  }
+
   // ── Set up NDJSON streaming response ─────────────────────────────────────
   res.setHeader("Content-Type", "application/x-ndjson");
   res.setHeader("Transfer-Encoding", "chunked");

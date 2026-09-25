@@ -187,6 +187,9 @@ export interface SiteSettings {
   site_background: string;
   // Attribution text shown in the registrar card's server-info section
   whois_server_attribution: string;
+  // Demo-data mode — queries for the configured TLD(s) return fixed demo data
+  demo_mode_enabled: string;
+  demo_tld: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -347,6 +350,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   whoisds_list_urls: "",
   site_background: "dot",
   whois_server_attribution: "来自：不讲·李提供",
+  demo_mode_enabled: "",
+  demo_tld: "xx",
 };
 
 // ── Result page ads (multi-ad management) ────────────────────────────────────
