@@ -1,21 +1,22 @@
 /**
  * Vercel Cron — Automatic TLD Lifecycle Batch Scraper
  *
- * Scheduled in vercel.json. Picks the next batch of pending/failed TLDs
- * from the database and scrapes them using the existing AI extraction pipeline.
+ * Scheduled in vercel.json. Picks the next batch of pending/failed/warn_defaults
+ * TLDs (plus stale 'ok' rows past their 180-day refresh TTL — R13) from the
+ * database and scrapes them through the unified `scrapeTld` service.
  *
  * Priority queue:
  *   1. pending        — never scraped
- *   2. warn_defaults  — only got ICANN defaults last time (worth retrying)
- *   3. failed         — network/parse errors under the retry threshold
+ *   2. ok (stale)     — scraped successfully but older than 180 days (R13)
+ *   3. warn_defaults  — only got ICANN defaults last time (worth retrying)
+ *   4. failed         — network/parse errors under the retry threshold
  *
- * Skipped: manually_edited=true, scrape_status='ok', scrape_status='no_data'
+ * Skipped: manually_edited=true, scrape_status='no_data'
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { one, run, many } from "@/lib/db-query";
-import { fetchPageText, extractWithAI } from "@/pages/api/admin/tld-rules";
-import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
+import { run, many } from "@/lib/db-query";
+import { scrapeTld } from "@/lib/server/tld-scrape";
 import { createLogger } from "@/lib/logger";
 import { verifySecretTimingSafe } from "@/lib/admin";
 
@@ -24,109 +25,12 @@ const logger = createLogger("api/cron/tld-scrape");
 const BATCH_SIZE = 5;
 const MAX_WARN_ATTEMPTS = 3;
 const MAX_FAILED_ATTEMPTS = 5;
+const STALE_OK_DAYS = 180; // R13 AC1: refresh successfully-scraped rules past this age
 
 interface TldQueueRow {
   tld: string;
   scrape_status: string;
   scrape_attempts: number;
-}
-
-function isAllDefaults(r: {
-  grace_period_days: number;
-  redemption_period_days: number;
-  pending_delete_days: number;
-}) {
-  return (
-    r.grace_period_days === 30 &&
-    r.redemption_period_days === 30 &&
-    r.pending_delete_days === 5
-  );
-}
-
-async function saveTldRule(
-  tld: string,
-  extracted: {
-    grace_period_days: number;
-    redemption_period_days: number;
-    pending_delete_days: number;
-    drop_hour: number | null;
-    drop_minute: number | null;
-    drop_second: number | null;
-    drop_timezone: string | null;
-    pre_expiry_days: number | null;
-    reasoning: string;
-    model_used: string;
-  },
-  finalUrl: string,
-  scrapeStatus: string
-) {
-  await run(
-    `INSERT INTO tld_rules
-       (tld, grace_period_days, redemption_period_days, pending_delete_days,
-        source_url, confidence, ai_reasoning, model_used,
-        drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
-        scraped_at, updated_at, scrape_status, failure_reason, needs_admin_review, scrape_attempts)
-     VALUES ($1,$2,$3,$4,$5,'ai',$6,$7,$8,$9,$10,$11,$12,NOW(),NOW(),$13,NULL,$14,1)
-     ON CONFLICT (tld) DO UPDATE SET
-       grace_period_days      = EXCLUDED.grace_period_days,
-       redemption_period_days = EXCLUDED.redemption_period_days,
-       pending_delete_days    = EXCLUDED.pending_delete_days,
-       source_url             = EXCLUDED.source_url,
-       confidence             = 'ai',
-       ai_reasoning           = EXCLUDED.ai_reasoning,
-       model_used             = EXCLUDED.model_used,
-       drop_hour              = EXCLUDED.drop_hour,
-       drop_minute            = EXCLUDED.drop_minute,
-       drop_second            = EXCLUDED.drop_second,
-       drop_timezone          = EXCLUDED.drop_timezone,
-       pre_expiry_days        = EXCLUDED.pre_expiry_days,
-       scraped_at             = NOW(),
-       updated_at             = NOW(),
-scrape_status          = EXCLUDED.scrape_status,
-        failure_reason         = NULL,
-        needs_admin_review     = EXCLUDED.needs_admin_review,
-        processing_at          = NULL,
-        processing_from        = NULL,
-        scrape_attempts        = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
-    [
-      tld,
-      extracted.grace_period_days,
-      extracted.redemption_period_days,
-      extracted.pending_delete_days,
-      finalUrl,
-      extracted.reasoning,
-      extracted.model_used || null,
-      extracted.drop_hour,
-      extracted.drop_minute,
-      extracted.drop_second,
-      extracted.drop_timezone,
-      extracted.pre_expiry_days ?? 0,
-      scrapeStatus,
-      scrapeStatus !== "ok",
-    ]
-  );
-}
-
-async function saveFailure(tld: string, reason: string) {
-  await run(
-    `INSERT INTO tld_rules
-       (tld, grace_period_days, redemption_period_days, pending_delete_days,
-        scrape_status, failure_reason, scraped_at, updated_at,
-        needs_admin_review, confidence, scrape_attempts)
-     VALUES ($1,30,30,5,'failed',$2,NOW(),NOW(),TRUE,'low',1)
-     ON CONFLICT (tld) DO UPDATE SET
-scrape_status      = 'failed',
-        failure_reason     = $2,
-        scraped_at         = NOW(),
-        updated_at         = NOW(),
-        needs_admin_review = TRUE,
-        processing_at      = NULL,
-        processing_from    = NULL,
-        scrape_attempts    = COALESCE(tld_rules.scrape_attempts, 0) + 1`,
-    [tld, reason.slice(0, 500)]
-  ).catch((e: Error) =>
-    logger.warn(`[cron/tld-scrape] DB write failure for ${tld}:`, e.message)
-  );
 }
 
 async function markNoData(tld: string, reason: string) {
@@ -151,14 +55,18 @@ async function getNextBatch(): Promise<TldQueueRow[]> {
               COALESCE(scrape_attempts,0) AS scrape_attempts
        FROM tld_rules
        WHERE COALESCE(manually_edited, FALSE) = FALSE
-         AND COALESCE(scrape_status,'pending') IN ('pending','warn_defaults','failed')
+         AND (
+           COALESCE(scrape_status,'pending') IN ('pending','warn_defaults','failed')
+           OR (scrape_status = 'ok' AND updated_at < NOW() - ($2 || ' days')::INTERVAL)
+         )
          AND COALESCE(scrape_status,'pending') != 'no_data'
        ORDER BY
-         CASE COALESCE(scrape_status,'pending')
-           WHEN 'pending'       THEN 1
-           WHEN 'warn_defaults' THEN 2
-           WHEN 'failed'        THEN 3
-           ELSE 4
+         CASE
+           WHEN COALESCE(scrape_status,'pending') = 'pending'       THEN 1
+           WHEN scrape_status = 'ok'                                THEN 2
+           WHEN COALESCE(scrape_status,'pending') = 'warn_defaults' THEN 3
+           WHEN COALESCE(scrape_status,'pending') = 'failed'        THEN 4
+           ELSE 5
          END,
          COALESCE(scrape_attempts,0) ASC,
          tld ASC
@@ -171,11 +79,14 @@ async function getNextBatch(): Promise<TldQueueRow[]> {
      FROM   candidates c
      WHERE  t.tld = c.tld
        AND  t.processing_at IS NULL
-       AND  COALESCE(t.scrape_status,'pending') IN ('pending','warn_defaults','failed')
+       AND  (
+         COALESCE(t.scrape_status,'pending') IN ('pending','warn_defaults','failed')
+         OR (t.scrape_status = 'ok' AND t.updated_at < NOW() - ($2 || ' days')::INTERVAL)
+       )
      RETURNING t.tld,
                c.scrape_status,
                c.scrape_attempts`,
-    [BATCH_SIZE]
+    [BATCH_SIZE, STALE_OK_DAYS]
   );
   return rows;
 }
@@ -260,28 +171,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       continue;
     }
 
-    const ianaUrl = `https://www.iana.org/domains/root/db/${tld}.html`;
+    const result = await scrapeTld({ tld, force: true });
 
-    try {
-      const { text: pageText, finalUrl } = await fetchPageText(ianaUrl);
-
-      if (!pageText || pageText.length < 50) {
-        throw new Error("页面内容为空");
-      }
-
-      const extracted = await extractWithAI(tld, pageText, finalUrl);
-
-      const scrapeStatus = isAllDefaults(extracted) ? "warn_defaults" : "ok";
-      await saveTldRule(tld, extracted, finalUrl, scrapeStatus);
-      invalidateLifecycleOverridesCache();
-
-      results.push({ tld, status: scrapeStatus, model: extracted.model_used });
+    if (result.ok && result.scrapeStatus) {
+      results.push({ tld, status: result.scrapeStatus, model: result.extracted?.model_used });
       logger.info(
-        `[cron/tld-scrape] .${tld} → ${scrapeStatus} | grace=${extracted.grace_period_days}d redemption=${extracted.redemption_period_days}d pending=${extracted.pending_delete_days}d [${extracted.model_used}]`
+        `[cron/tld-scrape] .${tld} → ${result.scrapeStatus} | grace=${result.extracted?.grace_period_days}d redemption=${result.extracted?.redemption_period_days}d pending=${result.extracted?.pending_delete_days}d [${result.extracted?.model_used}]`
       );
-    } catch (err: any) {
-      const reason = (err.message ?? String(err)).slice(0, 400);
-      await saveFailure(tld, reason);
+    } else {
+      const reason = (result.error ?? "Unknown error").slice(0, 400);
       results.push({ tld, status: "failed", error: reason.slice(0, 120) });
       logger.error(`[cron/tld-scrape] .${tld} → failed: ${reason.slice(0, 120)}`);
     }

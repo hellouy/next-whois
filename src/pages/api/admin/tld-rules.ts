@@ -8,33 +8,17 @@ import {
   deleteRedisValue,
 } from "@/lib/server/redis";
 import { createLogger } from "@/lib/logger";
-
-const logger = createLogger("api/admin/tld-rules");
-import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { callProviderWithFallback } from "@/lib/server/ai-providers";
 import { invalidateLifecycleOverridesCache } from "@/lib/server/lifecycle-overrides";
+import {
+  scrapeTld,
+  validatePublicUrl,
+  SCRAPE_CACHE_KEY,
+  hasLifecycleInfo,
+} from "@/lib/server/tld-scrape";
 
-// ─── SSRF protection: only allow public HTTP/HTTPS URLs ───────────────────────
-const PRIVATE_IP_RE =
-  /^(localhost|127\.\d+\.\d+\.\d+|::1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|fc[0-9a-f]{2}:|fd[0-9a-f]{2}:)/i;
-
-function validatePublicUrl(raw: string): { ok: true; url: string } | { ok: false; error: string } {
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return { ok: false, error: "Invalid URL format" };
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { ok: false, error: "Only http:// and https:// URLs are allowed" };
-  }
-  if (PRIVATE_IP_RE.test(parsed.hostname)) {
-    return { ok: false, error: "Private or loopback addresses are not allowed" };
-  }
-  return { ok: true, url: parsed.toString() };
-}
+const logger = createLogger("api/admin/tld-rules");
 
 // ─── Local JSON file cache (best-effort, fails silently in read-only envs) ────
 const LOCAL_CACHE_PATH = join(process.cwd(), "data", "tld-rules.json");
@@ -58,53 +42,10 @@ function updateLocalCache(tld: string, data: Record<string, unknown>): void {
   }
 }
 
-// Redis keys
-const RATE_LIMIT_KEY = (tld: string) => `tld_rules_rl:${tld}`;
-const SCRAPE_CACHE_KEY = (url: string) =>
-  `tld_rules_scrape:${Buffer.from(url).toString("base64").slice(0, 60)}`;
-const REGISTRY_URL_CACHE_KEY = (tld: string) => `tld_registry_url:${tld}`;
-
-// TTLs
-const RATE_LIMIT_TTL_S = 60 * 60;       // 1 request per TLD per hour
-const SCRAPE_CACHE_TTL_S = 60 * 60 * 6; // raw page text cached 6 h
-const REGISTRY_URL_TTL_S = 60 * 60 * 24 * 7; // registry URL cached 7 days
-
-// Lifecycle keywords that signal a page has actual domain lifecycle policy info.
-// IMPORTANT: Keep these SPECIFIC enough to avoid false positives from cookie banners,
-// privacy policies, and general website content that also use words like "delete", "expir".
-const LIFECYCLE_KEYWORDS = [
-  // English — multi-word or domain-specific single terms only
-  "grace period", "redemption period", "pending delete", "pendingdelete",
-  "rgp", "autorenew grace", "auto-renew grace", "registry grace period",
-  "add grace period", "drop time", "drop date", "drop catch",
-  "lifecycle", "life cycle", "domain lifecycle",
-  "expiry period", "expiration period", "renewal grace period",
-  "registry lock period", "domain deletion", "domain expiration",
-  "domain expiry", "restore period", "redemption grace",
-  // Chinese (Simplified + Traditional) — multi-char terms are naturally specific
-  "宽限期", "赎回期", "待删除", "掉落时间", "释放时间", "删除时间",
-  "续费宽限", "到期删除", "赎回", "注册局宽限",
-  // Japanese — domain-specific multi-character terms
-  "ライフサイクル", "猶予期間", "回復期間", "削除待ち", "更新猶予",
-  "ドメイン有効期限", "削除期間",
-  // Korean
-  "갱신유예", "복구기간", "삭제대기", "라이프사이클",
-  // German — compound terms unique to domain industry
-  "löschfrist", "kündigungsfrist", "löschantrag", "wiederherstellungsphase",
-  "domainlöschung", "freigabephase", "domainlebenszykl",
-  // French — specific domain lifecycle terms
-  "période de grâce", "rédemption", "suppression en attente", "cycle de vie",
-  "durée de grâce",
-  // Russian
-  "период льготы", "период выкупа",
-];
-
-function hasLifecycleInfo(text: string): boolean {
-  const lower = text.toLowerCase();
-  return LIFECYCLE_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
-}
-
 // ─── Rate limiting ────────────────────────────────────────────────────────────
+const RATE_LIMIT_KEY = (tld: string) => `tld_rules_rl:${tld}`;
+const RATE_LIMIT_TTL_S = 60 * 60; // 1 request per TLD per hour
+
 async function checkRateLimit(tld: string): Promise<boolean> {
   if (!isRedisAvailable()) return true; // skip if no Redis
   const key = RATE_LIMIT_KEY(tld);
@@ -114,531 +55,7 @@ async function checkRateLimit(tld: string): Promise<boolean> {
   return true;
 }
 
-// ─── Fetch & clean page text (with lifecycle keyword prioritization) ──────────
-async function fetchRawHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; next-whois-ui/1.0; domain-lifecycle-crawler)",
-      Accept: "text/html,application/xhtml+xml,*/*",
-      "Accept-Language": "en,zh;q=0.9",
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  return res.text();
-}
-
-function extractText(html: string, maxChars = 10_000): string {
-  const $ = cheerio.load(html);
-  $("script,style,nav,header,footer,noscript,iframe,svg,button,form").remove();
-
-  // Try to get the most relevant section first
-  const mainEl = $("main,article,[class*=content],[id*=content],.policy,.lifecycle,.domain-info,body").first();
-  const rawText = (mainEl.text() || $("body").text())
-    .replace(/\s{3,}/g, "\n")
-    .replace(/\n{4,}/g, "\n\n")
-    .trim();
-
-  if (rawText.length <= maxChars) return rawText;
-
-  // Smart slicing: prefer sections containing lifecycle keywords
-  const lines = rawText.split("\n");
-  const relevantLines: string[] = [];
-  const otherLines: string[] = [];
-
-  for (const line of lines) {
-    if (LIFECYCLE_KEYWORDS.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
-      // Include surrounding context (3 lines before+after handled by gathering blocks)
-      relevantLines.push(line);
-    } else {
-      otherLines.push(line);
-    }
-  }
-
-  // Prioritize: relevant lines first, then fill with remaining lines
-  const priority = relevantLines.join("\n").slice(0, Math.floor(maxChars * 0.7));
-  const rest = otherLines.join("\n").slice(0, maxChars - priority.length);
-  return (priority + "\n\n" + rest).trim().slice(0, maxChars);
-}
-
-/**
- * Extract the registry's official URL from an IANA root-db page.
- * Works on both raw HTML (preferred) and extracted plain text.
- */
-function extractRegistryUrl(htmlOrText: string): string | null {
-  // First try: find the <a> href right after "URL for registration services"
-  // IANA HTML: <b>URL for registration services:</b><br/> <a href="https://...">...</a>
-  const hrefMatch = htmlOrText.match(
-    /URL for registration services[^<]*<[^>]+>\s*<a[^>]+href=["']?(https?:\/\/[^"'\s>]+)["']?/i
-  );
-  if (hrefMatch) {
-    return hrefMatch[1].replace(/\/$/, "").replace(/[)\]>]+$/, "");
-  }
-
-  // Second try: plain-text URL (full http:// form)
-  const urlMatch = htmlOrText.match(
-    /URL for registration services[^\n]*\n?\s*(https?:\/\/[^\s\n<>]+)/i
-  );
-  if (urlMatch) {
-    return urlMatch[1].replace(/\/$/, "").replace(/[)\]>]+$/, "");
-  }
-
-  // Third try: "www." style (no scheme) — add https://
-  const wwwMatch = htmlOrText.match(
-    /URL for registration services[^\n]*\n?\s*(www\.[^\s\n<>]+)/i
-  );
-  if (wwwMatch) {
-    return `https://${wwwMatch[1]}`.replace(/\/$/, "");
-  }
-
-  return null;
-}
-
-/**
- * Extract registry URL from raw IANA HTML (more reliable than text).
- * Falls back to text-based extraction.
- */
-function extractRegistryUrlFromHtml(html: string): string | null {
-  // IANA page structure: the link after "URL for registration services"
-  const $ = cheerio.load(html);
-  let found: string | null = null;
-
-  $("*").each((_, el) => {
-    const text = $(el).clone().children().remove().end().text();
-    if (/URL for registration services/i.test(text)) {
-      // Look for next sibling or nested <a>
-      const nextA = $(el).next("a").attr("href") ??
-        $(el).parent().find("a").first().attr("href") ?? null;
-      if (nextA?.match(/^https?:\/\//)) {
-        found = nextA.replace(/\/$/, "");
-        return false; // break
-      }
-    }
-  });
-
-  if (found) return found;
-
-  // Also try: find any <a> whose href is near the string in the page
-  const blockMatch = html.match(
-    /URL for registration services[\s\S]{0,200}?href=["']?(https?:\/\/[^"'\s>]+)/i
-  );
-  if (blockMatch) return blockMatch[1].replace(/\/$/, "");
-
-  // Fall back to text parsing
-  return extractRegistryUrl($.text());
-}
-
-/** Common lifecycle path suffixes to probe on a registry domain */
-const LIFECYCLE_PATHS = [
-  // Lifecycle-specific paths (highest signal)
-  "/domain-lifecycle", "/domains/lifecycle", "/en/domains/lifecycle",
-  "/lifecycle", "/en/lifecycle", "/policies/lifecycle",
-  "/domain-names/lifecycle", "/support/lifecycle", "/faq/lifecycle",
-  "/about/lifecycle", "/en/domain-lifecycle", "/domains/domain-lifecycle",
-  "/en/domains/domain-lifecycle", "/registrar/lifecycle",
-  // General policy/domain info pages (often contain lifecycle)
-  "/policies", "/en/policies", "/domains/policies", "/domains",
-  "/en/domains", "/en/domain-names", "/domain-names",
-  "/registrar-information", "/registrar-resources",
-  // FAQ / help sections (registries often document lifecycle in FAQs)
-  "/faq", "/en/faq", "/help", "/en/help", "/support", "/en/support",
-  "/help-center", "/knowledge-base", "/kb",
-  // German ccTLD registries (DENIC .de)
-  "/en/the-dot-de-domain", "/en/domains/conditions",
-  "/domainrichtlinien", "/richtlinien",
-  "/en/domain-names/conditions",
-  // French ccTLD (afnic .fr)
-  "/en/domain-names-and-support/managing-a-domain-name",
-  "/en/domain-names-and-support",
-  // Australian ccTLD (auDA .au)
-  "/for-registrants/au-domain-administration",
-  "/domain-names", "/registrants",
-];
-
-/** Link href keywords that indicate a lifecycle/renewal policy page */
-const LIFECYCLE_LINK_KEYWORDS = [
-  // English
-  "lifecycle", "life-cycle", "grace", "redemption", "renewal", "expir",
-  "policy", "policies", "domain-rules", "domain-policy", "rgp", "purge", "delete",
-  // Chinese
-  "待删", "宽限", "赎回", "续费", "政策", "规则", "生命周期", "到期",
-  // Japanese
-  "ライフサイクル", "猶予", "削除", "更新", "有効期限", "ルール",
-  // Korean
-  "라이프사이클", "갱신", "삭제",
-  // German
-  "lebenszyklus", "lösch", "kündig",
-  // French
-  "cycle", "suppression", "rédem",
-];
-
-function hasLifecycleLinkKeyword(href: string, text: string): boolean {
-  const combined = `${href} ${text}`.toLowerCase();
-  return LIFECYCLE_LINK_KEYWORDS.some(kw => combined.includes(kw.toLowerCase()));
-}
-
-/**
- * Parse all <a> hrefs from an HTML page that look like lifecycle policy links.
- * Returns absolute URLs, deduped, capped at 20.
- */
-function extractLifecycleLinks(html: string, baseUrl: string): string[] {
-  const $ = cheerio.load(html);
-  const base = new URL(baseUrl).origin;
-  const seen = new Set<string>();
-  const links: string[] = [];
-
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href") ?? "";
-    const text = $(el).text().trim();
-    if (!hasLifecycleLinkKeyword(href, text)) return;
-
-    let abs: string;
-    try {
-      abs = new URL(href, baseUrl).href;
-    } catch { return; }
-
-    // Only follow links on the same domain or subdomains
-    if (!abs.startsWith(base)) return;
-    if (seen.has(abs)) return;
-    seen.add(abs);
-    links.push(abs);
-    if (links.length >= 20) return false; // stop iteration
-  });
-
-  return links;
-}
-
-/**
- * Fetch a URL via Jina Reader (r.jina.ai) which renders JS and returns clean Markdown.
- * No API key needed. Returns the rendered Markdown text.
- */
-async function fetchViaJina(url: string): Promise<string> {
-  const jinaUrl = `https://r.jina.ai/${url}`;
-  const res = await fetch(jinaUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; next-whois-ui/1.0)",
-      Accept: "text/plain,text/markdown,*/*",
-      "X-No-Cache": "true",
-    },
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!res.ok) throw new Error(`Jina HTTP ${res.status} for ${url}`);
-  const text = await res.text();
-  if (!text || text.length < 100) throw new Error(`Jina returned empty content for ${url}`);
-  return text;
-}
-
-/**
- * Parse lifecycle-looking links from Jina Markdown output.
- * Jina formats links as: [Link text](https://example.com/path)
- */
-function extractLifecycleLinksFromMarkdown(markdown: string, baseUrl: string): string[] {
-  const base = new URL(baseUrl).origin;
-  const seen = new Set<string>();
-  const links: string[] = [];
-
-  // Match: [text](url) patterns from Markdown
-  const mdLinkRe = /\[([^\]]{1,80})\]\((https?:\/\/[^\s)]+)\)/g;
-  let match: RegExpExecArray | null;
-  while ((match = mdLinkRe.exec(markdown)) !== null) {
-    const text = match[1];
-    const href = match[2];
-    if (!hasLifecycleLinkKeyword(href, text)) continue;
-    if (!href.startsWith(base)) continue;
-    if (seen.has(href)) continue;
-    seen.add(href);
-    links.push(href);
-    if (links.length >= 15) break;
-  }
-  return links;
-}
-
-/**
- * Multi-strategy registry lifecycle page finder.
- * Strategy 1: Try the registry URL itself (homepage may have lifecycle info)
- * Strategy 2: Try common path suffixes
- * Strategy 3: Crawl homepage + linked pages for lifecycle keywords
- * Strategy 4: Jina Reader fallback (handles JS-rendered sites like DENIC, nic.fr, nic.uk)
- * Returns { url, text } of the best page found, or null.
- */
-async function findRegistryLifecyclePage(
-  registryUrl: string
-): Promise<{ url: string; text: string }| null> {
-  const base = new URL(registryUrl).origin;
-
-  // ── Strategy 1-3: Static HTML crawl ─────────────────────────────────────────
-  try {
-    const html = await fetchRawHtml(registryUrl);
-    const text = extractText(html, 10_000);
-    if (hasLifecycleInfo(text)) {
-      return { url: registryUrl, text };
-    }
-
-    // ── Strategy 2: Try common path suffixes ──────────────────────────────────
-    for (const path of LIFECYCLE_PATHS) {
-      const url = base + path;
-      try {
-        const pHtml = await fetchRawHtml(url);
-        const pText = extractText(pHtml, 10_000);
-        if (hasLifecycleInfo(pText)) {
-          return { url, text: pText };
-        }
-      } catch { /* try next path */ }
-    }
-
-    // ── Strategy 3: Follow lifecycle-looking links from the homepage ──────────
-    const linkedUrls = extractLifecycleLinks(html, registryUrl);
-    for (const linkedUrl of linkedUrls) {
-      try {
-        const lHtml = await fetchRawHtml(linkedUrl);
-        const lText = extractText(lHtml, 10_000);
-        if (hasLifecycleInfo(lText)) {
-          return { url: linkedUrl, text: lText };
-        }
-        // If the linked page itself has MORE lifecycle links, follow one level deeper
-        const deepLinks = extractLifecycleLinks(lHtml, linkedUrl).slice(0, 5);
-        for (const deepUrl of deepLinks) {
-          if (deepUrl === linkedUrl || deepUrl === registryUrl) continue;
-          try {
-            const dHtml = await fetchRawHtml(deepUrl);
-            const dText = extractText(dHtml, 10_000);
-            if (hasLifecycleInfo(dText)) {
-              return { url: deepUrl, text: dText };
-            }
-          } catch { /* skip */ }
-        }
-      } catch { /* try next link */ }
-    }
-  } catch { /* registry unreachable via direct fetch */ }
-
-  // ── Strategy 4: Jina Reader (JS-rendered sites) ───────────────────────────
-  // Used when direct fetching finds no lifecycle info (JS-heavy sites like DENIC, nic.fr, nic.uk)
-  logger.info(`[tld-rules] Strategy 4: Trying Jina Reader for ${registryUrl}`);
-  try {
-    // 4a: Render registry homepage via Jina
-    const jinaMarkdown = await fetchViaJina(registryUrl);
-    if (hasLifecycleInfo(jinaMarkdown)) {
-      return { url: registryUrl, text: jinaMarkdown.slice(0, 10_000) };
-    }
-
-    // 4b: Extract lifecycle links from Jina-rendered Markdown, follow them via Jina
-    const jinaLinks = extractLifecycleLinksFromMarkdown(jinaMarkdown, registryUrl);
-    logger.info(`[tld-rules] Jina found ${jinaLinks.length} lifecycle-keyword links`);
-    for (const jLink of jinaLinks) {
-      try {
-        const jPageText = await fetchViaJina(jLink);
-        if (hasLifecycleInfo(jPageText)) {
-          return { url: jLink, text: jPageText.slice(0, 10_000) };
-        }
-        // One level deeper from Jina-rendered linked page
-        const deepJinaLinks = extractLifecycleLinksFromMarkdown(jPageText, jLink).slice(0, 4);
-        for (const djLink of deepJinaLinks) {
-          if (djLink === jLink || djLink === registryUrl) continue;
-          try {
-            const djText = await fetchViaJina(djLink);
-            if (hasLifecycleInfo(djText)) {
-              return { url: djLink, text: djText.slice(0, 10_000) };
-            }
-          } catch { /* skip */ }
-        }
-      } catch { /* try next Jina link */ }
-    }
-
-    // 4c: Try common lifecycle path suffixes via Jina (JS sites may render those too)
-    // Include lifecycle-specific paths AND registry-specific paths (FAQ, conditions, etc.)
-    const jinaPathsToTry = LIFECYCLE_PATHS.slice(0, 20);
-    for (const path of jinaPathsToTry) {
-      const url = base + path;
-      try {
-        const pText = await fetchViaJina(url);
-        if (hasLifecycleInfo(pText)) {
-          return { url, text: pText.slice(0, 10_000) };
-        }
-      } catch { /* try next */ }
-    }
-  } catch (jinaErr) {
-    logger.warn(`[tld-rules] Jina Reader failed for ${registryUrl}:`, (jinaErr as Error).message);
-  }
-
-  return null;
-}
-
-async function fetchPageText(url: string): Promise<{ text: string; finalUrl: string }> {
-  // Check cache first
-  const cacheKey = SCRAPE_CACHE_KEY(url);
-  if (isRedisAvailable()) {
-    const cached = await getRedisValue(cacheKey);
-    if (cached) {
-      try {
-        const obj = JSON.parse(cached);
-        return { text: obj.text, finalUrl: obj.finalUrl ?? url };
-      } catch {
-        return { text: cached, finalUrl: url };
-      }
-    }
-  }
-
-  let html = await fetchRawHtml(url);
-  const ianaText = extractText(html, 10_000);
-  let text = ianaText;
-  let finalUrl = url;
-
-  // ── Smart URL discovery: if IANA page has no lifecycle data, find registry page ──
-  if (!hasLifecycleInfo(ianaText) && url.includes("iana.org")) {
-    // Extract from raw HTML first (gets the <a href="..."> link directly)
-    const registryUrl = extractRegistryUrlFromHtml(html) ?? extractRegistryUrl(ianaText);
-    if (registryUrl) {
-      const tldKey = new URL(url).pathname.split("/").pop()?.replace(/\.html$/, "") ?? "";
-      const cacheKey2 = REGISTRY_URL_CACHE_KEY(tldKey);
-
-      // Try cached result first
-      let cachedPayload: string | null = null;
-      if (isRedisAvailable()) {
-        cachedPayload = await getRedisValue(cacheKey2);
-      }
-
-      let found: { url: string; text: string } | null = null;
-      if (cachedPayload) {
-        try {
-          const parsed = JSON.parse(cachedPayload);
-          found = { url: parsed.url, text: parsed.text };
-        } catch {
-          // stale cache with just URL — re-fetch its text
-          try {
-            const fHtml = await fetchRawHtml(cachedPayload);
-            found = { url: cachedPayload, text: extractText(fHtml, 10_000) };
-          } catch { /* ignore */ }
-        }
-      }
-
-      if (!found) {
-        // Full multi-strategy discovery (may take several HTTP requests)
-        found = await findRegistryLifecyclePage(registryUrl).catch(() => null);
-        if (found && isRedisAvailable()) {
-          // Cache the URL + a snippet of text (text too large to cache fully — just URL)
-          await setRedisValue(cacheKey2, found.url, REGISTRY_URL_TTL_S);
-        }
-      }
-
-      if (found) {
-        // Always use registry page text — even without lifecycle keywords,
-        // the AI may still extract data from context (e.g., policy tables in non-English).
-        // Signal to AI whether strong keywords were found.
-        const hasKw = hasLifecycleInfo(found.text);
-        const hint = hasKw
-          ? ""
-          : "\n[注意：本页未检测到标准生命周期关键词，但仍尝试从上下文提取数据，如无法提取请使用行业默认值]\n";
-        text = `[IANA 页面 — 注册局信息]\n${ianaText.slice(0, 1500)}\n\n[注册局官网 ${found.url}]${hint}\n${found.text.slice(0, 7500)}`;
-        finalUrl = found.url;
-      } else if (!hasLifecycleInfo(ianaText)) {
-        // No registry page found — still send IANA text to AI with a hint
-        text = `[IANA 页面 — 注册局信息，无注册局官网数据]\n${ianaText}\n[注意：未能找到注册局生命周期政策页，请根据TLD类型判断是否使用行业默认值]`;
-      }
-    }
-  }
-
-  const payload = JSON.stringify({ text, finalUrl });
-  if (text && isRedisAvailable()) {
-    await setRedisValue(cacheKey, payload, SCRAPE_CACHE_TTL_S);
-  }
-  return { text, finalUrl };
-}
-
-// ─── AI extraction with multi-model fallback ──────────────────────────────────
-interface ExtractedLifecycle {
-  grace_period_days: number;
-  redemption_period_days: number;
-  pending_delete_days: number;
-  drop_hour: number | null;
-  drop_minute: number | null;
-  drop_second: number | null;
-  drop_timezone: string | null;
-  pre_expiry_days: number | null;
-  reasoning: string;
-  model_used: string;
-}
-
-const SYSTEM_PROMPT = `你是域名注册局政策专家，精通ICANN及各国注册局的域名生命周期规则。
-从注册局官网文字中精准提取以下字段（英文/中文页面均可）：
-
-1. grace_period_days — 宽限期天数（域名到期后仍可续费；英文：grace period / autorenew grace period）
-2. redemption_period_days — 赎回期天数（RGP；英文：redemption grace period / redemption period）
-3. pending_delete_days — 待删除期天数（英文：pending delete / pending purge / pending deletion）
-4. pre_expiry_days — 注册局在到期日【之前】多少天提前删除（如 .nl 提前3天、.in 提前30天）；无此规定填0
-5. drop_hour — 域名最终被释放/删除的确切时刻（小时 0-23）；若页面未明确提及填null
-6. drop_minute — 释放时刻分钟（0-59）；未知填null
-7. drop_second — 释放时刻秒（0-59）；未知填null  
-8. drop_timezone — 释放时刻的时区（IANA格式，如 Europe/Berlin、Asia/Shanghai、UTC）；未知填null
-
-【关键规则】：
-- 若页面内容是IANA注册局信息页（只有注册局联系信息，无任何天数/时间信息），grace/redemption/pending_delete仍需填行业默认值（30/30/5），并在reasoning中注明"IANA页面无具体数据，使用ICANN gTLD默认值"
-- 若是ccTLD且页面无数据，reasoning中注明"ccTLD注册局页面无具体政策数据"
-- drop_hour/drop_timezone只有页面明确说明时才填，不要猜测
-
-严格输出JSON，不加任何额外文字、注释或代码块标记：
-{"grace_period_days":30,"redemption_period_days":30,"pending_delete_days":5,"pre_expiry_days":0,"drop_hour":null,"drop_minute":null,"drop_second":null,"drop_timezone":null,"reasoning":"数据来源和提取说明"}`;
-
-function parseAiJson(content: string): ExtractedLifecycle {
-  const cleaned = content
-    .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "")
-    .replace(/^[^{]*({[\s\S]*})[^}]*$/, "$1") // extract JSON object even with surrounding text
-    .trim();
-  const parsed = JSON.parse(cleaned);
-  const toInt = (v: unknown, min = 0) => Math.max(min, parseInt(String(v)) || 0);
-  const toNullInt = (v: unknown, lo: number, hi: number): number | null => {
-    if (v === null || v === undefined || v === "") return null;
-    const n = parseInt(String(v));
-    return isNaN(n) ? null : Math.min(hi, Math.max(lo, n));
-  };
-  return {
-    grace_period_days: toInt(parsed.grace_period_days),
-    redemption_period_days: toInt(parsed.redemption_period_days),
-    pending_delete_days: toInt(parsed.pending_delete_days),
-    pre_expiry_days: toNullInt(parsed.pre_expiry_days, 0, 365),
-    drop_hour:   toNullInt(parsed.drop_hour,   0, 23),
-    drop_minute: toNullInt(parsed.drop_minute, 0, 59),
-    drop_second: toNullInt(parsed.drop_second, 0, 59),
-    drop_timezone: typeof parsed.drop_timezone === "string" && parsed.drop_timezone
-      ? parsed.drop_timezone.slice(0, 50) : null,
-    reasoning: String(parsed.reasoning || "").slice(0, 600),
-    model_used: "",
-  };
-}
-
-async function extractWithAI(
-  tld: string,
-  pageText: string,
-  sourceUrl: string,
-  preferredModel?: string
-): Promise<ExtractedLifecycle> {
-  // Trim to ~8k chars — balances context richness vs. small-context model limits
-  const pageSnippet = pageText.slice(0, 8000);
-  const userMessage = `TLD: .${tld}\n来源页面: ${sourceUrl}\n\n页面内容：\n${pageSnippet}`;
-  const messages = [
-    { role: "system" as const, content: SYSTEM_PROMPT },
-    { role: "user" as const, content: userMessage },
-  ];
-
-  const errors: string[] = [];
-  const { content, provider } = await callProviderWithFallback(messages, preferredModel, errors);
-
-  try {
-    const result = parseAiJson(content);
-    result.model_used = provider.name;
-    return result;
-  } catch (e) {
-    throw new Error(
-      `AI(${provider.name}) returned unparseable JSON: ${content.slice(0, 300)}\nErrors: ${errors.join("; ")}`
-    );
-  }
-}
-
-// ─── Exported for use by cron/tld-scrape ─────────────────────────────────────
-export { fetchPageText, extractWithAI, hasLifecycleInfo };
-export type { ExtractedLifecycle };
-
-// ─── Main handler ─────────────────────────────────────────────────────────────
-/** Fetch runtime IANA root-zone non-IDN TLD count with 24h cache. */
+// ─── Fetch runtime IANA root-zone non-IDN TLD count with 24h cache (R9) ───────
 async function fetchIanaTotalLive(): Promise<number | null> {
   const key = "iana:root_zone_total_v2";
   if (isRedisAvailable()) {
@@ -687,6 +104,7 @@ export default async function handler(
       scraped_at: string | null; updated_at: string; model_used: string | null;
       ai_reasoning: string | null; manually_edited: boolean;
       scrape_status: string; failure_reason: string | null; fetch_strategy: string | null;
+      fields_source: string | null;
       scrape_attempts: number; covered_by_override: boolean;
     }>(
       `SELECT r.tld, r.grace_period_days, r.redemption_period_days, r.pending_delete_days,
@@ -697,7 +115,7 @@ export default async function handler(
               COALESCE(r.manually_edited, FALSE) AS manually_edited,
               COALESCE(r.scrape_status, 'pending') AS scrape_status,
               COALESCE(r.needs_admin_review, FALSE) AS needs_admin_review,
-              r.failure_reason, r.fetch_strategy,
+              r.failure_reason, r.fetch_strategy, r.fields_source,
               COALESCE(r.scrape_attempts, 0) AS scrape_attempts,
               (o.tld IS NOT NULL) AS covered_by_override
        FROM tld_rules r
@@ -762,7 +180,7 @@ export default async function handler(
     return res.json({ rules: rows, stats });
   }
 
-  // POST — scrape + AI extract + save
+  // POST — scrape + AI extract + save (via unified scrapeTld service, R6)
   if (req.method === "POST") {
     const session = await requireAdmin(req, res);
     if (!session) return;
@@ -841,112 +259,56 @@ export default async function handler(
       });
     }
 
-    try {
-      // 1. Scrape page (smart URL discovery: IANA → registry lifecycle page)
-      const { text: pageText, finalUrl } = await fetchPageText(cleanUrl);
-      if (!pageText || pageText.length < 50) {
-        return res
-          .status(422)
-          .json({ error: "Could not extract meaningful text from the page" });
-      }
+    const result = await scrapeTld({
+      tld: cleanTld,
+      sourceUrl: rawUrl || undefined,
+      preferredModel: model,
+      force: !!force,
+    });
 
-      // 2. AI extraction with multi-model fallback
-      const extracted = await extractWithAI(cleanTld, pageText, finalUrl, model);
-
-      // Determine status: 'ok' if non-default data, 'warn_defaults' if only got industry defaults
-      const isAllDefaults = extracted.grace_period_days === 30 &&
-        extracted.redemption_period_days === 30 && extracted.pending_delete_days === 5;
-      const scrapeStatusVal = isAllDefaults ? "warn_defaults" : "ok";
-
-      // 3. Save to DB
-      await run(
-        `INSERT INTO tld_rules
-           (tld, grace_period_days, redemption_period_days, pending_delete_days,
-            source_url, confidence, raw_excerpt, ai_reasoning, model_used,
-            drop_hour, drop_minute, drop_second, drop_timezone, pre_expiry_days,
-            scraped_at, updated_at,
-            scrape_status, failure_reason, scrape_attempts)
-         VALUES ($1,$2,$3,$4,$5,'ai',$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW(),$14,NULL,1)
-         ON CONFLICT (tld) DO UPDATE SET
-           grace_period_days      = EXCLUDED.grace_period_days,
-           redemption_period_days = EXCLUDED.redemption_period_days,
-           pending_delete_days    = EXCLUDED.pending_delete_days,
-           source_url             = EXCLUDED.source_url,
-           confidence             = 'ai',
-           raw_excerpt            = EXCLUDED.raw_excerpt,
-           ai_reasoning           = EXCLUDED.ai_reasoning,
-           model_used             = EXCLUDED.model_used,
-           drop_hour              = EXCLUDED.drop_hour,
-           drop_minute            = EXCLUDED.drop_minute,
-           drop_second            = EXCLUDED.drop_second,
-           drop_timezone          = EXCLUDED.drop_timezone,
-           pre_expiry_days        = EXCLUDED.pre_expiry_days,
-           scraped_at             = NOW(),
-           updated_at             = NOW(),
-           scrape_status          = EXCLUDED.scrape_status,
-           failure_reason         = NULL,
-           scrape_attempts        = COALESCE(tld_rules.scrape_attempts,0)+1`,
-        [
-          cleanTld,
-          extracted.grace_period_days,
-          extracted.redemption_period_days,
-          extracted.pending_delete_days,
-          finalUrl,
-          pageText.slice(0, 1000),
-          extracted.reasoning,
-          extracted.model_used || null,
-          extracted.drop_hour,
-          extracted.drop_minute,
-          extracted.drop_second,
-          extracted.drop_timezone,
-          extracted.pre_expiry_days,
-          scrapeStatusVal,
-        ]
-      );
-
-      const total_release_days =
-        extracted.grace_period_days +
-        extracted.redemption_period_days +
-        extracted.pending_delete_days;
-
-      // ── Immediately invalidate lifecycle override cache so new data is live ──
-      invalidateLifecycleOverridesCache();
-
-      // ── Also persist to local JSON file (dual storage / backup) ──────────
-      updateLocalCache(cleanTld, {
-        grace_period_days: extracted.grace_period_days,
-        redemption_period_days: extracted.redemption_period_days,
-        pending_delete_days: extracted.pending_delete_days,
-        total_release_days,
-        drop_hour: extracted.drop_hour,
-        drop_minute: extracted.drop_minute,
-        drop_second: extracted.drop_second,
-        drop_timezone: extracted.drop_timezone,
-        pre_expiry_days: extracted.pre_expiry_days,
-        confidence: "ai",
-        source_url: finalUrl,
-        reasoning: extracted.reasoning,
-      });
-
-      return res.json({
-        ok: true,
-        tld: cleanTld,
-        ...extracted,
-        total_release_days,
-        source_url: finalUrl,
-        source_url_requested: cleanUrl,
-        has_lifecycle_info: hasLifecycleInfo(pageText),
-        scrape_status: scrapeStatusVal,
-        is_defaults: isAllDefaults,
-      });
-    } catch (err: any) {
+    if (!result.ok || !result.extracted || !result.scrapeStatus) {
       // Release the rate-limit token on error so retries are possible
       deleteRedisValue(RATE_LIMIT_KEY(cleanTld)).catch(() => {});
-      return res.status(500).json({ error: err.message ?? "Unknown error" });
+      return res.status(500).json({ error: result.error ?? "Unknown error" });
     }
+
+    const extracted = result.extracted;
+    const total_release_days =
+      extracted.grace_period_days +
+      extracted.redemption_period_days +
+      extracted.pending_delete_days;
+
+    // ── Also persist to local JSON file (dual storage / backup) ──────────
+    updateLocalCache(cleanTld, {
+      grace_period_days: extracted.grace_period_days,
+      redemption_period_days: extracted.redemption_period_days,
+      pending_delete_days: extracted.pending_delete_days,
+      total_release_days,
+      drop_hour: extracted.drop_hour,
+      drop_minute: extracted.drop_minute,
+      drop_second: extracted.drop_second,
+      drop_timezone: extracted.drop_timezone,
+      pre_expiry_days: extracted.pre_expiry_days,
+      confidence: extracted.confidence,
+      source_url: result.finalUrl,
+      reasoning: extracted.reasoning,
+    });
+
+    return res.json({
+      ok: true,
+      tld: cleanTld,
+      ...extracted,
+      total_release_days,
+      source_url: result.finalUrl,
+      source_url_requested: cleanUrl,
+      has_lifecycle_info: result.hasLifecycleInfo,
+      fetch_strategy: result.fetchStrategy ?? null,
+      scrape_status: result.scrapeStatus,
+      is_defaults: result.scrapeStatus === "warn_defaults",
+    });
   }
 
-  // PATCH — manual edit OR admin special actions (reset-to-pending)
+  // PATCH — manual edit OR admin special actions (reset / bulk re-scrape)
   if (req.method === "PATCH") {
     const session = await requireAdmin(req, res);
     if (!session) return;
@@ -963,6 +325,37 @@ export default async function handler(
         [cleanTld]
       );
       return res.json({ ok: true, message: `已将 .${cleanTld} 重置为待抓取状态` });
+    }
+
+    // Special action: bulk re-scrape selected TLDs (R13 AC2) — resets each
+    // selected non-manual rule to pending, then runs scrapeTld one by one,
+    // continuing past individual failures (R13 AC3).
+    if (req.body?.action === "rescan-many") {
+      const tlds: string[] = Array.isArray(req.body.tlds)
+        ? req.body.tlds.map((t: unknown) => String(t).toLowerCase().replace(/^\./, "")).filter(Boolean)
+        : [];
+      if (tlds.length === 0) return res.status(400).json({ error: "tlds is required" });
+
+      const results: Array<{ tld: string; ok: boolean; scrape_status?: string; error: string | null }> = [];
+      for (const t of tlds) {
+        // Reset to pending (skip manually-edited rows — R13 AC4)
+        await run(
+          `UPDATE tld_rules
+           SET scrape_status='pending', needs_admin_review=FALSE,
+               scrape_attempts=0, failure_reason=NULL, updated_at=NOW()
+           WHERE tld=$1 AND COALESCE(manually_edited, FALSE) = FALSE`,
+          [t]
+        ).catch(() => {});
+        const r = await scrapeTld({ tld: t, force: true });
+        results.push({
+          tld: t,
+          ok: r.ok,
+          scrape_status: r.scrapeStatus,
+          error: r.ok ? null : (r.error ?? "Unknown error"),
+        });
+      }
+      invalidateLifecycleOverridesCache();
+      return res.json({ ok: true, processed: results.length, results });
     }
 
     const {

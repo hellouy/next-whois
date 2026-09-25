@@ -1135,6 +1135,9 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
   const [rulePage, setRulePage] = React.useState(1);
   const [rulePerPage, setRulePerPage] = React.useState(50);
   const [showAllAttention, setShowAllAttention] = React.useState(false);
+  const [rescanSelected, setRescanSelected] = React.useState<Set<string>>(new Set());
+  const [rescanning, setRescanning] = React.useState(false);
+  const [rescanResult, setRescanResult] = React.useState<{ tld: string; ok: boolean; scrape_status?: string; error: string | null }[] | null>(null);
   const [scraping, setScraping] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({ tld: "", source_url: "", force: false });
@@ -1394,6 +1397,46 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
 
   // Purge all failed/no_data/warn_defaults records
   const [purging, setPurging] = React.useState(false);
+
+  // Bulk re-scrape selected TLDs (R13 AC2/AC3): reset each non-manual rule to
+  // pending, then scrape one by one — individual failures don't stop the rest.
+  async function handleRescanMany() {
+    const tlds = Array.from(rescanSelected);
+    if (tlds.length === 0) return;
+    if (!confirm(`确定批量重抓 ${tlds.length} 个 TLD？\n已成功的数据将重置后重新抓取（手动录入的除外），单个失败不影响其余继续。`)) return;
+    setRescanning(true);
+    setRescanResult(null);
+    try {
+      const res = await fetch("/api/admin/tld-rules", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rescan-many", tlds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "批量重抓失败");
+      setRescanResult(data.results ?? []);
+      const failed = (data.results ?? []).filter((r: any) => !r.ok).length;
+      toast.success(failed === 0
+        ? `批量重抓完成：${data.processed ?? 0} 个全部成功`
+        : `批量重抓完成：${data.processed ?? 0} 个，其中 ${failed} 个失败`);
+      setRescanSelected(new Set());
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "批量重抓失败");
+    } finally {
+      setRescanning(false);
+    }
+  }
+
+  function toggleRescanSelect(tld: string) {
+    setRescanSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(tld)) next.delete(tld);
+      else next.add(tld);
+      return next;
+    });
+  }
+
   async function purgeFailed() {
     const batchWasRunning = BatchRunner.getState().status === "running";
     const msg = batchWasRunning
@@ -1805,6 +1848,16 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                 — 失败、默认值或已穷尽重试的 TLD（已在生命周期规则库中手动覆盖的除外），建议手动录入或重置后再次抓取
               </span>
               <div className="flex-1" />
+              <Button
+                variant="outline" size="sm"
+                className="h-7 gap-1 text-xs border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-400"
+                disabled={rescanning || rescanSelected.size === 0}
+                title="将选中的问题记录重置为待抓取并逐个重新抓取"
+                onClick={handleRescanMany}
+              >
+                {rescanning ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" /> : <RiRefreshLine className="w-3.5 h-3.5" />}
+                批量重抓{rescanSelected.size > 0 ? ` (${rescanSelected.size})` : ""}
+              </Button>
               <button
                 onClick={purgeFailed}
                 disabled={purging}
@@ -1816,6 +1869,14 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
               </button>
             </div>
             <div className="divide-y divide-border">
+              {rescanResult && (
+                <div className="px-4 py-2 bg-violet-50/60 dark:bg-violet-950/20 text-xs text-violet-700 dark:text-violet-300">
+                  批量重抓结果：{rescanResult.filter(r => r.ok).length} 成功 / {rescanResult.filter(r => !r.ok).length} 失败
+                  {rescanResult.filter(r => !r.ok).slice(0, 3).map(r => (
+                    <span key={r.tld} className="ml-2 font-mono">.{r.tld}: {r.error}</span>
+                  ))}
+                </div>
+              )}
               {attentionVisible.map(r => (
                   <div key={r.tld} className={cn(
                     "flex items-start gap-3 px-4 py-3",
@@ -1823,6 +1884,14 @@ export function TldRulesWorkspace({ embedded = false, initialTab = "cc", workspa
                     r.scrape_status === "warn_defaults" && "bg-orange-50/30 dark:bg-orange-950/10",
                     r.scrape_status === "no_data"       && "bg-rose-50/40 dark:bg-rose-950/10",
                   )}>
+                    <input
+                      type="checkbox"
+                      checked={rescanSelected.has(r.tld)}
+                      disabled={r.manually_edited || rescanning}
+                      onChange={() => toggleRescanSelect(r.tld)}
+                      className="mt-1 shrink-0 accent-violet-600"
+                      title={r.manually_edited ? "手动录入记录不可批量重抓" : "勾选后批量重抓"}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-sm">.{r.tld}</span>

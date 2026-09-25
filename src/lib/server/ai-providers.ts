@@ -323,21 +323,143 @@ export async function getProvidersInfoAsync(): Promise<AiProviderInfo[]> {
   }));
 }
 
+// ─── Call context (usage audit) ───────────────────────────────────────────────
+export interface AiCallContext {
+  kind?: string; // e.g. "tld_extract", "hot_prefix", "generic"
+  tld?: string;
+}
+
+// ─── Circuit breaker (R10): per-provider in-memory state ─────────────────────
+export type CircuitStateValue = "closed" | "open" | "half_open";
+
+export interface CircuitState {
+  id: string;
+  name: string;
+  state: CircuitStateValue;
+  consecutiveFails: number;
+  firstFailTs: number;
+  openUntil: number;
+  transitionTs: number;
+  transitions: number;
+}
+
+const FAILURE_THRESHOLD = 3;      // consecutive failures within window → open
+const WINDOW_MS         = 5 * 60 * 1000;  // sliding window
+const COOLDOWN_MS       = 10 * 60 * 1000; // open cooldown before half-open probe
+
+const _circuit = new Map<string, CircuitState>();
+
+function getCircuit(id: string, name: string): CircuitState {
+  let c = _circuit.get(id);
+  if (!c) {
+    c = { id, name, state: "closed", consecutiveFails: 0, firstFailTs: 0, openUntil: 0, transitionTs: 0, transitions: 0 };
+    _circuit.set(id, c);
+  }
+  return c;
+}
+
+/** Best-effort audit write to ai_call_log (R11). Never blocks the scrape pipeline. */
+async function writeAiLog(entry: {
+  provider: string; model: string; kind: string; tld?: string;
+  ok: boolean; ms: number | null; error?: string;
+}): Promise<void> {
+  try {
+    const { run } = await import("@/lib/db-query");
+    await run(
+      `INSERT INTO ai_call_log (provider, model, kind, tld, ok, ms, error)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        entry.provider,
+        entry.model,
+        entry.kind,
+        entry.tld ?? null,
+        entry.ok,
+        entry.ms ?? null,
+        entry.error ? entry.error.slice(0, 300) : null,
+      ],
+    ).catch(() => {});
+  } catch {
+    /* fire-and-forget */
+  }
+}
+
+function logCircuitTransition(state: CircuitState, to: CircuitStateValue, reason: string): void {
+  state.transitions += 1;
+  state.transitionTs = Date.now();
+  state.state = to;
+  writeAiLog({
+    provider: state.name,
+    model: state.id,
+    kind: "circuit",
+    ok: true,
+    ms: null,
+    error: `circuit transition → ${to}: ${reason}`,
+  }).catch(() => {});
+}
+
+/** Resolve current effective state, advancing open → half_open once cooldown lapses. */
+function circuitEffectiveState(state: CircuitState): CircuitStateValue {
+  if (state.state === "open" && Date.now() >= state.openUntil) {
+    logCircuitTransition(state, "half_open", "cooldown elapsed, allowing single probe");
+    return "half_open";
+  }
+  return state.state;
+}
+
+function recordCircuitFailure(state: CircuitState): void {
+  const now = Date.now();
+  if (now - state.firstFailTs > WINDOW_MS) {
+    state.consecutiveFails = 1;
+    state.firstFailTs = now;
+  } else {
+    state.consecutiveFails += 1;
+  }
+  if (state.state === "half_open") {
+    logCircuitTransition(state, "open", `half-open probe failed (${state.consecutiveFails} fails in window)`);
+    state.openUntil = now + COOLDOWN_MS;
+  } else if (state.state === "closed" && state.consecutiveFails >= FAILURE_THRESHOLD) {
+    logCircuitTransition(state, "open", `${state.consecutiveFails} consecutive failures in 5-min window`);
+    state.openUntil = now + COOLDOWN_MS;
+  }
+}
+
+function recordCircuitSuccess(state: CircuitState): void {
+  if (state.state !== "closed") {
+    logCircuitTransition(state, "closed", "probe/call succeeded");
+  }
+  state.consecutiveFails = 0;
+  state.firstFailTs = 0;
+  state.openUntil = 0;
+}
+
+/** Snapshot of circuit states — consumed by the admin AI usage page (R11 AC2). */
+export function getCircuitStates(): CircuitState[] {
+  return Array.from(_circuit.values()).map(c => ({ ...c }));
+}
+
 /**
  * Call providers in priority order, return first successful content string.
  * Automatically merges env vars + DB-stored keys (DB takes priority).
  * If `preferredId` is set, tries that provider first.
+ *
+ * R10: providers tripped open by the circuit breaker are skipped; at most one
+ * half-open probe is let through per call. If everything is open, fail fast.
+ * R11: every attempt (success or failure) is written to ai_call_log.
  */
 export async function callProviderWithFallback(
   messages: { role: ChatRole; content: string }[],
   preferredId?: string,
-  errors: string[] = []
+  errors: string[] = [],
+  ctx?: AiCallContext
 ): Promise<{ content: string; provider: AiProvider }> {
   const dbKeys = await loadDbKeys();
   const available = buildProviders(dbKeys).filter(p => p.configured);
   if (available.length === 0) {
     throw new Error("未配置任何 AI 提供商。请在后台「API 接入」页设置至少一个 AI Key，或配置对应环境变量。");
   }
+
+  const kind = ctx?.kind ?? "generic";
+  const tld = ctx?.tld ?? undefined;
 
   const ordered = preferredId
     ? [
@@ -346,12 +468,49 @@ export async function callProviderWithFallback(
       ]
     : available;
 
-  for (const provider of ordered) {
+  // R10: drop tripped-open providers; allow at most one half-open probe.
+  const openNames: string[] = [];
+  let probeAllowed = false;
+  const eligible = ordered.filter(p => {
+    const state = getCircuit(p.id, p.name);
+    const eff = circuitEffectiveState(state);
+    if (eff === "open") {
+      openNames.push(p.name);
+      return false;
+    }
+    if (eff === "half_open") {
+      if (probeAllowed) return false;
+      probeAllowed = true;
+    }
+    return true;
+  });
+
+  if (eligible.length === 0) {
+    throw new Error(
+      `所有可用 AI 提供商均已熔断（open：${openNames.join("、")}），请冷却后重试。`
+    );
+  }
+
+  for (const provider of eligible) {
+    const state = getCircuit(provider.id, provider.name);
+    const started = Date.now();
     try {
       const content = await provider.chat(messages);
+      await writeAiLog({
+        provider: provider.name, model: provider.model, kind, tld,
+        ok: true, ms: Date.now() - started,
+      });
+      recordCircuitSuccess(state);
       return { content, provider };
     } catch (e: any) {
-      errors.push(`[${provider.name}] ${e.message}`);
+      const ms = Date.now() - started;
+      const message = e.message ?? String(e);
+      errors.push(`[${provider.name}] ${message}`);
+      await writeAiLog({
+        provider: provider.name, model: provider.model, kind, tld,
+        ok: false, ms, error: message,
+      });
+      recordCircuitFailure(state);
     }
   }
 

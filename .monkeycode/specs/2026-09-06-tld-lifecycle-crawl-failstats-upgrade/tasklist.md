@@ -20,17 +20,17 @@ Status: In Progress
 
 ## 批次 3 — B 组统一抓取服务层
 
-- [ ] 3.1 新建 `scrapeTld` 统一服务：合并 cron/POST 保存、失败落库 failed、needs_admin_review 一致（R6）
-- [ ] 3.2 `fetchPageText` 返回 `fetchStrategy`；`findRegistryLifecyclePage` 并发 3 + Jina 短路（R12）
-- [ ] 3.3 时区/掉落字段严格校验：白名单 + drop 三件套整体性 + 范围 clamp（R8）
-- [ ] 3.4 IANA 根区总数动态化（R9）
-- [ ] 3.5 cron 队列 stale 优先级 + PATCH 批量重抓 + 页面批量刷新按钮（R13）
+- [x] 3.1 新建 `scrapeTld` 统一服务：合并 cron/POST 保存、失败落库 failed、needs_admin_review 一致（R6）
+- [x] 3.2 `fetchPageText` 返回 `fetchStrategy`；`findRegistryLifecyclePage` 并发 3 + Jina 短路（R12）
+- [x] 3.3 时区/掉落字段严格校验：白名单 + drop 三件套整体性 + 范围 clamp（R8）
+- [x] 3.4 IANA 根区总数动态化（R9）
+- [x] 3.5 cron 队列 stale 优先级 + PATCH 批量重抓 + 页面批量刷新按钮（R13）
 
 ## 批次 4 — B 组 AI 增强
 
-- [ ] 4.1 AI 字段来源标记 prompt + `parseAiJson` 双格式兼容 + confidence + warn_defaults 新判定（R7）
-- [ ] 4.2 Provider 熔断降权（进程内滑窗 + 半开放行）（R10）
-- [ ] 4.3 `ai_call_log` 写入 + `/api/admin/ai-stats` + 用量区块（R11）
+- [x] 4.1 AI 字段来源标记 prompt + `parseAiJson` 双格式兼容 + confidence + warn_defaults 新判定（R7）
+- [x] 4.2 Provider 熔断降权（进程内滑窗 + 半开放行）（R10）
+- [x] 4.3 `ai_call_log` 写入 + `/api/admin/ai-stats` + 用量区块（R11）
 
 ## 批次 5 — 回归与部署
 

@@ -16,6 +16,7 @@ import {
   RiGlobalLine, RiMailSendLine, RiDownloadLine,
   RiBillLine, RiAlertLine, RiBarChartLine,
   RiNotification3Line, RiNetworkLine, RiWifiLine,
+  RiRobot2Line,
 } from "@remixicon/react";
 
 type Stats = {
@@ -174,7 +175,13 @@ const ACTION_GROUPS: ActionGroup[] = [
       { href: "/admin/users",            label: "用户管理",    desc: "账号、停用、手动订阅",       icon: RiUserLine,       color: "text-violet-500" },
       { href: "/admin/payment/plans",    label: "订阅套餐",    desc: "定价策略与功能权益配置",     icon: RiVipCrownLine,   color: "text-indigo-500" },
       { href: "/admin/payment/orders",   label: "支付订单",    desc: "流水明细与对账管理",         icon: RiBillLine,       color: "text-green-500" },
-      { href: "/admin/access-control",   label: "访问控制",    desc: "API 密钥·邀请码·激活码",     icon: RiShieldUserLine, color: "text-slate-500" },
+    ],
+  },
+  {
+    label: "访问与密钥",
+    accentColor: "text-slate-500",
+    items: [
+      { href: "/admin/access-control",   label: "访问与密钥",  desc: "访问密钥·AI 凭据·邀请码·激活码", icon: RiShieldUserLine, color: "text-slate-500" },
     ],
   },
   {
@@ -190,14 +197,13 @@ const ACTION_GROUPS: ActionGroup[] = [
     ],
   },
   {
-    label: "域名与接入",
+    label: "域名与 TLD",
     accentColor: "text-blue-500",
     items: [
+      { href: "/admin/tlds-hub",                label: "域名与 TLD 中枢", desc: "生命周期·AI抓取·失败·WHOIS·对比", icon: RiCodeBoxLine, color: "text-teal-500" },
       { href: "/admin/domain-access",           label: "域名接入",     desc: "接入监控总览与 TLD 分布",    icon: RiNetworkLine,    color: "text-blue-500" },
-      { href: "/admin/tlds-hub",                label: "域名与 TLD",   desc: "生命周期·AI抓取·失败·WHOIS·对比", icon: RiCodeBoxLine, color: "text-teal-500" },
-      { href: "/admin/tlds-hub?tab=failures",   label: "失败详细统计", desc: "完整失败统计·repair·第三方API",icon: RiBarChartLine,   color: "text-orange-500" },
       { href: "/admin/query-logs",              label: "查询日志",     desc: "实时请求日志与错误率监控",   icon: RiHistoryLine,    color: "text-sky-500" },
-      { href: "/admin/access-control?tab=providers", label: "API 集成", desc: "AI Key · 第三方数据源配置", icon: RiPlugLine, color: "text-orange-500" },
+      { href: "/admin/ai-usage",                 label: "AI 用量审计", desc: "各模型调用量·熔断状态", icon: RiRobot2Line, color: "text-violet-500" },
       { href: "/admin/hot-prefixes",            label: "热门搜索词",   desc: "首页推荐查询词条管理",       icon: RiFireLine,       color: "text-red-500" },
     ],
   },

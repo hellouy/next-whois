@@ -32,6 +32,7 @@ const sample = {
   registrantPrivacy: false,
   nsAttributions: [{ ns: "ns1.sedoparking.com", brand: "Sedo", kind: "parking" as const }],
   dnssec: "unsigned",
+  dsRecords: ["12345 8 2 AAAA..."],
 };
 
 describe("saveEnrichment", () => {

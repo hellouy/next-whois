@@ -17,7 +17,9 @@
 
 - [x] **T3 创建域名增强服务** `src/lib/server/domain-enrichment.ts`
   - `NsAttribution`/`DomainEnrichment` 类型 + `enrichDomainInfo()`：NS 归属分类、whois 服务器归属（`WHOIS_SERVER_OWNERS` 内置映射）、停放平台合并、`forSale` 三源判定、`sanityCheckDates` 日期校验。
+  - R3.3 DS 记录补充（数据层）：`src/lib/server/dns-ds.ts` best-effort DoH DS 查询（失败/NXDOMAIN 返回 [] 不阻断主流程），经 lookup.ts `enrichAndPersist` 随增强结果落库 `domain_enrichments.ds_records`（JSON）；db.ts CREATE_TABLES + ALTER_COLUMNS 新增 `ds_records TEXT`；StoredEnrichment 增 `dsRecords`。遵循 Out of Scope：不新增前端卡片。
   - 测试 `domain-enrichment.test.ts`：NS 归属四分类、日期 4 种异常、三源优先级、脱敏标记。
+  - 测试 `dns-ds.test.ts`：去重解析、NXDOMAIN 空、resolver 回退、全失败不抛、非法域名。
 
 - [x] **T4 落库迁移** `domain_enrichments` 表
   - db.ts runMigrations 新增表 + `generated_at` 索引；`ENRICHMENT_TTL_MS=7d`。

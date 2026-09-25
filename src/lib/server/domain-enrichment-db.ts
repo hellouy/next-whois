@@ -34,6 +34,8 @@ export type StoredEnrichment = {
   registrantPrivacy: boolean | null;
   nsAttributions: NsAttribution[] | null;
   dnssec: string | null;
+  /** DS records in presentation format ("keyTag algorithm digestType digest"). */
+  dsRecords: string[] | null;
   updatedAt: string;
 };
 
@@ -58,6 +60,7 @@ function rowToStored(row: Record<string, unknown>): StoredEnrichment {
     registrantPrivacy: row.registrant_privacy == null ? null : Boolean(row.registrant_privacy),
     nsAttributions: parseJson<NsAttribution[] | null>(row.ns_attributions, null),
     dnssec: row.dnssec ? String(row.dnssec) : null,
+    dsRecords: parseJson<string[] | null>(row.ds_records, null),
     updatedAt: String(row.updated_at ?? new Date().toISOString()),
   };
 }
@@ -88,7 +91,7 @@ export async function readEnrichment(
       `SELECT domain, registrar, registrar_iana_id, whois_server,
               whois_server_attribution, parking_provider, parking_kind,
               for_sale, for_sale_source, date_sanity, registrant_privacy,
-              ns_attributions, dnssec, updated_at
+              ns_attributions, dnssec, ds_records, updated_at
        FROM domain_enrichments
        WHERE domain = $1`,
       [domain.toLowerCase()],
@@ -133,8 +136,8 @@ export async function saveEnrichment(
          domain, registrar, registrar_iana_id, whois_server,
          whois_server_attribution, parking_provider, parking_kind,
          for_sale, for_sale_source, date_sanity, registrant_privacy,
-         ns_attributions, dnssec, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+         ns_attributions, dnssec, ds_records, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
        ON CONFLICT (domain) DO UPDATE SET
          registrar = EXCLUDED.registrar,
          registrar_iana_id = EXCLUDED.registrar_iana_id,
@@ -148,6 +151,7 @@ export async function saveEnrichment(
          registrant_privacy = EXCLUDED.registrant_privacy,
          ns_attributions = EXCLUDED.ns_attributions,
          dnssec = EXCLUDED.dnssec,
+         ds_records = EXCLUDED.ds_records,
          updated_at = NOW()`,
       [
         key,
@@ -163,6 +167,7 @@ export async function saveEnrichment(
         data.registrantPrivacy,
         data.nsAttributions ? JSON.stringify(data.nsAttributions) : null,
         data.dnssec,
+        data.dsRecords && data.dsRecords.length > 0 ? JSON.stringify(data.dsRecords) : null,
       ],
     );
   } catch {

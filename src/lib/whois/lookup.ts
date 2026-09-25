@@ -18,6 +18,7 @@ import { probeDomain, probeDomainFast } from "@/lib/whois/dns-check";
 import { checkDomainPremium } from "@/lib/server/premium-check";
 import { warmupDnsCache } from "@/lib/whois/dns-resolver";
 import { enrichDomainInfo } from "@/lib/server/domain-enrichment";
+import { fetchDsRecords } from "@/lib/server/dns-ds";
 import { saveEnrichment, readEnrichment } from "@/lib/server/domain-enrichment-db";
 import {
   isWhoisRateLimited,
@@ -918,20 +919,24 @@ export async function lookupWhois(domain: string, onPartialResult?: (partial: Wh
     } catch { /* enrichment must never fail a successful lookup */ }
     // Only persist for domain queries with a resolvable name.
     if (isDomainQuery && res.domain) {
-      saveEnrichment(res.domain, {
-        registrar: res.registrar === "Unknown" ? null : res.registrar,
-        registrarIanaId: res.registrarIanaId ?? null,
-        whoisServer: res.whoisServer === "Unknown" ? null : res.whoisServer,
-        whoisServerAttribution: res.whoisServerAttribution ?? null,
-        parkingProvider: res.parkingProvider ?? null,
-        parkingKind: res.parkingKind ?? null,
-        forSale: res.forSale ?? null,
-        forSaleSource: res.forSaleSource ?? null,
-        dateSanity: res.dateSanity ?? null,
-        registrantPrivacy: res.registrantPrivacy ?? null,
-        nsAttributions: res.nsAttributions ?? null,
-        dnssec: res.dnssec || null,
-      }).catch(() => {});
+      const dsRecordsPromise = fetchDsRecords(res.domain).catch(() => []);
+      void dsRecordsPromise.then((dsRecords) =>
+        saveEnrichment(res.domain, {
+          registrar: res.registrar === "Unknown" ? null : res.registrar,
+          registrarIanaId: res.registrarIanaId ?? null,
+          whoisServer: res.whoisServer === "Unknown" ? null : res.whoisServer,
+          whoisServerAttribution: res.whoisServerAttribution ?? null,
+          parkingProvider: res.parkingProvider ?? null,
+          parkingKind: res.parkingKind ?? null,
+          forSale: res.forSale ?? null,
+          forSaleSource: res.forSaleSource ?? null,
+          dateSanity: res.dateSanity ?? null,
+          registrantPrivacy: res.registrantPrivacy ?? null,
+          nsAttributions: res.nsAttributions ?? null,
+          dnssec: res.dnssec || null,
+          dsRecords: dsRecords.length > 0 ? dsRecords : null,
+        }).catch(() => {}),
+      );
     }
     return res;
   };

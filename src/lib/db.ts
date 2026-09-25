@@ -426,6 +426,8 @@ export const ALTER_COLUMNS = [
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS processing_at        TIMESTAMPTZ`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS processing_from      TEXT`,
   `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS channels             TEXT`,
+  `ALTER TABLE tld_rules     ADD COLUMN IF NOT EXISTS fields_source        TEXT`,
+  `ALTER TABLE domain_enrichments ADD COLUMN IF NOT EXISTS ds_records TEXT`,
   `ALTER TABLE payment_plans ADD COLUMN IF NOT EXISTS balance_grant_cents INTEGER NOT NULL DEFAULT 0`,
   /* Drop overly-restrictive confidence check — scraper uses high/medium/low/ai */
   `ALTER TABLE tld_rules DROP CONSTRAINT IF EXISTS tld_rules_confidence_check`,
@@ -698,6 +700,7 @@ export const CREATE_INDEXES = [
     registrant_privacy      BOOLEAN,
     ns_attributions         TEXT,         -- JSON: [{ ns, brand, kind }]
     dnssec                  TEXT,
+    ds_records              TEXT,         -- JSON: ["keyTag algorithm digestType digest", ...]
     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     created_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW()
   )`,
