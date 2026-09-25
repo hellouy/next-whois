@@ -16,6 +16,8 @@ import { prefetchLookup } from "@/lib/lookup-prefetch";
 import { listHistory, HistoryItem } from "@/lib/history";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import { useSiteSettings } from "@/lib/site-settings";
+import { DEFAULT_DEMO_TLD, isDemoTldMatch, normalizeDemoTlds } from "@/lib/demo-whois";
 
 const MAX_INPUT_LENGTH = 300;
 const CHAR_COUNTER_THRESHOLD = 200;
@@ -156,6 +158,10 @@ export function SearchBox({
   placeholder: placeholderProp,
 }: SearchBoxProps) {
   const { t } = useTranslation();
+  const settings = useSiteSettings();
+  const demoTlds = settings.demo_mode_enabled === "1"
+    ? normalizeDemoTlds(settings.demo_tld || DEFAULT_DEMO_TLD)
+    : [];
   const [inputValue, setInputValue] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SuggestionGroup[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -465,8 +471,10 @@ export function SearchBox({
     const tldPart = lastDot > 0 ? value.slice(lastDot + 1) : "";
     if (tldPart.length >= 2) {
       const result = validateAndSanitizeInput(cleaned || value);
+      const isDemoQuery = demoTlds.length > 0 && isDemoTldMatch(cleaned || value, demoTlds);
       if (
         !result.valid &&
+        !isDemoQuery &&
         (result.errorKey === "validation.unknown_tld_suggest" ||
           result.errorKey === "validation.unknown_tld_gibberish")
       ) {
@@ -559,7 +567,8 @@ export function SearchBox({
   const submitQuery = (raw: string) => {
     if (!raw) return;
     const result = validateAndSanitizeInput(raw);
-    if (!result.valid) {
+    const isDemoQuery = demoTlds.length > 0 && isDemoTldMatch(raw, demoTlds);
+    if (!result.valid && !isDemoQuery) {
       setInputValue(raw);
       setValidationError({ message: t(result.errorKey as any, result.errorArgs as any) });
       setShowSuggestions(false);
