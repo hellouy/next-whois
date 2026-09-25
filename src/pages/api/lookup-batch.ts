@@ -11,16 +11,6 @@ import { logQuery } from "@/lib/db";
 import { saveSearchRecord } from "@/lib/server/save-search-record";
 import { classifyQueryOutcome } from "@/lib/whois/whois-patterns";
 import { createLogger } from "@/lib/logger";
-import {
-  DEMO_ENABLED_KEY,
-  DEMO_NAMESERVERS,
-  DEMO_TLD_KEY,
-  DEFAULT_DEMO_TLD,
-  buildDemoWhois,
-  isDemoTldMatch,
-  normalizeDemoTlds,
-} from "@/lib/demo-whois";
-import type { BatchAvailability } from "@/lib/whois/lookup";
 
 const logger = createLogger("api/lookup-batch");
 
@@ -86,31 +76,6 @@ async function runWithConcurrency<T>(
 
   await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
   return results;
-}
-
-/** Build a fixed demo record for domains matching the configured demo TLD. */
-function buildDemoBatchAvailability(domain: string): Promise<BatchAvailability> {
-  const demo = buildDemoWhois(domain);
-  const dnsProbe = {
-    domain: demo.result.domain,
-    registrationStatus: "registered" as const,
-    confidence: "high" as const,
-    nameservers: DEMO_NAMESERVERS,
-    ipv4: ["127.0.0.1"],
-    ipv6: [],
-    mx: [],
-    isWildcardA: false,
-    parked: false,
-    parkingProvider: null,
-    allTimedOut: false,
-  };
-  return Promise.resolve({
-    registration: "registered",
-    confidence: "high",
-    source: "whois",
-    dnsProbe,
-    result: demo.result,
-  });
 }
 
 export default async function handler(
@@ -190,23 +155,11 @@ export default async function handler(
     return res.status(400).json({ error: "No valid domain strings in \"domains\" array" });
   }
 
-  // ── Demo-data mode interception (parity with /api/lookup + SSR) ───────────
-  const [demoModeEnabled, demoTldRaw] = await Promise.all([
-    getSetting(DEMO_ENABLED_KEY),
-    getSetting(DEMO_TLD_KEY),
-  ]);
-  const demoTlds = demoModeEnabled === "1" ? normalizeDemoTlds(demoTldRaw || DEFAULT_DEMO_TLD) : [];
-
   // ── Execute lookups with controlled concurrency ───────────────────────────
   // This avoids hammering upstream WHOIS servers while still being fast.
   // Cache hits are returned instantly, so effective throughput is much higher.
   const batchStart = Date.now();
-  const tasks = queryList.map(domain => () => {
-    if (demoTlds.length > 0 && isDemoTldMatch(domain, demoTlds)) {
-      return buildDemoBatchAvailability(domain);
-    }
-    return lookupBatchAvailability(domain);
-  });
+  const tasks = queryList.map(domain => () => lookupBatchAvailability(domain));
   const settled = await runWithConcurrency(tasks, CONCURRENCY);
 
   const items: BatchItem[] = settled.map((result, i) => {

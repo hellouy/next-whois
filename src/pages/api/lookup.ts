@@ -143,42 +143,6 @@ export default async function handler(
     });
   }
 
-  // ── Demo-data mode ─────────────────────────────────────────────────────────
-  // When enabled in admin, domains whose TLD matches the configured demo
-  // suffix(es) return a fixed demo record instead of a real WHOIS/RDAP lookup.
-  // This runs AFTER auth/rate-limit/API-key gates but BEFORE the network call.
-  {
-    const [demoEnabled, demoTld] = await Promise.all([
-      getSetting("demo_mode_enabled"),
-      getSetting("demo_tld", "xx"),
-    ]);
-    if (demoEnabled === "1") {
-      const { isDemoTldMatch, normalizeDemoTlds, buildDemoWhois } = await import("@/lib/demo-whois");
-      if (isDemoTldMatch(trimmed, normalizeDemoTlds(demoTld || "xx"))) {
-        const built = buildDemoWhois(trimmed);
-        const tldParts = trimmed.toLowerCase().split(".");
-        const tld = tldParts.length >= 2 ? tldParts[tldParts.length - 1] : trimmed;
-        await logQuery({
-          domain: trimmed, tld, success: true, cached: false,
-          durationMs: 0, errorCode: null, source: "whois",
-          outcome: "registered", userId, userEmail, ip,
-        }).catch(e => logger.error("[lookup] demo logQuery failed:", e.message));
-        await saveSearchRecord(trimmed, built.result, built.dnsProbe, userId, userEmail)
-          .catch(e => logger.error("[lookup] demo saveSearchRecord failed:", e.message));
-        // Demo output is dynamic — no CDN caching.
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(200).json({
-          time: 0,
-          status: true,
-          cached: false,
-          source: "whois" as const,
-          result: built.result,
-          dnsProbe: built.dnsProbe,
-        });
-      }
-    }
-  }
-
   const nocache = req.query.nocache === "1";
   const { time, status, result, error, cached, cachedAt, cacheTtl, source, dnsProbe, registryUrl, premium } =
     await lookupWhoisWithCache(trimmed, { nocache });
